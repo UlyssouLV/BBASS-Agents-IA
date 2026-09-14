@@ -1,0 +1,3 @@
+# Backend local par poste plutôt qu'un serveur applicatif central
+
+Chaque poste collaborateur installe et exécute son propre backend Python et sa propre interface web, plutôt que de faire tourner un unique serveur applicatif central que tous les postes viendraient consulter en navigateur. On a choisi cette forme pour rester dans la logique du déploiement envisagé (installation/mise à jour poste par poste) plutôt que de monter d'emblée une infrastructure serveur multi-utilisateurs. La conséquence directe est que tout ce qui doit rester centralisé et sensible (comptes, clé Mistral) ne peut pas vivre sur le poste : voir [0002](./0002-relais-central-mistral.md).
