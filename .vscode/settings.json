@@ -1,0 +1,8 @@
+{
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}/vm-centrale/src",
+    "${workspaceFolder}/poste/src",
+    "${workspaceFolder}/vm-centrale/.venv/Lib/site-packages",
+    "${workspaceFolder}/poste/.venv/Lib/site-packages"
+  ]
+}

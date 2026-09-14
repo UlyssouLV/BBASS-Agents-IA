@@ -1,0 +1,21 @@
+{
+  "extraPaths": [
+    "vm-centrale/src",
+    "poste/src",
+    "vm-centrale/.venv/Lib/site-packages",
+    "poste/.venv/Lib/site-packages"
+  ],
+  "executionEnvironments": [
+    {
+      "root": "vm-centrale",
+      "extraPaths": [
+        "vm-centrale/src",
+        "vm-centrale/.venv/Lib/site-packages"
+      ]
+    },
+    {
+      "root": "poste",
+      "extraPaths": ["poste/src", "poste/.venv/Lib/site-packages"]
+    }
+  ]
+}
