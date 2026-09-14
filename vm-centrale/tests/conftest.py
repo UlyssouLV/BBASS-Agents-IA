@@ -6,8 +6,30 @@ from sqlalchemy.pool import StaticPool
 
 from vm_centrale.database import Base, get_db
 from vm_centrale.main import app
+from vm_centrale.mistral_client import get_mistral_client
 from vm_centrale.models import Compte
 from vm_centrale.security import hash_password
+
+
+class ClientMistralFactice:
+    def __init__(self) -> None:
+        self.messages_recus: list[str] = []
+        self._reponse: str | None = None
+        self._exception: Exception | None = None
+
+    def repondre(self, reponse: str) -> None:
+        self._reponse = reponse
+        self._exception = None
+
+    def echouer(self, exception: Exception) -> None:
+        self._exception = exception
+
+    def chat(self, message: str) -> str:
+        self.messages_recus.append(message)
+        if self._exception is not None:
+            raise self._exception
+        assert self._reponse is not None
+        return self._reponse
 
 
 @pytest.fixture()
@@ -29,11 +51,17 @@ def db_session():
 
 
 @pytest.fixture()
-def client(db_session):
+def mistral_client_factice():
+    return ClientMistralFactice()
+
+
+@pytest.fixture()
+def client(db_session, mistral_client_factice):
     def override_get_db():
         yield db_session
 
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_mistral_client] = lambda: mistral_client_factice
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()

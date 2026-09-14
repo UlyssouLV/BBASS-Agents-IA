@@ -5,6 +5,7 @@ from fastapi import FastAPI
 
 from vm_centrale.database import init_db
 from vm_centrale.routers.auth import router as auth_router
+from vm_centrale.routers.relais import router as relais_router
 
 
 @asynccontextmanager
@@ -15,6 +16,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="VM centrale", lifespan=lifespan)
 app.include_router(auth_router)
+app.include_router(relais_router)
 
 
 def run() -> None:
