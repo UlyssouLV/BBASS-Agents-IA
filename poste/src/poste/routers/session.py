@@ -18,17 +18,17 @@ def connexion(
     session: SessionStore = Depends(get_session_store),
 ) -> ConnexionResponse:
     try:
-        authentifie = client.authentifier(requete.identifiant, requete.mot_de_passe)
+        jeton = client.authentifier(requete.identifiant, requete.mot_de_passe)
     except Exception as erreur:
         # Couvre aussi bien une VM centrale injoignable qu'une réponse en erreur
         # de sa part : jamais un plantage côté poste, toujours un état d'erreur
         # propre distinct d'un échec d'authentification (qui reste un 401).
         raise HTTPException(status_code=502, detail=_VM_CENTRALE_INDISPONIBLE) from erreur
 
-    if not authentifie:
+    if jeton is None:
         raise HTTPException(status_code=401, detail=_ECHEC_CONNEXION)
 
-    session.ouvrir(requete.identifiant)
+    session.ouvrir(requete.identifiant, jeton)
     return ConnexionResponse(identifiant=requete.identifiant)
 
 

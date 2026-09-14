@@ -6,7 +6,23 @@ def test_compte_valide_reussit_et_retourne_agence_et_pole(client, seed_compte):
     )
 
     assert reponse.status_code == 200
-    assert reponse.json() == {"agence": "Castries", "pole": "Foncier"}
+    corps = reponse.json()
+    assert corps["agence"] == "Castries"
+    assert corps["pole"] == "Foncier"
+    assert corps["jeton"]
+
+
+def test_compte_valide_recoit_un_jeton_different_a_chaque_connexion(client, seed_compte):
+    seed_compte("j.dupont", "correcthorsebatterystaple", agence="Castries", pole="Foncier")
+
+    premiere_reponse = client.post(
+        "/auth", json={"identifiant": "j.dupont", "mot_de_passe": "correcthorsebatterystaple"}
+    )
+    seconde_reponse = client.post(
+        "/auth", json={"identifiant": "j.dupont", "mot_de_passe": "correcthorsebatterystaple"}
+    )
+
+    assert premiere_reponse.json()["jeton"] != seconde_reponse.json()["jeton"]
 
 
 def test_identifiant_inconnu_echoue(client, seed_compte):

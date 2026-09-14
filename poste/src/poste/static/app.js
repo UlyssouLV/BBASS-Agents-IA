@@ -4,6 +4,11 @@ const formulaireConnexion = document.getElementById("formulaire-connexion");
 const erreurConnexion = document.getElementById("erreur-connexion");
 const identifiantConnecte = document.getElementById("identifiant-connecte");
 const boutonDeconnexion = document.getElementById("bouton-deconnexion");
+const messages = document.getElementById("messages");
+const chatChargement = document.getElementById("chat-chargement");
+const chatErreur = document.getElementById("chat-erreur");
+const formulaireChat = document.getElementById("formulaire-chat");
+const champMessage = document.getElementById("message");
 
 function afficherEcranCompte(identifiant) {
   identifiantConnecte.textContent = identifiant;
@@ -15,6 +20,15 @@ function afficherEcranConnexion() {
   ecranConnexion.hidden = false;
   ecranCompte.hidden = true;
   erreurConnexion.hidden = true;
+  messages.replaceChildren();
+  chatErreur.hidden = true;
+}
+
+function ajouterMessage(auteur, texte) {
+  const paragraphe = document.createElement("p");
+  paragraphe.className = auteur === "collaborateur" ? "message-collaborateur" : "message-reponse";
+  paragraphe.textContent = texte;
+  messages.append(paragraphe);
 }
 
 async function verifierSessionActive() {
@@ -60,6 +74,51 @@ formulaireConnexion.addEventListener("submit", async (evenement) => {
 boutonDeconnexion.addEventListener("click", async () => {
   await fetch("/deconnexion", { method: "POST" });
   afficherEcranConnexion();
+});
+
+formulaireChat.addEventListener("submit", async (evenement) => {
+  evenement.preventDefault();
+  chatErreur.hidden = true;
+
+  const message = champMessage.value;
+  if (!message.trim()) {
+    return;
+  }
+
+  ajouterMessage("collaborateur", message);
+  champMessage.value = "";
+  champMessage.disabled = true;
+  chatChargement.hidden = false;
+
+  try {
+    let reponse;
+    try {
+      reponse = await fetch("/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message }),
+      });
+    } catch {
+      chatErreur.textContent = "Impossible de joindre le service de chat. Réessayez plus tard.";
+      chatErreur.hidden = false;
+      return;
+    }
+
+    if (!reponse.ok) {
+      const detail = await reponse.json().catch(() => null);
+      chatErreur.textContent =
+        detail && detail.detail ? detail.detail : "L'envoi du message a échoué. Réessayez plus tard.";
+      chatErreur.hidden = false;
+      return;
+    }
+
+    const corps = await reponse.json();
+    ajouterMessage("reponse", corps.reponse);
+  } finally {
+    chatChargement.hidden = true;
+    champMessage.disabled = false;
+    champMessage.focus();
+  }
 });
 
 verifierSessionActive();

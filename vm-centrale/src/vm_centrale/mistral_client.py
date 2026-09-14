@@ -1,11 +1,11 @@
 import httpx
 
-from vm_centrale.config import get_mistral_api_key
+from vm_centrale.config import MISTRAL_HTTP_TIMEOUT, get_mistral_api_key
 
 _API_URL = "https://api.mistral.ai/v1/chat/completions"
 _MODELE = "mistral-small-latest"
 
-_http_client = httpx.Client(timeout=30.0)
+_http_client = httpx.Client(timeout=MISTRAL_HTTP_TIMEOUT)
 
 
 class MistralClient:

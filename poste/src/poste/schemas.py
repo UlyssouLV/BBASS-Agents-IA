@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ConnexionRequest(BaseModel):
@@ -12,3 +12,11 @@ class ConnexionResponse(BaseModel):
 
 class CompteResponse(BaseModel):
     identifiant: str
+
+
+class MessageRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=8000)
+
+
+class MessageResponse(BaseModel):
+    reponse: str

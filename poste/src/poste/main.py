@@ -5,12 +5,14 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from poste.config import POSTE_HOST, POSTE_PORT
+from poste.routers.chat import router as chat_router
 from poste.routers.session import router as session_router
 
 _STATIC_DIR = Path(__file__).parent / "static"
 
 app = FastAPI(title="Poste")
 app.include_router(session_router)
+app.include_router(chat_router)
 app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
 
 

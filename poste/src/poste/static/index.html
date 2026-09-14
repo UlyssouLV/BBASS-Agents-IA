@@ -25,6 +25,16 @@
       <span>Connecté en tant que <strong id="identifiant-connecte"></strong></span>
       <button type="button" id="bouton-deconnexion">Se déconnecter</button>
     </header>
+
+    <div id="messages" role="log"></div>
+    <p id="chat-chargement" hidden>Envoi en cours…</p>
+    <p id="chat-erreur" role="alert" hidden></p>
+
+    <form id="formulaire-chat">
+      <label for="message" class="visually-hidden">Message</label>
+      <input type="text" id="message" name="message" autocomplete="off" required />
+      <button type="submit">Envoyer</button>
+    </form>
   </main>
 
   <script src="/static/app.js"></script>

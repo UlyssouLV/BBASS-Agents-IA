@@ -9,6 +9,7 @@ class AuthRequest(BaseModel):
 class AuthResponse(BaseModel):
     agence: str
     pole: str
+    jeton: str
 
 
 class RelaisRequest(BaseModel):

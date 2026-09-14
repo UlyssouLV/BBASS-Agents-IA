@@ -9,6 +9,7 @@ from vm_centrale.main import app
 from vm_centrale.mistral_client import get_mistral_client
 from vm_centrale.models import Compte
 from vm_centrale.security import hash_password
+from vm_centrale.jetons import JetonStore, get_jeton_store
 
 
 class ClientMistralFactice:
@@ -56,15 +57,26 @@ def mistral_client_factice():
 
 
 @pytest.fixture()
-def client(db_session, mistral_client_factice):
+def jeton_store():
+    return JetonStore()
+
+
+@pytest.fixture()
+def client(db_session, mistral_client_factice, jeton_store):
     def override_get_db():
         yield db_session
 
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_mistral_client] = lambda: mistral_client_factice
+    app.dependency_overrides[get_jeton_store] = lambda: jeton_store
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
+
+
+@pytest.fixture()
+def jeton_valide(jeton_store):
+    return jeton_store.emettre()
 
 
 @pytest.fixture()
