@@ -7,6 +7,8 @@ class AuthRequest(BaseModel):
 
 
 class AuthResponse(BaseModel):
+    prenom: str
+    nom: str
     agence: str
     pole: str
     jeton: str

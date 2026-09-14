@@ -81,10 +81,19 @@ def jeton_valide(jeton_store):
 
 @pytest.fixture()
 def seed_compte(db_session):
-    def _seed(identifiant: str, mot_de_passe: str, agence: str, pole: str) -> Compte:
+    def _seed(
+        identifiant: str,
+        mot_de_passe: str,
+        agence: str,
+        pole: str,
+        prenom: str,
+        nom: str,
+    ) -> Compte:
         compte = Compte(
             identifiant=identifiant,
             mot_de_passe_hash=hash_password(mot_de_passe),
+            prenom=prenom,
+            nom=nom,
             agence=agence,
             pole=pole,
         )

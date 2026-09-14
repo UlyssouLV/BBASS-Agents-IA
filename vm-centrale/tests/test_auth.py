@@ -1,5 +1,8 @@
 def test_compte_valide_reussit_et_retourne_agence_et_pole(client, seed_compte):
-    seed_compte("j.dupont", "correcthorsebatterystaple", agence="Castries", pole="Foncier")
+    seed_compte(
+        "j.dupont", "correcthorsebatterystaple", agence="Castries", pole="Foncier",
+        prenom="Jean", nom="Dupont",
+    )
 
     reponse = client.post(
         "/auth", json={"identifiant": "j.dupont", "mot_de_passe": "correcthorsebatterystaple"}
@@ -12,8 +15,27 @@ def test_compte_valide_reussit_et_retourne_agence_et_pole(client, seed_compte):
     assert corps["jeton"]
 
 
+def test_compte_valide_retourne_prenom_et_nom(client, seed_compte):
+    seed_compte(
+        "j.dupont", "correcthorsebatterystaple", agence="Castries", pole="Foncier",
+        prenom="Jean", nom="Dupont",
+    )
+
+    reponse = client.post(
+        "/auth", json={"identifiant": "j.dupont", "mot_de_passe": "correcthorsebatterystaple"}
+    )
+
+    assert reponse.status_code == 200
+    corps = reponse.json()
+    assert corps["prenom"] == "Jean"
+    assert corps["nom"] == "Dupont"
+
+
 def test_compte_valide_recoit_un_jeton_different_a_chaque_connexion(client, seed_compte):
-    seed_compte("j.dupont", "correcthorsebatterystaple", agence="Castries", pole="Foncier")
+    seed_compte(
+        "j.dupont", "correcthorsebatterystaple", agence="Castries", pole="Foncier",
+        prenom="Jean", nom="Dupont",
+    )
 
     premiere_reponse = client.post(
         "/auth", json={"identifiant": "j.dupont", "mot_de_passe": "correcthorsebatterystaple"}
@@ -26,7 +48,10 @@ def test_compte_valide_recoit_un_jeton_different_a_chaque_connexion(client, seed
 
 
 def test_identifiant_inconnu_echoue(client, seed_compte):
-    seed_compte("j.dupont", "correcthorsebatterystaple", agence="Castries", pole="Foncier")
+    seed_compte(
+        "j.dupont", "correcthorsebatterystaple", agence="Castries", pole="Foncier",
+        prenom="Jean", nom="Dupont",
+    )
 
     reponse = client.post(
         "/auth", json={"identifiant": "inconnu", "mot_de_passe": "correcthorsebatterystaple"}
@@ -38,7 +63,10 @@ def test_identifiant_inconnu_echoue(client, seed_compte):
 
 
 def test_mot_de_passe_incorrect_echoue(client, seed_compte):
-    seed_compte("j.dupont", "correcthorsebatterystaple", agence="Castries", pole="Foncier")
+    seed_compte(
+        "j.dupont", "correcthorsebatterystaple", agence="Castries", pole="Foncier",
+        prenom="Jean", nom="Dupont",
+    )
 
     reponse = client.post(
         "/auth", json={"identifiant": "j.dupont", "mot_de_passe": "mauvais-mot-de-passe"}
@@ -50,7 +78,10 @@ def test_mot_de_passe_incorrect_echoue(client, seed_compte):
 
 
 def test_echec_ne_revele_pas_quelle_partie_est_fausse(client, seed_compte):
-    seed_compte("j.dupont", "correcthorsebatterystaple", agence="Castries", pole="Foncier")
+    seed_compte(
+        "j.dupont", "correcthorsebatterystaple", agence="Castries", pole="Foncier",
+        prenom="Jean", nom="Dupont",
+    )
 
     reponse_identifiant_inconnu = client.post(
         "/auth", json={"identifiant": "inconnu", "mot_de_passe": "correcthorsebatterystaple"}

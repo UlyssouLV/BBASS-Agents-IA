@@ -33,4 +33,10 @@ def authentifier(
     if compte is None or not mot_de_passe_valide:
         raise HTTPException(status_code=401, detail=_ECHEC_AUTHENTIFICATION)
 
-    return AuthResponse(agence=compte.agence, pole=compte.pole, jeton=jetons.emettre())
+    return AuthResponse(
+        prenom=compte.prenom,
+        nom=compte.nom,
+        agence=compte.agence,
+        pole=compte.pole,
+        jeton=jetons.emettre(),
+    )

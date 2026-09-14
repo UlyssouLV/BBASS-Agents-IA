@@ -10,5 +10,7 @@ class Compte(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     identifiant: Mapped[str] = mapped_column(String, unique=True, index=True)
     mot_de_passe_hash: Mapped[str] = mapped_column(String)
+    prenom: Mapped[str] = mapped_column(String)
+    nom: Mapped[str] = mapped_column(String)
     agence: Mapped[str] = mapped_column(String)
     pole: Mapped[str] = mapped_column(String)
