@@ -13,7 +13,7 @@ Le système IA destiné à traiter les demandes d'un pôle donné. Non construit
 _Avoid_: assistant, bot
 
 **Compte**:
-L'identité de connexion d'un collaborateur : un login, rattaché à exactement une agence et un pôle. Créé manuellement en base pour la V1, jamais par auto-inscription.
+L'identité de connexion d'un collaborateur : un login, un prénom et un nom (obligatoires, affichés dans l'interface), rattaché à exactement une agence et un pôle. Créé manuellement en base pour la V1, jamais par auto-inscription.
 _Avoid_: utilisateur, profil
 
 **Poste**:
@@ -36,4 +36,5 @@ Le service de la VM centrale qui détient seul la clé API Mistral et transmet l
 _Avoid_: proxy, passerelle
 
 **Session**:
-L'état de connexion d'un compte sur un poste. Persiste tant que la session Windows du collaborateur reste ouverte ; se termine par une déconnexion explicite, jamais par expiration automatique en V1.
+L'état de connexion d'un compte sur un poste. Persiste au-delà de la fermeture/relance de l'appli et d'un redémarrage complet du poste : l'identifiant et le jeton sont conservés via le gestionnaire d'identifiants Windows (chiffré, lié au compte Windows courant) côté poste, et le jeton est lui-même persisté côté VM centrale (survit à un redémarrage de la VM). Se termine par une déconnexion explicite depuis le poste (qui invalide aussi le jeton côté VM) ou par une déconnexion forcée déclenchée côté VM (invalide tous les jetons actifs du compte) ; jamais par expiration automatique en V1. Si le gestionnaire d'identifiants Windows est indisponible, le poste dégrade silencieusement vers une session en mémoire pour la durée du processus.
+_Avoid_: session applicative limitée au process (ancien comportement, remplacé)
