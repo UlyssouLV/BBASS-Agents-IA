@@ -8,10 +8,14 @@ class ConnexionRequest(BaseModel):
 
 class ConnexionResponse(BaseModel):
     identifiant: str
+    prenom: str
+    nom: str
 
 
 class CompteResponse(BaseModel):
     identifiant: str
+    prenom: str
+    nom: str
 
 
 class MessageRequest(BaseModel):

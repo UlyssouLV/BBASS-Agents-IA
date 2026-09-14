@@ -10,8 +10,8 @@ const chatErreur = document.getElementById("chat-erreur");
 const formulaireChat = document.getElementById("formulaire-chat");
 const champMessage = document.getElementById("message");
 
-function afficherEcranCompte(identifiant) {
-  identifiantConnecte.textContent = identifiant;
+function afficherEcranCompte(compte) {
+  identifiantConnecte.textContent = `${compte.prenom} ${compte.nom} (${compte.identifiant})`;
   ecranConnexion.hidden = true;
   ecranCompte.hidden = false;
 }
@@ -35,7 +35,7 @@ async function verifierSessionActive() {
   const reponse = await fetch("/compte");
   if (reponse.ok) {
     const compte = await reponse.json();
-    afficherEcranCompte(compte.identifiant);
+    afficherEcranCompte(compte);
   }
 }
 
@@ -68,7 +68,7 @@ formulaireConnexion.addEventListener("submit", async (evenement) => {
   }
 
   const compte = await reponse.json();
-  afficherEcranCompte(compte.identifiant);
+  afficherEcranCompte(compte);
 });
 
 boutonDeconnexion.addEventListener("click", async () => {

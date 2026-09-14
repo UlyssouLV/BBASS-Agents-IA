@@ -18,18 +18,22 @@ def connexion(
     session: SessionStore = Depends(get_session_store),
 ) -> ConnexionResponse:
     try:
-        jeton = client.authentifier(requete.identifiant, requete.mot_de_passe)
+        authentification = client.authentifier(requete.identifiant, requete.mot_de_passe)
     except Exception as erreur:
         # Couvre aussi bien une VM centrale injoignable qu'une réponse en erreur
         # de sa part : jamais un plantage côté poste, toujours un état d'erreur
         # propre distinct d'un échec d'authentification (qui reste un 401).
         raise HTTPException(status_code=502, detail=_VM_CENTRALE_INDISPONIBLE) from erreur
 
-    if jeton is None:
+    if authentification is None:
         raise HTTPException(status_code=401, detail=_ECHEC_CONNEXION)
 
-    session.ouvrir(requete.identifiant, jeton)
-    return ConnexionResponse(identifiant=requete.identifiant)
+    session.ouvrir(
+        requete.identifiant, authentification.prenom, authentification.nom, authentification.jeton
+    )
+    return ConnexionResponse(
+        identifiant=requete.identifiant, prenom=authentification.prenom, nom=authentification.nom
+    )
 
 
 @router.post("/deconnexion", status_code=204)
@@ -43,4 +47,7 @@ def compte_connecte(session: SessionStore = Depends(get_session_store)) -> Compt
     if identifiant is None:
         raise HTTPException(status_code=401, detail=_AUCUNE_SESSION)
 
-    return CompteResponse(identifiant=identifiant)
+    # SessionStore.ouvrir()/fermer() posent toujours identifiant, prenom et nom
+    # ensemble : identifiant non-None garantit prenom/nom non-None.
+    assert session.prenom is not None and session.nom is not None
+    return CompteResponse(identifiant=identifiant, prenom=session.prenom, nom=session.nom)

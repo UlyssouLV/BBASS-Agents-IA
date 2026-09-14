@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 
 from poste.main import app
 from poste.session import SessionStore, get_session_store
-from poste.vm_centrale_client import get_vm_centrale_client
+from poste.vm_centrale_client import AuthentificationReussie, get_vm_centrale_client
 
 
 class VmCentraleClientFactice:
@@ -15,10 +15,14 @@ class VmCentraleClientFactice:
         self._exception: Exception | None = None
         self._reponse_message = ""
         self._jeton = "jeton-factice"
+        self._prenom = "Jean"
+        self._nom = "Dupont"
 
-    def accepter(self) -> None:
+    def accepter(self, prenom: str = "Jean", nom: str = "Dupont") -> None:
         self._authentifie = True
         self._exception = None
+        self._prenom = prenom
+        self._nom = nom
 
     def rejeter(self) -> None:
         self._authentifie = False
@@ -31,11 +35,13 @@ class VmCentraleClientFactice:
         self._reponse_message = reponse
         self._exception = None
 
-    def authentifier(self, identifiant: str, mot_de_passe: str) -> str | None:
+    def authentifier(self, identifiant: str, mot_de_passe: str) -> AuthentificationReussie | None:
         self.appels.append((identifiant, mot_de_passe))
         if self._exception is not None:
             raise self._exception
-        return self._jeton if self._authentifie else None
+        if not self._authentifie:
+            return None
+        return AuthentificationReussie(prenom=self._prenom, nom=self._nom, jeton=self._jeton)
 
     def envoyer_message(self, message: str, jeton: str) -> str:
         self.messages_recus.append(message)

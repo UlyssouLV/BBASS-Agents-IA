@@ -21,7 +21,7 @@ def test_compte_connecte_affiche_l_identifiant_sans_agence_ni_pole(client, vm_ce
     reponse = client.get("/compte")
 
     assert reponse.status_code == 200
-    assert reponse.json() == {"identifiant": "j.dupont"}
+    assert reponse.json() == {"identifiant": "j.dupont", "prenom": "Jean", "nom": "Dupont"}
 
 
 def test_deconnexion_efface_la_session(client, vm_centrale_client_factice):

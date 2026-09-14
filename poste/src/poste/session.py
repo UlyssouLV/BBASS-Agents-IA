@@ -6,6 +6,8 @@ class SessionStore:
     # reste de la session à la déconnexion.
     def __init__(self) -> None:
         self._identifiant: str | None = None
+        self._prenom: str | None = None
+        self._nom: str | None = None
         self._jeton: str | None = None
 
     @property
@@ -17,15 +19,27 @@ class SessionStore:
         return self._identifiant
 
     @property
+    def prenom(self) -> str | None:
+        return self._prenom
+
+    @property
+    def nom(self) -> str | None:
+        return self._nom
+
+    @property
     def jeton(self) -> str | None:
         return self._jeton
 
-    def ouvrir(self, identifiant: str, jeton: str) -> None:
+    def ouvrir(self, identifiant: str, prenom: str, nom: str, jeton: str) -> None:
         self._identifiant = identifiant
+        self._prenom = prenom
+        self._nom = nom
         self._jeton = jeton
 
     def fermer(self) -> None:
         self._identifiant = None
+        self._prenom = None
+        self._nom = None
         self._jeton = None
 
 

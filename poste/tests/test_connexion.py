@@ -2,14 +2,14 @@ import httpx
 
 
 def test_connexion_valide_reussit_et_ouvre_la_session(client, vm_centrale_client_factice):
-    vm_centrale_client_factice.accepter()
+    vm_centrale_client_factice.accepter(prenom="Jean", nom="Dupont")
 
     reponse = client.post(
         "/connexion", json={"identifiant": "j.dupont", "mot_de_passe": "correcthorsebatterystaple"}
     )
 
     assert reponse.status_code == 200
-    assert reponse.json() == {"identifiant": "j.dupont"}
+    assert reponse.json() == {"identifiant": "j.dupont", "prenom": "Jean", "nom": "Dupont"}
     assert vm_centrale_client_factice.appels == [("j.dupont", "correcthorsebatterystaple")]
 
 
