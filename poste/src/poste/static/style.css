@@ -1,0 +1,32 @@
+body {
+  font-family: system-ui, sans-serif;
+  background: #f5f5f4;
+  color: #1c1c1c;
+  margin: 0;
+  padding: 2rem;
+}
+
+main {
+  max-width: 24rem;
+  margin: 0 auto;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+button {
+  cursor: pointer;
+}
+
+#erreur-connexion {
+  color: #b91c1c;
+}
+
+#ecran-compte header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
