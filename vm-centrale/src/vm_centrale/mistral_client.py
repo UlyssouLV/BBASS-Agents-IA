@@ -1,6 +1,6 @@
-import os
-
 import httpx
+
+from vm_centrale.config import get_mistral_api_key
 
 _API_URL = "https://api.mistral.ai/v1/chat/completions"
 _MODELE = "mistral-small-latest"
@@ -13,10 +13,7 @@ class MistralClient:
         self._modele = modele
 
     def chat(self, message: str) -> str:
-        # Lu ici plutôt qu'à la construction : une clé manquante doit lever
-        # pendant l'appel, dans le try/except du endpoint de relais, jamais
-        # pendant la résolution de la dépendance FastAPI (avant ce try/except).
-        api_key = os.environ["MISTRAL_API_KEY"]
+        api_key = get_mistral_api_key()
         reponse = _http_client.post(
             _API_URL,
             headers={"Authorization": f"Bearer {api_key}"},
