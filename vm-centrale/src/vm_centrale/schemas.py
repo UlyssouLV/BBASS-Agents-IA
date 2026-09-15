@@ -71,8 +71,14 @@ class CompteResponse(BaseModel):
 
 class CompteCreeResponse(CompteResponse):
     # Le mot de passe généré n'est jamais renvoyé ailleurs (ni dans
-    # CompteResponse, ni stocké en clair) : c'est la seule occasion où
-    # l'administrateur peut le récupérer pour le transmettre au collaborateur.
+    # CompteResponse, ni stocké en clair) : à la création, c'est la seule
+    # occasion où l'administrateur peut le récupérer pour le transmettre au
+    # collaborateur (l'autre occasion étant une réinitialisation, voir
+    # MotDePasseReinitialiseResponse).
+    mot_de_passe: str
+
+
+class MotDePasseReinitialiseResponse(BaseModel):
     mot_de_passe: str
 
 

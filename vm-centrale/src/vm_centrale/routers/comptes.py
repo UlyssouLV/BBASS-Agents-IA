@@ -10,6 +10,7 @@ from vm_centrale.schemas import (
     CompteCreeResponse,
     CompteModifieRequest,
     CompteResponse,
+    MotDePasseReinitialiseResponse,
 )
 from vm_centrale.security import generer_mot_de_passe_aleatoire, hash_password
 
@@ -109,3 +110,27 @@ def modifier_compte(
     db.refresh(compte)
 
     return _vers_reponse(compte)
+
+
+@router.post(
+    "/{identifiant}/reinitialiser-mot-de-passe",
+    response_model=MotDePasseReinitialiseResponse,
+)
+def reinitialiser_mot_de_passe(
+    identifiant: str,
+    db: Session = Depends(get_db),
+    _admin: Compte = Depends(get_compte_admin),
+) -> MotDePasseReinitialiseResponse:
+    compte = db.query(Compte).filter(Compte.identifiant == identifiant).first()
+    if compte is None:
+        raise HTTPException(status_code=404, detail=_COMPTE_INTROUVABLE)
+
+    mot_de_passe = generer_mot_de_passe_aleatoire()
+    compte.mot_de_passe_hash = hash_password(mot_de_passe)
+    compte.doit_changer_mot_de_passe = True
+    # Ne touche pas à la table Jeton : les jetons actifs du compte restent
+    # valides, à la différence de la déconnexion forcée (ticket #12), qui est
+    # une action distincte et explicite (spec V1.1, user story 16).
+    db.commit()
+
+    return MotDePasseReinitialiseResponse(mot_de_passe=mot_de_passe)

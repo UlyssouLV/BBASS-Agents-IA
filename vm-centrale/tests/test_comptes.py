@@ -350,3 +350,95 @@ def test_modification_echoue_avec_jeton_d_un_compte_non_admin(client, seed_compt
     )
 
     assert reponse.status_code == 403
+
+
+# --- POST /comptes/{identifiant}/reinitialiser-mot-de-passe ------------------
+
+
+def test_reinitialisation_reussit_avec_jeton_admin_et_genere_un_nouveau_mot_de_passe(
+    client, seed_compte
+):
+    jeton = _jeton_admin(client, seed_compte)
+    seed_compte(
+        "n.durand", "ancien-mot-de-passe", agence="Castries", poles=["Foncier"],
+        prenom="Nadia", nom="Durand",
+    )
+
+    reponse = client.post(
+        "/comptes/n.durand/reinitialiser-mot-de-passe", headers=_autorisation(jeton)
+    )
+
+    assert reponse.status_code == 200
+    nouveau_mot_de_passe = reponse.json()["mot_de_passe"]
+    assert nouveau_mot_de_passe
+
+    reponse_auth = client.post(
+        "/auth", json={"identifiant": "n.durand", "mot_de_passe": nouveau_mot_de_passe}
+    )
+    assert reponse_auth.status_code == 200
+    assert reponse_auth.json()["doit_changer_mot_de_passe"] is True
+
+    reponse_ancien_mot_de_passe = client.post(
+        "/auth", json={"identifiant": "n.durand", "mot_de_passe": "ancien-mot-de-passe"}
+    )
+    assert reponse_ancien_mot_de_passe.status_code == 401
+
+
+def test_reinitialisation_ne_revoque_pas_les_jetons_actifs_du_compte(
+    client, seed_compte, mistral_client_factice
+):
+    jeton_admin = _jeton_admin(client, seed_compte)
+    seed_compte(
+        "n.durand", "ancien-mot-de-passe", agence="Castries", poles=["Foncier"],
+        prenom="Nadia", nom="Durand",
+    )
+    reponse_auth = client.post(
+        "/auth", json={"identifiant": "n.durand", "mot_de_passe": "ancien-mot-de-passe"}
+    )
+    ancien_jeton = reponse_auth.json()["jeton"]
+    mistral_client_factice.repondre("Bonjour, comment puis-je vous aider ?")
+
+    reponse = client.post(
+        "/comptes/n.durand/reinitialiser-mot-de-passe", headers=_autorisation(jeton_admin)
+    )
+    assert reponse.status_code == 200
+
+    reponse_relais = client.post(
+        "/relais", json={"message": "Bonjour"}, headers=_autorisation(ancien_jeton)
+    )
+    assert reponse_relais.status_code == 200
+
+
+def test_reinitialisation_echoue_avec_un_identifiant_inconnu(client, seed_compte):
+    jeton = _jeton_admin(client, seed_compte)
+
+    reponse = client.post(
+        "/comptes/inconnu/reinitialiser-mot-de-passe", headers=_autorisation(jeton)
+    )
+
+    assert reponse.status_code == 404
+
+
+def test_reinitialisation_echoue_sans_jeton(client, seed_compte):
+    seed_compte(
+        "n.durand", "ancien-mot-de-passe", agence="Castries", poles=["Foncier"],
+        prenom="Nadia", nom="Durand",
+    )
+
+    reponse = client.post("/comptes/n.durand/reinitialiser-mot-de-passe")
+
+    assert reponse.status_code == 401
+
+
+def test_reinitialisation_echoue_avec_jeton_d_un_compte_non_admin(client, seed_compte):
+    jeton = _jeton_non_admin(client, seed_compte)
+    seed_compte(
+        "n.durand", "ancien-mot-de-passe", agence="Castries", poles=["Foncier"],
+        prenom="Nadia", nom="Durand",
+    )
+
+    reponse = client.post(
+        "/comptes/n.durand/reinitialiser-mot-de-passe", headers=_autorisation(jeton)
+    )
+
+    assert reponse.status_code == 403
