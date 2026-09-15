@@ -1,10 +1,12 @@
 import hashlib
 import hmac
 import os
+import secrets
 
 _ALGORITHM = "sha256"
 _ITERATIONS = 600_000
 _SALT_BYTES = 16
+_MOT_DE_PASSE_ALEATOIRE_BYTES = 12
 
 
 def hash_password(mot_de_passe: str) -> str:
@@ -24,3 +26,10 @@ def verify_password(mot_de_passe: str, mot_de_passe_hash: str) -> bool:
 
     candidate = hashlib.pbkdf2_hmac(algorithm, mot_de_passe.encode("utf-8"), salt, iterations)
     return hmac.compare_digest(candidate, expected)
+
+
+def generer_mot_de_passe_aleatoire() -> str:
+    # Renvoyé une seule fois, à l'administrateur qui crée ou réinitialise le
+    # compte (voir user stories 1 et 2 de la spec V1.1) : jamais reconstruit
+    # ni relu ensuite, seul son hash est conservé.
+    return secrets.token_urlsafe(_MOT_DE_PASSE_ALEATOIRE_BYTES)

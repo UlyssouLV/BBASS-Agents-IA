@@ -134,17 +134,3 @@ def test_echec_ne_revele_pas_quelle_partie_est_fausse(client, seed_compte):
 
     assert reponse_identifiant_inconnu.status_code == reponse_mot_de_passe_incorrect.status_code
     assert reponse_identifiant_inconnu.json() == reponse_mot_de_passe_incorrect.json()
-
-
-def test_aucun_endpoint_de_creation_de_compte(client):
-    reponse = client.post(
-        "/comptes",
-        json={
-            "identifiant": "nouveau",
-            "mot_de_passe": "x",
-            "agence": "Castries",
-            "pole": "Foncier",
-        },
-    )
-
-    assert reponse.status_code == 404
