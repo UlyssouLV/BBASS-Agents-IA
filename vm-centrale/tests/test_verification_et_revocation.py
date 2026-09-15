@@ -4,7 +4,7 @@ def _autorisation(jeton: str) -> dict[str, str]:
 
 def test_verifier_avec_jeton_valide_retourne_l_identifiant(client, seed_compte):
     seed_compte(
-        "j.dupont", "correcthorsebatterystaple", agence="Castries", pole="Foncier",
+        "j.dupont", "correcthorsebatterystaple", agence="Castries", poles=["Foncier"],
         prenom="Jean", nom="Dupont",
     )
     reponse_auth = client.post(
@@ -15,7 +15,37 @@ def test_verifier_avec_jeton_valide_retourne_l_identifiant(client, seed_compte):
     reponse = client.get("/auth/verifier", headers=_autorisation(jeton))
 
     assert reponse.status_code == 200
-    assert reponse.json() == {"identifiant": "j.dupont"}
+    assert reponse.json() == {"identifiant": "j.dupont", "est_admin": False}
+
+
+def test_verifier_retourne_est_admin_a_jour_meme_change_apres_l_emission_du_jeton(
+    client, seed_compte, db_session
+):
+    compte = seed_compte(
+        "j.dupont", "correcthorsebatterystaple", agence="Castries", poles=["Foncier"],
+        prenom="Jean", nom="Dupont", est_admin=False,
+    )
+    reponse_auth = client.post(
+        "/auth", json={"identifiant": "j.dupont", "mot_de_passe": "correcthorsebatterystaple"}
+    )
+    jeton = reponse_auth.json()["jeton"]
+
+    compte.est_admin = True
+    db_session.commit()
+
+    reponse = client.get("/auth/verifier", headers=_autorisation(jeton))
+
+    assert reponse.status_code == 200
+    assert reponse.json() == {"identifiant": "j.dupont", "est_admin": True}
+
+
+def test_verifier_avec_jeton_pour_un_compte_introuvable_retourne_est_admin_false(
+    client, jeton_valide
+):
+    reponse = client.get("/auth/verifier", headers=_autorisation(jeton_valide))
+
+    assert reponse.status_code == 200
+    assert reponse.json() == {"identifiant": "j.dupont", "est_admin": False}
 
 
 def test_verifier_sans_jeton_echoue(client):

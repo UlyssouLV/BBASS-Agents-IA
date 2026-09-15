@@ -1,7 +1,7 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import Boolean, DateTime, ForeignKey, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from vm_centrale.database import Base
 
@@ -14,8 +14,25 @@ class Compte(Base):
     mot_de_passe_hash: Mapped[str] = mapped_column(String)
     prenom: Mapped[str] = mapped_column(String)
     nom: Mapped[str] = mapped_column(String)
+    email: Mapped[str | None] = mapped_column(String, nullable=True)
     agence: Mapped[str] = mapped_column(String)
-    pole: Mapped[str] = mapped_column(String)
+    est_admin: Mapped[bool] = mapped_column(Boolean, default=False)
+    doit_changer_mot_de_passe: Mapped[bool] = mapped_column(Boolean, default=False)
+    poles: Mapped[list["ComptePole"]] = relationship(
+        back_populates="compte", cascade="all, delete-orphan", order_by="ComptePole.pole"
+    )
+
+
+class ComptePole(Base):
+    # Table de jointure compte/pôle ([[0006-compte-rattache-plusieurs-poles]]) :
+    # la liste des six pôles reste une liste fermée fixée dans le code, pas une
+    # table `Pôle` gérable dynamiquement pour cette itération.
+    __tablename__ = "comptes_poles"
+
+    compte_id: Mapped[int] = mapped_column(ForeignKey("comptes.id"), primary_key=True)
+    pole: Mapped[str] = mapped_column(String, primary_key=True)
+
+    compte: Mapped["Compte"] = relationship(back_populates="poles")
 
 
 class Jeton(Base):

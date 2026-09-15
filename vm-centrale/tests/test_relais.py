@@ -108,7 +108,7 @@ def test_relais_avec_jeton_invalide_est_refuse_sans_appeler_mistral(client, mist
 
 def test_jeton_emis_par_auth_autorise_le_relais(client, mistral_client_factice, seed_compte):
     seed_compte(
-        "j.dupont", "correcthorsebatterystaple", agence="Castries", pole="Foncier",
+        "j.dupont", "correcthorsebatterystaple", agence="Castries", poles=["Foncier"],
         prenom="Jean", nom="Dupont",
     )
     mistral_client_factice.repondre("Bonjour, comment puis-je vous aider ?")

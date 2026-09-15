@@ -2,6 +2,8 @@
 
 How the engineering skills should consume this repo's domain documentation when exploring the codebase.
 
+`/code-review` **Standards** starts at repo-root `CLAUDE.md`, which points here. Load this file, then `CONTEXT.md` and relevant `docs/adr/`, instead of reporting “no conventions”.
+
 ## Before exploring, read these
 
 - **`CONTEXT.md`** at the repo root, or

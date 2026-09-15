@@ -15,13 +15,22 @@ def test_chat_reste_accessible_sans_re_authentification(client, vm_centrale_clie
     assert vm_centrale_client_factice.appels == []
 
 
-def test_compte_connecte_affiche_l_identifiant_sans_agence_ni_pole(client, vm_centrale_client_factice):
-    _connecter(client, vm_centrale_client_factice, identifiant="j.dupont")
+def test_compte_connecte_affiche_l_identifiant_l_agence_et_les_poles(client, vm_centrale_client_factice):
+    vm_centrale_client_factice.accepter(agence="Castries", poles=["Foncier"])
+    client.post("/connexion", json={"identifiant": "j.dupont", "mot_de_passe": "x"})
 
     reponse = client.get("/compte")
 
     assert reponse.status_code == 200
-    assert reponse.json() == {"identifiant": "j.dupont", "prenom": "Jean", "nom": "Dupont"}
+    assert reponse.json() == {
+        "identifiant": "j.dupont",
+        "prenom": "Jean",
+        "nom": "Dupont",
+        "agence": "Castries",
+        "poles": ["Foncier"],
+        "est_admin": False,
+        "doit_changer_mot_de_passe": False,
+    }
 
 
 def test_deconnexion_efface_la_session(client, vm_centrale_client_factice):

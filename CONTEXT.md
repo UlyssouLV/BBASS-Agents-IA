@@ -5,7 +5,7 @@ Logiciel donnant aux collaborateurs du cabinet BBASS un point d'entrée unique (
 ## Language
 
 **Pôle**:
-Un des six domaines métiers du cabinet auxquels le logiciel est destiné (Administration, Appels d'offres, Foncier, DAO, Urbanisme, Détection de réseaux). Chaque compte est rattaché à un seul pôle.
+Un des six domaines métiers du cabinet auxquels le logiciel est destiné (Administration, Appels d'offres, Foncier, DAO, Urbanisme, Détection de réseaux). Un compte peut être rattaché à un ou plusieurs pôles ([[0006-compte-rattache-plusieurs-poles]]). Le pôle « Administration » est une valeur de pôle ordinaire, sans lien avec le droit de compte administrateur.
 _Avoid_: métier, domaine, agent (l'agent est l'implémentation logicielle qui servira un pôle, pas le pôle lui-même)
 
 **Agent**:
@@ -13,8 +13,12 @@ Le système IA destiné à traiter les demandes d'un pôle donné. Non construit
 _Avoid_: assistant, bot
 
 **Compte**:
-L'identité de connexion d'un collaborateur : un login, un prénom et un nom (obligatoires, affichés dans l'interface), rattaché à exactement une agence et un pôle. Créé manuellement en base pour la V1, jamais par auto-inscription.
+L'identité de connexion d'un collaborateur : un login, un prénom et un nom (obligatoires, affichés dans l'interface), rattaché à exactement une agence et à un ou plusieurs pôles ([[0006-compte-rattache-plusieurs-poles]]). Un email est optionnel. Créé et modifié par un compte administrateur ; le tout premier compte administrateur reste créé manuellement en base, comme tous les comptes en V1. Jamais par auto-inscription.
 _Avoid_: utilisateur, profil
+
+**Compte administrateur**:
+Un compte portant, en plus de son identité de connexion normale, le droit de créer, modifier, supprimer n'importe quel compte, promouvoir ou rétrograder un autre compte administrateur, et forcer la déconnexion d'un compte. Un droit global, jamais limité à un pôle ou une agence ([[0005-compte-administrateur-droit-global]]). Distinct de la Clé d'administration VM, que ce compte doit en plus fournir pour supprimer un compte ou promouvoir/rétrograder un autre compte administrateur.
+_Avoid_: admin (seul, ambigu avec la Clé d'administration VM), rôle
 
 **Poste**:
 La machine d'un collaborateur, sur laquelle le backend Python et l'interface web sont installés et exécutés localement.
@@ -34,6 +38,10 @@ _Avoid_: serveur, backend central (le backend s'exécute sur le poste, pas sur l
 **Relais Mistral**:
 Le service de la VM centrale qui détient seul la clé API Mistral et transmet les appels des postes vers Mistral. Un poste n'appelle jamais Mistral directement.
 _Avoid_: proxy, passerelle
+
+**Clé d'administration VM**:
+Un secret partagé, distinct du mot de passe de tout compte, qui autorise les actions les plus sensibles de la VM centrale : la révocation forcée de tous les jetons d'un compte, et la suppression d'un compte ou la promotion/rétrogradation d'un compte administrateur, saisie depuis le poste au moment de l'action ([[0007-cle-admin-vm-reutilisee-poste]]). Connue des comptes administrateurs, pas seulement de l'équipe technique.
+_Avoid_: clé admin (seul, ambigu avec compte administrateur)
 
 **Session**:
 L'état de connexion d'un compte sur un poste. Persiste au-delà de la fermeture/relance de l'appli et d'un redémarrage complet du poste : l'identifiant et le jeton sont conservés via le gestionnaire d'identifiants Windows (chiffré, lié au compte Windows courant) côté poste, et le jeton est lui-même persisté côté VM centrale (survit à un redémarrage de la VM). Se termine par une déconnexion explicite depuis le poste (qui invalide aussi le jeton côté VM) ou par une déconnexion forcée déclenchée côté VM (invalide tous les jetons actifs du compte) ; jamais par expiration automatique en V1. Si le gestionnaire d'identifiants Windows est indisponible, le poste dégrade silencieusement vers une session en mémoire pour la durée du processus.

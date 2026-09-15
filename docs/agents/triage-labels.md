@@ -14,12 +14,12 @@ When a skill mentions a role (e.g. "apply the AFK-ready triage label"), use the 
 
 ## Lifecycle (not a Matt Pocock triage role)
 
-GitHub issues are only **Open** or **Closed**. This extra label marks work that is **coded on a feature branch** but **not yet in `main`**. Do not `gh issue close` for that; see skill `fermer-issues-apres-merge-main`.
+GitHub issues are only **Open** or **Closed**. This extra label marks work that is **coded on a feature branch** but **not yet in `main`**. Do not `gh issue close` for that.
 
 | Label in our tracker | Meaning |
 | -------------------- | ------- |
 | `awaiting-merge`     | Implemented on the feature branch. Issue stays **Open**. Remove `ready-for-agent` / `ready-for-human` so agents do not re-implement it. GitHub closes the issue at PR merge via `Fixes #n`. |
 
-When `/implement` finishes: skill `apres-implement-awaiting-merge` asks for confirmation, then adds `awaiting-merge` and removes the ready-* labels.
+When `/implement` finishes green: skill `encadrer-implement` commits, pushes, adds `awaiting-merge` and removes the ready-* labels.
 
 Edit the right-hand column of the triage table to match whatever vocabulary you actually use.

@@ -11,6 +11,51 @@ main {
   margin: 0 auto;
 }
 
+/* Élargit l'écran quand l'onglet Comptes (tableau + formulaire) est affiché,
+   sans repasser par du JS juste pour une largeur. */
+#ecran-compte:has(#onglet-comptes:not([hidden])) {
+  max-width: 40rem;
+}
+
+#onglets-compte {
+  display: flex;
+  gap: 0.5rem;
+}
+
+#tableau-comptes {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+}
+
+#tableau-comptes th,
+#tableau-comptes td {
+  text-align: left;
+  padding: 0.25rem 0.5rem;
+  border-bottom: 1px solid #d4d4d4;
+}
+
+#creation-poles,
+#modification-poles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  border: none;
+  padding: 0;
+}
+
+#creation-erreur,
+#modification-erreur {
+  color: #b91c1c;
+}
+
+#compte-cree,
+#mot-de-passe-reinitialise {
+  background: #dcfce7;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+}
+
 form {
   display: flex;
   flex-direction: column;
@@ -22,6 +67,10 @@ button {
 }
 
 #erreur-connexion {
+  color: #b91c1c;
+}
+
+#erreur-changement-mot-de-passe {
   color: #b91c1c;
 }
 

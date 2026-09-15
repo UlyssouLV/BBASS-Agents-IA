@@ -9,7 +9,15 @@ def test_connexion_valide_reussit_et_ouvre_la_session(client, vm_centrale_client
     )
 
     assert reponse.status_code == 200
-    assert reponse.json() == {"identifiant": "j.dupont", "prenom": "Jean", "nom": "Dupont"}
+    assert reponse.json() == {
+        "identifiant": "j.dupont",
+        "prenom": "Jean",
+        "nom": "Dupont",
+        "agence": "Castries",
+        "poles": ["Foncier"],
+        "est_admin": False,
+        "doit_changer_mot_de_passe": False,
+    }
     assert vm_centrale_client_factice.appels == [("j.dupont", "correcthorsebatterystaple")]
 
 
@@ -55,15 +63,21 @@ def test_vm_centrale_injoignable_n_ouvre_pas_de_session(client, vm_centrale_clie
     assert reponse.status_code == 401
 
 
-def test_reponse_de_connexion_n_expose_ni_agence_ni_pole(client, vm_centrale_client_factice):
-    vm_centrale_client_factice.accepter()
+def test_reponse_de_connexion_expose_agence_poles_et_droits(client, vm_centrale_client_factice):
+    # Décision V1.1 : reversée depuis V1 (issue #11), voir docs/specs/v1.1-gestion-comptes-admin.md.
+    vm_centrale_client_factice.accepter(
+        agence="Castries", poles=["Foncier", "Urbanisme"], est_admin=True, doit_changer_mot_de_passe=True
+    )
 
     reponse = client.post(
         "/connexion", json={"identifiant": "j.dupont", "mot_de_passe": "correcthorsebatterystaple"}
     )
 
-    assert "agence" not in reponse.text
-    assert "pole" not in reponse.text
+    corps = reponse.json()
+    assert corps["agence"] == "Castries"
+    assert corps["poles"] == ["Foncier", "Urbanisme"]
+    assert corps["est_admin"] is True
+    assert corps["doit_changer_mot_de_passe"] is True
 
 
 def test_connexion_normale_n_expose_aucun_avertissement(client, vm_centrale_client_factice):

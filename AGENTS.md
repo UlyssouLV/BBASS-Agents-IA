@@ -12,20 +12,24 @@ Default canonical labels (`needs-triage`, `needs-info`, `ready-for-agent`, `read
 
 ### After `/implement`
 
-Ask before labelling `awaiting-merge`. See skill `apres-implement-awaiting-merge`.
+Matt Pocock `/implement` for TDD. Then skill `encadrer-implement`: tests → commit + push + `awaiting-merge` (issue stays Open) → next unblocked child (`/clear` + `/implement`) **or**, if every PR child is done, `/code-review` once vs `main`.
+
+### Finalise the version
+
+When the user says **« Finalise la version »**: skill `finaliser-la-version`. Check every PR child is `awaiting-merge`, **then** GitHub Release (semver tag on the **feature branch** SHA, so `git log` of the tag still shows ticket history), **then** squash-merge the PR into `main` (one commit) and delete the feature branch.
 
 ### Domain docs
 
-Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`. `/code-review` Standards: start at `CLAUDE.md`.
 
 ## Git commits and pushes
 
-Do **not** run `git commit`, `git push`, or `gh` commands that publish unless the **current user message** explicitly asks to commit, push, or publish.
+After a green `/implement` of a child ticket, skill `encadrer-implement` **does** commit and push that ticket (no extra “say the word”). Still never force-push; never commit `.env`, `*.db`, `.venv`, or secrets.
 
-Finishing a ticket, tests passing, or `/implement` is **not** permission to commit. Show the summary, list files, and wait: "Ready to commit — say the word."
+Do **not** commit or push for other reasons unless the **current user message** explicitly asks.
 
 ## GitHub issues vs `main`
 
-Cycle for every feature: **branch → open issues → implement on the branch → PR → merge to `main` → close the branch and close the issues → GitHub Release (semver tag on that `main` commit).**
+Cycle for every feature: **branch + PR → implement children on the branch → « Finalise la version » (Release tag on the feature SHA, squash-merge to `main`, delete the branch).** GitHub closes issues via `Fixes` on the squash.
 
-Do **not** `gh issue close` because the work is done on a feature branch. Issues stay **Open** until that work is **merged into `main`**. Prefer `Fixes #n` on the **PR** so GitHub closes them at merge. See skill `fermer-issues-apres-merge-main`.
+Do **not** `gh issue close` because the work is done on a feature branch. Issues stay **Open** until that work is **merged into `main`**.

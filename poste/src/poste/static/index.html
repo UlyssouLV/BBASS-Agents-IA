@@ -20,22 +20,186 @@
     </form>
   </main>
 
+  <main id="ecran-changement-mot-de-passe" hidden>
+    <h1>Changement de mot de passe requis</h1>
+    <p>Vous devez choisir un nouveau mot de passe avant d'accéder à l'application.</p>
+    <form id="formulaire-changement-mot-de-passe">
+      <label for="nouveau-mot-de-passe">Nouveau mot de passe</label>
+      <input
+        type="password"
+        id="nouveau-mot-de-passe"
+        name="nouveau-mot-de-passe"
+        autocomplete="new-password"
+        required
+      />
+
+      <label for="confirmation-mot-de-passe">Confirmer le nouveau mot de passe</label>
+      <input
+        type="password"
+        id="confirmation-mot-de-passe"
+        name="confirmation-mot-de-passe"
+        autocomplete="new-password"
+        required
+      />
+
+      <button type="submit">Changer le mot de passe</button>
+      <p id="erreur-changement-mot-de-passe" role="alert" hidden></p>
+    </form>
+  </main>
+
   <main id="ecran-compte" hidden>
     <header>
-      <span>Connecté en tant que <strong id="identifiant-connecte"></strong></span>
+      <span>
+        Connecté en tant que <strong id="identifiant-connecte"></strong>
+        (<span id="pole-agence-connecte"></span>)
+      </span>
+      <nav id="onglets-compte">
+        <button type="button" id="onglet-bouton-chat">Discussion</button>
+        <button type="button" id="onglet-bouton-comptes" hidden>Comptes</button>
+      </nav>
       <button type="button" id="bouton-deconnexion">Se déconnecter</button>
     </header>
     <p id="avertissement-session" role="alert" hidden></p>
 
-    <div id="messages" role="log"></div>
-    <p id="chat-chargement" hidden>Envoi en cours…</p>
-    <p id="chat-erreur" role="alert" hidden></p>
+    <section id="onglet-chat">
+      <div id="messages" role="log"></div>
+      <p id="chat-chargement" hidden>Envoi en cours…</p>
+      <p id="chat-erreur" role="alert" hidden></p>
 
-    <form id="formulaire-chat">
-      <label for="message" class="visually-hidden">Message</label>
-      <input type="text" id="message" name="message" autocomplete="off" required />
-      <button type="submit">Envoyer</button>
-    </form>
+      <form id="formulaire-chat">
+        <label for="message" class="visually-hidden">Message</label>
+        <input type="text" id="message" name="message" autocomplete="off" required />
+        <button type="submit">Envoyer</button>
+      </form>
+    </section>
+
+    <section id="onglet-comptes" hidden>
+      <h2>Comptes</h2>
+      <p id="comptes-erreur" role="alert" hidden></p>
+      <table id="tableau-comptes">
+        <thead>
+          <tr>
+            <th>Identifiant</th>
+            <th>Prénom</th>
+            <th>Nom</th>
+            <th>Agence</th>
+            <th>Pôles</th>
+            <th>Email</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="corps-tableau-comptes"></tbody>
+      </table>
+
+      <h3 id="modification-titre" hidden>Modifier le compte <span id="modification-identifiant"></span></h3>
+      <form id="formulaire-modification-compte" hidden>
+        <label for="modification-prenom">Prénom</label>
+        <input type="text" id="modification-prenom" name="prenom" required />
+
+        <label for="modification-nom">Nom</label>
+        <input type="text" id="modification-nom" name="nom" required />
+
+        <label for="modification-email">Email (optionnel)</label>
+        <input type="email" id="modification-email" name="email" />
+
+        <label for="modification-agence">Agence</label>
+        <input type="text" id="modification-agence" name="agence" required />
+
+        <fieldset id="modification-poles">
+          <legend>Pôles</legend>
+          <label><input type="checkbox" name="poles" value="Administration" /> Administration</label>
+          <label><input type="checkbox" name="poles" value="Appels d'offres" /> Appels d'offres</label>
+          <label><input type="checkbox" name="poles" value="Foncier" /> Foncier</label>
+          <label><input type="checkbox" name="poles" value="DAO" /> DAO</label>
+          <label><input type="checkbox" name="poles" value="Urbanisme" /> Urbanisme</label>
+          <label><input type="checkbox" name="poles" value="Détection de réseaux" /> Détection de réseaux</label>
+        </fieldset>
+
+        <button type="submit">Enregistrer</button>
+        <button type="button" id="modification-annuler">Annuler</button>
+      </form>
+      <p id="modification-erreur" role="alert" hidden></p>
+
+      <h3>Créer un compte</h3>
+      <form id="formulaire-creation-compte">
+        <label for="creation-identifiant">Identifiant</label>
+        <input type="text" id="creation-identifiant" name="identifiant" required />
+
+        <label for="creation-prenom">Prénom</label>
+        <input type="text" id="creation-prenom" name="prenom" required />
+
+        <label for="creation-nom">Nom</label>
+        <input type="text" id="creation-nom" name="nom" required />
+
+        <label for="creation-email">Email (optionnel)</label>
+        <input type="email" id="creation-email" name="email" />
+
+        <label for="creation-agence">Agence</label>
+        <input type="text" id="creation-agence" name="agence" required />
+
+        <fieldset id="creation-poles">
+          <legend>Pôles</legend>
+          <label><input type="checkbox" name="poles" value="Administration" /> Administration</label>
+          <label><input type="checkbox" name="poles" value="Appels d'offres" /> Appels d'offres</label>
+          <label><input type="checkbox" name="poles" value="Foncier" /> Foncier</label>
+          <label><input type="checkbox" name="poles" value="DAO" /> DAO</label>
+          <label><input type="checkbox" name="poles" value="Urbanisme" /> Urbanisme</label>
+          <label><input type="checkbox" name="poles" value="Détection de réseaux" /> Détection de réseaux</label>
+        </fieldset>
+
+        <button type="submit">Créer le compte</button>
+      </form>
+      <p id="creation-erreur" role="alert" hidden></p>
+
+      <div id="compte-cree" role="status" hidden>
+        <p>Compte créé. Mot de passe généré à transmettre au collaborateur :</p>
+        <p><strong id="compte-cree-mot-de-passe"></strong></p>
+      </div>
+
+      <div id="mot-de-passe-reinitialise" role="status" hidden>
+        <p>
+          Mot de passe réinitialisé pour
+          <strong id="mot-de-passe-reinitialise-identifiant"></strong>. Nouveau mot de passe à transmettre au
+          collaborateur :
+        </p>
+        <p><strong id="mot-de-passe-reinitialise-valeur"></strong></p>
+      </div>
+
+      <p id="deconnexion-forcee-confirmation" role="status" hidden>
+        Déconnexion forcée pour <strong id="deconnexion-forcee-identifiant"></strong>.
+      </p>
+
+      <h3 id="statut-admin-titre" hidden>
+        <span id="statut-admin-action"></span> le compte <span id="statut-admin-identifiant"></span>
+      </h3>
+      <form id="formulaire-statut-admin" hidden>
+        <label for="statut-admin-cle">Clé d'administration VM</label>
+        <input type="password" id="statut-admin-cle" name="cle_admin_vm" required />
+
+        <button type="submit">Confirmer</button>
+        <button type="button" id="statut-admin-annuler">Annuler</button>
+      </form>
+      <p id="statut-admin-erreur" role="alert" hidden></p>
+
+      <p id="statut-admin-confirmation" role="status" hidden>
+        <strong id="statut-admin-confirmation-identifiant"></strong> est désormais
+        <span id="statut-admin-confirmation-statut"></span>.
+      </p>
+
+      <h3 id="suppression-titre" hidden>Supprimer le compte <span id="suppression-identifiant"></span></h3>
+      <form id="formulaire-suppression-compte" hidden>
+        <label for="suppression-cle">Clé d'administration VM</label>
+        <input type="password" id="suppression-cle" name="cle_admin_vm" required />
+
+        <button type="submit">Confirmer la suppression</button>
+        <button type="button" id="suppression-annuler">Annuler</button>
+      </form>
+      <p id="suppression-erreur" role="alert" hidden></p>
+
+      <p id="suppression-confirmation" role="status" hidden>
+        Compte <strong id="suppression-confirmation-identifiant"></strong> supprimé définitivement.
+      </p>
+    </section>
   </main>
 
   <script src="/static/app.js"></script>

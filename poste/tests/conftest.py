@@ -5,7 +5,10 @@ from poste.main import app
 from poste.session import SessionStore, get_session_store
 from poste.vm_centrale_client import (
     AuthentificationReussie,
+    CompteAdmin,
+    CompteCree,
     JetonInvalideError,
+    VerificationReussie,
     get_vm_centrale_client,
 )
 
@@ -24,15 +27,59 @@ class VmCentraleClientFactice:
         self._jeton = "jeton-factice"
         self._prenom = "Jean"
         self._nom = "Dupont"
+        self._agence = "Castries"
+        self._poles: list[str] = ["Foncier"]
+        self._est_admin = False
+        self._doit_changer_mot_de_passe = False
         self._identifiant_verifie: str | None = None
+        self._est_admin_verifie = False
         self._exception_verification: Exception | None = None
         self._exception_revocation: Exception | None = None
+        self._comptes: list[CompteAdmin] = []
+        self._exception_liste_comptes: Exception | None = None
+        self._jetons_liste_comptes: list[str] = []
+        self._compte_cree: CompteCree | None = None
+        self._exception_creation_compte: Exception | None = None
+        self._requetes_creation_compte: list[dict] = []
+        self._jetons_creation_compte: list[str] = []
+        self._exception_changement_mot_de_passe: Exception | None = None
+        self.appels_changement_mot_de_passe: list[tuple[str, str]] = []
+        self._compte_modifie: CompteAdmin | None = None
+        self._exception_modification_compte: Exception | None = None
+        self._requetes_modification_compte: list[dict] = []
+        self._jetons_modification_compte: list[str] = []
+        self._mot_de_passe_reinitialise: str | None = None
+        self._exception_reinitialisation_mot_de_passe: Exception | None = None
+        self._jetons_reinitialisation_mot_de_passe: list[str] = []
+        self._identifiants_reinitialisation_mot_de_passe: list[str] = []
+        self._exception_deconnexion_forcee: Exception | None = None
+        self._jetons_deconnexion_forcee: list[str] = []
+        self._identifiants_deconnexion_forcee: list[str] = []
+        self._compte_statut_admin_modifie: CompteAdmin | None = None
+        self._exception_statut_admin: Exception | None = None
+        self._jetons_statut_admin: list[str] = []
+        self._requetes_statut_admin: list[dict] = []
+        self._exception_suppression_compte: Exception | None = None
+        self._jetons_suppression_compte: list[str] = []
+        self._requetes_suppression_compte: list[dict] = []
 
-    def accepter(self, prenom: str = "Jean", nom: str = "Dupont") -> None:
+    def accepter(
+        self,
+        prenom: str = "Jean",
+        nom: str = "Dupont",
+        agence: str = "Castries",
+        poles: list[str] | None = None,
+        est_admin: bool = False,
+        doit_changer_mot_de_passe: bool = False,
+    ) -> None:
         self._authentifie = True
         self._exception = None
         self._prenom = prenom
         self._nom = nom
+        self._agence = agence
+        self._poles = poles if poles is not None else ["Foncier"]
+        self._est_admin = est_admin
+        self._doit_changer_mot_de_passe = doit_changer_mot_de_passe
 
     def rejeter(self) -> None:
         self._authentifie = False
@@ -51,8 +98,9 @@ class VmCentraleClientFactice:
         self._jeton_rejete_par_le_relais = True
         self._exception = None
 
-    def verification_reussit(self, identifiant: str) -> None:
+    def verification_reussit(self, identifiant: str, est_admin: bool = False) -> None:
         self._identifiant_verifie = identifiant
+        self._est_admin_verifie = est_admin
         self._exception_verification = None
 
     def verification_echoue(self) -> None:
@@ -71,7 +119,15 @@ class VmCentraleClientFactice:
             raise self._exception
         if not self._authentifie:
             return None
-        return AuthentificationReussie(prenom=self._prenom, nom=self._nom, jeton=self._jeton)
+        return AuthentificationReussie(
+            prenom=self._prenom,
+            nom=self._nom,
+            jeton=self._jeton,
+            agence=self._agence,
+            poles=self._poles,
+            est_admin=self._est_admin,
+            doit_changer_mot_de_passe=self._doit_changer_mot_de_passe,
+        )
 
     def envoyer_message(self, message: str, jeton: str) -> str:
         self.messages_recus.append(message)
@@ -82,16 +138,162 @@ class VmCentraleClientFactice:
             raise self._exception
         return self._reponse_message
 
-    def verifier(self, jeton: str) -> str | None:
+    def verifier(self, jeton: str) -> VerificationReussie | None:
         self.jetons_verifies.append(jeton)
         if self._exception_verification is not None:
             raise self._exception_verification
-        return self._identifiant_verifie
+        if self._identifiant_verifie is None:
+            return None
+        return VerificationReussie(identifiant=self._identifiant_verifie, est_admin=self._est_admin_verifie)
 
     def revoquer(self, jeton: str) -> None:
         self.jetons_revoques.append(jeton)
         if self._exception_revocation is not None:
             raise self._exception_revocation
+
+    def liste_comptes_retourne(self, comptes: list[CompteAdmin]) -> None:
+        self._comptes = comptes
+        self._exception_liste_comptes = None
+
+    def liste_comptes_echoue(self, exception: Exception) -> None:
+        # Couvre aussi bien JetonInvalideError / AccesAdminRequisError
+        # (erreurs métier attendues, voir vm_centrale_client) qu'une panne
+        # quelconque de la VM centrale.
+        self._exception_liste_comptes = exception
+
+    def lister_comptes(self, jeton: str) -> list[CompteAdmin]:
+        self._jetons_liste_comptes.append(jeton)
+        if self._exception_liste_comptes is not None:
+            raise self._exception_liste_comptes
+        return self._comptes
+
+    def creation_compte_reussit(self, compte: CompteCree) -> None:
+        self._compte_cree = compte
+        self._exception_creation_compte = None
+
+    def creation_compte_echoue(self, exception: Exception) -> None:
+        self._exception_creation_compte = exception
+
+    def creer_compte(
+        self,
+        jeton: str,
+        identifiant: str,
+        prenom: str,
+        nom: str,
+        agence: str,
+        poles: list[str],
+        email: str | None = None,
+    ) -> CompteCree:
+        self._jetons_creation_compte.append(jeton)
+        self._requetes_creation_compte.append(
+            {
+                "identifiant": identifiant,
+                "prenom": prenom,
+                "nom": nom,
+                "email": email,
+                "agence": agence,
+                "poles": poles,
+            }
+        )
+        if self._exception_creation_compte is not None:
+            raise self._exception_creation_compte
+        assert self._compte_cree is not None
+        return self._compte_cree
+
+    def modification_compte_reussit(self, compte: CompteAdmin) -> None:
+        self._compte_modifie = compte
+        self._exception_modification_compte = None
+
+    def modification_compte_echoue(self, exception: Exception) -> None:
+        self._exception_modification_compte = exception
+
+    def modifier_compte(
+        self,
+        jeton: str,
+        identifiant: str,
+        prenom: str,
+        nom: str,
+        agence: str,
+        poles: list[str],
+        email: str | None = None,
+    ) -> CompteAdmin:
+        self._jetons_modification_compte.append(jeton)
+        self._requetes_modification_compte.append(
+            {
+                "identifiant": identifiant,
+                "prenom": prenom,
+                "nom": nom,
+                "email": email,
+                "agence": agence,
+                "poles": poles,
+            }
+        )
+        if self._exception_modification_compte is not None:
+            raise self._exception_modification_compte
+        assert self._compte_modifie is not None
+        return self._compte_modifie
+
+    def changement_mot_de_passe_echoue(self, exception: Exception) -> None:
+        self._exception_changement_mot_de_passe = exception
+
+    def changer_mot_de_passe(self, jeton: str, nouveau_mot_de_passe: str) -> None:
+        self.appels_changement_mot_de_passe.append((jeton, nouveau_mot_de_passe))
+        if self._exception_changement_mot_de_passe is not None:
+            raise self._exception_changement_mot_de_passe
+
+    def reinitialisation_mot_de_passe_reussit(self, mot_de_passe: str) -> None:
+        self._mot_de_passe_reinitialise = mot_de_passe
+        self._exception_reinitialisation_mot_de_passe = None
+
+    def reinitialisation_mot_de_passe_echoue(self, exception: Exception) -> None:
+        self._exception_reinitialisation_mot_de_passe = exception
+
+    def reinitialiser_mot_de_passe(self, jeton: str, identifiant: str) -> str:
+        self._jetons_reinitialisation_mot_de_passe.append(jeton)
+        self._identifiants_reinitialisation_mot_de_passe.append(identifiant)
+        if self._exception_reinitialisation_mot_de_passe is not None:
+            raise self._exception_reinitialisation_mot_de_passe
+        assert self._mot_de_passe_reinitialise is not None
+        return self._mot_de_passe_reinitialise
+
+    def deconnexion_forcee_echoue(self, exception: Exception) -> None:
+        self._exception_deconnexion_forcee = exception
+
+    def deconnexion_forcee(self, jeton: str, identifiant: str) -> None:
+        self._jetons_deconnexion_forcee.append(jeton)
+        self._identifiants_deconnexion_forcee.append(identifiant)
+        if self._exception_deconnexion_forcee is not None:
+            raise self._exception_deconnexion_forcee
+
+    def statut_admin_modifie(self, compte: CompteAdmin) -> None:
+        self._compte_statut_admin_modifie = compte
+        self._exception_statut_admin = None
+
+    def statut_admin_echoue(self, exception: Exception) -> None:
+        self._exception_statut_admin = exception
+
+    def modifier_statut_admin(
+        self, jeton: str, identifiant: str, est_admin: bool, cle_admin_vm: str
+    ) -> CompteAdmin:
+        self._jetons_statut_admin.append(jeton)
+        self._requetes_statut_admin.append(
+            {"identifiant": identifiant, "est_admin": est_admin, "cle_admin_vm": cle_admin_vm}
+        )
+        if self._exception_statut_admin is not None:
+            raise self._exception_statut_admin
+        assert self._compte_statut_admin_modifie is not None
+        return self._compte_statut_admin_modifie
+
+    def suppression_compte_echoue(self, exception: Exception) -> None:
+        self._exception_suppression_compte = exception
+
+    def supprimer_compte(self, jeton: str, identifiant: str, cle_admin_vm: str) -> None:
+        self._jetons_suppression_compte.append(jeton)
+        self._requetes_suppression_compte.append(
+            {"identifiant": identifiant, "cle_admin_vm": cle_admin_vm}
+        )
+        if self._exception_suppression_compte is not None:
+            raise self._exception_suppression_compte
 
 
 @pytest.fixture(autouse=True)

@@ -7,7 +7,7 @@ from sqlalchemy.pool import StaticPool
 from vm_centrale.database import Base, get_db
 from vm_centrale.main import app
 from vm_centrale.mistral_client import get_mistral_client
-from vm_centrale.models import Compte
+from vm_centrale.models import Compte, ComptePole
 from vm_centrale.security import hash_password
 from vm_centrale.jetons import JetonStore, get_jeton_store
 
@@ -85,17 +85,23 @@ def seed_compte(db_session):
         identifiant: str,
         mot_de_passe: str,
         agence: str,
-        pole: str,
+        poles: list[str],
         prenom: str,
         nom: str,
+        email: str | None = None,
+        est_admin: bool = False,
+        doit_changer_mot_de_passe: bool = False,
     ) -> Compte:
         compte = Compte(
             identifiant=identifiant,
             mot_de_passe_hash=hash_password(mot_de_passe),
             prenom=prenom,
             nom=nom,
+            email=email,
             agence=agence,
-            pole=pole,
+            est_admin=est_admin,
+            doit_changer_mot_de_passe=doit_changer_mot_de_passe,
+            poles=[ComptePole(pole=p) for p in poles],
         )
         db_session.add(compte)
         db_session.commit()
