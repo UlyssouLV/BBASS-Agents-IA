@@ -16,7 +16,7 @@ Ask before labelling `awaiting-merge`. See skill `apres-implement-awaiting-merge
 
 ### Domain docs
 
-Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`. `/code-review` Standards: start at `CLAUDE.md`.
 
 ## Git commits and pushes
 
