@@ -401,6 +401,78 @@ def test_reinitialisation_avec_vm_centrale_injoignable_retourne_une_erreur_propr
     assert reponse.json()["detail"]
 
 
+# --- POST /comptes/{identifiant}/deconnexion-forcee ---------------------------
+
+
+def test_deconnexion_forcee_avec_session_admin_reussit(client, vm_centrale_client_factice):
+    _connecter(client, vm_centrale_client_factice)
+
+    reponse = client.post("/comptes/n.durand/deconnexion-forcee")
+
+    assert reponse.status_code == 204
+
+
+def test_deconnexion_forcee_transmet_le_jeton_et_l_identifiant(client, vm_centrale_client_factice):
+    _connecter(client, vm_centrale_client_factice)
+
+    client.post("/comptes/n.durand/deconnexion-forcee")
+
+    assert vm_centrale_client_factice._jetons_deconnexion_forcee == ["jeton-factice"]
+    assert vm_centrale_client_factice._identifiants_deconnexion_forcee == ["n.durand"]
+
+
+def test_deconnexion_forcee_sans_session_active_est_refusee(client, vm_centrale_client_factice):
+    reponse = client.post("/comptes/n.durand/deconnexion-forcee")
+
+    assert reponse.status_code == 401
+    assert vm_centrale_client_factice._identifiants_deconnexion_forcee == []
+
+
+def test_deconnexion_forcee_avec_session_non_admin_est_refusee(client, vm_centrale_client_factice):
+    _connecter(client, vm_centrale_client_factice, est_admin=False)
+    vm_centrale_client_factice.deconnexion_forcee_echoue(AccesAdminRequisError())
+
+    reponse = client.post("/comptes/n.durand/deconnexion-forcee")
+
+    assert reponse.status_code == 403
+    assert reponse.json()["detail"]
+
+
+def test_deconnexion_forcee_avec_identifiant_inconnu_renvoie_404(client, vm_centrale_client_factice):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.deconnexion_forcee_echoue(CompteInexistantError())
+
+    reponse = client.post("/comptes/inconnu/deconnexion-forcee")
+
+    assert reponse.status_code == 404
+    assert reponse.json()["detail"]
+
+
+def test_deconnexion_forcee_avec_jeton_revoque_renvoie_401_et_efface_la_session(
+    client, vm_centrale_client_factice
+):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.deconnexion_forcee_echoue(JetonInvalideError())
+
+    reponse_deconnexion = client.post("/comptes/n.durand/deconnexion-forcee")
+    reponse_compte = client.get("/compte")
+
+    assert reponse_deconnexion.status_code == 401
+    assert reponse_compte.status_code == 401
+
+
+def test_deconnexion_forcee_avec_vm_centrale_injoignable_retourne_une_erreur_propre(
+    client, vm_centrale_client_factice
+):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.deconnexion_forcee_echoue(httpx.ConnectError("connexion refusée"))
+
+    reponse = client.post("/comptes/n.durand/deconnexion-forcee")
+
+    assert reponse.status_code == 502
+    assert reponse.json()["detail"]
+
+
 # --- Visibilité de l'onglet dans le HTML/JS servi -----------------------------
 
 
@@ -434,3 +506,18 @@ def test_front_end_porte_le_balisage_et_l_appel_de_reinitialisation_du_mot_de_pa
     assert 'id="mot-de-passe-reinitialise" role="status" hidden' in html
     assert 'id="mot-de-passe-reinitialise-valeur"' in html
     assert "/reinitialiser-mot-de-passe" in js
+
+
+def test_front_end_porte_le_balisage_et_l_appel_de_deconnexion_forcee(
+    client, vm_centrale_client_factice
+):
+    # Même limite que les tests précédents (aucun rendu côté serveur) : on
+    # vérifie que le HTML sert bien la zone de confirmation, et que le JS
+    # appelle le bon endpoint plutôt qu'une simple présence du texte du
+    # bouton, qui laisserait passer un mauvais chemin.
+    html = client.get("/").text
+    js = client.get("/static/app.js").text
+
+    assert 'id="deconnexion-forcee-confirmation" role="status" hidden' in html
+    assert 'id="deconnexion-forcee-identifiant"' in html
+    assert "/deconnexion-forcee" in js

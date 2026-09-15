@@ -160,3 +160,16 @@ def reinitialiser_mot_de_passe(
         raise _erreur_vm_vers_http(session, erreur) from erreur
 
     return MotDePasseReinitialiseResponse(mot_de_passe=mot_de_passe)
+
+
+@router.post("/comptes/{identifiant}/deconnexion-forcee", status_code=204)
+def deconnexion_forcee(
+    identifiant: str,
+    client: VmCentraleClient = Depends(get_vm_centrale_client),
+    session: SessionStore = Depends(get_session_store),
+) -> None:
+    jeton = _jeton_de_session(session)
+    try:
+        client.deconnexion_forcee(jeton, identifiant)
+    except Exception as erreur:
+        raise _erreur_vm_vers_http(session, erreur) from erreur

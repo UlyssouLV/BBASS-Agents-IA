@@ -52,6 +52,9 @@ class VmCentraleClientFactice:
         self._exception_reinitialisation_mot_de_passe: Exception | None = None
         self._jetons_reinitialisation_mot_de_passe: list[str] = []
         self._identifiants_reinitialisation_mot_de_passe: list[str] = []
+        self._exception_deconnexion_forcee: Exception | None = None
+        self._jetons_deconnexion_forcee: list[str] = []
+        self._identifiants_deconnexion_forcee: list[str] = []
 
     def accepter(
         self,
@@ -245,6 +248,15 @@ class VmCentraleClientFactice:
             raise self._exception_reinitialisation_mot_de_passe
         assert self._mot_de_passe_reinitialise is not None
         return self._mot_de_passe_reinitialise
+
+    def deconnexion_forcee_echoue(self, exception: Exception) -> None:
+        self._exception_deconnexion_forcee = exception
+
+    def deconnexion_forcee(self, jeton: str, identifiant: str) -> None:
+        self._jetons_deconnexion_forcee.append(jeton)
+        self._identifiants_deconnexion_forcee.append(identifiant)
+        if self._exception_deconnexion_forcee is not None:
+            raise self._exception_deconnexion_forcee
 
 
 @pytest.fixture(autouse=True)

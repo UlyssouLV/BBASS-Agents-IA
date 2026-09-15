@@ -30,6 +30,8 @@ const compteCreeMotDePasse = document.getElementById("compte-cree-mot-de-passe")
 const motDePasseReinitialise = document.getElementById("mot-de-passe-reinitialise");
 const motDePasseReinitialiseIdentifiant = document.getElementById("mot-de-passe-reinitialise-identifiant");
 const motDePasseReinitialiseValeur = document.getElementById("mot-de-passe-reinitialise-valeur");
+const deconnexionForceeConfirmation = document.getElementById("deconnexion-forcee-confirmation");
+const deconnexionForceeIdentifiant = document.getElementById("deconnexion-forcee-identifiant");
 const modificationTitre = document.getElementById("modification-titre");
 const modificationIdentifiant = document.getElementById("modification-identifiant");
 const formulaireModificationCompte = document.getElementById("formulaire-modification-compte");
@@ -273,9 +275,50 @@ function ligneCompte(compte) {
   boutonReinitialiser.addEventListener("click", () => reinitialiserMotDePasse(compte.identifiant));
   celluleActions.append(boutonReinitialiser);
 
+  const boutonDeconnecter = document.createElement("button");
+  boutonDeconnecter.type = "button";
+  boutonDeconnecter.textContent = "Forcer la déconnexion";
+  boutonDeconnecter.dataset.identifiant = compte.identifiant;
+  boutonDeconnecter.addEventListener("click", () => forcerLaDeconnexion(compte.identifiant));
+  celluleActions.append(boutonDeconnecter);
+
   ligne.append(celluleActions);
 
   return ligne;
+}
+
+async function forcerLaDeconnexion(identifiant) {
+  comptesErreur.hidden = true;
+  deconnexionForceeConfirmation.hidden = true;
+
+  let reponse;
+  try {
+    reponse = await fetch(`/comptes/${encodeURIComponent(identifiant)}/deconnexion-forcee`, {
+      method: "POST",
+    });
+  } catch {
+    comptesErreur.textContent = "Impossible de joindre le service de gestion des comptes. Réessayez plus tard.";
+    comptesErreur.hidden = false;
+    return;
+  }
+
+  if (reponse.status === 401) {
+    afficherEcranConnexion();
+    return;
+  }
+
+  if (!reponse.ok) {
+    const detail = await reponse.json().catch(() => null);
+    comptesErreur.textContent =
+      detail && typeof detail.detail === "string"
+        ? detail.detail
+        : "La déconnexion forcée a échoué. Réessayez plus tard.";
+    comptesErreur.hidden = false;
+    return;
+  }
+
+  deconnexionForceeIdentifiant.textContent = identifiant;
+  deconnexionForceeConfirmation.hidden = false;
 }
 
 async function reinitialiserMotDePasse(identifiant) {

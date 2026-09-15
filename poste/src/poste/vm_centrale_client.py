@@ -227,6 +227,16 @@ class VmCentraleClient:
         reponse.raise_for_status()
         return reponse.json()["mot_de_passe"]
 
+    def deconnexion_forcee(self, jeton: str, identifiant: str) -> None:
+        reponse = _http_client.post(
+            f"{VM_CENTRALE_BASE_URL}/comptes/{quote(identifiant, safe='')}/deconnexion-forcee",
+            headers={"Authorization": f"Bearer {jeton}"},
+        )
+        _lever_si_jeton_ou_droits_refuses(reponse)
+        if reponse.status_code == 404:
+            raise CompteInexistantError()
+        reponse.raise_for_status()
+
 
 def get_vm_centrale_client() -> VmCentraleClient:
     return VmCentraleClient()
