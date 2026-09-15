@@ -216,6 +216,17 @@ class VmCentraleClient:
         reponse.raise_for_status()
         return CompteAdmin(**_champs_compte_admin(reponse.json()))
 
+    def reinitialiser_mot_de_passe(self, jeton: str, identifiant: str) -> str:
+        reponse = _http_client.post(
+            f"{VM_CENTRALE_BASE_URL}/comptes/{quote(identifiant, safe='')}/reinitialiser-mot-de-passe",
+            headers={"Authorization": f"Bearer {jeton}"},
+        )
+        _lever_si_jeton_ou_droits_refuses(reponse)
+        if reponse.status_code == 404:
+            raise CompteInexistantError()
+        reponse.raise_for_status()
+        return reponse.json()["mot_de_passe"]
+
 
 def get_vm_centrale_client() -> VmCentraleClient:
     return VmCentraleClient()

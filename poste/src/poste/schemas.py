@@ -71,3 +71,7 @@ class CompteModificationRequest(BaseModel):
     email: str | None = None
     agence: str = Field(min_length=1)
     poles: list[str] = Field(min_length=1)
+
+
+class MotDePasseReinitialiseResponse(BaseModel):
+    mot_de_passe: str

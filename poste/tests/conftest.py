@@ -48,6 +48,10 @@ class VmCentraleClientFactice:
         self._exception_modification_compte: Exception | None = None
         self._requetes_modification_compte: list[dict] = []
         self._jetons_modification_compte: list[str] = []
+        self._mot_de_passe_reinitialise: str | None = None
+        self._exception_reinitialisation_mot_de_passe: Exception | None = None
+        self._jetons_reinitialisation_mot_de_passe: list[str] = []
+        self._identifiants_reinitialisation_mot_de_passe: list[str] = []
 
     def accepter(
         self,
@@ -226,6 +230,21 @@ class VmCentraleClientFactice:
         self.appels_changement_mot_de_passe.append((jeton, nouveau_mot_de_passe))
         if self._exception_changement_mot_de_passe is not None:
             raise self._exception_changement_mot_de_passe
+
+    def reinitialisation_mot_de_passe_reussit(self, mot_de_passe: str) -> None:
+        self._mot_de_passe_reinitialise = mot_de_passe
+        self._exception_reinitialisation_mot_de_passe = None
+
+    def reinitialisation_mot_de_passe_echoue(self, exception: Exception) -> None:
+        self._exception_reinitialisation_mot_de_passe = exception
+
+    def reinitialiser_mot_de_passe(self, jeton: str, identifiant: str) -> str:
+        self._jetons_reinitialisation_mot_de_passe.append(jeton)
+        self._identifiants_reinitialisation_mot_de_passe.append(identifiant)
+        if self._exception_reinitialisation_mot_de_passe is not None:
+            raise self._exception_reinitialisation_mot_de_passe
+        assert self._mot_de_passe_reinitialise is not None
+        return self._mot_de_passe_reinitialise
 
 
 @pytest.fixture(autouse=True)

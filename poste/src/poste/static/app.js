@@ -27,6 +27,9 @@ const formulaireCreationCompte = document.getElementById("formulaire-creation-co
 const creationErreur = document.getElementById("creation-erreur");
 const compteCree = document.getElementById("compte-cree");
 const compteCreeMotDePasse = document.getElementById("compte-cree-mot-de-passe");
+const motDePasseReinitialise = document.getElementById("mot-de-passe-reinitialise");
+const motDePasseReinitialiseIdentifiant = document.getElementById("mot-de-passe-reinitialise-identifiant");
+const motDePasseReinitialiseValeur = document.getElementById("mot-de-passe-reinitialise-valeur");
 const modificationTitre = document.getElementById("modification-titre");
 const modificationIdentifiant = document.getElementById("modification-identifiant");
 const formulaireModificationCompte = document.getElementById("formulaire-modification-compte");
@@ -262,9 +265,53 @@ function ligneCompte(compte) {
   boutonModifier.dataset.identifiant = compte.identifiant;
   boutonModifier.addEventListener("click", () => ouvrirModificationCompte(compte.identifiant));
   celluleActions.append(boutonModifier);
+
+  const boutonReinitialiser = document.createElement("button");
+  boutonReinitialiser.type = "button";
+  boutonReinitialiser.textContent = "Réinitialiser le mot de passe";
+  boutonReinitialiser.dataset.identifiant = compte.identifiant;
+  boutonReinitialiser.addEventListener("click", () => reinitialiserMotDePasse(compte.identifiant));
+  celluleActions.append(boutonReinitialiser);
+
   ligne.append(celluleActions);
 
   return ligne;
+}
+
+async function reinitialiserMotDePasse(identifiant) {
+  comptesErreur.hidden = true;
+  motDePasseReinitialise.hidden = true;
+
+  let reponse;
+  try {
+    reponse = await fetch(`/comptes/${encodeURIComponent(identifiant)}/reinitialiser-mot-de-passe`, {
+      method: "POST",
+    });
+  } catch {
+    comptesErreur.textContent = "Impossible de joindre le service de gestion des comptes. Réessayez plus tard.";
+    comptesErreur.hidden = false;
+    return;
+  }
+
+  if (reponse.status === 401) {
+    afficherEcranConnexion();
+    return;
+  }
+
+  if (!reponse.ok) {
+    const detail = await reponse.json().catch(() => null);
+    comptesErreur.textContent =
+      detail && typeof detail.detail === "string"
+        ? detail.detail
+        : "La réinitialisation du mot de passe a échoué. Réessayez plus tard.";
+    comptesErreur.hidden = false;
+    return;
+  }
+
+  const corps = await reponse.json();
+  motDePasseReinitialiseIdentifiant.textContent = identifiant;
+  motDePasseReinitialiseValeur.textContent = corps.mot_de_passe;
+  motDePasseReinitialise.hidden = false;
 }
 
 function ouvrirModificationCompte(identifiant) {

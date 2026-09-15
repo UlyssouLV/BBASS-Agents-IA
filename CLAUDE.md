@@ -15,6 +15,10 @@ Read, in order:
 
 HTTP-boundary tests only (observable responses). Do not praise or require tests of internal function calls. Same convention as V1 and `docs/specs/`.
 
+## When to run `/code-review`
+
+Not after each `/implement`. Once vs `main` when the PR’s child tickets are done. See skill `code-review-avant-pr`.
+
 ## Out of this file
 
 GitHub tracker, labels, `/implement` lifecycle: `AGENTS.md` and `docs/agents/`. Product spec for the Spec review axis: the originating issue plus `docs/specs/`.

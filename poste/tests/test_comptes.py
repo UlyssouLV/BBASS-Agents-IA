@@ -324,6 +324,83 @@ def test_modification_avec_vm_centrale_injoignable_retourne_une_erreur_propre(
     assert reponse.json()["detail"]
 
 
+# --- POST /comptes/{identifiant}/reinitialiser-mot-de-passe ------------------
+
+
+def test_reinitialisation_avec_session_admin_reussit_et_renvoie_le_mot_de_passe_genere(
+    client, vm_centrale_client_factice
+):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.reinitialisation_mot_de_passe_reussit("Xk9#mPz2Qw")
+
+    reponse = client.post("/comptes/n.durand/reinitialiser-mot-de-passe")
+
+    assert reponse.status_code == 200
+    assert reponse.json()["mot_de_passe"] == "Xk9#mPz2Qw"
+
+
+def test_reinitialisation_transmet_le_jeton_et_l_identifiant(client, vm_centrale_client_factice):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.reinitialisation_mot_de_passe_reussit("Xk9#mPz2Qw")
+
+    client.post("/comptes/n.durand/reinitialiser-mot-de-passe")
+
+    assert vm_centrale_client_factice._jetons_reinitialisation_mot_de_passe == ["jeton-factice"]
+    assert vm_centrale_client_factice._identifiants_reinitialisation_mot_de_passe == ["n.durand"]
+
+
+def test_reinitialisation_sans_session_active_est_refusee(client, vm_centrale_client_factice):
+    reponse = client.post("/comptes/n.durand/reinitialiser-mot-de-passe")
+
+    assert reponse.status_code == 401
+    assert vm_centrale_client_factice._identifiants_reinitialisation_mot_de_passe == []
+
+
+def test_reinitialisation_avec_session_non_admin_est_refusee(client, vm_centrale_client_factice):
+    _connecter(client, vm_centrale_client_factice, est_admin=False)
+    vm_centrale_client_factice.reinitialisation_mot_de_passe_echoue(AccesAdminRequisError())
+
+    reponse = client.post("/comptes/n.durand/reinitialiser-mot-de-passe")
+
+    assert reponse.status_code == 403
+    assert reponse.json()["detail"]
+
+
+def test_reinitialisation_avec_identifiant_inconnu_renvoie_404(client, vm_centrale_client_factice):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.reinitialisation_mot_de_passe_echoue(CompteInexistantError())
+
+    reponse = client.post("/comptes/inconnu/reinitialiser-mot-de-passe")
+
+    assert reponse.status_code == 404
+    assert reponse.json()["detail"]
+
+
+def test_reinitialisation_avec_jeton_revoque_renvoie_401_et_efface_la_session(
+    client, vm_centrale_client_factice
+):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.reinitialisation_mot_de_passe_echoue(JetonInvalideError())
+
+    reponse_reinitialisation = client.post("/comptes/n.durand/reinitialiser-mot-de-passe")
+    reponse_compte = client.get("/compte")
+
+    assert reponse_reinitialisation.status_code == 401
+    assert reponse_compte.status_code == 401
+
+
+def test_reinitialisation_avec_vm_centrale_injoignable_retourne_une_erreur_propre(
+    client, vm_centrale_client_factice
+):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.reinitialisation_mot_de_passe_echoue(httpx.ConnectError("connexion refusée"))
+
+    reponse = client.post("/comptes/n.durand/reinitialiser-mot-de-passe")
+
+    assert reponse.status_code == 502
+    assert reponse.json()["detail"]
+
+
 # --- Visibilité de l'onglet dans le HTML/JS servi -----------------------------
 
 
@@ -342,3 +419,18 @@ def test_front_end_porte_le_balisage_et_la_logique_de_l_onglet_comptes(client, v
     assert 'id="onglet-bouton-comptes" hidden' in html
     assert 'id="onglet-comptes" hidden' in html
     assert "ongletBoutonComptes.hidden = !compte.est_admin" in js
+
+
+def test_front_end_porte_le_balisage_et_l_appel_de_reinitialisation_du_mot_de_passe(
+    client, vm_centrale_client_factice
+):
+    # Même limite que le test précédent (aucun rendu côté serveur) : on
+    # vérifie ici que le HTML sert bien la zone où afficher le mot de passe
+    # régénéré, et que le JS appelle le bon endpoint plutôt qu'une simple
+    # présence du texte du bouton, qui laisserait passer un mauvais chemin.
+    html = client.get("/").text
+    js = client.get("/static/app.js").text
+
+    assert 'id="mot-de-passe-reinitialise" role="status" hidden' in html
+    assert 'id="mot-de-passe-reinitialise-valeur"' in html
+    assert "/reinitialiser-mot-de-passe" in js

@@ -22,6 +22,7 @@ This is the "developed, not merged" state. Close happens only at merge to `main`
 
 3. Only if the **latest user message** clearly says yes (e.g. "oui", "ok pour awaiting-merge", "marque #10"): run `gh` below.
 4. Still do **not** commit or push unless they asked for that separately.
+5. Do **not** run `/code-review` here. See skill `code-review-avant-pr`.
 
 ## Correct GitHub state (after yes)
 

@@ -5,6 +5,7 @@ from poste.schemas import (
     CompteCreationRequest,
     CompteCreeResponse,
     CompteModificationRequest,
+    MotDePasseReinitialiseResponse,
 )
 from poste.session import SessionStore, get_session_store
 from poste.vm_centrale_client import (
@@ -141,3 +142,21 @@ def modifier_compte(
         est_admin=compte.est_admin,
         doit_changer_mot_de_passe=compte.doit_changer_mot_de_passe,
     )
+
+
+@router.post(
+    "/comptes/{identifiant}/reinitialiser-mot-de-passe",
+    response_model=MotDePasseReinitialiseResponse,
+)
+def reinitialiser_mot_de_passe(
+    identifiant: str,
+    client: VmCentraleClient = Depends(get_vm_centrale_client),
+    session: SessionStore = Depends(get_session_store),
+) -> MotDePasseReinitialiseResponse:
+    jeton = _jeton_de_session(session)
+    try:
+        mot_de_passe = client.reinitialiser_mot_de_passe(jeton, identifiant)
+    except Exception as erreur:
+        raise _erreur_vm_vers_http(session, erreur) from erreur
+
+    return MotDePasseReinitialiseResponse(mot_de_passe=mot_de_passe)

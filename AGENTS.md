@@ -14,6 +14,8 @@ Default canonical labels (`needs-triage`, `needs-info`, `ready-for-agent`, `read
 
 Ask before labelling `awaiting-merge`. See skill `apres-implement-awaiting-merge`.
 
+Do **not** run `/code-review` after each child ticket. One review vs `main` when the PR slice is complete. See skill `code-review-avant-pr`.
+
 ### Domain docs
 
 Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`. `/code-review` Standards: start at `CLAUDE.md`.
