@@ -727,6 +727,25 @@ def test_suppression_sur_dernier_administrateur_renvoie_409(client, vm_centrale_
     assert reponse.json()["detail"]
 
 
+def test_suppression_sur_dernier_administrateur_relaie_le_message_de_la_vm(
+    client, vm_centrale_client_factice
+):
+    # Le message de suppression ("Impossible de supprimer...") diffère de
+    # celui de la rétrogradation ("Impossible de retirer...", voir
+    # test_changement_de_statut_admin_sur_dernier_administrateur_renvoie_409) :
+    # relayé tel quel plutôt qu'un texte générique unique (voir
+    # DernierAdministrateurError et _erreur_vm_vers_http).
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.suppression_compte_echoue(
+        DernierAdministrateurError("Impossible de supprimer le dernier compte administrateur restant")
+    )
+
+    reponse = _supprimer(client, identifiant="a.martin")
+
+    assert reponse.status_code == 409
+    assert reponse.json()["detail"] == "Impossible de supprimer le dernier compte administrateur restant"
+
+
 def test_suppression_sans_cle_est_rejetee_sans_appeler_la_vm(client, vm_centrale_client_factice):
     _connecter(client, vm_centrale_client_factice)
 

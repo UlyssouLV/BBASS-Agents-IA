@@ -41,8 +41,12 @@ class CleAdminInvalideError(Exception):
 
 
 class DernierAdministrateurError(Exception):
-    # 409 de la VM : la rétrogradation ferait passer le nombre de comptes
-    # administrateur à zéro (garde-fou dernier administrateur, spec V1.1).
+    # 409 de la VM : la rétrogradation ou la suppression ferait passer le
+    # nombre de comptes administrateur à zéro (garde-fou dernier
+    # administrateur, spec V1.1). La VM distingue les deux cas par un texte
+    # différent (vm_centrale.routers.comptes) : porté par le message de cette
+    # exception plutôt que redupliqué ici, pour que le poste affiche le bon
+    # verbe (rétrograder vs supprimer) sans connaître les deux textes.
     pass
 
 
@@ -126,7 +130,7 @@ def _lever_si_action_avec_cle_admin_refusee(reponse: httpx.Response) -> None:
     if reponse.status_code == 403:
         raise AccesAdminRequisError()
     if reponse.status_code == 409:
-        raise DernierAdministrateurError()
+        raise DernierAdministrateurError(reponse.json()["detail"])
 
 
 class VmCentraleClient:

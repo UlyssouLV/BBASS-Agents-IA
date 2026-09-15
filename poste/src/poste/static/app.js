@@ -657,10 +657,16 @@ formulaireSuppressionCompte.addEventListener("submit", async (evenement) => {
   suppressionErreur.hidden = true;
 
   const cleAdminVm = suppressionCle.value;
+  // Capturé avant l'attente réseau : si l'administrateur ouvre la
+  // confirmation d'un autre compte pendant que cette requête est en vol,
+  // identifiantEnCoursDeSuppression aura changé (voir ouvrirSuppressionCompte)
+  // et ne doit pas être relu après coup, au risque d'attribuer la suppression
+  // au mauvais compte.
+  const identifiantSupprime = identifiantEnCoursDeSuppression;
 
   let reponse;
   try {
-    reponse = await fetch(`/comptes/${encodeURIComponent(identifiantEnCoursDeSuppression)}`, {
+    reponse = await fetch(`/comptes/${encodeURIComponent(identifiantSupprime)}`, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ cle_admin_vm: cleAdminVm }),
@@ -686,8 +692,13 @@ formulaireSuppressionCompte.addEventListener("submit", async (evenement) => {
     return;
   }
 
-  const identifiantSupprime = identifiantEnCoursDeSuppression;
-  fermerSuppressionCompte();
+  // Ne referme le formulaire que s'il concerne toujours le compte qu'on
+  // vient de supprimer : l'administrateur a pu, pendant la requête, ouvrir la
+  // confirmation d'un autre compte (voir capture d'identifiantSupprime
+  // ci-dessus), auquel cas cette saisie en cours ne doit pas être perdue.
+  if (identifiantEnCoursDeSuppression === identifiantSupprime) {
+    fermerSuppressionCompte();
+  }
   suppressionConfirmationIdentifiant.textContent = identifiantSupprime;
   suppressionConfirmation.hidden = false;
   await chargerComptes();

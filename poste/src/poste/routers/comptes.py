@@ -64,7 +64,13 @@ def _erreur_vm_vers_http(session: SessionStore, erreur: Exception) -> HTTPExcept
         # CleAdminInvalideError et ADR-0007).
         return HTTPException(status_code=403, detail=_CLE_ADMIN_INVALIDE)
     if isinstance(erreur, DernierAdministrateurError):
-        return HTTPException(status_code=409, detail=_DERNIER_ADMINISTRATEUR)
+        # La VM distingue rétrogradation ("retirer") et suppression
+        # ("supprimer") par un texte différent (voir DernierAdministrateurError) :
+        # on le relaie tel quel plutôt que d'afficher toujours le même verbe.
+        # Le message factice sans argument des tests de router retombe sur
+        # _DERNIER_ADMINISTRATEUR.
+        detail = str(erreur) or _DERNIER_ADMINISTRATEUR
+        return HTTPException(status_code=409, detail=detail)
     return HTTPException(status_code=502, detail=_VM_CENTRALE_INDISPONIBLE)
 
 
