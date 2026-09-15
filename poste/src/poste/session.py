@@ -15,6 +15,10 @@ class DonneesSessionPersistee:
     prenom: str
     nom: str
     jeton: str
+    agence: str
+    poles: list[str]
+    est_admin: bool
+    doit_changer_mot_de_passe: bool
 
 
 class SessionStore:
@@ -29,6 +33,10 @@ class SessionStore:
         self._prenom: str | None = None
         self._nom: str | None = None
         self._jeton: str | None = None
+        self._agence: str | None = None
+        self._poles: list[str] | None = None
+        self._est_admin: bool | None = None
+        self._doit_changer_mot_de_passe: bool | None = None
         self._persistance_degradee = False
 
     @property
@@ -52,42 +60,106 @@ class SessionStore:
         return self._jeton
 
     @property
+    def agence(self) -> str | None:
+        return self._agence
+
+    @property
+    def poles(self) -> list[str] | None:
+        return self._poles
+
+    @property
+    def est_admin(self) -> bool | None:
+        return self._est_admin
+
+    @property
+    def doit_changer_mot_de_passe(self) -> bool | None:
+        return self._doit_changer_mot_de_passe
+
+    @property
     def persistance_degradee(self) -> bool:
         return self._persistance_degradee
 
-    def ouvrir(self, identifiant: str, prenom: str, nom: str, jeton: str) -> None:
-        self._definir(identifiant, prenom, nom, jeton)
+    def ouvrir(
+        self,
+        identifiant: str,
+        prenom: str,
+        nom: str,
+        jeton: str,
+        agence: str,
+        poles: list[str],
+        est_admin: bool,
+        doit_changer_mot_de_passe: bool,
+    ) -> None:
+        self._definir(identifiant, prenom, nom, jeton, agence, poles, est_admin, doit_changer_mot_de_passe)
         try:
             keyring.set_password(
                 _SERVICE_NOM,
                 _UTILISATEUR,
                 json.dumps(
-                    {"identifiant": identifiant, "prenom": prenom, "nom": nom, "jeton": jeton}
+                    {
+                        "identifiant": identifiant,
+                        "prenom": prenom,
+                        "nom": nom,
+                        "jeton": jeton,
+                        "agence": agence,
+                        "poles": poles,
+                        "est_admin": est_admin,
+                        "doit_changer_mot_de_passe": doit_changer_mot_de_passe,
+                    }
                 ),
             )
             self._persistance_degradee = False
         except Exception:
             self._persistance_degradee = True
 
-    def restaurer_verifiee(self, identifiant: str, prenom: str, nom: str, jeton: str) -> None:
-        # Utilisé uniquement par verifier_session_au_demarrage : les données
-        # sont déjà persistées (elles viennent d'en être lues) et l'identifiant
-        # vient de la vérification côté VM, jamais du blob local en l'état où
-        # il a été lu. Ne ré-écrit pas le keyring (lecture puis écriture
-        # identique à chaque lancement, pure perte).
-        self._definir(identifiant, prenom, nom, jeton)
+    def restaurer_verifiee(
+        self,
+        identifiant: str,
+        est_admin: bool,
+        prenom: str,
+        nom: str,
+        jeton: str,
+        agence: str,
+        poles: list[str],
+        doit_changer_mot_de_passe: bool,
+    ) -> None:
+        # Utilisé uniquement par verifier_session_au_demarrage : identifiant et
+        # est_admin viennent de la vérification côté VM (source de vérité,
+        # jamais mis en cache au-delà de cette vérification), tandis que
+        # prenom/nom/agence/poles/doit_changer_mot_de_passe viennent du blob
+        # local déjà persisté. Ne ré-écrit pas le keyring (lecture puis
+        # écriture identique à chaque lancement, pure perte).
+        self._definir(identifiant, prenom, nom, jeton, agence, poles, est_admin, doit_changer_mot_de_passe)
 
-    def _definir(self, identifiant: str, prenom: str, nom: str, jeton: str) -> None:
+    def _definir(
+        self,
+        identifiant: str,
+        prenom: str,
+        nom: str,
+        jeton: str,
+        agence: str,
+        poles: list[str],
+        est_admin: bool,
+        doit_changer_mot_de_passe: bool,
+    ) -> None:
         self._identifiant = identifiant
         self._prenom = prenom
         self._nom = nom
         self._jeton = jeton
+        self._agence = agence
+        self._poles = poles
+        self._est_admin = est_admin
+        self._doit_changer_mot_de_passe = doit_changer_mot_de_passe
 
     def fermer(self) -> None:
         self._identifiant = None
         self._prenom = None
         self._nom = None
         self._jeton = None
+        self._agence = None
+        self._poles = None
+        self._est_admin = None
+        self._doit_changer_mot_de_passe = None
         try:
             keyring.delete_password(_SERVICE_NOM, _UTILISATEUR)
         except Exception:
@@ -113,6 +185,10 @@ class SessionStore:
                 prenom=donnees["prenom"],
                 nom=donnees["nom"],
                 jeton=donnees["jeton"],
+                agence=donnees["agence"],
+                poles=donnees["poles"],
+                est_admin=donnees["est_admin"],
+                doit_changer_mot_de_passe=donnees["doit_changer_mot_de_passe"],
             )
         except (ValueError, KeyError, TypeError):
             return None
@@ -134,17 +210,28 @@ def verifier_session_au_demarrage(session: SessionStore, client: VmCentraleClien
         return
 
     try:
-        identifiant_verifie = client.verifier(donnees.jeton)
+        verification = client.verifier(donnees.jeton)
     except Exception:
         # VM injoignable au lancement : écran de connexion, sans toucher à la
         # session persistée (elle pourra être revalidée au prochain lancement).
         return
 
-    if identifiant_verifie is None:
+    if verification is None:
         session.fermer()
         return
 
-    # L'identifiant vient de la réponse de la VM (source de vérité), jamais
-    # du blob local : le jeton stocké est la seule donnée que la VM
-    # authentifie réellement ici.
-    session.restaurer_verifiee(identifiant_verifie, donnees.prenom, donnees.nom, donnees.jeton)
+    # identifiant et est_admin viennent de la réponse de la VM (source de
+    # vérité, jamais du blob local) : est_admin n'est jamais mis en cache
+    # au-delà de cette vérification, contrairement à prenom/nom/agence/poles
+    # /doit_changer_mot_de_passe qui restent lus du cache local comme
+    # aujourd'hui.
+    session.restaurer_verifiee(
+        identifiant=verification.identifiant,
+        est_admin=verification.est_admin,
+        prenom=donnees.prenom,
+        nom=donnees.nom,
+        jeton=donnees.jeton,
+        agence=donnees.agence,
+        poles=donnees.poles,
+        doit_changer_mot_de_passe=donnees.doit_changer_mot_de_passe,
+    )

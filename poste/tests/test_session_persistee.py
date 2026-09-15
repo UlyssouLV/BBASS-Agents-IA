@@ -1,10 +1,27 @@
+import json
+
 from poste.session import SessionStore
+
+_POLES = ["Foncier", "Urbanisme"]
+
+
+def _ouvrir(store, identifiant="j.dupont", prenom="Jean", nom="Dupont", jeton="jeton-abc"):
+    store.ouvrir(
+        identifiant,
+        prenom,
+        nom,
+        jeton,
+        "Castries",
+        _POLES,
+        True,
+        True,
+    )
 
 
 def test_ouvrir_persiste_la_session(keyring_factice):
     store = SessionStore()
 
-    store.ouvrir("j.dupont", "Jean", "Dupont", "jeton-abc")
+    _ouvrir(store)
 
     autre_store = SessionStore()
     donnees = autre_store.lire_session_persistee()
@@ -13,15 +30,19 @@ def test_ouvrir_persiste_la_session(keyring_factice):
     assert donnees.prenom == "Jean"
     assert donnees.nom == "Dupont"
     assert donnees.jeton == "jeton-abc"
+    assert donnees.agence == "Castries"
+    assert donnees.poles == _POLES
+    assert donnees.est_admin is True
+    assert donnees.doit_changer_mot_de_passe is True
 
 
 def test_le_mot_de_passe_n_est_jamais_persiste(keyring_factice):
     store = SessionStore()
 
-    store.ouvrir("j.dupont", "Jean", "Dupont", "jeton-abc")
+    _ouvrir(store)
 
     ((_service, _utilisateur), brut) = next(iter(keyring_factice.items()))
-    assert "mot_de_passe" not in brut
+    assert "mot_de_passe" not in json.loads(brut)
     assert "mot-de-passe" not in brut
 
 
@@ -33,7 +54,7 @@ def test_lire_session_persistee_retourne_none_si_rien_n_est_stocke(keyring_facti
 
 def test_fermer_supprime_la_session_persistee(keyring_factice):
     store = SessionStore()
-    store.ouvrir("j.dupont", "Jean", "Dupont", "jeton-abc")
+    _ouvrir(store)
 
     store.fermer()
 
@@ -53,7 +74,7 @@ def test_ouvrir_degrade_silencieusement_si_keyring_leve_une_exception(monkeypatc
     monkeypatch.setattr("poste.session.keyring.set_password", set_password_en_echec)
     store = SessionStore()
 
-    store.ouvrir("j.dupont", "Jean", "Dupont", "jeton-abc")
+    _ouvrir(store)
 
     assert store.est_connecte
     assert store.identifiant == "j.dupont"
@@ -84,10 +105,10 @@ def test_persistance_degradee_se_reinitialise_apres_un_succes(monkeypatch):
     monkeypatch.setattr("poste.session.keyring.set_password", set_password_echoue_une_fois)
     store = SessionStore()
 
-    store.ouvrir("j.dupont", "Jean", "Dupont", "jeton-1")
+    _ouvrir(store, jeton="jeton-1")
     assert store.persistance_degradee
 
-    store.ouvrir("j.dupont", "Jean", "Dupont", "jeton-2")
+    _ouvrir(store, jeton="jeton-2")
     assert not store.persistance_degradee
 
 
@@ -97,7 +118,7 @@ def test_fermer_ignore_une_exception_du_gestionnaire_d_identifiants(monkeypatch)
 
     monkeypatch.setattr("poste.session.keyring.delete_password", delete_password_en_echec)
     store = SessionStore()
-    store.ouvrir("j.dupont", "Jean", "Dupont", "jeton-abc")
+    _ouvrir(store)
 
     store.fermer()
 

@@ -33,12 +33,23 @@ def connexion(
         raise HTTPException(status_code=401, detail=_ECHEC_CONNEXION)
 
     session.ouvrir(
-        requete.identifiant, authentification.prenom, authentification.nom, authentification.jeton
+        requete.identifiant,
+        authentification.prenom,
+        authentification.nom,
+        authentification.jeton,
+        authentification.agence,
+        authentification.poles,
+        authentification.est_admin,
+        authentification.doit_changer_mot_de_passe,
     )
     return ConnexionResponse(
         identifiant=requete.identifiant,
         prenom=authentification.prenom,
         nom=authentification.nom,
+        agence=authentification.agence,
+        poles=authentification.poles,
+        est_admin=authentification.est_admin,
+        doit_changer_mot_de_passe=authentification.doit_changer_mot_de_passe,
         avertissement=_PERSISTANCE_DEGRADEE if session.persistance_degradee else None,
     )
 
@@ -66,7 +77,22 @@ def compte_connecte(session: SessionStore = Depends(get_session_store)) -> Compt
     if identifiant is None:
         raise HTTPException(status_code=401, detail=_AUCUNE_SESSION)
 
-    # SessionStore.ouvrir()/fermer() posent toujours identifiant, prenom et nom
-    # ensemble : identifiant non-None garantit prenom/nom non-None.
-    assert session.prenom is not None and session.nom is not None
-    return CompteResponse(identifiant=identifiant, prenom=session.prenom, nom=session.nom)
+    # SessionStore.ouvrir()/fermer() posent toujours ces champs ensemble :
+    # identifiant non-None garantit que les autres le sont aussi.
+    assert (
+        session.prenom is not None
+        and session.nom is not None
+        and session.agence is not None
+        and session.poles is not None
+        and session.est_admin is not None
+        and session.doit_changer_mot_de_passe is not None
+    )
+    return CompteResponse(
+        identifiant=identifiant,
+        prenom=session.prenom,
+        nom=session.nom,
+        agence=session.agence,
+        poles=session.poles,
+        est_admin=session.est_admin,
+        doit_changer_mot_de_passe=session.doit_changer_mot_de_passe,
+    )

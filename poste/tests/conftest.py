@@ -6,6 +6,7 @@ from poste.session import SessionStore, get_session_store
 from poste.vm_centrale_client import (
     AuthentificationReussie,
     JetonInvalideError,
+    VerificationReussie,
     get_vm_centrale_client,
 )
 
@@ -24,15 +25,32 @@ class VmCentraleClientFactice:
         self._jeton = "jeton-factice"
         self._prenom = "Jean"
         self._nom = "Dupont"
+        self._agence = "Castries"
+        self._poles: list[str] = ["Foncier"]
+        self._est_admin = False
+        self._doit_changer_mot_de_passe = False
         self._identifiant_verifie: str | None = None
+        self._est_admin_verifie = False
         self._exception_verification: Exception | None = None
         self._exception_revocation: Exception | None = None
 
-    def accepter(self, prenom: str = "Jean", nom: str = "Dupont") -> None:
+    def accepter(
+        self,
+        prenom: str = "Jean",
+        nom: str = "Dupont",
+        agence: str = "Castries",
+        poles: list[str] | None = None,
+        est_admin: bool = False,
+        doit_changer_mot_de_passe: bool = False,
+    ) -> None:
         self._authentifie = True
         self._exception = None
         self._prenom = prenom
         self._nom = nom
+        self._agence = agence
+        self._poles = poles if poles is not None else ["Foncier"]
+        self._est_admin = est_admin
+        self._doit_changer_mot_de_passe = doit_changer_mot_de_passe
 
     def rejeter(self) -> None:
         self._authentifie = False
@@ -51,8 +69,9 @@ class VmCentraleClientFactice:
         self._jeton_rejete_par_le_relais = True
         self._exception = None
 
-    def verification_reussit(self, identifiant: str) -> None:
+    def verification_reussit(self, identifiant: str, est_admin: bool = False) -> None:
         self._identifiant_verifie = identifiant
+        self._est_admin_verifie = est_admin
         self._exception_verification = None
 
     def verification_echoue(self) -> None:
@@ -71,7 +90,15 @@ class VmCentraleClientFactice:
             raise self._exception
         if not self._authentifie:
             return None
-        return AuthentificationReussie(prenom=self._prenom, nom=self._nom, jeton=self._jeton)
+        return AuthentificationReussie(
+            prenom=self._prenom,
+            nom=self._nom,
+            jeton=self._jeton,
+            agence=self._agence,
+            poles=self._poles,
+            est_admin=self._est_admin,
+            doit_changer_mot_de_passe=self._doit_changer_mot_de_passe,
+        )
 
     def envoyer_message(self, message: str, jeton: str) -> str:
         self.messages_recus.append(message)
@@ -82,11 +109,13 @@ class VmCentraleClientFactice:
             raise self._exception
         return self._reponse_message
 
-    def verifier(self, jeton: str) -> str | None:
+    def verifier(self, jeton: str) -> VerificationReussie | None:
         self.jetons_verifies.append(jeton)
         if self._exception_verification is not None:
             raise self._exception_verification
-        return self._identifiant_verifie
+        if self._identifiant_verifie is None:
+            return None
+        return VerificationReussie(identifiant=self._identifiant_verifie, est_admin=self._est_admin_verifie)
 
     def revoquer(self, jeton: str) -> None:
         self.jetons_revoques.append(jeton)

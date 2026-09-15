@@ -10,6 +10,10 @@ class ConnexionResponse(BaseModel):
     identifiant: str
     prenom: str
     nom: str
+    agence: str
+    poles: list[str]
+    est_admin: bool
+    doit_changer_mot_de_passe: bool
     avertissement: str | None = None
 
 
@@ -17,6 +21,10 @@ class CompteResponse(BaseModel):
     identifiant: str
     prenom: str
     nom: str
+    agence: str
+    poles: list[str]
+    est_admin: bool
+    doit_changer_mot_de_passe: bool
 
 
 class MessageRequest(BaseModel):

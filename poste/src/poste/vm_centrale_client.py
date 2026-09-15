@@ -19,6 +19,16 @@ class AuthentificationReussie:
     prenom: str
     nom: str
     jeton: str
+    agence: str
+    poles: list[str]
+    est_admin: bool
+    doit_changer_mot_de_passe: bool
+
+
+@dataclass
+class VerificationReussie:
+    identifiant: str
+    est_admin: bool
 
 
 class VmCentraleClient:
@@ -31,7 +41,15 @@ class VmCentraleClient:
             return None
         reponse.raise_for_status()
         corps = reponse.json()
-        return AuthentificationReussie(prenom=corps["prenom"], nom=corps["nom"], jeton=corps["jeton"])
+        return AuthentificationReussie(
+            prenom=corps["prenom"],
+            nom=corps["nom"],
+            jeton=corps["jeton"],
+            agence=corps["agence"],
+            poles=corps["poles"],
+            est_admin=corps["est_admin"],
+            doit_changer_mot_de_passe=corps["doit_changer_mot_de_passe"],
+        )
 
     def envoyer_message(self, message: str, jeton: str) -> str:
         reponse = _http_client.post(
@@ -44,7 +62,7 @@ class VmCentraleClient:
         reponse.raise_for_status()
         return reponse.json()["reponse"]
 
-    def verifier(self, jeton: str) -> str | None:
+    def verifier(self, jeton: str) -> VerificationReussie | None:
         reponse = _http_client.get(
             f"{VM_CENTRALE_BASE_URL}/auth/verifier",
             headers={"Authorization": f"Bearer {jeton}"},
@@ -52,7 +70,8 @@ class VmCentraleClient:
         if reponse.status_code == 401:
             return None
         reponse.raise_for_status()
-        return reponse.json()["identifiant"]
+        corps = reponse.json()
+        return VerificationReussie(identifiant=corps["identifiant"], est_admin=corps["est_admin"])
 
     def revoquer(self, jeton: str) -> None:
         reponse = _http_client.delete(
