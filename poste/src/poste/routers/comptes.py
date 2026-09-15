@@ -6,11 +6,14 @@ from poste.schemas import (
     CompteCreeResponse,
     CompteModificationRequest,
     MotDePasseReinitialiseResponse,
+    StatutAdminRequest,
 )
 from poste.session import SessionStore, get_session_store
 from poste.vm_centrale_client import (
     AccesAdminRequisError,
+    CleAdminInvalideError,
     CompteInexistantError,
+    DernierAdministrateurError,
     IdentifiantDejaUtiliseError,
     JetonInvalideError,
     VmCentraleClient,
@@ -24,6 +27,10 @@ _ACCES_ADMIN_REQUIS = "Accès réservé aux comptes administrateurs"
 _IDENTIFIANT_DEJA_UTILISE = "Cet identifiant est déjà utilisé"
 _COMPTE_INTROUVABLE = "Compte introuvable"
 _VM_CENTRALE_INDISPONIBLE = "Le service de gestion des comptes de la VM centrale est indisponible"
+# Mêmes textes que côté VM (vm_centrale.routers.comptes/autorisation) : voir
+# _COMPTE_INTROUVABLE ci-dessus pour le même principe déjà en place.
+_CLE_ADMIN_INVALIDE = "Clé d'administration manquante ou invalide"
+_DERNIER_ADMINISTRATEUR = "Impossible de retirer le dernier compte administrateur restant"
 
 
 def _jeton_de_session(session: SessionStore) -> str:
@@ -49,6 +56,14 @@ def _erreur_vm_vers_http(session: SessionStore, erreur: Exception) -> HTTPExcept
         return HTTPException(status_code=409, detail=_IDENTIFIANT_DEJA_UTILISE)
     if isinstance(erreur, CompteInexistantError):
         return HTTPException(status_code=404, detail=_COMPTE_INTROUVABLE)
+    if isinstance(erreur, CleAdminInvalideError):
+        # 403, jamais 401 : contrairement à un jeton invalide, la clé
+        # d'administration VM saisie en trop n'a rien à voir avec la session
+        # de l'administrateur, qui doit rester ouverte (voir
+        # CleAdminInvalideError et ADR-0007).
+        return HTTPException(status_code=403, detail=_CLE_ADMIN_INVALIDE)
+    if isinstance(erreur, DernierAdministrateurError):
+        return HTTPException(status_code=409, detail=_DERNIER_ADMINISTRATEUR)
     return HTTPException(status_code=502, detail=_VM_CENTRALE_INDISPONIBLE)
 
 
@@ -173,3 +188,30 @@ def deconnexion_forcee(
         client.deconnexion_forcee(jeton, identifiant)
     except Exception as erreur:
         raise _erreur_vm_vers_http(session, erreur) from erreur
+
+
+@router.patch("/comptes/{identifiant}/est-admin", response_model=CompteAdminResponse)
+def modifier_statut_admin(
+    identifiant: str,
+    requete: StatutAdminRequest,
+    client: VmCentraleClient = Depends(get_vm_centrale_client),
+    session: SessionStore = Depends(get_session_store),
+) -> CompteAdminResponse:
+    jeton = _jeton_de_session(session)
+    try:
+        compte = client.modifier_statut_admin(
+            jeton, identifiant, est_admin=requete.est_admin, cle_admin_vm=requete.cle_admin_vm
+        )
+    except Exception as erreur:
+        raise _erreur_vm_vers_http(session, erreur) from erreur
+
+    return CompteAdminResponse(
+        identifiant=compte.identifiant,
+        prenom=compte.prenom,
+        nom=compte.nom,
+        email=compte.email,
+        agence=compte.agence,
+        poles=compte.poles,
+        est_admin=compte.est_admin,
+        doit_changer_mot_de_passe=compte.doit_changer_mot_de_passe,
+    )

@@ -55,6 +55,10 @@ class VmCentraleClientFactice:
         self._exception_deconnexion_forcee: Exception | None = None
         self._jetons_deconnexion_forcee: list[str] = []
         self._identifiants_deconnexion_forcee: list[str] = []
+        self._compte_statut_admin_modifie: CompteAdmin | None = None
+        self._exception_statut_admin: Exception | None = None
+        self._jetons_statut_admin: list[str] = []
+        self._requetes_statut_admin: list[dict] = []
 
     def accepter(
         self,
@@ -257,6 +261,25 @@ class VmCentraleClientFactice:
         self._identifiants_deconnexion_forcee.append(identifiant)
         if self._exception_deconnexion_forcee is not None:
             raise self._exception_deconnexion_forcee
+
+    def statut_admin_modifie(self, compte: CompteAdmin) -> None:
+        self._compte_statut_admin_modifie = compte
+        self._exception_statut_admin = None
+
+    def statut_admin_echoue(self, exception: Exception) -> None:
+        self._exception_statut_admin = exception
+
+    def modifier_statut_admin(
+        self, jeton: str, identifiant: str, est_admin: bool, cle_admin_vm: str
+    ) -> CompteAdmin:
+        self._jetons_statut_admin.append(jeton)
+        self._requetes_statut_admin.append(
+            {"identifiant": identifiant, "est_admin": est_admin, "cle_admin_vm": cle_admin_vm}
+        )
+        if self._exception_statut_admin is not None:
+            raise self._exception_statut_admin
+        assert self._compte_statut_admin_modifie is not None
+        return self._compte_statut_admin_modifie
 
 
 @pytest.fixture(autouse=True)

@@ -2,9 +2,11 @@ import httpx
 
 from poste.vm_centrale_client import (
     AccesAdminRequisError,
+    CleAdminInvalideError,
     CompteAdmin,
     CompteCree,
     CompteInexistantError,
+    DernierAdministrateurError,
     IdentifiantDejaUtiliseError,
     JetonInvalideError,
 )
@@ -473,6 +475,163 @@ def test_deconnexion_forcee_avec_vm_centrale_injoignable_retourne_une_erreur_pro
     assert reponse.json()["detail"]
 
 
+# --- PATCH /comptes/{identifiant}/est-admin -----------------------------------
+
+
+def test_changement_de_statut_admin_avec_session_admin_et_cle_valide_reussit(
+    client, vm_centrale_client_factice
+):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.statut_admin_modifie(
+        _compte_admin(identifiant="n.durand", est_admin=True)
+    )
+
+    reponse = client.patch(
+        "/comptes/n.durand/est-admin",
+        json={"est_admin": True, "cle_admin_vm": "cle-admin-de-test"},
+    )
+
+    assert reponse.status_code == 200
+    corps = reponse.json()
+    assert corps["identifiant"] == "n.durand"
+    assert corps["est_admin"] is True
+
+
+def test_changement_de_statut_admin_transmet_le_jeton_et_la_requete(
+    client, vm_centrale_client_factice
+):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.statut_admin_modifie(_compte_admin(identifiant="n.durand"))
+
+    client.patch(
+        "/comptes/n.durand/est-admin",
+        json={"est_admin": False, "cle_admin_vm": "cle-admin-de-test"},
+    )
+
+    assert vm_centrale_client_factice._jetons_statut_admin == ["jeton-factice"]
+    assert vm_centrale_client_factice._requetes_statut_admin == [
+        {"identifiant": "n.durand", "est_admin": False, "cle_admin_vm": "cle-admin-de-test"}
+    ]
+
+
+def test_changement_de_statut_admin_sans_session_active_est_refuse(
+    client, vm_centrale_client_factice
+):
+    reponse = client.patch(
+        "/comptes/n.durand/est-admin",
+        json={"est_admin": True, "cle_admin_vm": "cle-admin-de-test"},
+    )
+
+    assert reponse.status_code == 401
+    assert vm_centrale_client_factice._requetes_statut_admin == []
+
+
+def test_changement_de_statut_admin_avec_session_non_admin_est_refuse(
+    client, vm_centrale_client_factice
+):
+    _connecter(client, vm_centrale_client_factice, est_admin=False)
+    vm_centrale_client_factice.statut_admin_echoue(AccesAdminRequisError())
+
+    reponse = client.patch(
+        "/comptes/n.durand/est-admin",
+        json={"est_admin": True, "cle_admin_vm": "cle-admin-de-test"},
+    )
+
+    assert reponse.status_code == 403
+    assert reponse.json()["detail"]
+
+
+def test_changement_de_statut_admin_avec_cle_admin_invalide_est_refuse_sans_fermer_la_session(
+    client, vm_centrale_client_factice
+):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.statut_admin_echoue(CleAdminInvalideError())
+
+    reponse_changement = client.patch(
+        "/comptes/n.durand/est-admin",
+        json={"est_admin": True, "cle_admin_vm": "mauvaise-cle"},
+    )
+    reponse_compte = client.get("/compte")
+
+    assert reponse_changement.status_code == 403
+    assert reponse_changement.json()["detail"]
+    assert reponse_compte.status_code == 200
+
+
+def test_changement_de_statut_admin_avec_jeton_revoque_renvoie_401_et_efface_la_session(
+    client, vm_centrale_client_factice
+):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.statut_admin_echoue(JetonInvalideError())
+
+    reponse_changement = client.patch(
+        "/comptes/n.durand/est-admin",
+        json={"est_admin": True, "cle_admin_vm": "cle-admin-de-test"},
+    )
+    reponse_compte = client.get("/compte")
+
+    assert reponse_changement.status_code == 401
+    assert reponse_compte.status_code == 401
+
+
+def test_changement_de_statut_admin_avec_identifiant_inconnu_renvoie_404(
+    client, vm_centrale_client_factice
+):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.statut_admin_echoue(CompteInexistantError())
+
+    reponse = client.patch(
+        "/comptes/inconnu/est-admin",
+        json={"est_admin": True, "cle_admin_vm": "cle-admin-de-test"},
+    )
+
+    assert reponse.status_code == 404
+    assert reponse.json()["detail"]
+
+
+def test_changement_de_statut_admin_sur_dernier_administrateur_renvoie_409(
+    client, vm_centrale_client_factice
+):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.statut_admin_echoue(DernierAdministrateurError())
+
+    reponse = client.patch(
+        "/comptes/a.martin/est-admin",
+        json={"est_admin": False, "cle_admin_vm": "cle-admin-de-test"},
+    )
+
+    assert reponse.status_code == 409
+    assert reponse.json()["detail"]
+
+
+def test_changement_de_statut_admin_sans_cle_est_rejete_sans_appeler_la_vm(
+    client, vm_centrale_client_factice
+):
+    _connecter(client, vm_centrale_client_factice)
+
+    reponse = client.patch(
+        "/comptes/n.durand/est-admin", json={"est_admin": True, "cle_admin_vm": ""}
+    )
+
+    assert reponse.status_code == 422
+    assert vm_centrale_client_factice._requetes_statut_admin == []
+
+
+def test_changement_de_statut_admin_avec_vm_centrale_injoignable_retourne_une_erreur_propre(
+    client, vm_centrale_client_factice
+):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.statut_admin_echoue(httpx.ConnectError("connexion refusée"))
+
+    reponse = client.patch(
+        "/comptes/n.durand/est-admin",
+        json={"est_admin": True, "cle_admin_vm": "cle-admin-de-test"},
+    )
+
+    assert reponse.status_code == 502
+    assert reponse.json()["detail"]
+
+
 # --- Visibilité de l'onglet dans le HTML/JS servi -----------------------------
 
 
@@ -521,3 +680,21 @@ def test_front_end_porte_le_balisage_et_l_appel_de_deconnexion_forcee(
     assert 'id="deconnexion-forcee-confirmation" role="status" hidden' in html
     assert 'id="deconnexion-forcee-identifiant"' in html
     assert "/deconnexion-forcee" in js
+
+
+def test_front_end_porte_le_balisage_et_l_appel_de_changement_de_statut_admin(
+    client, vm_centrale_client_factice
+):
+    # Même limite que les tests précédents (aucun rendu côté serveur) : on
+    # vérifie que le HTML sert bien le formulaire de saisie de la clé
+    # d'administration VM, et que le JS appelle le bon endpoint avec
+    # est_admin et cle_admin_vm plutôt qu'une simple présence du texte du
+    # bouton, qui laisserait passer un mauvais chemin ou un oubli de la clé.
+    html = client.get("/").text
+    js = client.get("/static/app.js").text
+
+    assert 'id="formulaire-statut-admin" hidden' in html
+    assert 'id="statut-admin-cle"' in html
+    assert 'id="statut-admin-confirmation" role="status" hidden' in html
+    assert "/est-admin" in js
+    assert "cle_admin_vm" in js

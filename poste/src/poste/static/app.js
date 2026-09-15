@@ -37,9 +37,21 @@ const modificationIdentifiant = document.getElementById("modification-identifian
 const formulaireModificationCompte = document.getElementById("formulaire-modification-compte");
 const modificationErreur = document.getElementById("modification-erreur");
 const modificationAnnuler = document.getElementById("modification-annuler");
+const statutAdminTitre = document.getElementById("statut-admin-titre");
+const statutAdminAction = document.getElementById("statut-admin-action");
+const statutAdminIdentifiant = document.getElementById("statut-admin-identifiant");
+const formulaireStatutAdmin = document.getElementById("formulaire-statut-admin");
+const statutAdminCle = document.getElementById("statut-admin-cle");
+const statutAdminAnnuler = document.getElementById("statut-admin-annuler");
+const statutAdminErreur = document.getElementById("statut-admin-erreur");
+const statutAdminConfirmation = document.getElementById("statut-admin-confirmation");
+const statutAdminConfirmationIdentifiant = document.getElementById("statut-admin-confirmation-identifiant");
+const statutAdminConfirmationStatut = document.getElementById("statut-admin-confirmation-statut");
 
 let comptesActuels = [];
 let identifiantEnCoursDeModification = null;
+let identifiantEnCoursDeChangementStatutAdmin = null;
+let estAdminCibleEnCours = null;
 
 function afficherOngletChat() {
   ongletChat.hidden = false;
@@ -282,6 +294,15 @@ function ligneCompte(compte) {
   boutonDeconnecter.addEventListener("click", () => forcerLaDeconnexion(compte.identifiant));
   celluleActions.append(boutonDeconnecter);
 
+  const boutonStatutAdmin = document.createElement("button");
+  boutonStatutAdmin.type = "button";
+  boutonStatutAdmin.textContent = compte.est_admin ? "Rétrograder" : "Promouvoir administrateur";
+  boutonStatutAdmin.dataset.identifiant = compte.identifiant;
+  boutonStatutAdmin.addEventListener("click", () =>
+    ouvrirChangementStatutAdmin(compte.identifiant, !compte.est_admin)
+  );
+  celluleActions.append(boutonStatutAdmin);
+
   ligne.append(celluleActions);
 
   return ligne;
@@ -384,6 +405,27 @@ function fermerModificationCompte() {
   formulaireModificationCompte.hidden = true;
   formulaireModificationCompte.reset();
   modificationErreur.hidden = true;
+}
+
+function ouvrirChangementStatutAdmin(identifiant, nouveauEstAdmin) {
+  identifiantEnCoursDeChangementStatutAdmin = identifiant;
+  estAdminCibleEnCours = nouveauEstAdmin;
+  statutAdminErreur.hidden = true;
+  statutAdminConfirmation.hidden = true;
+  statutAdminAction.textContent = nouveauEstAdmin ? "Promouvoir" : "Rétrograder";
+  statutAdminIdentifiant.textContent = identifiant;
+  statutAdminTitre.hidden = false;
+  formulaireStatutAdmin.hidden = false;
+  statutAdminCle.focus();
+}
+
+function fermerChangementStatutAdmin() {
+  identifiantEnCoursDeChangementStatutAdmin = null;
+  estAdminCibleEnCours = null;
+  statutAdminTitre.hidden = true;
+  formulaireStatutAdmin.hidden = true;
+  formulaireStatutAdmin.reset();
+  statutAdminErreur.hidden = true;
 }
 
 async function chargerComptes() {
@@ -526,6 +568,51 @@ formulaireModificationCompte.addEventListener("submit", async (evenement) => {
   }
 
   fermerModificationCompte();
+  await chargerComptes();
+});
+
+statutAdminAnnuler.addEventListener("click", fermerChangementStatutAdmin);
+
+formulaireStatutAdmin.addEventListener("submit", async (evenement) => {
+  evenement.preventDefault();
+  statutAdminErreur.hidden = true;
+
+  const cleAdminVm = statutAdminCle.value;
+  const corpsRequete = { est_admin: estAdminCibleEnCours, cle_admin_vm: cleAdminVm };
+
+  let reponse;
+  try {
+    reponse = await fetch(`/comptes/${encodeURIComponent(identifiantEnCoursDeChangementStatutAdmin)}/est-admin`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(corpsRequete),
+    });
+  } catch {
+    statutAdminErreur.textContent = "Impossible de joindre le service de gestion des comptes. Réessayez plus tard.";
+    statutAdminErreur.hidden = false;
+    return;
+  }
+
+  if (reponse.status === 401) {
+    afficherEcranConnexion();
+    return;
+  }
+
+  if (!reponse.ok) {
+    const detail = await reponse.json().catch(() => null);
+    statutAdminErreur.textContent =
+      detail && typeof detail.detail === "string"
+        ? detail.detail
+        : "Le changement de statut administrateur a échoué. Réessayez plus tard.";
+    statutAdminErreur.hidden = false;
+    return;
+  }
+
+  const compte = await reponse.json();
+  statutAdminConfirmationIdentifiant.textContent = compte.identifiant;
+  statutAdminConfirmationStatut.textContent = compte.est_admin ? "administrateur" : "un compte normal";
+  fermerChangementStatutAdmin();
+  statutAdminConfirmation.hidden = false;
   await chargerComptes();
 });
 

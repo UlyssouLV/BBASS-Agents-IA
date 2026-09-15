@@ -75,3 +75,8 @@ class CompteModificationRequest(BaseModel):
 
 class MotDePasseReinitialiseResponse(BaseModel):
     mot_de_passe: str
+
+
+class StatutAdminRequest(BaseModel):
+    est_admin: bool
+    cle_admin_vm: str = Field(min_length=1)

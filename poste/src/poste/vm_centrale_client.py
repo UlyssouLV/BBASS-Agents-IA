@@ -31,6 +31,21 @@ class CompteInexistantError(Exception):
     pass
 
 
+class CleAdminInvalideError(Exception):
+    # 401 de la VM levé par exiger_cle_admin_vm (clé d'administration VM
+    # absente/invalide) : distinct d'un jeton invalide (401 levé par
+    # get_compte_admin), qui doit fermer la session côté poste alors que
+    # celui-ci ne le doit pas (le jeton de session reste valide, seule la
+    # confirmation par clé a échoué).
+    pass
+
+
+class DernierAdministrateurError(Exception):
+    # 409 de la VM : la rétrogradation ferait passer le nombre de comptes
+    # administrateur à zéro (garde-fou dernier administrateur, spec V1.1).
+    pass
+
+
 @dataclass
 class AuthentificationReussie:
     prenom: str
@@ -90,6 +105,24 @@ def _lever_si_jeton_ou_droits_refuses(reponse: httpx.Response) -> None:
         raise JetonInvalideError()
     if reponse.status_code == 403:
         raise AccesAdminRequisError()
+
+
+# Doit rester identique à vm_centrale.autorisation._CLE_ADMIN_INVALIDE : c'est
+# le seul moyen pour ce client de distinguer, parmi les deux causes possibles
+# d'un 401 sur PATCH /comptes/{identifiant}/est-admin, celle qui ne doit pas
+# fermer la session de l'administrateur (voir CleAdminInvalideError).
+_CLE_ADMIN_INVALIDE_DETAIL = "Clé d'administration manquante ou invalide"
+
+
+def _lever_si_statut_admin_refuse(reponse: httpx.Response) -> None:
+    if reponse.status_code == 401:
+        if reponse.json().get("detail") == _CLE_ADMIN_INVALIDE_DETAIL:
+            raise CleAdminInvalideError()
+        raise JetonInvalideError()
+    if reponse.status_code == 403:
+        raise AccesAdminRequisError()
+    if reponse.status_code == 409:
+        raise DernierAdministrateurError()
 
 
 class VmCentraleClient:
@@ -236,6 +269,20 @@ class VmCentraleClient:
         if reponse.status_code == 404:
             raise CompteInexistantError()
         reponse.raise_for_status()
+
+    def modifier_statut_admin(
+        self, jeton: str, identifiant: str, est_admin: bool, cle_admin_vm: str
+    ) -> CompteAdmin:
+        reponse = _http_client.patch(
+            f"{VM_CENTRALE_BASE_URL}/comptes/{quote(identifiant, safe='')}/est-admin",
+            json={"est_admin": est_admin},
+            headers={"Authorization": f"Bearer {jeton}", "X-Admin-Key": cle_admin_vm},
+        )
+        _lever_si_statut_admin_refuse(reponse)
+        if reponse.status_code == 404:
+            raise CompteInexistantError()
+        reponse.raise_for_status()
+        return CompteAdmin(**_champs_compte_admin(reponse.json()))
 
 
 def get_vm_centrale_client() -> VmCentraleClient:

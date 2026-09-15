@@ -168,6 +168,23 @@
       <p id="deconnexion-forcee-confirmation" role="status" hidden>
         Déconnexion forcée pour <strong id="deconnexion-forcee-identifiant"></strong>.
       </p>
+
+      <h3 id="statut-admin-titre" hidden>
+        <span id="statut-admin-action"></span> le compte <span id="statut-admin-identifiant"></span>
+      </h3>
+      <form id="formulaire-statut-admin" hidden>
+        <label for="statut-admin-cle">Clé d'administration VM</label>
+        <input type="password" id="statut-admin-cle" name="cle_admin_vm" required />
+
+        <button type="submit">Confirmer</button>
+        <button type="button" id="statut-admin-annuler">Annuler</button>
+      </form>
+      <p id="statut-admin-erreur" role="alert" hidden></p>
+
+      <p id="statut-admin-confirmation" role="status" hidden>
+        <strong id="statut-admin-confirmation-identifiant"></strong> est désormais
+        <span id="statut-admin-confirmation-statut"></span>.
+      </p>
     </section>
   </main>
 
