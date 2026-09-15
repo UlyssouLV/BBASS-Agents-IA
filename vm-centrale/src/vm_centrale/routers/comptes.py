@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from vm_centrale.autorisation import get_compte_admin
 from vm_centrale.database import get_db
+from vm_centrale.jetons import JetonStore, get_jeton_store
 from vm_centrale.models import Compte, ComptePole
 from vm_centrale.schemas import (
     CompteCreeRequest,
@@ -134,3 +135,19 @@ def reinitialiser_mot_de_passe(
     db.commit()
 
     return MotDePasseReinitialiseResponse(mot_de_passe=mot_de_passe)
+
+
+@router.post("/{identifiant}/deconnexion-forcee", status_code=204)
+def deconnexion_forcee(
+    identifiant: str,
+    db: Session = Depends(get_db),
+    jetons: JetonStore = Depends(get_jeton_store),
+    _admin: Compte = Depends(get_compte_admin),
+) -> None:
+    compte = db.query(Compte).filter(Compte.identifiant == identifiant).first()
+    if compte is None:
+        raise HTTPException(status_code=404, detail=_COMPTE_INTROUVABLE)
+
+    # Réutilise le même mécanisme de révocation que DELETE /auth/jeton/{identifiant}
+    # (protégé par X-Admin-Key) plutôt que d'en construire un second.
+    jetons.revoquer_tous(identifiant)

@@ -442,3 +442,103 @@ def test_reinitialisation_echoue_avec_jeton_d_un_compte_non_admin(client, seed_c
     )
 
     assert reponse.status_code == 403
+
+
+# --- POST /comptes/{identifiant}/deconnexion-forcee ---------------------------
+
+
+def test_deconnexion_forcee_reussit_et_revoque_tous_les_jetons_actifs_du_compte_vise(
+    client, seed_compte, jeton_store
+):
+    jeton_admin = _jeton_admin(client, seed_compte)
+    seed_compte(
+        "n.durand", "correcthorsebatterystaple", agence="Castries", poles=["Foncier"],
+        prenom="Nadia", nom="Durand",
+    )
+    jeton_1 = jeton_store.emettre("n.durand")
+    jeton_2 = jeton_store.emettre("n.durand")
+
+    reponse = client.post(
+        "/comptes/n.durand/deconnexion-forcee", headers=_autorisation(jeton_admin)
+    )
+
+    assert reponse.status_code == 204
+    assert client.get("/auth/verifier", headers=_autorisation(jeton_1)).status_code == 401
+    assert client.get("/auth/verifier", headers=_autorisation(jeton_2)).status_code == 401
+
+
+def test_deconnexion_forcee_ne_revoque_pas_les_jetons_des_autres_comptes(
+    client, seed_compte, jeton_store
+):
+    jeton_admin = _jeton_admin(client, seed_compte)
+    seed_compte(
+        "n.durand", "correcthorsebatterystaple", agence="Castries", poles=["Foncier"],
+        prenom="Nadia", nom="Durand",
+    )
+    jeton_autre_compte = jeton_store.emettre("p.leroy")
+
+    client.post("/comptes/n.durand/deconnexion-forcee", headers=_autorisation(jeton_admin))
+
+    assert (
+        client.get("/auth/verifier", headers=_autorisation(jeton_autre_compte)).status_code
+        == 200
+    )
+
+
+def test_deconnexion_forcee_rejette_le_relais_avec_l_ancien_jeton(
+    client, seed_compte, mistral_client_factice
+):
+    jeton_admin = _jeton_admin(client, seed_compte)
+    seed_compte(
+        "n.durand", "correcthorsebatterystaple", agence="Castries", poles=["Foncier"],
+        prenom="Nadia", nom="Durand",
+    )
+    reponse_auth = client.post(
+        "/auth", json={"identifiant": "n.durand", "mot_de_passe": "correcthorsebatterystaple"}
+    )
+    jeton_compte = reponse_auth.json()["jeton"]
+    mistral_client_factice.repondre("Ne devrait jamais être retournée")
+
+    client.post("/comptes/n.durand/deconnexion-forcee", headers=_autorisation(jeton_admin))
+
+    reponse_relais = client.post(
+        "/relais", json={"message": "Bonjour"}, headers=_autorisation(jeton_compte)
+    )
+
+    assert reponse_relais.status_code == 401
+    assert mistral_client_factice.messages_recus == []
+
+
+def test_deconnexion_forcee_echoue_avec_un_identifiant_inconnu(client, seed_compte):
+    jeton_admin = _jeton_admin(client, seed_compte)
+
+    reponse = client.post(
+        "/comptes/inconnu/deconnexion-forcee", headers=_autorisation(jeton_admin)
+    )
+
+    assert reponse.status_code == 404
+
+
+def test_deconnexion_forcee_echoue_sans_jeton(client, seed_compte):
+    seed_compte(
+        "n.durand", "correcthorsebatterystaple", agence="Castries", poles=["Foncier"],
+        prenom="Nadia", nom="Durand",
+    )
+
+    reponse = client.post("/comptes/n.durand/deconnexion-forcee")
+
+    assert reponse.status_code == 401
+
+
+def test_deconnexion_forcee_echoue_avec_jeton_d_un_compte_non_admin(client, seed_compte):
+    jeton = _jeton_non_admin(client, seed_compte)
+    seed_compte(
+        "n.durand", "correcthorsebatterystaple", agence="Castries", poles=["Foncier"],
+        prenom="Nadia", nom="Durand",
+    )
+
+    reponse = client.post(
+        "/comptes/n.durand/deconnexion-forcee", headers=_autorisation(jeton)
+    )
+
+    assert reponse.status_code == 403
