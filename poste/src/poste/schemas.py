@@ -63,3 +63,11 @@ class CompteCreeResponse(CompteAdminResponse):
     # Le mot de passe généré n'est renvoyé qu'à la création, jamais ailleurs
     # (voir CompteAdminResponse, utilisé par la liste).
     mot_de_passe: str
+
+
+class CompteModificationRequest(BaseModel):
+    prenom: str = Field(min_length=1)
+    nom: str = Field(min_length=1)
+    email: str | None = None
+    agence: str = Field(min_length=1)
+    poles: list[str] = Field(min_length=1)

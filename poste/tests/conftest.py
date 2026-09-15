@@ -44,6 +44,10 @@ class VmCentraleClientFactice:
         self._jetons_creation_compte: list[str] = []
         self._exception_changement_mot_de_passe: Exception | None = None
         self.appels_changement_mot_de_passe: list[tuple[str, str]] = []
+        self._compte_modifie: CompteAdmin | None = None
+        self._exception_modification_compte: Exception | None = None
+        self._requetes_modification_compte: list[dict] = []
+        self._jetons_modification_compte: list[str] = []
 
     def accepter(
         self,
@@ -181,6 +185,39 @@ class VmCentraleClientFactice:
             raise self._exception_creation_compte
         assert self._compte_cree is not None
         return self._compte_cree
+
+    def modification_compte_reussit(self, compte: CompteAdmin) -> None:
+        self._compte_modifie = compte
+        self._exception_modification_compte = None
+
+    def modification_compte_echoue(self, exception: Exception) -> None:
+        self._exception_modification_compte = exception
+
+    def modifier_compte(
+        self,
+        jeton: str,
+        identifiant: str,
+        prenom: str,
+        nom: str,
+        agence: str,
+        poles: list[str],
+        email: str | None = None,
+    ) -> CompteAdmin:
+        self._jetons_modification_compte.append(jeton)
+        self._requetes_modification_compte.append(
+            {
+                "identifiant": identifiant,
+                "prenom": prenom,
+                "nom": nom,
+                "email": email,
+                "agence": agence,
+                "poles": poles,
+            }
+        )
+        if self._exception_modification_compte is not None:
+            raise self._exception_modification_compte
+        assert self._compte_modifie is not None
+        return self._compte_modifie
 
     def changement_mot_de_passe_echoue(self, exception: Exception) -> None:
         self._exception_changement_mot_de_passe = exception

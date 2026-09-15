@@ -27,6 +27,14 @@ const formulaireCreationCompte = document.getElementById("formulaire-creation-co
 const creationErreur = document.getElementById("creation-erreur");
 const compteCree = document.getElementById("compte-cree");
 const compteCreeMotDePasse = document.getElementById("compte-cree-mot-de-passe");
+const modificationTitre = document.getElementById("modification-titre");
+const modificationIdentifiant = document.getElementById("modification-identifiant");
+const formulaireModificationCompte = document.getElementById("formulaire-modification-compte");
+const modificationErreur = document.getElementById("modification-erreur");
+const modificationAnnuler = document.getElementById("modification-annuler");
+
+let comptesActuels = [];
+let identifiantEnCoursDeModification = null;
 
 function afficherOngletChat() {
   ongletChat.hidden = false;
@@ -246,7 +254,46 @@ function ligneCompte(compte) {
     cellule.textContent = valeur;
     ligne.append(cellule);
   }
+
+  const celluleActions = document.createElement("td");
+  const boutonModifier = document.createElement("button");
+  boutonModifier.type = "button";
+  boutonModifier.textContent = "Modifier";
+  boutonModifier.dataset.identifiant = compte.identifiant;
+  boutonModifier.addEventListener("click", () => ouvrirModificationCompte(compte.identifiant));
+  celluleActions.append(boutonModifier);
+  ligne.append(celluleActions);
+
   return ligne;
+}
+
+function ouvrirModificationCompte(identifiant) {
+  const compte = comptesActuels.find((candidat) => candidat.identifiant === identifiant);
+  if (!compte) {
+    return;
+  }
+
+  identifiantEnCoursDeModification = identifiant;
+  modificationErreur.hidden = true;
+  modificationIdentifiant.textContent = identifiant;
+  formulaireModificationCompte.elements.prenom.value = compte.prenom;
+  formulaireModificationCompte.elements.nom.value = compte.nom;
+  formulaireModificationCompte.elements.email.value = compte.email || "";
+  formulaireModificationCompte.elements.agence.value = compte.agence;
+  for (const case_ of formulaireModificationCompte.querySelectorAll('input[name="poles"]')) {
+    case_.checked = compte.poles.includes(case_.value);
+  }
+
+  modificationTitre.hidden = false;
+  formulaireModificationCompte.hidden = false;
+}
+
+function fermerModificationCompte() {
+  identifiantEnCoursDeModification = null;
+  modificationTitre.hidden = true;
+  formulaireModificationCompte.hidden = true;
+  formulaireModificationCompte.reset();
+  modificationErreur.hidden = true;
 }
 
 async function chargerComptes() {
@@ -275,6 +322,7 @@ async function chargerComptes() {
   }
 
   const comptes = await reponse.json();
+  comptesActuels = comptes;
   corpsTableauComptes.replaceChildren(...comptes.map(ligneCompte));
 }
 
@@ -333,6 +381,61 @@ formulaireCreationCompte.addEventListener("submit", async (evenement) => {
   formulaireCreationCompte.reset();
   compteCreeMotDePasse.textContent = compte.mot_de_passe;
   compteCree.hidden = false;
+  await chargerComptes();
+});
+
+modificationAnnuler.addEventListener("click", fermerModificationCompte);
+
+formulaireModificationCompte.addEventListener("submit", async (evenement) => {
+  evenement.preventDefault();
+  modificationErreur.hidden = true;
+
+  const donnees = new FormData(formulaireModificationCompte);
+  const poles = donnees.getAll("poles");
+  if (poles.length === 0) {
+    modificationErreur.textContent = "Sélectionnez au moins un pôle.";
+    modificationErreur.hidden = false;
+    return;
+  }
+
+  const email = donnees.get("email");
+  const corpsRequete = {
+    prenom: donnees.get("prenom"),
+    nom: donnees.get("nom"),
+    email: email ? email : null,
+    agence: donnees.get("agence"),
+    poles,
+  };
+
+  let reponse;
+  try {
+    reponse = await fetch(`/comptes/${encodeURIComponent(identifiantEnCoursDeModification)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(corpsRequete),
+    });
+  } catch {
+    modificationErreur.textContent = "Impossible de joindre le service de gestion des comptes. Réessayez plus tard.";
+    modificationErreur.hidden = false;
+    return;
+  }
+
+  if (reponse.status === 401) {
+    afficherEcranConnexion();
+    return;
+  }
+
+  if (!reponse.ok) {
+    const detail = await reponse.json().catch(() => null);
+    modificationErreur.textContent =
+      detail && typeof detail.detail === "string"
+        ? detail.detail
+        : "La modification du compte a échoué. Réessayez plus tard.";
+    modificationErreur.hidden = false;
+    return;
+  }
+
+  fermerModificationCompte();
   await chargerComptes();
 });
 

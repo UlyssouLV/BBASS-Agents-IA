@@ -85,10 +85,40 @@
             <th>Agence</th>
             <th>Pôles</th>
             <th>Email</th>
+            <th></th>
           </tr>
         </thead>
         <tbody id="corps-tableau-comptes"></tbody>
       </table>
+
+      <h3 id="modification-titre" hidden>Modifier le compte <span id="modification-identifiant"></span></h3>
+      <form id="formulaire-modification-compte" hidden>
+        <label for="modification-prenom">Prénom</label>
+        <input type="text" id="modification-prenom" name="prenom" required />
+
+        <label for="modification-nom">Nom</label>
+        <input type="text" id="modification-nom" name="nom" required />
+
+        <label for="modification-email">Email (optionnel)</label>
+        <input type="email" id="modification-email" name="email" />
+
+        <label for="modification-agence">Agence</label>
+        <input type="text" id="modification-agence" name="agence" required />
+
+        <fieldset id="modification-poles">
+          <legend>Pôles</legend>
+          <label><input type="checkbox" name="poles" value="Administration" /> Administration</label>
+          <label><input type="checkbox" name="poles" value="Appels d'offres" /> Appels d'offres</label>
+          <label><input type="checkbox" name="poles" value="Foncier" /> Foncier</label>
+          <label><input type="checkbox" name="poles" value="DAO" /> DAO</label>
+          <label><input type="checkbox" name="poles" value="Urbanisme" /> Urbanisme</label>
+          <label><input type="checkbox" name="poles" value="Détection de réseaux" /> Détection de réseaux</label>
+        </fieldset>
+
+        <button type="submit">Enregistrer</button>
+        <button type="button" id="modification-annuler">Annuler</button>
+      </form>
+      <p id="modification-erreur" role="alert" hidden></p>
 
       <h3>Créer un compte</h3>
       <form id="formulaire-creation-compte">

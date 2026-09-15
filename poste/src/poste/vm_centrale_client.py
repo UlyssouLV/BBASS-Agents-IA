@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from urllib.parse import quote
 
 import httpx
 
@@ -22,6 +23,11 @@ class AccesAdminRequisError(Exception):
 
 class IdentifiantDejaUtiliseError(Exception):
     # 409 de la VM à la création : identifiant déjà pris par un autre compte.
+    pass
+
+
+class CompteInexistantError(Exception):
+    # 404 de la VM à la modification : identifiant ne correspondant à aucun compte.
     pass
 
 
@@ -59,6 +65,31 @@ class CompteCree(CompteAdmin):
     # Le mot de passe généré n'est disponible qu'à cette occasion (voir
     # vm-centrale CompteCreeResponse) : jamais renvoyé par GET /comptes.
     mot_de_passe: str
+
+
+def _champs_compte_admin(corps: dict) -> dict:
+    # Extraction partagée par lister_comptes/creer_compte/modifier_compte :
+    # les trois construisent un CompteAdmin (ou un CompteCree, qui y ajoute
+    # juste mot_de_passe) à partir des mêmes champs de réponse VM.
+    return {
+        "identifiant": corps["identifiant"],
+        "prenom": corps["prenom"],
+        "nom": corps["nom"],
+        "email": corps["email"],
+        "agence": corps["agence"],
+        "poles": corps["poles"],
+        "est_admin": corps["est_admin"],
+        "doit_changer_mot_de_passe": corps["doit_changer_mot_de_passe"],
+    }
+
+
+def _lever_si_jeton_ou_droits_refuses(reponse: httpx.Response) -> None:
+    # Partagé par lister_comptes/creer_compte/modifier_compte : mêmes codes
+    # d'erreur, même correspondance vers les exceptions métier du client.
+    if reponse.status_code == 401:
+        raise JetonInvalideError()
+    if reponse.status_code == 403:
+        raise AccesAdminRequisError()
 
 
 class VmCentraleClient:
@@ -125,24 +156,9 @@ class VmCentraleClient:
             f"{VM_CENTRALE_BASE_URL}/comptes",
             headers={"Authorization": f"Bearer {jeton}"},
         )
-        if reponse.status_code == 401:
-            raise JetonInvalideError()
-        if reponse.status_code == 403:
-            raise AccesAdminRequisError()
+        _lever_si_jeton_ou_droits_refuses(reponse)
         reponse.raise_for_status()
-        return [
-            CompteAdmin(
-                identifiant=compte["identifiant"],
-                prenom=compte["prenom"],
-                nom=compte["nom"],
-                email=compte["email"],
-                agence=compte["agence"],
-                poles=compte["poles"],
-                est_admin=compte["est_admin"],
-                doit_changer_mot_de_passe=compte["doit_changer_mot_de_passe"],
-            )
-            for compte in reponse.json()
-        ]
+        return [CompteAdmin(**_champs_compte_admin(compte)) for compte in reponse.json()]
 
     def creer_compte(
         self,
@@ -166,25 +182,39 @@ class VmCentraleClient:
             },
             headers={"Authorization": f"Bearer {jeton}"},
         )
-        if reponse.status_code == 401:
-            raise JetonInvalideError()
-        if reponse.status_code == 403:
-            raise AccesAdminRequisError()
+        _lever_si_jeton_ou_droits_refuses(reponse)
         if reponse.status_code == 409:
             raise IdentifiantDejaUtiliseError()
         reponse.raise_for_status()
         corps = reponse.json()
-        return CompteCree(
-            identifiant=corps["identifiant"],
-            prenom=corps["prenom"],
-            nom=corps["nom"],
-            email=corps["email"],
-            agence=corps["agence"],
-            poles=corps["poles"],
-            est_admin=corps["est_admin"],
-            doit_changer_mot_de_passe=corps["doit_changer_mot_de_passe"],
-            mot_de_passe=corps["mot_de_passe"],
+        return CompteCree(**_champs_compte_admin(corps), mot_de_passe=corps["mot_de_passe"])
+
+    def modifier_compte(
+        self,
+        jeton: str,
+        identifiant: str,
+        prenom: str,
+        nom: str,
+        agence: str,
+        poles: list[str],
+        email: str | None = None,
+    ) -> CompteAdmin:
+        reponse = _http_client.patch(
+            f"{VM_CENTRALE_BASE_URL}/comptes/{quote(identifiant, safe='')}",
+            json={
+                "prenom": prenom,
+                "nom": nom,
+                "email": email,
+                "agence": agence,
+                "poles": poles,
+            },
+            headers={"Authorization": f"Bearer {jeton}"},
         )
+        _lever_si_jeton_ou_droits_refuses(reponse)
+        if reponse.status_code == 404:
+            raise CompteInexistantError()
+        reponse.raise_for_status()
+        return CompteAdmin(**_champs_compte_admin(reponse.json()))
 
 
 def get_vm_centrale_client() -> VmCentraleClient:

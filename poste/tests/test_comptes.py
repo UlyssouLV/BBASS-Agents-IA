@@ -4,6 +4,7 @@ from poste.vm_centrale_client import (
     AccesAdminRequisError,
     CompteAdmin,
     CompteCree,
+    CompteInexistantError,
     IdentifiantDejaUtiliseError,
     JetonInvalideError,
 )
@@ -207,6 +208,117 @@ def test_creation_avec_vm_centrale_injoignable_retourne_une_erreur_propre(client
     vm_centrale_client_factice.creation_compte_echoue(httpx.ConnectError("connexion refusée"))
 
     reponse = client.post("/comptes", json=_requete_creation())
+
+    assert reponse.status_code == 502
+    assert reponse.json()["detail"]
+
+
+# --- PATCH /comptes/{identifiant} ---------------------------------------------
+
+
+def _requete_modification(**overrides) -> dict:
+    base = {
+        "prenom": "Nadège",
+        "nom": "Dupuis",
+        "email": "n.dupuis@bbass.fr",
+        "agence": "Perpignan",
+        "poles": ["Urbanisme", "DAO"],
+    }
+    base.update(overrides)
+    return base
+
+
+def test_modification_avec_session_admin_reussit_et_renvoie_le_compte_modifie(
+    client, vm_centrale_client_factice
+):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.modification_compte_reussit(
+        _compte_admin(
+            identifiant="n.durand",
+            prenom="Nadège",
+            nom="Dupuis",
+            email="n.dupuis@bbass.fr",
+            agence="Perpignan",
+            poles=["Urbanisme", "DAO"],
+        )
+    )
+
+    reponse = client.patch("/comptes/n.durand", json=_requete_modification())
+
+    assert reponse.status_code == 200
+    corps = reponse.json()
+    assert corps["identifiant"] == "n.durand"
+    assert corps["prenom"] == "Nadège"
+    assert corps["nom"] == "Dupuis"
+    assert corps["email"] == "n.dupuis@bbass.fr"
+    assert corps["agence"] == "Perpignan"
+    assert corps["poles"] == ["Urbanisme", "DAO"]
+
+
+def test_modification_transmet_la_requete_et_le_jeton(client, vm_centrale_client_factice):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.modification_compte_reussit(_compte_admin(identifiant="n.durand"))
+
+    client.patch("/comptes/n.durand", json=_requete_modification())
+
+    assert vm_centrale_client_factice._jetons_modification_compte == ["jeton-factice"]
+    assert vm_centrale_client_factice._requetes_modification_compte == [
+        {
+            "identifiant": "n.durand",
+            "prenom": "Nadège",
+            "nom": "Dupuis",
+            "email": "n.dupuis@bbass.fr",
+            "agence": "Perpignan",
+            "poles": ["Urbanisme", "DAO"],
+        }
+    ]
+
+
+def test_modification_sans_session_active_est_refusee(client, vm_centrale_client_factice):
+    reponse = client.patch("/comptes/n.durand", json=_requete_modification())
+
+    assert reponse.status_code == 401
+    assert vm_centrale_client_factice._requetes_modification_compte == []
+
+
+def test_modification_avec_session_non_admin_est_refusee(client, vm_centrale_client_factice):
+    _connecter(client, vm_centrale_client_factice, est_admin=False)
+    vm_centrale_client_factice.modification_compte_echoue(AccesAdminRequisError())
+
+    reponse = client.patch("/comptes/n.durand", json=_requete_modification())
+
+    assert reponse.status_code == 403
+    assert reponse.json()["detail"]
+
+
+def test_modification_avec_identifiant_inconnu_renvoie_404(client, vm_centrale_client_factice):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.modification_compte_echoue(CompteInexistantError())
+
+    reponse = client.patch("/comptes/inconnu", json=_requete_modification())
+
+    assert reponse.status_code == 404
+    assert reponse.json()["detail"]
+
+
+def test_modification_sans_au_moins_un_pole_est_rejetee_sans_appeler_la_vm(
+    client, vm_centrale_client_factice
+):
+    _connecter(client, vm_centrale_client_factice)
+
+    reponse = client.patch("/comptes/n.durand", json=_requete_modification(poles=[]))
+
+    assert reponse.status_code == 422
+    assert vm_centrale_client_factice._requetes_modification_compte == []
+
+
+def test_modification_avec_vm_centrale_injoignable_retourne_une_erreur_propre(
+    client, vm_centrale_client_factice
+):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.modification_compte_echoue(httpx.ConnectError("connexion refusée"))
+
+    reponse = client.patch("/comptes/n.durand", json=_requete_modification())
 
     assert reponse.status_code == 502
     assert reponse.json()["detail"]
