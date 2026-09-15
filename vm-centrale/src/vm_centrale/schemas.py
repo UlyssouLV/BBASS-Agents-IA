@@ -24,6 +24,10 @@ class VerifierResponse(BaseModel):
     est_admin: bool
 
 
+class ChangerMotDePasseRequest(BaseModel):
+    nouveau_mot_de_passe: str = Field(min_length=1)
+
+
 class CompteCreeRequest(BaseModel):
     identifiant: str = Field(min_length=1)
     prenom: str = Field(min_length=1)

@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from vm_centrale.config import get_vm_admin_key
 from vm_centrale.database import get_db
 from vm_centrale.models import Compte
-from vm_centrale.schemas import AuthRequest, AuthResponse, VerifierResponse
+from vm_centrale.schemas import AuthRequest, AuthResponse, ChangerMotDePasseRequest, VerifierResponse
 from vm_centrale.security import hash_password, verify_password
 from vm_centrale.jetons import JetonStore, get_jeton_store
 
@@ -16,6 +16,10 @@ router = APIRouter()
 _ECHEC_AUTHENTIFICATION = "Identifiant ou mot de passe incorrect"
 _JETON_INVALIDE = "Jeton d'authentification manquant ou invalide"
 _CLE_ADMIN_INVALIDE = "Clé d'administration manquante ou invalide"
+_CHANGEMENT_NON_AUTORISE = (
+    "Le changement de mot de passe n'est autorisé que dans le flux imposé après "
+    "création ou réinitialisation"
+)
 
 # Hash bidon de coût identique à un vrai hash, utilisé quand l'identifiant est
 # inconnu : sans lui, vérifier un mot de passe contre un compte inexistant
@@ -53,13 +57,19 @@ def authentifier(
     )
 
 
+def _identifiant_depuis_le_jeton(
+    credentials: HTTPAuthorizationCredentials | None, jetons: JetonStore
+) -> str | None:
+    return jetons.identifiant_pour(credentials.credentials) if credentials is not None else None
+
+
 @router.get("/auth/verifier", response_model=VerifierResponse)
 def verifier(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
     db: Session = Depends(get_db),
     jetons: JetonStore = Depends(get_jeton_store),
 ) -> VerifierResponse:
-    identifiant = jetons.identifiant_pour(credentials.credentials) if credentials is not None else None
+    identifiant = _identifiant_depuis_le_jeton(credentials, jetons)
     if identifiant is None:
         raise HTTPException(status_code=401, detail=_JETON_INVALIDE)
 
@@ -74,6 +84,35 @@ def verifier(
         identifiant=identifiant,
         est_admin=compte.est_admin if compte is not None else False,
     )
+
+
+@router.post("/auth/mot-de-passe", status_code=204)
+def changer_mot_de_passe(
+    requete: ChangerMotDePasseRequest,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
+    db: Session = Depends(get_db),
+    jetons: JetonStore = Depends(get_jeton_store),
+) -> None:
+    identifiant = _identifiant_depuis_le_jeton(credentials, jetons)
+    if identifiant is None:
+        raise HTTPException(status_code=401, detail=_JETON_INVALIDE)
+
+    # Contrairement à verifier(), un compte introuvable est ici rejeté plutôt
+    # que toléré : il n'y a pas de ligne sur laquelle poser le nouveau hash.
+    compte = db.query(Compte).filter(Compte.identifiant == identifiant).first()
+    if compte is None:
+        raise HTTPException(status_code=401, detail=_JETON_INVALIDE)
+
+    # Réservé au flux de changement imposé après création/réinitialisation
+    # (spec V1.1, user story 15 + Out of Scope) : un compte qui n'a pas ce
+    # flag ne peut pas changer volontairement son mot de passe via cet
+    # endpoint à un autre moment.
+    if not compte.doit_changer_mot_de_passe:
+        raise HTTPException(status_code=403, detail=_CHANGEMENT_NON_AUTORISE)
+
+    compte.mot_de_passe_hash = hash_password(requete.nouveau_mot_de_passe)
+    compte.doit_changer_mot_de_passe = False
+    db.commit()
 
 
 @router.delete("/auth/jeton", status_code=204)
