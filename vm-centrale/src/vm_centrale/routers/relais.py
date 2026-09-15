@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
@@ -6,6 +8,7 @@ from vm_centrale.schemas import RelaisRequest, RelaisResponse
 from vm_centrale.jetons import JetonStore, get_jeton_store
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 _ECHEC_RELAIS = "Le relais Mistral est indisponible"
 _JETON_INVALIDE = "Jeton d'authentification manquant ou invalide"
@@ -28,7 +31,11 @@ def relayer(
     except Exception as erreur:
         # Le message d'exception n'est jamais renvoyé au client : une erreur
         # Mistral pourrait techniquement porter des détails de la requête
-        # (dont la clé API) que l'endpoint ne doit jamais exposer.
+        # (dont la clé API) que l'endpoint ne doit jamais exposer. Journalisé
+        # côté serveur en revanche, sinon un 429 Mistral (rate limit) et une
+        # vraie panne réseau sont indiscernables depuis les seuls logs
+        # d'accès uvicorn.
+        logger.error("Échec de l'appel au relais Mistral : %s", erreur)
         raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
 
     return RelaisResponse(reponse=reponse)
