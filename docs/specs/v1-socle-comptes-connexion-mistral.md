@@ -1,0 +1,70 @@
+# V1 — Socle interface, comptes et connexion Mistral (Castries)
+
+## Problem Statement
+
+Les collaborateurs du cabinet BBASS n'ont aujourd'hui aucun moyen d'accéder à un assistant IA. Le cabinet veut leur donner un point d'entrée simple et sûr — un chat — vers les futurs agents métiers, en s'appuyant sur Mistral (choix déjà fait pour des raisons de souveraineté), sans exposer la clé API payante sur chaque poste, et sans construire dès maintenant les agents métiers qui n'existent pas encore.
+
+## Solution
+
+Un logiciel installé et exécuté localement sur chaque poste de l'agence de Castries : un collaborateur se connecte avec son compte, arrive directement sur une fenêtre de chat sobre, et peut envoyer un message qui déclenche un vrai appel à Mistral. Le poste ne détient jamais la clé API : il passe par un relais porté par une VM centrale à Castries, qui détient seule la clé et valide aussi les comptes. Cette itération pose et valide ce socle (comptes, connexion, chat, appel Mistral réel) sans construire les agents métiers eux-mêmes, sans déployer sur les autres agences, et sans mécanisme de mise à jour automatique.
+
+## User Stories
+
+1. En tant que collaborateur de Castries, je veux me connecter avec mon compte, afin que seuls les collaborateurs autorisés puissent utiliser le logiciel.
+2. En tant que collaborateur de Castries, je veux que ma connexion soit vérifiée auprès de la base de comptes centrale, afin que l'accès soit contrôlé depuis un seul endroit plutôt que poste par poste.
+3. En tant que collaborateur de Castries, je veux rester connecté pendant toute la durée de ma session Windows, afin de ne pas ressaisir mes identifiants à chaque relance de l'appli.
+4. En tant que collaborateur de Castries partageant un poste avec des collègues, je veux une option de déconnexion explicite, afin de pouvoir changer de compte sans laisser ma session ouverte pour la personne suivante.
+5. En tant que collaborateur de Castries, je veux voir mon nom/mes informations de compte quelque part dans l'interface, afin de savoir quel compte est actif.
+6. En tant que collaborateur de Castries, je veux arriver directement sur une fenêtre de chat après connexion, afin de ne pas naviguer dans des menus pour commencer à travailler.
+7. En tant que collaborateur de Castries, je veux une fenêtre de chat sobre et professionnelle, afin qu'elle corresponde au ton d'un cabinet de géomètres-experts.
+8. En tant que collaborateur de Castries, je veux envoyer un message et voir un état de chargement clair pendant l'attente, afin de savoir que l'appli fonctionne et n'est pas figée.
+9. En tant que collaborateur de Castries, je veux que mon message déclenche un vrai appel à Mistral, afin d'obtenir une réponse réellement générée plutôt qu'un texte statique.
+10. En tant que collaborateur de Castries, je veux recevoir la réponse de Mistral même si elle est générique/pas encore adaptée à mon métier, afin que la mécanique sous-jacente puisse être validée avant que le comportement spécifique aux agents ne soit construit.
+11. En tant que collaborateur de Castries, je veux que l'interface n'affiche aucun sélecteur de pôle ni mention de mon métier, afin que l'écran reste aussi simple qu'une seule fenêtre de chat pour cette itération.
+12. En tant que collaborateur de Castries, je veux un message d'erreur clair (pas un plantage) si la VM centrale est injoignable, afin de comprendre pourquoi le chat ne répond pas.
+13. En tant que responsable du projet, je veux que le backend local du poste ne détienne jamais la clé API Mistral, afin qu'un poste compromis ou inspecté ne puisse pas divulguer une clé payante partagée.
+14. En tant que responsable du projet, je veux que chaque appel à Mistral passe par le relais central de la VM à Castries, afin que la clé API reste à un seul endroit.
+15. En tant que responsable du projet, je veux que l'URL du relais soit un paramètre de configuration sur le poste plutôt qu'une valeur en dur, afin qu'une évolution future (ex. clé par agence) n'exige pas de réécrire le backend du poste.
+16. En tant que responsable du projet, je veux insérer les comptes directement dans la base centrale, afin que les collaborateurs puissent se connecter sans qu'un écran de gestion des comptes soit nécessaire pour cette itération.
+17. En tant que responsable du projet, je veux que chaque compte stocke un champ agence et un champ pôle, afin que le schéma n'ait pas à changer quand un comportement dépendant de l'agence ou du pôle sera construit plus tard.
+18. En tant que responsable du projet, je veux que les champs agence et pôle n'aient aucun effet sur le comportement ni sur l'affichage pour cette itération, afin de ne pas construire de logique de routage avant que de vrais agents n'existent.
+19. En tant que responsable du projet, je veux que les conversations soient éphémères (non persistées) pour cette itération, afin de ne pas prendre en charge les questions de rétention/confidentialité avant que le socle ne soit validé.
+20. En tant que responsable du projet, je veux que la base de comptes et le relais de la VM centrale ne soient joignables qu'en LAN interne (pas d'exposition Internet), afin que le périmètre de cette itération reste limité à Castries.
+21. En tant que responsable du projet, je veux redéployer le code mis à jour sur les postes manuellement, afin de ne pas construire de launcher de mise à jour automatique avant que le socle applicatif ne soit éprouvé.
+22. En tant que responsable du projet, je veux que le backend local du poste et l'API de la VM centrale soient chacun testables à leur propre frontière HTTP, afin que les tests portent sur un comportement observable réel plutôt que sur des détails internes.
+23. En tant que futur mainteneur de ce code, je veux que les ADR existants (backend local par poste, relais central Mistral, périmètre V1 limité à Castries) soient respectés par l'implémentation, afin que l'architecture ne dérive pas silencieusement des décisions documentées.
+
+## Implementation Decisions
+
+- **Poste — backend local (Python)** : s'exécute sur le poste de chaque collaborateur. Sert le front-end (HTML/CSS/JS) et expose trois comportements : connexion (transmet les identifiants à l'endpoint d'authentification de la VM centrale, reçoit en retour le prénom, le nom, l'agence, le pôle et un jeton, et persiste la session — identifiant, jeton, prénom, nom — via le gestionnaire d'identifiants Windows, liée au compte Windows courant et survivant à la fermeture de l'application ainsi qu'à un redémarrage du poste), envoi de message (transmet le message du collaborateur, avec le jeton de la session en cours, à l'endpoint du relais Mistral de la VM centrale et retourne la réponse telle quelle), et déconnexion (efface la session persistée localement, jeton compris, et invalide ce jeton auprès de la VM centrale). Ne détient ni la clé Mistral, ni les données de comptes.
+- **VM centrale — API (Python)** : pas encore provisionnée ; le contrat de l'API doit pouvoir être développé et testé sur un environnement local avant que la VM réelle à Castries n'existe. Expose trois comportements : authentification (vérifie les identifiants d'un compte auprès de la base de comptes et retourne succès/échec ainsi que le prénom, le nom, l'agence, le pôle et un jeton du compte), vérification/révocation de session (permet au poste de valider un jeton stocké ; permet une déconnexion forcée — protégée par un secret dédié, distinct des jetons de session, jamais exposé côté poste, sans interface d'administration pour cette itération — qui invalide tous les jetons actifs d'un compte) et relais Mistral (exige un jeton valide émis par l'authentification — sans quoi la requête est rejetée avant tout appel à Mistral ; reçoit un message de chat, appelle l'API de complétion de chat de Mistral avec la seule clé API qu'elle détient, retourne la réponse de Mistral sans modification — aucune logique par pôle).
+- **Jetons du relais** : un jeton est émis à chaque authentification réussie et persisté dans une table dédiée de la base centrale, associée à l'identifiant du compte — pas seulement en mémoire : un jeton reste valide même après un redémarrage du processus de la VM centrale, jusqu'à une déconnexion explicite ou une révocation forcée. Le relais Mistral rejette (401) toute requête sans jeton valide, avant tout appel à Mistral, pour qu'un appelant du LAN sans jeton ne puisse jamais consommer de crédit Mistral. N'ouvre ni les agents, ni les satellites, ni un modèle Mistral choisi par le poste sur `/relais` (ADR-0004).
+- **Base de comptes (DB centrale)** : un enregistrement compte par collaborateur, portant au minimum un identifiant, un mot de passe, un prénom, un nom (obligatoires, affichés dans l'interface), une agence et un pôle. Les comptes sont insérés manuellement (aucun écran de gestion des comptes pour cette itération). Un seul rôle plat pour tous les comptes. Le schéma de la table `comptes` n'étant géré par aucun outil de migration (les tables sont créées via `Base.metadata.create_all`, qui n'altère jamais une table existante), toute base déjà seedée avant l'ajout d'une colonne obligatoire doit être recréée et ses comptes ré-insérés manuellement avec les champs à jour avant déploiement.
+- **Configuration** : le backend local du poste lit l'URL de base de la VM centrale et son propre timeout HTTP depuis des paramètres de configuration, jamais des valeurs en dur (ADR-0002). Le timeout HTTP du poste vers la VM centrale (35 s par défaut) reste toujours supérieur ou égal au timeout HTTP de la VM centrale vers Mistral (30 s par défaut, également en configuration) : sinon le poste abandonnerait avant que la VM n'ait fini d'attendre Mistral.
+- **Accessibilité réseau** : les endpoints d'authentification et de relais de la VM centrale sont exposés en LAN interne uniquement, pas sur Internet (ADR-0003).
+- **Session** : l'état de session (identifiant, jeton, prénom, nom) est persisté localement sur le poste via le gestionnaire d'identifiants Windows (chiffré, lié au compte Windows courant) et survit à la fermeture de l'application ainsi qu'à un redémarrage complet du poste. La session se termine uniquement par une déconnexion explicite depuis le poste (qui invalide aussi le jeton côté VM) ou par une déconnexion forcée déclenchée côté VM (invalide tous les jetons actifs du compte) ; elle n'expire jamais automatiquement. Si le gestionnaire d'identifiants Windows est indisponible, le poste dégrade silencieusement vers une session en mémoire pour la durée du processus et informe le collaborateur qu'une reconnexion sera nécessaire au prochain lancement. Pendant l'usage, une révocation côté VM est détectée au prochain appel réel au relais (pas de vérification périodique en tâche de fond) ; au lancement de l'appli, un jeton stocké est validé auprès de la VM avant d'afficher l'écran de chat.
+- **Front-end** : un seul écran de chat après connexion, avec indicateur de chargement et affichage de l'identité du compte connecté sous la forme « Prénom Nom (identifiant) » ; aucun sélecteur de pôle/agent nulle part dans l'interface.
+- **Gestion des erreurs** : quand le backend local du poste ne peut pas joindre la VM centrale, le front-end doit afficher un état d'erreur clair, sans plantage.
+- **Aucune persistance de conversation** pour cette itération.
+
+## Testing Decisions
+
+Les tests portent sur la frontière HTTP propre à chaque service et vérifient des réponses observables, jamais des appels de fonctions internes — le repo est vierge de code, il n'y a donc pas de précédent à suivre ; ces tests fixent la convention pour la suite.
+
+- **API de la VM centrale** : authentification contre une base de comptes de test préremplie (un compte valide réussit et retourne son prénom/nom/agence/pôle/jeton ; un compte invalide ou inconnu échoue sans révéler quelle partie était fausse) ; relais avec le client Mistral mocké (le message est transmis, la réponse mockée est retournée telle quelle, la clé API n'apparaît jamais dans une réponse ni un message d'erreur) — sans jeton ou avec un jeton invalide, le relais répond 401 et le client Mistral mocké n'est jamais appelé ; avec le jeton émis par une authentification réussie, le relais se comporte normalement ; un jeton persisté reste valide après un redémarrage simulé du store de jetons de la VM.
+- **Backend local du poste** (client de la VM centrale mocké) : chemins de succès/échec de la connexion ; le chat est accessible après connexion sans ré-authentification ; la déconnexion révoque l'accès au chat ; la route de chat transmet le message et retourne la réponse mockée du relais ; le jeton reçu à la connexion est transmis à chaque appel de chat ; une erreur de connexion mockée vers la VM centrale se traduit par un état d'erreur propre, jamais un plantage ; le front-end servi ne contient aucun balisage de sélecteur de pôle/agent.
+
+## Out of Scope
+
+- Déploiement sur les agences satellites ; exposition Internet du relais/authentification.
+- Agents métiers réels et toute réponse différenciée par pôle.
+- Historique de conversation persistant.
+- Écran d'administration des comptes.
+- Launcher / mise à jour automatique au lancement.
+- Répartition multi-clés ou multi-workspace Mistral pour absorber la charge.
+- Mode hors-ligne, modèle local, entraînement de modèle.
+
+## Further Notes
+
+- La VM centrale à Castries n'est pas encore créée : l'API centrale doit être développable et testable sur un environnement local avant provisionnement.
+- Vocabulaire et décisions d'architecture sous-jacentes : voir `CONTEXT.md` (Poste, Agence, Compte, Pôle, Agent, VM centrale, Relais Mistral, Session) et `docs/adr/0001` à `0004`.

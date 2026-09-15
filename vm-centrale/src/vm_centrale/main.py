@@ -1,0 +1,29 @@
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+
+from vm_centrale.config import VM_CENTRALE_HOST, VM_CENTRALE_PORT
+from vm_centrale.database import init_db
+from vm_centrale.routers.auth import router as auth_router
+from vm_centrale.routers.relais import router as relais_router
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    yield
+
+
+app = FastAPI(title="VM centrale", lifespan=lifespan)
+app.include_router(auth_router)
+app.include_router(relais_router)
+
+
+def run() -> None:
+    import uvicorn
+
+    uvicorn.run(app, host=VM_CENTRALE_HOST, port=VM_CENTRALE_PORT)
+
+
+if __name__ == "__main__":
+    run()

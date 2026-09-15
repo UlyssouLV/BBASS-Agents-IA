@@ -1,0 +1,78 @@
+body {
+  font-family: system-ui, sans-serif;
+  background: #f5f5f4;
+  color: #1c1c1c;
+  margin: 0;
+  padding: 2rem;
+}
+
+main {
+  max-width: 24rem;
+  margin: 0 auto;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+button {
+  cursor: pointer;
+}
+
+#erreur-connexion {
+  color: #b91c1c;
+}
+
+#ecran-compte header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+
+#messages {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 1rem 0;
+  min-height: 8rem;
+}
+
+#messages p {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  max-width: 80%;
+}
+
+.message-collaborateur {
+  align-self: flex-end;
+  background: #e0e7ff;
+}
+
+.message-reponse {
+  align-self: flex-start;
+  background: #e5e5e4;
+}
+
+#chat-erreur {
+  color: #b91c1c;
+}
+
+#formulaire-chat {
+  display: flex;
+  gap: 0.5rem;
+}
+
+#formulaire-chat input {
+  flex: 1;
+}

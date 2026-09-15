@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <title>BBASS Agents IA</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <main id="ecran-connexion">
+    <h1>Connexion</h1>
+    <form id="formulaire-connexion">
+      <label for="identifiant">Identifiant</label>
+      <input type="text" id="identifiant" name="identifiant" autocomplete="username" required />
+
+      <label for="mot-de-passe">Mot de passe</label>
+      <input type="password" id="mot-de-passe" name="mot-de-passe" autocomplete="current-password" required />
+
+      <button type="submit">Se connecter</button>
+      <p id="erreur-connexion" role="alert" hidden></p>
+    </form>
+  </main>
+
+  <main id="ecran-compte" hidden>
+    <header>
+      <span>Connecté en tant que <strong id="identifiant-connecte"></strong></span>
+      <button type="button" id="bouton-deconnexion">Se déconnecter</button>
+    </header>
+    <p id="avertissement-session" role="alert" hidden></p>
+
+    <div id="messages" role="log"></div>
+    <p id="chat-chargement" hidden>Envoi en cours…</p>
+    <p id="chat-erreur" role="alert" hidden></p>
+
+    <form id="formulaire-chat">
+      <label for="message" class="visually-hidden">Message</label>
+      <input type="text" id="message" name="message" autocomplete="off" required />
+      <button type="submit">Envoyer</button>
+    </form>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
