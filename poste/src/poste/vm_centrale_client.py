@@ -14,6 +14,17 @@ class JetonInvalideError(Exception):
     pass
 
 
+class AccesAdminRequisError(Exception):
+    # 403 de la VM : jeton valide mais compte non-administrateur (ou droit
+    # retiré depuis l'ouverture de la session côté poste).
+    pass
+
+
+class IdentifiantDejaUtiliseError(Exception):
+    # 409 de la VM à la création : identifiant déjà pris par un autre compte.
+    pass
+
+
 @dataclass
 class AuthentificationReussie:
     prenom: str
@@ -29,6 +40,25 @@ class AuthentificationReussie:
 class VerificationReussie:
     identifiant: str
     est_admin: bool
+
+
+@dataclass
+class CompteAdmin:
+    identifiant: str
+    prenom: str
+    nom: str
+    email: str | None
+    agence: str
+    poles: list[str]
+    est_admin: bool
+    doit_changer_mot_de_passe: bool
+
+
+@dataclass
+class CompteCree(CompteAdmin):
+    # Le mot de passe généré n'est disponible qu'à cette occasion (voir
+    # vm-centrale CompteCreeResponse) : jamais renvoyé par GET /comptes.
+    mot_de_passe: str
 
 
 class VmCentraleClient:
@@ -79,6 +109,72 @@ class VmCentraleClient:
             headers={"Authorization": f"Bearer {jeton}"},
         )
         reponse.raise_for_status()
+
+    def lister_comptes(self, jeton: str) -> list[CompteAdmin]:
+        reponse = _http_client.get(
+            f"{VM_CENTRALE_BASE_URL}/comptes",
+            headers={"Authorization": f"Bearer {jeton}"},
+        )
+        if reponse.status_code == 401:
+            raise JetonInvalideError()
+        if reponse.status_code == 403:
+            raise AccesAdminRequisError()
+        reponse.raise_for_status()
+        return [
+            CompteAdmin(
+                identifiant=compte["identifiant"],
+                prenom=compte["prenom"],
+                nom=compte["nom"],
+                email=compte["email"],
+                agence=compte["agence"],
+                poles=compte["poles"],
+                est_admin=compte["est_admin"],
+                doit_changer_mot_de_passe=compte["doit_changer_mot_de_passe"],
+            )
+            for compte in reponse.json()
+        ]
+
+    def creer_compte(
+        self,
+        jeton: str,
+        identifiant: str,
+        prenom: str,
+        nom: str,
+        agence: str,
+        poles: list[str],
+        email: str | None = None,
+    ) -> CompteCree:
+        reponse = _http_client.post(
+            f"{VM_CENTRALE_BASE_URL}/comptes",
+            json={
+                "identifiant": identifiant,
+                "prenom": prenom,
+                "nom": nom,
+                "email": email,
+                "agence": agence,
+                "poles": poles,
+            },
+            headers={"Authorization": f"Bearer {jeton}"},
+        )
+        if reponse.status_code == 401:
+            raise JetonInvalideError()
+        if reponse.status_code == 403:
+            raise AccesAdminRequisError()
+        if reponse.status_code == 409:
+            raise IdentifiantDejaUtiliseError()
+        reponse.raise_for_status()
+        corps = reponse.json()
+        return CompteCree(
+            identifiant=corps["identifiant"],
+            prenom=corps["prenom"],
+            nom=corps["nom"],
+            email=corps["email"],
+            agence=corps["agence"],
+            poles=corps["poles"],
+            est_admin=corps["est_admin"],
+            doit_changer_mot_de_passe=corps["doit_changer_mot_de_passe"],
+            mot_de_passe=corps["mot_de_passe"],
+        )
 
 
 def get_vm_centrale_client() -> VmCentraleClient:

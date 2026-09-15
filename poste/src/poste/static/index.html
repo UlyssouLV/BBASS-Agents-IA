@@ -26,19 +26,79 @@
         Connecté en tant que <strong id="identifiant-connecte"></strong>
         (<span id="pole-agence-connecte"></span>)
       </span>
+      <nav id="onglets-compte">
+        <button type="button" id="onglet-bouton-chat">Discussion</button>
+        <button type="button" id="onglet-bouton-comptes" hidden>Comptes</button>
+      </nav>
       <button type="button" id="bouton-deconnexion">Se déconnecter</button>
     </header>
     <p id="avertissement-session" role="alert" hidden></p>
 
-    <div id="messages" role="log"></div>
-    <p id="chat-chargement" hidden>Envoi en cours…</p>
-    <p id="chat-erreur" role="alert" hidden></p>
+    <section id="onglet-chat">
+      <div id="messages" role="log"></div>
+      <p id="chat-chargement" hidden>Envoi en cours…</p>
+      <p id="chat-erreur" role="alert" hidden></p>
 
-    <form id="formulaire-chat">
-      <label for="message" class="visually-hidden">Message</label>
-      <input type="text" id="message" name="message" autocomplete="off" required />
-      <button type="submit">Envoyer</button>
-    </form>
+      <form id="formulaire-chat">
+        <label for="message" class="visually-hidden">Message</label>
+        <input type="text" id="message" name="message" autocomplete="off" required />
+        <button type="submit">Envoyer</button>
+      </form>
+    </section>
+
+    <section id="onglet-comptes" hidden>
+      <h2>Comptes</h2>
+      <p id="comptes-erreur" role="alert" hidden></p>
+      <table id="tableau-comptes">
+        <thead>
+          <tr>
+            <th>Identifiant</th>
+            <th>Prénom</th>
+            <th>Nom</th>
+            <th>Agence</th>
+            <th>Pôles</th>
+            <th>Email</th>
+          </tr>
+        </thead>
+        <tbody id="corps-tableau-comptes"></tbody>
+      </table>
+
+      <h3>Créer un compte</h3>
+      <form id="formulaire-creation-compte">
+        <label for="creation-identifiant">Identifiant</label>
+        <input type="text" id="creation-identifiant" name="identifiant" required />
+
+        <label for="creation-prenom">Prénom</label>
+        <input type="text" id="creation-prenom" name="prenom" required />
+
+        <label for="creation-nom">Nom</label>
+        <input type="text" id="creation-nom" name="nom" required />
+
+        <label for="creation-email">Email (optionnel)</label>
+        <input type="email" id="creation-email" name="email" />
+
+        <label for="creation-agence">Agence</label>
+        <input type="text" id="creation-agence" name="agence" required />
+
+        <fieldset id="creation-poles">
+          <legend>Pôles</legend>
+          <label><input type="checkbox" name="poles" value="Administration" /> Administration</label>
+          <label><input type="checkbox" name="poles" value="Appels d'offres" /> Appels d'offres</label>
+          <label><input type="checkbox" name="poles" value="Foncier" /> Foncier</label>
+          <label><input type="checkbox" name="poles" value="DAO" /> DAO</label>
+          <label><input type="checkbox" name="poles" value="Urbanisme" /> Urbanisme</label>
+          <label><input type="checkbox" name="poles" value="Détection de réseaux" /> Détection de réseaux</label>
+        </fieldset>
+
+        <button type="submit">Créer le compte</button>
+      </form>
+      <p id="creation-erreur" role="alert" hidden></p>
+
+      <div id="compte-cree" role="status" hidden>
+        <p>Compte créé. Mot de passe généré à transmettre au collaborateur :</p>
+        <p><strong id="compte-cree-mot-de-passe"></strong></p>
+      </div>
+    </section>
   </main>
 
   <script src="/static/app.js"></script>

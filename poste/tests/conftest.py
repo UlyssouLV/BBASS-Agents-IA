@@ -5,6 +5,8 @@ from poste.main import app
 from poste.session import SessionStore, get_session_store
 from poste.vm_centrale_client import (
     AuthentificationReussie,
+    CompteAdmin,
+    CompteCree,
     JetonInvalideError,
     VerificationReussie,
     get_vm_centrale_client,
@@ -33,6 +35,13 @@ class VmCentraleClientFactice:
         self._est_admin_verifie = False
         self._exception_verification: Exception | None = None
         self._exception_revocation: Exception | None = None
+        self._comptes: list[CompteAdmin] = []
+        self._exception_liste_comptes: Exception | None = None
+        self._jetons_liste_comptes: list[str] = []
+        self._compte_cree: CompteCree | None = None
+        self._exception_creation_compte: Exception | None = None
+        self._requetes_creation_compte: list[dict] = []
+        self._jetons_creation_compte: list[str] = []
 
     def accepter(
         self,
@@ -121,6 +130,55 @@ class VmCentraleClientFactice:
         self.jetons_revoques.append(jeton)
         if self._exception_revocation is not None:
             raise self._exception_revocation
+
+    def liste_comptes_retourne(self, comptes: list[CompteAdmin]) -> None:
+        self._comptes = comptes
+        self._exception_liste_comptes = None
+
+    def liste_comptes_echoue(self, exception: Exception) -> None:
+        # Couvre aussi bien JetonInvalideError / AccesAdminRequisError
+        # (erreurs métier attendues, voir vm_centrale_client) qu'une panne
+        # quelconque de la VM centrale.
+        self._exception_liste_comptes = exception
+
+    def lister_comptes(self, jeton: str) -> list[CompteAdmin]:
+        self._jetons_liste_comptes.append(jeton)
+        if self._exception_liste_comptes is not None:
+            raise self._exception_liste_comptes
+        return self._comptes
+
+    def creation_compte_reussit(self, compte: CompteCree) -> None:
+        self._compte_cree = compte
+        self._exception_creation_compte = None
+
+    def creation_compte_echoue(self, exception: Exception) -> None:
+        self._exception_creation_compte = exception
+
+    def creer_compte(
+        self,
+        jeton: str,
+        identifiant: str,
+        prenom: str,
+        nom: str,
+        agence: str,
+        poles: list[str],
+        email: str | None = None,
+    ) -> CompteCree:
+        self._jetons_creation_compte.append(jeton)
+        self._requetes_creation_compte.append(
+            {
+                "identifiant": identifiant,
+                "prenom": prenom,
+                "nom": nom,
+                "email": email,
+                "agence": agence,
+                "poles": poles,
+            }
+        )
+        if self._exception_creation_compte is not None:
+            raise self._exception_creation_compte
+        assert self._compte_cree is not None
+        return self._compte_cree
 
 
 @pytest.fixture(autouse=True)
