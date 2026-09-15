@@ -53,8 +53,8 @@ def test_cle_api_manquante_retourne_une_erreur_propre_et_pas_un_plantage(db_sess
     def override_get_db():
         yield db_session
 
-    jeton_store = JetonStore()
-    jeton = jeton_store.emettre()
+    jeton_store = JetonStore(db_session)
+    jeton = jeton_store.emettre("j.dupont")
 
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_jeton_store] = lambda: jeton_store

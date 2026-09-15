@@ -10,6 +10,7 @@ class ConnexionResponse(BaseModel):
     identifiant: str
     prenom: str
     nom: str
+    avertissement: str | None = None
 
 
 class CompteResponse(BaseModel):

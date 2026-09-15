@@ -57,8 +57,8 @@ def mistral_client_factice():
 
 
 @pytest.fixture()
-def jeton_store():
-    return JetonStore()
+def jeton_store(db_session):
+    return JetonStore(db_session)
 
 
 @pytest.fixture()
@@ -76,7 +76,7 @@ def client(db_session, mistral_client_factice, jeton_store):
 
 @pytest.fixture()
 def jeton_valide(jeton_store):
-    return jeton_store.emettre()
+    return jeton_store.emettre("j.dupont")
 
 
 @pytest.fixture()

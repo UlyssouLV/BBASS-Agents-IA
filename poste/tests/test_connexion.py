@@ -64,3 +64,30 @@ def test_reponse_de_connexion_n_expose_ni_agence_ni_pole(client, vm_centrale_cli
 
     assert "agence" not in reponse.text
     assert "pole" not in reponse.text
+
+
+def test_connexion_normale_n_expose_aucun_avertissement(client, vm_centrale_client_factice):
+    vm_centrale_client_factice.accepter()
+
+    reponse = client.post(
+        "/connexion", json={"identifiant": "j.dupont", "mot_de_passe": "correcthorsebatterystaple"}
+    )
+
+    assert "avertissement" not in reponse.json()
+
+
+def test_connexion_signale_un_avertissement_si_la_persistance_est_degradee(
+    client, vm_centrale_client_factice, monkeypatch
+):
+    def set_password_en_echec(service_name, username, password):
+        raise RuntimeError("Credential Manager indisponible")
+
+    monkeypatch.setattr("poste.session.keyring.set_password", set_password_en_echec)
+    vm_centrale_client_factice.accepter()
+
+    reponse = client.post(
+        "/connexion", json={"identifiant": "j.dupont", "mot_de_passe": "correcthorsebatterystaple"}
+    )
+
+    assert reponse.status_code == 200
+    assert reponse.json()["avertissement"]

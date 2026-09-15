@@ -1,4 +1,6 @@
-from sqlalchemy import String
+from datetime import datetime
+
+from sqlalchemy import DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from vm_centrale.database import Base
@@ -14,3 +16,11 @@ class Compte(Base):
     nom: Mapped[str] = mapped_column(String)
     agence: Mapped[str] = mapped_column(String)
     pole: Mapped[str] = mapped_column(String)
+
+
+class Jeton(Base):
+    __tablename__ = "jetons"
+
+    jeton: Mapped[str] = mapped_column(String, primary_key=True)
+    identifiant_compte: Mapped[str] = mapped_column(String, index=True)
+    date_emission: Mapped[datetime] = mapped_column(DateTime)

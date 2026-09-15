@@ -40,6 +40,23 @@ def test_deconnexion_sans_session_active_ne_plante_pas(client):
     assert reponse.status_code == 204
 
 
+def test_deconnexion_invalide_le_jeton_cote_vm(client, vm_centrale_client_factice):
+    _connecter(client, vm_centrale_client_factice)
+
+    client.post("/deconnexion")
+
+    assert vm_centrale_client_factice.jetons_revoques == ["jeton-factice"]
+
+
+def test_deconnexion_reussit_meme_si_la_vm_est_injoignable(client, vm_centrale_client_factice):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.revocation_echoue(RuntimeError("VM injoignable"))
+
+    reponse = client.post("/deconnexion")
+
+    assert reponse.status_code == 204
+
+
 def test_acces_au_compte_sans_connexion_prealable_echoue(client):
     reponse = client.get("/compte")
 

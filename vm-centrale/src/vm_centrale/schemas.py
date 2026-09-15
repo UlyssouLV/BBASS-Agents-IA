@@ -14,6 +14,10 @@ class AuthResponse(BaseModel):
     jeton: str
 
 
+class VerifierResponse(BaseModel):
+    identifiant: str
+
+
 class RelaisRequest(BaseModel):
     message: str = Field(min_length=1, max_length=8000)
 

@@ -9,9 +9,13 @@ router = APIRouter()
 _ECHEC_CONNEXION = "Identifiant ou mot de passe incorrect"
 _VM_CENTRALE_INDISPONIBLE = "Le service de connexion de la VM centrale est indisponible"
 _AUCUNE_SESSION = "Aucune session active"
+_PERSISTANCE_DEGRADEE = (
+    "Impossible d'enregistrer votre session de façon durable : "
+    "une reconnexion sera nécessaire au prochain lancement du poste."
+)
 
 
-@router.post("/connexion", response_model=ConnexionResponse)
+@router.post("/connexion", response_model=ConnexionResponse, response_model_exclude_none=True)
 def connexion(
     requete: ConnexionRequest,
     client: VmCentraleClient = Depends(get_vm_centrale_client),
@@ -32,13 +36,28 @@ def connexion(
         requete.identifiant, authentification.prenom, authentification.nom, authentification.jeton
     )
     return ConnexionResponse(
-        identifiant=requete.identifiant, prenom=authentification.prenom, nom=authentification.nom
+        identifiant=requete.identifiant,
+        prenom=authentification.prenom,
+        nom=authentification.nom,
+        avertissement=_PERSISTANCE_DEGRADEE if session.persistance_degradee else None,
     )
 
 
 @router.post("/deconnexion", status_code=204)
-def deconnexion(session: SessionStore = Depends(get_session_store)) -> None:
+def deconnexion(
+    client: VmCentraleClient = Depends(get_vm_centrale_client),
+    session: SessionStore = Depends(get_session_store),
+) -> None:
+    jeton = session.jeton
     session.fermer()
+    if jeton is not None:
+        try:
+            client.revoquer(jeton)
+        except Exception:
+            # La session locale doit toujours pouvoir se fermer même si la VM
+            # centrale est injoignable ; le jeton reste alors valide côté VM
+            # jusqu'à son prochain redémarrage ou une révocation forcée.
+            pass
 
 
 @router.get("/compte", response_model=CompteResponse)

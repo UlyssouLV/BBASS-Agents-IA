@@ -71,3 +71,16 @@ def test_message_trop_long_est_rejete_sans_appeler_le_relais(client, vm_centrale
 
     assert reponse.status_code == 422
     assert vm_centrale_client_factice.messages_recus == []
+
+
+def test_jeton_revoque_pendant_l_usage_renvoie_401_et_efface_la_session(
+    client, vm_centrale_client_factice
+):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.rejeter_le_jeton_au_relais()
+
+    reponse_chat = client.post("/chat", json={"message": "Bonjour"})
+    reponse_compte = client.get("/compte")
+
+    assert reponse_chat.status_code == 401
+    assert reponse_compte.status_code == 401

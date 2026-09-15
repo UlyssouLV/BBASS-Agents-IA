@@ -17,3 +17,11 @@ def get_mistral_api_key() -> str:
     # manquante doit lever au moment de l'appel Mistral, dans le try/except
     # du endpoint de relais, jamais avant.
     return os.environ["MISTRAL_API_KEY"]
+
+
+def get_vm_admin_key() -> str | None:
+    # None (jamais une levée d'exception) quand la clé n'est pas configurée :
+    # l'endpoint de révocation forcée doit alors refuser toute requête (401),
+    # jamais planter. Une valeur vide (VM_ADMIN_KEY= dans .env) compte comme
+    # non configurée, sinon une clé vide fournie par l'appelant la validerait.
+    return os.environ.get("VM_ADMIN_KEY") or None
