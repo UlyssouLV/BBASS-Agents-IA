@@ -5,12 +5,18 @@ from sqlalchemy.orm import Session, selectinload
 from vm_centrale.autorisation import get_compte_admin
 from vm_centrale.database import get_db
 from vm_centrale.models import Compte, ComptePole
-from vm_centrale.schemas import CompteCreeRequest, CompteCreeResponse, CompteResponse
+from vm_centrale.schemas import (
+    CompteCreeRequest,
+    CompteCreeResponse,
+    CompteModifieRequest,
+    CompteResponse,
+)
 from vm_centrale.security import generer_mot_de_passe_aleatoire, hash_password
 
 router = APIRouter(prefix="/comptes")
 
 _IDENTIFIANT_DEJA_UTILISE = "Cet identifiant est déjà utilisé"
+_COMPTE_INTROUVABLE = "Compte introuvable"
 
 
 def _vers_reponse(compte: Compte) -> CompteResponse:
@@ -76,3 +82,30 @@ def creer_compte(
     db.refresh(compte)
 
     return CompteCreeResponse(**_vers_reponse(compte).model_dump(), mot_de_passe=mot_de_passe)
+
+
+@router.patch("/{identifiant}", response_model=CompteResponse)
+def modifier_compte(
+    identifiant: str,
+    requete: CompteModifieRequest,
+    db: Session = Depends(get_db),
+    _admin: Compte = Depends(get_compte_admin),
+) -> CompteResponse:
+    compte = (
+        db.query(Compte)
+        .options(selectinload(Compte.poles))
+        .filter(Compte.identifiant == identifiant)
+        .first()
+    )
+    if compte is None:
+        raise HTTPException(status_code=404, detail=_COMPTE_INTROUVABLE)
+
+    compte.prenom = requete.prenom
+    compte.nom = requete.nom
+    compte.email = requete.email
+    compte.agence = requete.agence
+    compte.poles = [ComptePole(pole=pole) for pole in requete.poles]
+    db.commit()
+    db.refresh(compte)
+
+    return _vers_reponse(compte)

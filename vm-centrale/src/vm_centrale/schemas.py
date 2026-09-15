@@ -3,6 +3,15 @@ from pydantic import BaseModel, Field, field_validator
 from vm_centrale.poles import POLES_VALIDES
 
 
+def _valider_poles(poles: list[str]) -> list[str]:
+    inconnus = [pole for pole in poles if pole not in POLES_VALIDES]
+    if inconnus:
+        raise ValueError(f"Pôle(s) inconnu(s) : {', '.join(inconnus)}")
+    if len(set(poles)) != len(poles):
+        raise ValueError("La liste des pôles ne doit pas contenir de doublon")
+    return poles
+
+
 class AuthRequest(BaseModel):
     identifiant: str
     mot_de_passe: str
@@ -28,8 +37,7 @@ class ChangerMotDePasseRequest(BaseModel):
     nouveau_mot_de_passe: str = Field(min_length=1)
 
 
-class CompteCreeRequest(BaseModel):
-    identifiant: str = Field(min_length=1)
+class _ChampsCompteModifiables(BaseModel):
     prenom: str = Field(min_length=1)
     nom: str = Field(min_length=1)
     email: str | None = None
@@ -39,12 +47,15 @@ class CompteCreeRequest(BaseModel):
     @field_validator("poles")
     @classmethod
     def _poles_valides(cls, poles: list[str]) -> list[str]:
-        inconnus = [pole for pole in poles if pole not in POLES_VALIDES]
-        if inconnus:
-            raise ValueError(f"Pôle(s) inconnu(s) : {', '.join(inconnus)}")
-        if len(set(poles)) != len(poles):
-            raise ValueError("La liste des pôles ne doit pas contenir de doublon")
-        return poles
+        return _valider_poles(poles)
+
+
+class CompteCreeRequest(_ChampsCompteModifiables):
+    identifiant: str = Field(min_length=1)
+
+
+class CompteModifieRequest(_ChampsCompteModifiables):
+    pass
 
 
 class CompteResponse(BaseModel):

@@ -36,6 +36,18 @@ def _requete_creation(**overrides) -> dict:
     return base
 
 
+def _requete_modification(**overrides) -> dict:
+    base = {
+        "prenom": "Nadia",
+        "nom": "Durand",
+        "email": "n.durand@bbass.fr",
+        "agence": "Castries",
+        "poles": ["Foncier"],
+    }
+    base.update(overrides)
+    return base
+
+
 # --- POST /comptes ---------------------------------------------------------
 
 
@@ -213,5 +225,128 @@ def test_liste_echoue_avec_jeton_d_un_compte_non_admin(client, seed_compte):
     jeton = _jeton_non_admin(client, seed_compte)
 
     reponse = client.get("/comptes", headers=_autorisation(jeton))
+
+    assert reponse.status_code == 403
+
+
+# --- PATCH /comptes/{identifiant} --------------------------------------------
+
+
+def test_modification_reussit_avec_jeton_admin_et_retourne_le_compte_modifie(client, seed_compte):
+    jeton = _jeton_admin(client, seed_compte)
+    seed_compte(
+        "n.durand", "correcthorsebatterystaple", agence="Castries", poles=["Foncier"],
+        prenom="Nadia", nom="Durand",
+    )
+
+    reponse = client.patch(
+        "/comptes/n.durand",
+        json=_requete_modification(
+            prenom="Nadège", nom="Dupuis", email="n.dupuis@bbass.fr",
+            agence="Perpignan", poles=["Urbanisme", "DAO"],
+        ),
+        headers=_autorisation(jeton),
+    )
+
+    assert reponse.status_code == 200
+    corps = reponse.json()
+    assert corps["identifiant"] == "n.durand"
+    assert corps["prenom"] == "Nadège"
+    assert corps["nom"] == "Dupuis"
+    assert corps["email"] == "n.dupuis@bbass.fr"
+    assert corps["agence"] == "Perpignan"
+    assert corps["poles"] == ["DAO", "Urbanisme"]
+
+
+def test_modification_peut_retirer_l_email_du_compte(client, seed_compte):
+    jeton = _jeton_admin(client, seed_compte)
+    seed_compte(
+        "n.durand", "correcthorsebatterystaple", agence="Castries", poles=["Foncier"],
+        prenom="Nadia", nom="Durand", email="n.durand@bbass.fr",
+    )
+
+    reponse = client.patch(
+        "/comptes/n.durand",
+        json=_requete_modification(email=None),
+        headers=_autorisation(jeton),
+    )
+
+    assert reponse.status_code == 200
+    assert reponse.json()["email"] is None
+
+
+def test_modification_ne_change_ni_l_identifiant_ni_le_statut_admin_ni_le_mot_de_passe(
+    client, seed_compte
+):
+    jeton = _jeton_admin(client, seed_compte)
+    seed_compte(
+        "n.durand", "correcthorsebatterystaple", agence="Castries", poles=["Foncier"],
+        prenom="Nadia", nom="Durand",
+    )
+
+    reponse = client.patch(
+        "/comptes/n.durand", json=_requete_modification(), headers=_autorisation(jeton)
+    )
+
+    assert reponse.status_code == 200
+    assert reponse.json()["identifiant"] == "n.durand"
+    assert reponse.json()["est_admin"] is False
+    reponse_auth = client.post(
+        "/auth", json={"identifiant": "n.durand", "mot_de_passe": "correcthorsebatterystaple"}
+    )
+    assert reponse_auth.status_code == 200
+
+
+def test_modification_echoue_avec_un_pole_inconnu(client, seed_compte, db_session):
+    jeton = _jeton_admin(client, seed_compte)
+    seed_compte(
+        "n.durand", "correcthorsebatterystaple", agence="Castries", poles=["Foncier"],
+        prenom="Nadia", nom="Durand",
+    )
+
+    reponse = client.patch(
+        "/comptes/n.durand",
+        json=_requete_modification(poles=["Comptabilité"]),
+        headers=_autorisation(jeton),
+    )
+
+    assert reponse.status_code == 422
+    from vm_centrale.models import Compte
+
+    compte = db_session.query(Compte).filter(Compte.identifiant == "n.durand").first()
+    assert [pole.pole for pole in compte.poles] == ["Foncier"]
+
+
+def test_modification_echoue_avec_un_identifiant_inconnu(client, seed_compte):
+    jeton = _jeton_admin(client, seed_compte)
+
+    reponse = client.patch(
+        "/comptes/inconnu", json=_requete_modification(), headers=_autorisation(jeton)
+    )
+
+    assert reponse.status_code == 404
+
+
+def test_modification_echoue_sans_jeton(client, seed_compte):
+    seed_compte(
+        "n.durand", "correcthorsebatterystaple", agence="Castries", poles=["Foncier"],
+        prenom="Nadia", nom="Durand",
+    )
+
+    reponse = client.patch("/comptes/n.durand", json=_requete_modification())
+
+    assert reponse.status_code == 401
+
+
+def test_modification_echoue_avec_jeton_d_un_compte_non_admin(client, seed_compte):
+    jeton = _jeton_non_admin(client, seed_compte)
+    seed_compte(
+        "n.durand", "correcthorsebatterystaple", agence="Castries", poles=["Foncier"],
+        prenom="Nadia", nom="Durand",
+    )
+
+    reponse = client.patch(
+        "/comptes/n.durand", json=_requete_modification(), headers=_autorisation(jeton)
+    )
 
     assert reponse.status_code == 403
