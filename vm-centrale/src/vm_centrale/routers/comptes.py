@@ -21,6 +21,9 @@ router = APIRouter(prefix="/comptes")
 _IDENTIFIANT_DEJA_UTILISE = "Cet identifiant est déjà utilisé"
 _COMPTE_INTROUVABLE = "Compte introuvable"
 _DERNIER_ADMINISTRATEUR = "Impossible de retirer le dernier compte administrateur restant"
+_DERNIER_ADMINISTRATEUR_SUPPRESSION = (
+    "Impossible de supprimer le dernier compte administrateur restant"
+)
 
 
 def _vers_reponse(compte: Compte) -> CompteResponse:
@@ -153,6 +156,33 @@ def deconnexion_forcee(
     # Réutilise le même mécanisme de révocation que DELETE /auth/jeton/{identifiant}
     # (protégé par X-Admin-Key) plutôt que d'en construire un second.
     jetons.revoquer_tous(identifiant)
+
+
+@router.delete("/{identifiant}", status_code=204)
+def supprimer_compte(
+    identifiant: str,
+    db: Session = Depends(get_db),
+    jetons: JetonStore = Depends(get_jeton_store),
+    _admin: Compte = Depends(get_compte_admin),
+    _cle_admin: None = Depends(exiger_cle_admin_vm),
+) -> None:
+    compte = db.query(Compte).filter(Compte.identifiant == identifiant).first()
+    if compte is None:
+        raise HTTPException(status_code=404, detail=_COMPTE_INTROUVABLE)
+
+    if compte.est_admin:
+        # Même garde-fou que PATCH .../est-admin (spec V1.1) : la suppression
+        # d'un administrateur est traitée comme une rétrogradation à ce titre.
+        nombre_administrateurs = db.query(Compte).filter(Compte.est_admin.is_(True)).count()
+        if nombre_administrateurs <= 1:
+            raise HTTPException(status_code=409, detail=_DERNIER_ADMINISTRATEUR_SUPPRESSION)
+
+    # Jeton n'a pas de clé étrangère vers Compte (voir jetons.py) : la cascade
+    # sur les jetons associés doit donc être explicite, avant la suppression
+    # du compte lui-même. Aucune trace ni archive conservée (spec du ticket).
+    jetons.revoquer_tous(identifiant)
+    db.delete(compte)
+    db.commit()
 
 
 @router.patch("/{identifiant}/est-admin", response_model=CompteResponse)

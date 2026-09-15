@@ -708,3 +708,183 @@ def test_modifier_statut_admin_echoue_avec_un_identifiant_inconnu(client, seed_c
     )
 
     assert reponse.status_code == 404
+
+
+# --- DELETE /comptes/{identifiant} --------------------------------------------
+
+
+def test_suppression_reussit_avec_jeton_admin_et_cle_admin_valide(client, seed_compte, monkeypatch, db_session):
+    monkeypatch.setenv("VM_ADMIN_KEY", "cle-admin-de-test")
+    jeton = _jeton_admin(client, seed_compte)
+    seed_compte(
+        "n.durand", "correcthorsebatterystaple", agence="Castries", poles=["Foncier"],
+        prenom="Nadia", nom="Durand", est_admin=False,
+    )
+
+    reponse = client.delete(
+        "/comptes/n.durand",
+        headers={**_autorisation(jeton), "X-Admin-Key": "cle-admin-de-test"},
+    )
+
+    assert reponse.status_code == 204
+    from vm_centrale.models import Compte
+
+    assert db_session.query(Compte).filter(Compte.identifiant == "n.durand").first() is None
+
+
+def test_suppression_revoque_les_jetons_actifs_du_compte_supprime(
+    client, seed_compte, jeton_store, monkeypatch
+):
+    monkeypatch.setenv("VM_ADMIN_KEY", "cle-admin-de-test")
+    jeton_admin = _jeton_admin(client, seed_compte)
+    seed_compte(
+        "n.durand", "correcthorsebatterystaple", agence="Castries", poles=["Foncier"],
+        prenom="Nadia", nom="Durand", est_admin=False,
+    )
+    jeton_1 = jeton_store.emettre("n.durand")
+    jeton_2 = jeton_store.emettre("n.durand")
+
+    reponse = client.delete(
+        "/comptes/n.durand",
+        headers={**_autorisation(jeton_admin), "X-Admin-Key": "cle-admin-de-test"},
+    )
+
+    assert reponse.status_code == 204
+    assert client.get("/auth/verifier", headers=_autorisation(jeton_1)).status_code == 401
+    assert client.get("/auth/verifier", headers=_autorisation(jeton_2)).status_code == 401
+
+
+def test_suppression_ne_revoque_pas_les_jetons_des_autres_comptes(
+    client, seed_compte, jeton_store, monkeypatch
+):
+    monkeypatch.setenv("VM_ADMIN_KEY", "cle-admin-de-test")
+    jeton_admin = _jeton_admin(client, seed_compte)
+    seed_compte(
+        "n.durand", "correcthorsebatterystaple", agence="Castries", poles=["Foncier"],
+        prenom="Nadia", nom="Durand", est_admin=False,
+    )
+    jeton_autre_compte = jeton_store.emettre("p.leroy")
+
+    client.delete(
+        "/comptes/n.durand",
+        headers={**_autorisation(jeton_admin), "X-Admin-Key": "cle-admin-de-test"},
+    )
+
+    assert (
+        client.get("/auth/verifier", headers=_autorisation(jeton_autre_compte)).status_code
+        == 200
+    )
+
+
+def test_suppression_echoue_avec_un_identifiant_inconnu(client, seed_compte, monkeypatch):
+    monkeypatch.setenv("VM_ADMIN_KEY", "cle-admin-de-test")
+    jeton = _jeton_admin(client, seed_compte)
+
+    reponse = client.delete(
+        "/comptes/inconnu", headers={**_autorisation(jeton), "X-Admin-Key": "cle-admin-de-test"}
+    )
+
+    assert reponse.status_code == 404
+
+
+def test_suppression_echoue_sans_cle_admin(client, seed_compte, monkeypatch, db_session):
+    monkeypatch.setenv("VM_ADMIN_KEY", "cle-admin-de-test")
+    jeton = _jeton_admin(client, seed_compte)
+    seed_compte(
+        "n.durand", "correcthorsebatterystaple", agence="Castries", poles=["Foncier"],
+        prenom="Nadia", nom="Durand", est_admin=False,
+    )
+
+    reponse = client.delete("/comptes/n.durand", headers=_autorisation(jeton))
+
+    assert reponse.status_code == 401
+    from vm_centrale.models import Compte
+
+    assert db_session.query(Compte).filter(Compte.identifiant == "n.durand").first() is not None
+
+
+def test_suppression_echoue_avec_une_cle_admin_invalide(client, seed_compte, monkeypatch, db_session):
+    monkeypatch.setenv("VM_ADMIN_KEY", "cle-admin-de-test")
+    jeton = _jeton_admin(client, seed_compte)
+    seed_compte(
+        "n.durand", "correcthorsebatterystaple", agence="Castries", poles=["Foncier"],
+        prenom="Nadia", nom="Durand", est_admin=False,
+    )
+
+    reponse = client.delete(
+        "/comptes/n.durand",
+        headers={**_autorisation(jeton), "X-Admin-Key": "mauvaise-cle"},
+    )
+
+    assert reponse.status_code == 401
+    from vm_centrale.models import Compte
+
+    assert db_session.query(Compte).filter(Compte.identifiant == "n.durand").first() is not None
+
+
+def test_suppression_echoue_sans_jeton(client, seed_compte, monkeypatch):
+    monkeypatch.setenv("VM_ADMIN_KEY", "cle-admin-de-test")
+    seed_compte(
+        "n.durand", "correcthorsebatterystaple", agence="Castries", poles=["Foncier"],
+        prenom="Nadia", nom="Durand", est_admin=False,
+    )
+
+    reponse = client.delete(
+        "/comptes/n.durand", headers={"X-Admin-Key": "cle-admin-de-test"}
+    )
+
+    assert reponse.status_code == 401
+
+
+def test_suppression_echoue_avec_jeton_d_un_compte_non_admin(client, seed_compte, monkeypatch):
+    monkeypatch.setenv("VM_ADMIN_KEY", "cle-admin-de-test")
+    jeton = _jeton_non_admin(client, seed_compte)
+    seed_compte(
+        "n.durand", "correcthorsebatterystaple", agence="Castries", poles=["Foncier"],
+        prenom="Nadia", nom="Durand", est_admin=False,
+    )
+
+    reponse = client.delete(
+        "/comptes/n.durand",
+        headers={**_autorisation(jeton), "X-Admin-Key": "cle-admin-de-test"},
+    )
+
+    assert reponse.status_code == 403
+
+
+def test_suppression_echoue_quand_c_est_le_dernier_administrateur(
+    client, seed_compte, monkeypatch, db_session
+):
+    monkeypatch.setenv("VM_ADMIN_KEY", "cle-admin-de-test")
+    jeton = _jeton_admin(client, seed_compte, identifiant="a.martin")
+
+    reponse = client.delete(
+        "/comptes/a.martin",
+        headers={**_autorisation(jeton), "X-Admin-Key": "cle-admin-de-test"},
+    )
+
+    assert reponse.status_code == 409
+    from vm_centrale.models import Compte
+
+    assert db_session.query(Compte).filter(Compte.identifiant == "a.martin").first() is not None
+
+
+def test_suppression_d_un_administrateur_reussit_quand_un_autre_subsiste(
+    client, seed_compte, monkeypatch, db_session
+):
+    monkeypatch.setenv("VM_ADMIN_KEY", "cle-admin-de-test")
+    jeton = _jeton_admin(client, seed_compte, identifiant="a.martin")
+    seed_compte(
+        "n.durand", "correcthorsebatterystaple", agence="Castries", poles=["Foncier"],
+        prenom="Nadia", nom="Durand", est_admin=True,
+    )
+
+    reponse = client.delete(
+        "/comptes/n.durand",
+        headers={**_autorisation(jeton), "X-Admin-Key": "cle-admin-de-test"},
+    )
+
+    assert reponse.status_code == 204
+    from vm_centrale.models import Compte
+
+    assert db_session.query(Compte).filter(Compte.identifiant == "n.durand").first() is None
