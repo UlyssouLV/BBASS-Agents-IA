@@ -14,6 +14,10 @@ Default canonical labels (`needs-triage`, `needs-info`, `ready-for-agent`, `read
 
 Matt Pocock `/implement` for TDD. Then skill `encadrer-implement`: tests → commit + push + `awaiting-merge` (issue stays Open) → next unblocked child (`/clear` + `/implement`) **or**, if every PR child is done, `/code-review` once vs `main`.
 
+### Finalise the version
+
+When the user says **« Finalise la version »**: skill `finaliser-la-version`. Check every PR child is `awaiting-merge`, **then** GitHub Release (semver tag on the **feature branch** SHA, so `git log` of the tag still shows ticket history), **then** squash-merge the PR into `main` (one commit) and delete the feature branch.
+
 ### Domain docs
 
 Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`. `/code-review` Standards: start at `CLAUDE.md`.
@@ -26,6 +30,6 @@ Do **not** commit or push for other reasons unless the **current user message** 
 
 ## GitHub issues vs `main`
 
-Cycle for every feature: **branch → open issues → implement on the branch → PR → merge to `main` → close the branch and close the issues → GitHub Release (semver tag on that `main` commit).**
+Cycle for every feature: **branch + PR → implement children on the branch → « Finalise la version » (Release tag on the feature SHA, squash-merge to `main`, delete the branch).** GitHub closes issues via `Fixes` on the squash.
 
-Do **not** `gh issue close` because the work is done on a feature branch. Issues stay **Open** until that work is **merged into `main`**. Prefer `Fixes #n` on the **PR** so GitHub closes them at merge.
+Do **not** `gh issue close` because the work is done on a feature branch. Issues stay **Open** until that work is **merged into `main`**.

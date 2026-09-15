@@ -54,6 +54,6 @@ A remaining ticket is **unblocked** when every issue named under **Blocked by** 
 
 ## Not this skill
 
-- Opening or merging the PR, GitHub Release, deleting the branch: only if the user asks, after the review.
+- Opening or merging the PR, GitHub Release, deleting the branch: skill `finaliser-la-version` (« Finalise la version »).
 - Re-implementing `awaiting-merge` tickets.
 - `needs-triage` work (e.g. #6) that is not a child of this PR.
