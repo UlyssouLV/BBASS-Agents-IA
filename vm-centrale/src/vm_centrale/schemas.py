@@ -9,13 +9,17 @@ class AuthRequest(BaseModel):
 class AuthResponse(BaseModel):
     prenom: str
     nom: str
+    email: str | None
     agence: str
-    pole: str
+    poles: list[str]
+    est_admin: bool
+    doit_changer_mot_de_passe: bool
     jeton: str
 
 
 class VerifierResponse(BaseModel):
     identifiant: str
+    est_admin: bool
 
 
 class RelaisRequest(BaseModel):

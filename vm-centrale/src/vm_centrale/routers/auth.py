@@ -44,8 +44,11 @@ def authentifier(
     return AuthResponse(
         prenom=compte.prenom,
         nom=compte.nom,
+        email=compte.email,
         agence=compte.agence,
-        pole=compte.pole,
+        poles=[compte_pole.pole for compte_pole in compte.poles],
+        est_admin=compte.est_admin,
+        doit_changer_mot_de_passe=compte.doit_changer_mot_de_passe,
         jeton=jetons.emettre(compte.identifiant),
     )
 
@@ -53,12 +56,24 @@ def authentifier(
 @router.get("/auth/verifier", response_model=VerifierResponse)
 def verifier(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
+    db: Session = Depends(get_db),
     jetons: JetonStore = Depends(get_jeton_store),
 ) -> VerifierResponse:
     identifiant = jetons.identifiant_pour(credentials.credentials) if credentials is not None else None
     if identifiant is None:
         raise HTTPException(status_code=401, detail=_JETON_INVALIDE)
-    return VerifierResponse(identifiant=identifiant)
+
+    compte = db.query(Compte).filter(Compte.identifiant == identifiant).first()
+    # est_admin est toujours relu en base ici, jamais mis en cache dans le
+    # jeton : un compte rétrogradé perd le droit admin dès la prochaine
+    # vérification, sans attendre une nouvelle connexion. Un compte introuvable
+    # (ex. supprimé après l'émission du jeton) est traité comme non-admin
+    # plutôt que rejeté : le jeton reste seul juge de la validité de la
+    # session, indépendamment de l'existence du compte.
+    return VerifierResponse(
+        identifiant=identifiant,
+        est_admin=compte.est_admin if compte is not None else False,
+    )
 
 
 @router.delete("/auth/jeton", status_code=204)
