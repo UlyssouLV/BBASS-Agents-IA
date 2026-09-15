@@ -20,6 +20,33 @@
     </form>
   </main>
 
+  <main id="ecran-changement-mot-de-passe" hidden>
+    <h1>Changement de mot de passe requis</h1>
+    <p>Vous devez choisir un nouveau mot de passe avant d'accéder à l'application.</p>
+    <form id="formulaire-changement-mot-de-passe">
+      <label for="nouveau-mot-de-passe">Nouveau mot de passe</label>
+      <input
+        type="password"
+        id="nouveau-mot-de-passe"
+        name="nouveau-mot-de-passe"
+        autocomplete="new-password"
+        required
+      />
+
+      <label for="confirmation-mot-de-passe">Confirmer le nouveau mot de passe</label>
+      <input
+        type="password"
+        id="confirmation-mot-de-passe"
+        name="confirmation-mot-de-passe"
+        autocomplete="new-password"
+        required
+      />
+
+      <button type="submit">Changer le mot de passe</button>
+      <p id="erreur-changement-mot-de-passe" role="alert" hidden></p>
+    </form>
+  </main>
+
   <main id="ecran-compte" hidden>
     <header>
       <span>

@@ -20,3 +20,30 @@ def test_front_end_affiche_le_pole_et_l_agence_du_compte_connecte(client, vm_cen
     assert 'id="pole-agence-connecte"' in html
     assert "compte.agence" in js
     assert "compte.poles" in js
+
+
+def test_connexion_avec_doit_changer_mot_de_passe_affiche_l_ecran_de_changement(
+    client, vm_centrale_client_factice
+):
+    # Issue #20 : un compte avec doit_changer_mot_de_passe=true ne doit
+    # jamais atteindre l'écran de chat, à la connexion comme à la
+    # restauration de session (voir aussi test_verification_au_demarrage.py
+    # côté backend, qui vérifie que GET /compte porte bien ce flag). Aucun
+    # rendu serveur : on vérifie ici le balisage de l'écran bloquant et la
+    # condition JS exacte qui y redirige au lieu d'afficher le chat.
+    vm_centrale_client_factice.accepter(doit_changer_mot_de_passe=True)
+
+    html = client.get("/").text
+    js = client.get("/static/app.js").text
+
+    assert 'id="ecran-changement-mot-de-passe" hidden' in html
+    assert 'id="formulaire-changement-mot-de-passe"' in html
+    assert "compte.doit_changer_mot_de_passe" in js
+    assert "afficherEcranChangementMotDePasse" in js
+
+
+def test_front_end_appelle_l_endpoint_de_changement_de_mot_de_passe(client):
+    js = client.get("/static/app.js").text
+
+    assert '"/mot-de-passe"' in js
+    assert "nouveau_mot_de_passe" in js

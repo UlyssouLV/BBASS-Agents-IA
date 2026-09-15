@@ -27,6 +27,10 @@ class CompteResponse(BaseModel):
     doit_changer_mot_de_passe: bool
 
 
+class ChangerMotDePasseRequest(BaseModel):
+    nouveau_mot_de_passe: str = Field(min_length=1)
+
+
 class MessageRequest(BaseModel):
     message: str = Field(min_length=1, max_length=8000)
 

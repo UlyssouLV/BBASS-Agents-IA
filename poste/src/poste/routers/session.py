@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 
-from poste.schemas import CompteResponse, ConnexionRequest, ConnexionResponse
+from poste.schemas import ChangerMotDePasseRequest, CompteResponse, ConnexionRequest, ConnexionResponse
 from poste.session import SessionStore, get_session_store
-from poste.vm_centrale_client import VmCentraleClient, get_vm_centrale_client
+from poste.vm_centrale_client import JetonInvalideError, VmCentraleClient, get_vm_centrale_client
 
 router = APIRouter()
 
@@ -69,6 +69,50 @@ def deconnexion(
             # centrale est injoignable ; le jeton reste alors valide côté VM
             # jusqu'à son prochain redémarrage ou une révocation forcée.
             pass
+
+
+@router.post("/mot-de-passe", response_model=CompteResponse)
+def changer_mot_de_passe(
+    requete: ChangerMotDePasseRequest,
+    client: VmCentraleClient = Depends(get_vm_centrale_client),
+    session: SessionStore = Depends(get_session_store),
+) -> CompteResponse:
+    jeton = session.jeton
+    if jeton is None:
+        raise HTTPException(status_code=401, detail=_AUCUNE_SESSION)
+
+    try:
+        client.changer_mot_de_passe(jeton, requete.nouveau_mot_de_passe)
+    except JetonInvalideError:
+        session.fermer()
+        raise HTTPException(status_code=401, detail=_AUCUNE_SESSION) from None
+    except Exception as erreur:
+        # Couvre aussi bien une VM centrale injoignable qu'une réponse en erreur
+        # de sa part : jamais un plantage côté poste, toujours un état d'erreur
+        # propre distinct d'un échec métier (qui reste un 401).
+        raise HTTPException(status_code=502, detail=_VM_CENTRALE_INDISPONIBLE) from erreur
+
+    session.marquer_mot_de_passe_change()
+
+    # SessionStore garantit ces champs non-None dès qu'une session est ouverte
+    # (voir compte_connecte ci-dessous), et le jeton ci-dessus le confirme.
+    assert (
+        session.identifiant is not None
+        and session.prenom is not None
+        and session.nom is not None
+        and session.agence is not None
+        and session.poles is not None
+        and session.est_admin is not None
+    )
+    return CompteResponse(
+        identifiant=session.identifiant,
+        prenom=session.prenom,
+        nom=session.nom,
+        agence=session.agence,
+        poles=session.poles,
+        est_admin=session.est_admin,
+        doit_changer_mot_de_passe=False,
+    )
 
 
 @router.get("/compte", response_model=CompteResponse)

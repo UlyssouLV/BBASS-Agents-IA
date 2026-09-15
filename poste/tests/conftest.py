@@ -42,6 +42,8 @@ class VmCentraleClientFactice:
         self._exception_creation_compte: Exception | None = None
         self._requetes_creation_compte: list[dict] = []
         self._jetons_creation_compte: list[str] = []
+        self._exception_changement_mot_de_passe: Exception | None = None
+        self.appels_changement_mot_de_passe: list[tuple[str, str]] = []
 
     def accepter(
         self,
@@ -179,6 +181,14 @@ class VmCentraleClientFactice:
             raise self._exception_creation_compte
         assert self._compte_cree is not None
         return self._compte_cree
+
+    def changement_mot_de_passe_echoue(self, exception: Exception) -> None:
+        self._exception_changement_mot_de_passe = exception
+
+    def changer_mot_de_passe(self, jeton: str, nouveau_mot_de_passe: str) -> None:
+        self.appels_changement_mot_de_passe.append((jeton, nouveau_mot_de_passe))
+        if self._exception_changement_mot_de_passe is not None:
+            raise self._exception_changement_mot_de_passe
 
 
 @pytest.fixture(autouse=True)

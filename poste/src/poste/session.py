@@ -91,20 +91,41 @@ class SessionStore:
         doit_changer_mot_de_passe: bool,
     ) -> None:
         self._definir(identifiant, prenom, nom, jeton, agence, poles, est_admin, doit_changer_mot_de_passe)
+        self._persister()
+
+    def marquer_mot_de_passe_change(self) -> None:
+        # Appelé après un POST /mot-de-passe réussi côté VM centrale (voir
+        # routers/session.py) : lève le flag en mémoire et dans le blob
+        # persisté, pour que le changement survive à un redémarrage du poste
+        # sans nécessiter une reconnexion.
+        self._doit_changer_mot_de_passe = False
+        self._persister()
+
+    def _persister(self) -> None:
+        assert (
+            self._identifiant is not None
+            and self._prenom is not None
+            and self._nom is not None
+            and self._jeton is not None
+            and self._agence is not None
+            and self._poles is not None
+            and self._est_admin is not None
+            and self._doit_changer_mot_de_passe is not None
+        )
         try:
             keyring.set_password(
                 _SERVICE_NOM,
                 _UTILISATEUR,
                 json.dumps(
                     {
-                        "identifiant": identifiant,
-                        "prenom": prenom,
-                        "nom": nom,
-                        "jeton": jeton,
-                        "agence": agence,
-                        "poles": poles,
-                        "est_admin": est_admin,
-                        "doit_changer_mot_de_passe": doit_changer_mot_de_passe,
+                        "identifiant": self._identifiant,
+                        "prenom": self._prenom,
+                        "nom": self._nom,
+                        "jeton": self._jeton,
+                        "agence": self._agence,
+                        "poles": self._poles,
+                        "est_admin": self._est_admin,
+                        "doit_changer_mot_de_passe": self._doit_changer_mot_de_passe,
                     }
                 ),
             )

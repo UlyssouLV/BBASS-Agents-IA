@@ -67,6 +67,10 @@ button {
   color: #b91c1c;
 }
 
+#erreur-changement-mot-de-passe {
+  color: #b91c1c;
+}
+
 #ecran-compte header {
   display: flex;
   align-items: center;

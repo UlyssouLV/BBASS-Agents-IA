@@ -92,6 +92,16 @@ class VmCentraleClient:
         reponse.raise_for_status()
         return reponse.json()["reponse"]
 
+    def changer_mot_de_passe(self, jeton: str, nouveau_mot_de_passe: str) -> None:
+        reponse = _http_client.post(
+            f"{VM_CENTRALE_BASE_URL}/auth/mot-de-passe",
+            json={"nouveau_mot_de_passe": nouveau_mot_de_passe},
+            headers={"Authorization": f"Bearer {jeton}"},
+        )
+        if reponse.status_code == 401:
+            raise JetonInvalideError()
+        reponse.raise_for_status()
+
     def verifier(self, jeton: str) -> VerificationReussie | None:
         reponse = _http_client.get(
             f"{VM_CENTRALE_BASE_URL}/auth/verifier",

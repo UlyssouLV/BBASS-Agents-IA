@@ -112,6 +112,18 @@ def test_persistance_degradee_se_reinitialise_apres_un_succes(monkeypatch):
     assert not store.persistance_degradee
 
 
+def test_marquer_mot_de_passe_change_leve_le_flag_en_memoire_et_dans_le_blob_persiste(keyring_factice):
+    store = SessionStore()
+    _ouvrir(store)
+
+    store.marquer_mot_de_passe_change()
+
+    assert store.doit_changer_mot_de_passe is False
+    donnees = SessionStore().lire_session_persistee()
+    assert donnees is not None
+    assert donnees.doit_changer_mot_de_passe is False
+
+
 def test_fermer_ignore_une_exception_du_gestionnaire_d_identifiants(monkeypatch):
     def delete_password_en_echec(service_name, username):
         raise RuntimeError("Credential Manager indisponible")

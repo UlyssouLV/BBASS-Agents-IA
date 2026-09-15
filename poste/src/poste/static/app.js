@@ -1,7 +1,12 @@
 const ecranConnexion = document.getElementById("ecran-connexion");
+const ecranChangementMotDePasse = document.getElementById("ecran-changement-mot-de-passe");
 const ecranCompte = document.getElementById("ecran-compte");
 const formulaireConnexion = document.getElementById("formulaire-connexion");
 const erreurConnexion = document.getElementById("erreur-connexion");
+const formulaireChangementMotDePasse = document.getElementById("formulaire-changement-mot-de-passe");
+const erreurChangementMotDePasse = document.getElementById("erreur-changement-mot-de-passe");
+const nouveauMotDePasseChamp = document.getElementById("nouveau-mot-de-passe");
+const confirmationMotDePasseChamp = document.getElementById("confirmation-mot-de-passe");
 const identifiantConnecte = document.getElementById("identifiant-connecte");
 const poleAgenceConnecte = document.getElementById("pole-agence-connecte");
 const boutonDeconnexion = document.getElementById("bouton-deconnexion");
@@ -35,6 +40,16 @@ async function afficherOngletComptes() {
 }
 
 function afficherEcranCompte(compte) {
+  // Un compte qui doit encore changer son mot de passe (création ou
+  // réinitialisation par un administrateur, voir docs/specs/v1.1-gestion-
+  // comptes-admin.md) ne doit jamais atteindre l'écran de chat, ni à la
+  // connexion ni à la restauration de session : l'écran de changement de
+  // mot de passe obligatoire prend sa place tant que ce n'est pas fait.
+  if (compte.doit_changer_mot_de_passe) {
+    afficherEcranChangementMotDePasse();
+    return;
+  }
+
   identifiantConnecte.textContent = `${compte.prenom} ${compte.nom} (${compte.identifiant})`;
   poleAgenceConnecte.textContent = [compte.poles.join(", "), compte.agence].filter(Boolean).join(" — ");
   if (compte.avertissement) {
@@ -49,11 +64,20 @@ function afficherEcranCompte(compte) {
   ongletBoutonComptes.hidden = !compte.est_admin;
   afficherOngletChat();
   ecranConnexion.hidden = true;
+  ecranChangementMotDePasse.hidden = true;
   ecranCompte.hidden = false;
+}
+
+function afficherEcranChangementMotDePasse() {
+  ecranConnexion.hidden = true;
+  ecranCompte.hidden = true;
+  erreurChangementMotDePasse.hidden = true;
+  ecranChangementMotDePasse.hidden = false;
 }
 
 function afficherEcranConnexion() {
   ecranConnexion.hidden = false;
+  ecranChangementMotDePasse.hidden = true;
   ecranCompte.hidden = true;
   erreurConnexion.hidden = true;
   messages.replaceChildren();
@@ -104,6 +128,51 @@ formulaireConnexion.addEventListener("submit", async (evenement) => {
     return;
   }
 
+  const compte = await reponse.json();
+  afficherEcranCompte(compte);
+});
+
+formulaireChangementMotDePasse.addEventListener("submit", async (evenement) => {
+  evenement.preventDefault();
+  erreurChangementMotDePasse.hidden = true;
+
+  const nouveauMotDePasse = nouveauMotDePasseChamp.value;
+  const confirmation = confirmationMotDePasseChamp.value;
+
+  if (nouveauMotDePasse !== confirmation) {
+    erreurChangementMotDePasse.textContent = "Les mots de passe saisis ne correspondent pas.";
+    erreurChangementMotDePasse.hidden = false;
+    return;
+  }
+
+  let reponse;
+  try {
+    reponse = await fetch("/mot-de-passe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nouveau_mot_de_passe: nouveauMotDePasse }),
+    });
+  } catch {
+    erreurChangementMotDePasse.textContent =
+      "Impossible de joindre le service de connexion. Réessayez plus tard.";
+    erreurChangementMotDePasse.hidden = false;
+    return;
+  }
+
+  if (reponse.status === 401) {
+    afficherEcranConnexion();
+    return;
+  }
+
+  if (!reponse.ok) {
+    const detail = await reponse.json().catch(() => null);
+    erreurChangementMotDePasse.textContent =
+      detail && detail.detail ? detail.detail : "Le changement de mot de passe a échoué. Réessayez plus tard.";
+    erreurChangementMotDePasse.hidden = false;
+    return;
+  }
+
+  formulaireChangementMotDePasse.reset();
   const compte = await reponse.json();
   afficherEcranCompte(compte);
 });
