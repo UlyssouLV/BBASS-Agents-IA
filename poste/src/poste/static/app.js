@@ -3,6 +3,7 @@ const ecranCompte = document.getElementById("ecran-compte");
 const formulaireConnexion = document.getElementById("formulaire-connexion");
 const erreurConnexion = document.getElementById("erreur-connexion");
 const identifiantConnecte = document.getElementById("identifiant-connecte");
+const poleAgenceConnecte = document.getElementById("pole-agence-connecte");
 const boutonDeconnexion = document.getElementById("bouton-deconnexion");
 const avertissementSession = document.getElementById("avertissement-session");
 const messages = document.getElementById("messages");
@@ -13,6 +14,7 @@ const champMessage = document.getElementById("message");
 
 function afficherEcranCompte(compte) {
   identifiantConnecte.textContent = `${compte.prenom} ${compte.nom} (${compte.identifiant})`;
+  poleAgenceConnecte.textContent = [compte.poles.join(", "), compte.agence].filter(Boolean).join(" — ");
   if (compte.avertissement) {
     avertissementSession.textContent = compte.avertissement;
     avertissementSession.hidden = false;
