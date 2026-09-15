@@ -82,6 +82,10 @@ class MotDePasseReinitialiseResponse(BaseModel):
     mot_de_passe: str
 
 
+class StatutAdminRequest(BaseModel):
+    est_admin: bool
+
+
 class RelaisRequest(BaseModel):
     message: str = Field(min_length=1, max_length=8000)
 

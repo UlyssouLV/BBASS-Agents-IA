@@ -542,3 +542,169 @@ def test_deconnexion_forcee_echoue_avec_jeton_d_un_compte_non_admin(client, seed
     )
 
     assert reponse.status_code == 403
+
+
+# --- PATCH /comptes/{identifiant}/est-admin -----------------------------------
+
+
+def test_promotion_reussit_avec_jeton_admin_et_cle_admin_valide(client, seed_compte, monkeypatch):
+    monkeypatch.setenv("VM_ADMIN_KEY", "cle-admin-de-test")
+    jeton = _jeton_admin(client, seed_compte)
+    seed_compte(
+        "n.durand", "correcthorsebatterystaple", agence="Castries", poles=["Foncier"],
+        prenom="Nadia", nom="Durand", est_admin=False,
+    )
+
+    reponse = client.patch(
+        "/comptes/n.durand/est-admin",
+        json={"est_admin": True},
+        headers={**_autorisation(jeton), "X-Admin-Key": "cle-admin-de-test"},
+    )
+
+    assert reponse.status_code == 200
+    assert reponse.json()["est_admin"] is True
+
+
+def test_retrogradation_reussit_quand_un_autre_administrateur_subsiste(
+    client, seed_compte, monkeypatch
+):
+    monkeypatch.setenv("VM_ADMIN_KEY", "cle-admin-de-test")
+    jeton = _jeton_admin(client, seed_compte)
+    seed_compte(
+        "n.durand", "correcthorsebatterystaple", agence="Castries", poles=["Foncier"],
+        prenom="Nadia", nom="Durand", est_admin=True,
+    )
+
+    reponse = client.patch(
+        "/comptes/n.durand/est-admin",
+        json={"est_admin": False},
+        headers={**_autorisation(jeton), "X-Admin-Key": "cle-admin-de-test"},
+    )
+
+    assert reponse.status_code == 200
+    assert reponse.json()["est_admin"] is False
+
+
+def test_retrogradation_echoue_sans_cle_admin(client, seed_compte, monkeypatch):
+    monkeypatch.setenv("VM_ADMIN_KEY", "cle-admin-de-test")
+    jeton = _jeton_admin(client, seed_compte)
+    seed_compte(
+        "n.durand", "correcthorsebatterystaple", agence="Castries", poles=["Foncier"],
+        prenom="Nadia", nom="Durand", est_admin=True,
+    )
+
+    reponse = client.patch(
+        "/comptes/n.durand/est-admin", json={"est_admin": False}, headers=_autorisation(jeton)
+    )
+
+    assert reponse.status_code == 401
+    reponse_liste = client.get(
+        "/comptes", headers={**_autorisation(jeton), "X-Admin-Key": "cle-admin-de-test"}
+    )
+    assert next(
+        c for c in reponse_liste.json() if c["identifiant"] == "n.durand"
+    )["est_admin"] is True
+
+
+def test_promotion_echoue_avec_une_cle_admin_invalide(client, seed_compte, monkeypatch, db_session):
+    monkeypatch.setenv("VM_ADMIN_KEY", "cle-admin-de-test")
+    jeton = _jeton_admin(client, seed_compte)
+    seed_compte(
+        "n.durand", "correcthorsebatterystaple", agence="Castries", poles=["Foncier"],
+        prenom="Nadia", nom="Durand", est_admin=False,
+    )
+
+    reponse = client.patch(
+        "/comptes/n.durand/est-admin",
+        json={"est_admin": True},
+        headers={**_autorisation(jeton), "X-Admin-Key": "mauvaise-cle"},
+    )
+
+    assert reponse.status_code == 401
+    from vm_centrale.models import Compte
+
+    compte = db_session.query(Compte).filter(Compte.identifiant == "n.durand").first()
+    assert compte.est_admin is False
+
+
+def test_promotion_echoue_sans_jeton(client, seed_compte, monkeypatch):
+    monkeypatch.setenv("VM_ADMIN_KEY", "cle-admin-de-test")
+    seed_compte(
+        "n.durand", "correcthorsebatterystaple", agence="Castries", poles=["Foncier"],
+        prenom="Nadia", nom="Durand", est_admin=False,
+    )
+
+    reponse = client.patch(
+        "/comptes/n.durand/est-admin",
+        json={"est_admin": True},
+        headers={"X-Admin-Key": "cle-admin-de-test"},
+    )
+
+    assert reponse.status_code == 401
+
+
+def test_promotion_echoue_avec_jeton_d_un_compte_non_admin(client, seed_compte, monkeypatch):
+    monkeypatch.setenv("VM_ADMIN_KEY", "cle-admin-de-test")
+    jeton = _jeton_non_admin(client, seed_compte)
+    seed_compte(
+        "n.durand", "correcthorsebatterystaple", agence="Castries", poles=["Foncier"],
+        prenom="Nadia", nom="Durand", est_admin=False,
+    )
+
+    reponse = client.patch(
+        "/comptes/n.durand/est-admin",
+        json={"est_admin": True},
+        headers={**_autorisation(jeton), "X-Admin-Key": "cle-admin-de-test"},
+    )
+
+    assert reponse.status_code == 403
+
+
+def test_retrogradation_echoue_quand_c_est_le_dernier_administrateur(
+    client, seed_compte, monkeypatch, db_session
+):
+    monkeypatch.setenv("VM_ADMIN_KEY", "cle-admin-de-test")
+    jeton = _jeton_admin(client, seed_compte, identifiant="a.martin")
+
+    reponse = client.patch(
+        "/comptes/a.martin/est-admin",
+        json={"est_admin": False},
+        headers={**_autorisation(jeton), "X-Admin-Key": "cle-admin-de-test"},
+    )
+
+    assert reponse.status_code == 409
+    from vm_centrale.models import Compte
+
+    compte = db_session.query(Compte).filter(Compte.identifiant == "a.martin").first()
+    assert compte.est_admin is True
+
+
+def test_retrogradation_du_dernier_administrateur_reussit_si_un_autre_est_promu_avant(
+    client, seed_compte, monkeypatch
+):
+    monkeypatch.setenv("VM_ADMIN_KEY", "cle-admin-de-test")
+    jeton = _jeton_admin(client, seed_compte, identifiant="a.martin")
+    seed_compte(
+        "n.durand", "correcthorsebatterystaple", agence="Castries", poles=["Foncier"],
+        prenom="Nadia", nom="Durand", est_admin=False,
+    )
+    en_tetes = {**_autorisation(jeton), "X-Admin-Key": "cle-admin-de-test"}
+    client.patch("/comptes/n.durand/est-admin", json={"est_admin": True}, headers=en_tetes)
+
+    reponse = client.patch("/comptes/a.martin/est-admin", json={"est_admin": False}, headers=en_tetes)
+
+    assert reponse.status_code == 200
+    assert reponse.json()["est_admin"] is False
+
+
+def test_modifier_statut_admin_echoue_avec_un_identifiant_inconnu(client, seed_compte, monkeypatch):
+    monkeypatch.setenv("VM_ADMIN_KEY", "cle-admin-de-test")
+    jeton = _jeton_admin(client, seed_compte)
+
+    reponse = client.patch(
+        "/comptes/inconnu/est-admin",
+        json={"est_admin": True},
+        headers={**_autorisation(jeton), "X-Admin-Key": "cle-admin-de-test"},
+    )
+
+    assert reponse.status_code == 404

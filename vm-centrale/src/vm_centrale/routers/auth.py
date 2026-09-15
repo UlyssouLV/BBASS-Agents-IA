@@ -1,10 +1,8 @@
-import hmac
-
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
-from vm_centrale.config import get_vm_admin_key
+from vm_centrale.autorisation import exiger_cle_admin_vm
 from vm_centrale.database import get_db
 from vm_centrale.models import Compte
 from vm_centrale.schemas import AuthRequest, AuthResponse, ChangerMotDePasseRequest, VerifierResponse
@@ -15,7 +13,6 @@ router = APIRouter()
 
 _ECHEC_AUTHENTIFICATION = "Identifiant ou mot de passe incorrect"
 _JETON_INVALIDE = "Jeton d'authentification manquant ou invalide"
-_CLE_ADMIN_INVALIDE = "Clé d'administration manquante ou invalide"
 _CHANGEMENT_NON_AUTORISE = (
     "Le changement de mot de passe n'est autorisé que dans le flux imposé après "
     "création ou réinitialisation"
@@ -129,16 +126,7 @@ def revoquer_jeton_courant(
 @router.delete("/auth/jeton/{identifiant}", status_code=204)
 def revoquer_tous_les_jetons(
     identifiant: str,
-    x_admin_key: str | None = Header(default=None),
     jetons: JetonStore = Depends(get_jeton_store),
+    _cle_admin: None = Depends(exiger_cle_admin_vm),
 ) -> None:
-    if not _cle_admin_valide(x_admin_key):
-        raise HTTPException(status_code=401, detail=_CLE_ADMIN_INVALIDE)
     jetons.revoquer_tous(identifiant)
-
-
-def _cle_admin_valide(cle_fournie: str | None) -> bool:
-    cle_attendue = get_vm_admin_key()
-    if cle_attendue is None or cle_fournie is None:
-        return False
-    return hmac.compare_digest(cle_fournie, cle_attendue)
