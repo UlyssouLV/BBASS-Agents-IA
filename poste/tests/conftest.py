@@ -59,6 +59,9 @@ class VmCentraleClientFactice:
         self._exception_statut_admin: Exception | None = None
         self._jetons_statut_admin: list[str] = []
         self._requetes_statut_admin: list[dict] = []
+        self._exception_suppression_compte: Exception | None = None
+        self._jetons_suppression_compte: list[str] = []
+        self._requetes_suppression_compte: list[dict] = []
 
     def accepter(
         self,
@@ -280,6 +283,17 @@ class VmCentraleClientFactice:
             raise self._exception_statut_admin
         assert self._compte_statut_admin_modifie is not None
         return self._compte_statut_admin_modifie
+
+    def suppression_compte_echoue(self, exception: Exception) -> None:
+        self._exception_suppression_compte = exception
+
+    def supprimer_compte(self, jeton: str, identifiant: str, cle_admin_vm: str) -> None:
+        self._jetons_suppression_compte.append(jeton)
+        self._requetes_suppression_compte.append(
+            {"identifiant": identifiant, "cle_admin_vm": cle_admin_vm}
+        )
+        if self._exception_suppression_compte is not None:
+            raise self._exception_suppression_compte
 
 
 @pytest.fixture(autouse=True)

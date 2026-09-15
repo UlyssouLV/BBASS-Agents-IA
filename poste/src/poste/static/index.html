@@ -185,6 +185,20 @@
         <strong id="statut-admin-confirmation-identifiant"></strong> est désormais
         <span id="statut-admin-confirmation-statut"></span>.
       </p>
+
+      <h3 id="suppression-titre" hidden>Supprimer le compte <span id="suppression-identifiant"></span></h3>
+      <form id="formulaire-suppression-compte" hidden>
+        <label for="suppression-cle">Clé d'administration VM</label>
+        <input type="password" id="suppression-cle" name="cle_admin_vm" required />
+
+        <button type="submit">Confirmer la suppression</button>
+        <button type="button" id="suppression-annuler">Annuler</button>
+      </form>
+      <p id="suppression-erreur" role="alert" hidden></p>
+
+      <p id="suppression-confirmation" role="status" hidden>
+        Compte <strong id="suppression-confirmation-identifiant"></strong> supprimé définitivement.
+      </p>
     </section>
   </main>
 

@@ -80,3 +80,7 @@ class MotDePasseReinitialiseResponse(BaseModel):
 class StatutAdminRequest(BaseModel):
     est_admin: bool
     cle_admin_vm: str = Field(min_length=1)
+
+
+class SuppressionCompteRequest(BaseModel):
+    cle_admin_vm: str = Field(min_length=1)

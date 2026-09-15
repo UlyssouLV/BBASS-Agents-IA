@@ -47,11 +47,20 @@ const statutAdminErreur = document.getElementById("statut-admin-erreur");
 const statutAdminConfirmation = document.getElementById("statut-admin-confirmation");
 const statutAdminConfirmationIdentifiant = document.getElementById("statut-admin-confirmation-identifiant");
 const statutAdminConfirmationStatut = document.getElementById("statut-admin-confirmation-statut");
+const suppressionTitre = document.getElementById("suppression-titre");
+const suppressionIdentifiant = document.getElementById("suppression-identifiant");
+const formulaireSuppressionCompte = document.getElementById("formulaire-suppression-compte");
+const suppressionCle = document.getElementById("suppression-cle");
+const suppressionAnnuler = document.getElementById("suppression-annuler");
+const suppressionErreur = document.getElementById("suppression-erreur");
+const suppressionConfirmation = document.getElementById("suppression-confirmation");
+const suppressionConfirmationIdentifiant = document.getElementById("suppression-confirmation-identifiant");
 
 let comptesActuels = [];
 let identifiantEnCoursDeModification = null;
 let identifiantEnCoursDeChangementStatutAdmin = null;
 let estAdminCibleEnCours = null;
+let identifiantEnCoursDeSuppression = null;
 
 function afficherOngletChat() {
   ongletChat.hidden = false;
@@ -302,6 +311,13 @@ function ligneCompte(compte) {
     ouvrirChangementStatutAdmin(compte.identifiant, !compte.est_admin)
   );
   celluleActions.append(boutonStatutAdmin);
+
+  const boutonSupprimer = document.createElement("button");
+  boutonSupprimer.type = "button";
+  boutonSupprimer.textContent = "Supprimer";
+  boutonSupprimer.dataset.identifiant = compte.identifiant;
+  boutonSupprimer.addEventListener("click", () => ouvrirSuppressionCompte(compte.identifiant));
+  celluleActions.append(boutonSupprimer);
 
   ligne.append(celluleActions);
 
@@ -613,6 +629,67 @@ formulaireStatutAdmin.addEventListener("submit", async (evenement) => {
   statutAdminConfirmationStatut.textContent = compte.est_admin ? "administrateur" : "un compte normal";
   fermerChangementStatutAdmin();
   statutAdminConfirmation.hidden = false;
+  await chargerComptes();
+});
+
+function ouvrirSuppressionCompte(identifiant) {
+  identifiantEnCoursDeSuppression = identifiant;
+  suppressionErreur.hidden = true;
+  suppressionConfirmation.hidden = true;
+  suppressionIdentifiant.textContent = identifiant;
+  suppressionTitre.hidden = false;
+  formulaireSuppressionCompte.hidden = false;
+  suppressionCle.focus();
+}
+
+function fermerSuppressionCompte() {
+  identifiantEnCoursDeSuppression = null;
+  suppressionTitre.hidden = true;
+  formulaireSuppressionCompte.hidden = true;
+  formulaireSuppressionCompte.reset();
+  suppressionErreur.hidden = true;
+}
+
+suppressionAnnuler.addEventListener("click", fermerSuppressionCompte);
+
+formulaireSuppressionCompte.addEventListener("submit", async (evenement) => {
+  evenement.preventDefault();
+  suppressionErreur.hidden = true;
+
+  const cleAdminVm = suppressionCle.value;
+
+  let reponse;
+  try {
+    reponse = await fetch(`/comptes/${encodeURIComponent(identifiantEnCoursDeSuppression)}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cle_admin_vm: cleAdminVm }),
+    });
+  } catch {
+    suppressionErreur.textContent = "Impossible de joindre le service de gestion des comptes. Réessayez plus tard.";
+    suppressionErreur.hidden = false;
+    return;
+  }
+
+  if (reponse.status === 401) {
+    afficherEcranConnexion();
+    return;
+  }
+
+  if (!reponse.ok) {
+    const detail = await reponse.json().catch(() => null);
+    suppressionErreur.textContent =
+      detail && typeof detail.detail === "string"
+        ? detail.detail
+        : "La suppression du compte a échoué. Réessayez plus tard.";
+    suppressionErreur.hidden = false;
+    return;
+  }
+
+  const identifiantSupprime = identifiantEnCoursDeSuppression;
+  fermerSuppressionCompte();
+  suppressionConfirmationIdentifiant.textContent = identifiantSupprime;
+  suppressionConfirmation.hidden = false;
   await chargerComptes();
 });
 

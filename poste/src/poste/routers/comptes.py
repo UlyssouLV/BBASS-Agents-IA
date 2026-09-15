@@ -7,6 +7,7 @@ from poste.schemas import (
     CompteModificationRequest,
     MotDePasseReinitialiseResponse,
     StatutAdminRequest,
+    SuppressionCompteRequest,
 )
 from poste.session import SessionStore, get_session_store
 from poste.vm_centrale_client import (
@@ -186,6 +187,20 @@ def deconnexion_forcee(
     jeton = _jeton_de_session(session)
     try:
         client.deconnexion_forcee(jeton, identifiant)
+    except Exception as erreur:
+        raise _erreur_vm_vers_http(session, erreur) from erreur
+
+
+@router.delete("/comptes/{identifiant}", status_code=204)
+def supprimer_compte(
+    identifiant: str,
+    requete: SuppressionCompteRequest,
+    client: VmCentraleClient = Depends(get_vm_centrale_client),
+    session: SessionStore = Depends(get_session_store),
+) -> None:
+    jeton = _jeton_de_session(session)
+    try:
+        client.supprimer_compte(jeton, identifiant, cle_admin_vm=requete.cle_admin_vm)
     except Exception as erreur:
         raise _erreur_vm_vers_http(session, erreur) from erreur
 

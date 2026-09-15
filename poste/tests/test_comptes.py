@@ -632,6 +632,122 @@ def test_changement_de_statut_admin_avec_vm_centrale_injoignable_retourne_une_er
     assert reponse.json()["detail"]
 
 
+# --- DELETE /comptes/{identifiant} --------------------------------------------
+
+
+def _supprimer(client, identifiant: str = "n.durand", cle_admin_vm: str = "cle-admin-de-test"):
+    # httpx.Client.delete() n'accepte pas de corps JSON : request() est requis
+    # pour envoyer cle_admin_vm, comme le fera fetch(..., {method: "DELETE"})
+    # côté navigateur (voir app.js).
+    return client.request(
+        "DELETE", f"/comptes/{identifiant}", json={"cle_admin_vm": cle_admin_vm}
+    )
+
+
+def test_suppression_avec_session_admin_et_cle_valide_reussit(client, vm_centrale_client_factice):
+    _connecter(client, vm_centrale_client_factice)
+
+    reponse = _supprimer(client)
+
+    assert reponse.status_code == 204
+
+
+def test_suppression_transmet_le_jeton_l_identifiant_et_la_cle(client, vm_centrale_client_factice):
+    _connecter(client, vm_centrale_client_factice)
+
+    _supprimer(client, identifiant="n.durand", cle_admin_vm="cle-admin-de-test")
+
+    assert vm_centrale_client_factice._jetons_suppression_compte == ["jeton-factice"]
+    assert vm_centrale_client_factice._requetes_suppression_compte == [
+        {"identifiant": "n.durand", "cle_admin_vm": "cle-admin-de-test"}
+    ]
+
+
+def test_suppression_sans_session_active_est_refusee(client, vm_centrale_client_factice):
+    reponse = _supprimer(client)
+
+    assert reponse.status_code == 401
+    assert vm_centrale_client_factice._requetes_suppression_compte == []
+
+
+def test_suppression_avec_session_non_admin_est_refusee(client, vm_centrale_client_factice):
+    _connecter(client, vm_centrale_client_factice, est_admin=False)
+    vm_centrale_client_factice.suppression_compte_echoue(AccesAdminRequisError())
+
+    reponse = _supprimer(client)
+
+    assert reponse.status_code == 403
+    assert reponse.json()["detail"]
+
+
+def test_suppression_avec_cle_admin_invalide_est_refusee_sans_fermer_la_session(
+    client, vm_centrale_client_factice
+):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.suppression_compte_echoue(CleAdminInvalideError())
+
+    reponse_suppression = _supprimer(client, cle_admin_vm="mauvaise-cle")
+    reponse_compte = client.get("/compte")
+
+    assert reponse_suppression.status_code == 403
+    assert reponse_suppression.json()["detail"]
+    assert reponse_compte.status_code == 200
+
+
+def test_suppression_avec_jeton_revoque_renvoie_401_et_efface_la_session(
+    client, vm_centrale_client_factice
+):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.suppression_compte_echoue(JetonInvalideError())
+
+    reponse_suppression = _supprimer(client)
+    reponse_compte = client.get("/compte")
+
+    assert reponse_suppression.status_code == 401
+    assert reponse_compte.status_code == 401
+
+
+def test_suppression_avec_identifiant_inconnu_renvoie_404(client, vm_centrale_client_factice):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.suppression_compte_echoue(CompteInexistantError())
+
+    reponse = _supprimer(client, identifiant="inconnu")
+
+    assert reponse.status_code == 404
+    assert reponse.json()["detail"]
+
+
+def test_suppression_sur_dernier_administrateur_renvoie_409(client, vm_centrale_client_factice):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.suppression_compte_echoue(DernierAdministrateurError())
+
+    reponse = _supprimer(client, identifiant="a.martin")
+
+    assert reponse.status_code == 409
+    assert reponse.json()["detail"]
+
+
+def test_suppression_sans_cle_est_rejetee_sans_appeler_la_vm(client, vm_centrale_client_factice):
+    _connecter(client, vm_centrale_client_factice)
+
+    reponse = _supprimer(client, cle_admin_vm="")
+
+    assert reponse.status_code == 422
+    assert vm_centrale_client_factice._requetes_suppression_compte == []
+
+
+def test_suppression_avec_vm_centrale_injoignable_retourne_une_erreur_propre(
+    client, vm_centrale_client_factice
+):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.suppression_compte_echoue(httpx.ConnectError("connexion refusée"))
+
+    reponse = _supprimer(client)
+
+    assert reponse.status_code == 502
+    assert reponse.json()["detail"]
+
+
 # --- Visibilité de l'onglet dans le HTML/JS servi -----------------------------
 
 
@@ -697,4 +813,22 @@ def test_front_end_porte_le_balisage_et_l_appel_de_changement_de_statut_admin(
     assert 'id="statut-admin-cle"' in html
     assert 'id="statut-admin-confirmation" role="status" hidden' in html
     assert "/est-admin" in js
+    assert "cle_admin_vm" in js
+
+
+def test_front_end_porte_le_balisage_et_l_appel_de_suppression_de_compte(
+    client, vm_centrale_client_factice
+):
+    # Même limite que les tests précédents (aucun rendu côté serveur) : on
+    # vérifie que le HTML sert bien le formulaire de saisie de la clé
+    # d'administration VM pour la suppression, et que le JS envoie une requête
+    # DELETE avec cle_admin_vm plutôt qu'une simple présence du texte du
+    # bouton, qui laisserait passer un mauvais chemin ou un oubli de la clé.
+    html = client.get("/").text
+    js = client.get("/static/app.js").text
+
+    assert 'id="formulaire-suppression-compte" hidden' in html
+    assert 'id="suppression-cle"' in html
+    assert 'id="suppression-confirmation" role="status" hidden' in html
+    assert "method: \"DELETE\"" in js
     assert "cle_admin_vm" in js

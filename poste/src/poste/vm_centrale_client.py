@@ -109,12 +109,16 @@ def _lever_si_jeton_ou_droits_refuses(reponse: httpx.Response) -> None:
 
 # Doit rester identique à vm_centrale.autorisation._CLE_ADMIN_INVALIDE : c'est
 # le seul moyen pour ce client de distinguer, parmi les deux causes possibles
-# d'un 401 sur PATCH /comptes/{identifiant}/est-admin, celle qui ne doit pas
-# fermer la session de l'administrateur (voir CleAdminInvalideError).
+# d'un 401 sur les endpoints exigeant la clé d'administration VM (suppression,
+# PATCH .../est-admin), celle qui ne doit pas fermer la session de
+# l'administrateur (voir CleAdminInvalideError).
 _CLE_ADMIN_INVALIDE_DETAIL = "Clé d'administration manquante ou invalide"
 
 
-def _lever_si_statut_admin_refuse(reponse: httpx.Response) -> None:
+def _lever_si_action_avec_cle_admin_refusee(reponse: httpx.Response) -> None:
+    # Partagée par supprimer_compte/modifier_statut_admin : mêmes codes
+    # d'erreur, même correspondance vers les exceptions métier du client
+    # (les deux seuls endpoints exigeant X-Admin-Key en plus du jeton).
     if reponse.status_code == 401:
         if reponse.json().get("detail") == _CLE_ADMIN_INVALIDE_DETAIL:
             raise CleAdminInvalideError()
@@ -278,11 +282,21 @@ class VmCentraleClient:
             json={"est_admin": est_admin},
             headers={"Authorization": f"Bearer {jeton}", "X-Admin-Key": cle_admin_vm},
         )
-        _lever_si_statut_admin_refuse(reponse)
+        _lever_si_action_avec_cle_admin_refusee(reponse)
         if reponse.status_code == 404:
             raise CompteInexistantError()
         reponse.raise_for_status()
         return CompteAdmin(**_champs_compte_admin(reponse.json()))
+
+    def supprimer_compte(self, jeton: str, identifiant: str, cle_admin_vm: str) -> None:
+        reponse = _http_client.delete(
+            f"{VM_CENTRALE_BASE_URL}/comptes/{quote(identifiant, safe='')}",
+            headers={"Authorization": f"Bearer {jeton}", "X-Admin-Key": cle_admin_vm},
+        )
+        _lever_si_action_avec_cle_admin_refusee(reponse)
+        if reponse.status_code == 404:
+            raise CompteInexistantError()
+        reponse.raise_for_status()
 
 
 def get_vm_centrale_client() -> VmCentraleClient:
