@@ -12,7 +12,11 @@ from vm_centrale.models import Conversation, Message
 from vm_centrale.schemas import (
     ConversationCreeRequest,
     ConversationCreeResponse,
+    ConversationDetailResponse,
+    ConversationRenommeeRequest,
+    ConversationResponse,
     ConversationResume,
+    MessageResponse,
 )
 
 router = APIRouter()
@@ -20,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 _ECHEC_RELAIS = "Le relais Mistral est indisponible"
 _JETON_INVALIDE = "Jeton d'authentification manquant ou invalide"
+_CONVERSATION_INTROUVABLE = "Conversation introuvable"
 
 _bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -33,6 +38,38 @@ def _prompt_titrage(message_utilisateur: str, reponse_assistant: str) -> str:
     )
 
 
+def _identifiant_compte_du_jeton(
+    credentials: HTTPAuthorizationCredentials | None, jetons: JetonStore
+) -> str:
+    identifiant_compte = (
+        jetons.identifiant_pour(credentials.credentials) if credentials is not None else None
+    )
+    if identifiant_compte is None:
+        raise HTTPException(status_code=401, detail=_JETON_INVALIDE)
+    return identifiant_compte
+
+
+def _recuperer_conversation_du_compte(
+    db: Session, conversation_id: int, identifiant_compte: str
+) -> Conversation:
+    conversation = db.get(Conversation, conversation_id)
+    if conversation is None or conversation.identifiant_compte != identifiant_compte:
+        # Jamais 403 : ne révèle pas l'existence de l'id à un compte qui n'en
+        # est pas propriétaire, y compris un compte administrateur (spec
+        # V1.1.1 — le droit de compte administrateur ne porte jamais sur le
+        # contenu des conversations).
+        raise HTTPException(status_code=404, detail=_CONVERSATION_INTROUVABLE)
+    return conversation
+
+
+def _vers_resume(conversation: Conversation) -> ConversationResponse:
+    return ConversationResponse(
+        id=conversation.id,
+        titre=conversation.titre,
+        date_derniere_activite=conversation.date_derniere_activite,
+    )
+
+
 @router.post("/conversations", response_model=ConversationCreeResponse)
 def creer_conversation(
     requete: ConversationCreeRequest,
@@ -41,11 +78,7 @@ def creer_conversation(
     jetons: JetonStore = Depends(get_jeton_store),
     db: Session = Depends(get_db),
 ) -> ConversationCreeResponse:
-    identifiant_compte = (
-        jetons.identifiant_pour(credentials.credentials) if credentials is not None else None
-    )
-    if identifiant_compte is None:
-        raise HTTPException(status_code=401, detail=_JETON_INVALIDE)
+    identifiant_compte = _identifiant_compte_du_jeton(credentials, jetons)
 
     # Les deux appels Mistral (réponse, puis titrage) sont faits avant toute
     # écriture en base : en cas d'échec de l'un ou l'autre, aucune conversation
@@ -91,3 +124,90 @@ def creer_conversation(
         conversation=ConversationResume(id=conversation.id, titre=conversation.titre),
         reponse=reponse,
     )
+
+
+@router.get("/conversations", response_model=list[ConversationResponse])
+def lister_conversations(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
+    jetons: JetonStore = Depends(get_jeton_store),
+    db: Session = Depends(get_db),
+) -> list[ConversationResponse]:
+    identifiant_compte = _identifiant_compte_du_jeton(credentials, jetons)
+
+    conversations = (
+        db.query(Conversation)
+        .filter(Conversation.identifiant_compte == identifiant_compte)
+        .order_by(Conversation.date_derniere_activite.desc())
+        .all()
+    )
+    return [_vers_resume(conversation) for conversation in conversations]
+
+
+@router.get("/conversations/{conversation_id}", response_model=ConversationDetailResponse)
+def consulter_conversation(
+    conversation_id: int,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
+    jetons: JetonStore = Depends(get_jeton_store),
+    db: Session = Depends(get_db),
+) -> ConversationDetailResponse:
+    identifiant_compte = _identifiant_compte_du_jeton(credentials, jetons)
+    conversation = _recuperer_conversation_du_compte(db, conversation_id, identifiant_compte)
+
+    messages = (
+        db.query(Message)
+        .filter(Message.conversation_id == conversation.id)
+        .order_by(Message.id)
+        .all()
+    )
+    return ConversationDetailResponse(
+        id=conversation.id,
+        titre=conversation.titre,
+        date_creation=conversation.date_creation,
+        date_derniere_activite=conversation.date_derniere_activite,
+        messages=[
+            MessageResponse(
+                id=message.id,
+                role=message.role,
+                contenu=message.contenu,
+                date_creation=message.date_creation,
+            )
+            for message in messages
+        ],
+    )
+
+
+@router.patch("/conversations/{conversation_id}", response_model=ConversationResponse)
+def renommer_conversation(
+    conversation_id: int,
+    requete: ConversationRenommeeRequest,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
+    jetons: JetonStore = Depends(get_jeton_store),
+    db: Session = Depends(get_db),
+) -> ConversationResponse:
+    identifiant_compte = _identifiant_compte_du_jeton(credentials, jetons)
+    conversation = _recuperer_conversation_du_compte(db, conversation_id, identifiant_compte)
+
+    conversation.titre = requete.titre
+    db.commit()
+    db.refresh(conversation)
+
+    return _vers_resume(conversation)
+
+
+@router.delete("/conversations/{conversation_id}", status_code=204)
+def supprimer_conversation(
+    conversation_id: int,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
+    jetons: JetonStore = Depends(get_jeton_store),
+    db: Session = Depends(get_db),
+) -> None:
+    identifiant_compte = _identifiant_compte_du_jeton(credentials, jetons)
+    conversation = _recuperer_conversation_du_compte(db, conversation_id, identifiant_compte)
+
+    # Message n'a pas de cascade ORM déclarée sur Conversation (même
+    # convention que Jeton/Compte, voir comptes.py) : la suppression des
+    # messages associés doit donc être explicite, avant celle de la
+    # conversation elle-même.
+    db.query(Message).filter(Message.conversation_id == conversation.id).delete()
+    db.delete(conversation)
+    db.commit()
