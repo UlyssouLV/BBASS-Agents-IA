@@ -1,8 +1,34 @@
+from io import BytesIO
 from pathlib import Path
 
 import pytest
+from docx import Document
+from openpyxl import Workbook
 
 from vm_centrale.models import PieceJointe
+
+_TYPE_MIME_DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+_TYPE_MIME_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+def _fichier_docx(*paragraphes: str) -> bytes:
+    document = Document()
+    for paragraphe in paragraphes:
+        document.add_paragraph(paragraphe)
+    tampon = BytesIO()
+    document.save(tampon)
+    return tampon.getvalue()
+
+
+def _fichier_xlsx(lignes: list[list[object]]) -> bytes:
+    classeur = Workbook()
+    feuille = classeur.active
+    assert feuille is not None
+    for ligne in lignes:
+        feuille.append(ligne)
+    tampon = BytesIO()
+    classeur.save(tampon)
+    return tampon.getvalue()
 
 
 def _autorisation(jeton: str) -> dict[str, str]:
@@ -66,6 +92,70 @@ def test_upload_pdf_valide_renvoie_201_stocke_le_fichier_et_extrait_le_contenu(
     assert chemin_attendu.read_bytes() == b"%PDF-1.4 contenu factice"
 
     assert mistral_client_factice.appels_ocr == [(b"%PDF-1.4 contenu factice", "application/pdf")]
+
+
+def test_upload_docx_valide_renvoie_201_et_extrait_le_texte_sans_appeler_mistral(
+    client, mistral_client_factice, jeton_valide, db_session, _repertoire_pieces_jointes
+):
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide)
+    contenu_docx = _fichier_docx("Première ligne du document", "Seconde ligne")
+    appels_chat_avant = len(mistral_client_factice.messages_recus)
+
+    reponse = client.post(
+        f"/conversations/{conversation_id}/pieces-jointes",
+        files={"fichier": ("document.docx", contenu_docx, _TYPE_MIME_DOCX)},
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert reponse.status_code == 201
+    corps = reponse.json()
+    assert corps["piece_jointe"]["nom_fichier"] == "document.docx"
+    assert corps["piece_jointe"]["type_mime"] == _TYPE_MIME_DOCX
+    assert corps["echec_analyse"] is False
+
+    piece_jointe = db_session.get(PieceJointe, corps["piece_jointe"]["id"])
+    assert piece_jointe.contenu_extrait == "Première ligne du document\nSeconde ligne"
+
+    chemin_attendu = (
+        Path(_repertoire_pieces_jointes)
+        / "j.dupont"
+        / str(conversation_id)
+        / f"{piece_jointe.id}-document.docx"
+    )
+    assert chemin_attendu.read_bytes() == contenu_docx
+
+    # Aucun format sans alternative locale ici : ni .chat() ni .ocr() ne
+    # doivent être sollicités pour du Word (spec 1.1.2). Compare un avant/
+    # après plutôt qu'une liste vide : _creer_conversation a déjà appelé
+    # .chat() deux fois (réponse + titrage) avant l'upload.
+    assert mistral_client_factice.appels_ocr == []
+    assert len(mistral_client_factice.messages_recus) == appels_chat_avant
+
+
+def test_upload_xlsx_valide_renvoie_201_et_extrait_les_valeurs_de_cellules_sans_appeler_mistral(
+    client, mistral_client_factice, jeton_valide, db_session, _repertoire_pieces_jointes
+):
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide)
+    contenu_xlsx = _fichier_xlsx([["Nom", "Montant"], ["Dupont", 42]])
+    appels_chat_avant = len(mistral_client_factice.messages_recus)
+
+    reponse = client.post(
+        f"/conversations/{conversation_id}/pieces-jointes",
+        files={"fichier": ("tableau.xlsx", contenu_xlsx, _TYPE_MIME_XLSX)},
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert reponse.status_code == 201
+    corps = reponse.json()
+    assert corps["piece_jointe"]["nom_fichier"] == "tableau.xlsx"
+    assert corps["piece_jointe"]["type_mime"] == _TYPE_MIME_XLSX
+    assert corps["echec_analyse"] is False
+
+    piece_jointe = db_session.get(PieceJointe, corps["piece_jointe"]["id"])
+    assert piece_jointe.contenu_extrait == "Nom\tMontant\nDupont\t42"
+
+    assert mistral_client_factice.appels_ocr == []
+    assert len(mistral_client_factice.messages_recus) == appels_chat_avant
 
 
 def test_upload_dune_conversation_dun_autre_compte_renvoie_404(
