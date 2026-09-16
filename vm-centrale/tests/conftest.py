@@ -12,6 +12,17 @@ from vm_centrale.security import hash_password
 from vm_centrale.jetons import JetonStore, get_jeton_store
 
 
+@pytest.fixture(autouse=True)
+def _sans_init_db_reel(monkeypatch):
+    # Le lifespan de l'app appelle `init_db()` sur l'engine réel (lié à
+    # VM_CENTRALE_DATABASE_URL), en dehors du système de dependency_overrides
+    # utilisé pour `get_db`. Sans ce patch, tout `TestClient(app)` exigerait
+    # un PostgreSQL local démarré, alors que les tests tournent sur SQLite en
+    # mémoire (fixture `db_session`) et ne doivent dépendre d'aucun service
+    # externe.
+    monkeypatch.setattr("vm_centrale.main.init_db", lambda: None)
+
+
 class ClientMistralFactice:
     def __init__(self) -> None:
         self.messages_recus: list[str] = []

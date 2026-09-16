@@ -4,7 +4,7 @@ Logiciel d'agents IA pour le cabinet de géomètres-experts BBASS. L'objectif es
 
 ## État actuel
 
-Socle V1 en cours (branche `feat/v1-socle`) : backend local **poste** (interface HTML/CSS/JS) et API **VM centrale** (comptes SQLite + relais Mistral). Les agents métiers ne sont pas encore construits.
+Socle V1 en cours (branche `feat/v1-socle`) : backend local **poste** (interface HTML/CSS/JS) et API **VM centrale** (comptes PostgreSQL + relais Mistral). Les agents métiers ne sont pas encore construits.
 
 ## Ce qu'on construit
 
@@ -34,8 +34,25 @@ Deux processus : la **VM centrale** (port 8000) puis le **poste** (port 8100). L
 ### Prérequis
 
 - **Python 3.11** (série figée : pas 3.12 / 3.13 / 3.14). Dernier installeur Windows officiel : [Python 3.11.9](https://www.python.org/downloads/release/python-3119/) — prendre *Windows installer (64-bit)*. Cocher **Add python.exe to PATH**. Les correctifs 3.11.x plus récents n'ont plus d'installeur (source only).
+- **Docker Desktop** pour le PostgreSQL local de la VM centrale ([ADR-0008](docs/adr/0008-postgresql-vm-centrale.md)) — pas nécessaire pour lancer les tests pytest (SQLite en mémoire).
 - Une clé API Mistral (console [La Plateforme](https://console.mistral.ai)) pour un vrai chat ; les tests pytest n'en ont pas besoin
 - Windows / PowerShell (chemins avec espaces : rester dans le dossier, ou tout quotter)
+
+### PostgreSQL local (VM centrale)
+
+Depuis la racine du clone :
+
+```powershell
+docker compose up -d
+```
+
+Démarre un PostgreSQL local sur `localhost:5432` (utilisateur/mot de passe/base `vm_centrale`), déjà pointé par `VM_CENTRALE_DATABASE_URL` dans `vm-centrale/.env.example`. Pour l'arrêter :
+
+```powershell
+docker compose down
+```
+
+(ajouter `-v` pour aussi supprimer les données persistées).
 
 ### Une fois par machine (dépendances)
 
@@ -83,7 +100,7 @@ db.commit()
 "@
 ```
 
-Si le schéma SQLite a changé (`create_all` n'ajoute pas de colonnes), supprimer `vm-centrale/vm_centrale.db` et ré-insérer le compte. Lancer la VM **depuis** `vm-centrale` pour que `.env` et `./vm_centrale.db` soient trouvés.
+Si le schéma a changé (`create_all` n'ajoute pas de colonnes), repartir d'une base vide (`docker compose down -v` puis `docker compose up -d`) et ré-insérer le compte. Lancer la VM **depuis** `vm-centrale` pour que `.env` soit trouvé.
 
 ### Démarrer (deux terminaux)
 
