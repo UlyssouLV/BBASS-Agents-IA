@@ -1,4 +1,5 @@
 import base64
+from collections.abc import Mapping, Sequence
 
 import httpx
 
@@ -17,7 +18,15 @@ class MistralClient:
 
     def chat(
         self,
-        messages: str | list[dict[str, str]],
+        # `content` reste une str pour un message texte, mais devient une
+        # liste de parts (`text`/`image_url`) pour l'appel vision image
+        # (vm_centrale.analyse_pieces_jointes.image) : ce paramètre reste
+        # celui d'un simple relais vers /v1/chat/completions, sans logique
+        # propre à un format, contrairement à .ocr() ci-dessous. `Sequence`/
+        # `Mapping` (covariants), pas `list`/`dict`, pour accepter aussi bien
+        # `list[dict[str, str]]` (messages texte usuels) que la liste de
+        # parts à contenu mixte de l'appel vision.
+        messages: str | Sequence[Mapping[str, object]],
         response_format: dict | None = None,
     ) -> str:
         if isinstance(messages, str):

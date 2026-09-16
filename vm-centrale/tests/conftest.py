@@ -1,3 +1,4 @@
+import json
 import threading
 
 import pytest
@@ -72,6 +73,16 @@ class ClientMistralFactice:
 
     def echouer_ocr(self, exception: Exception) -> None:
         self._exception_ocr = exception
+
+    def repondre_vision(self, contenu_extrait: str, echec_analyse: bool = False) -> None:
+        # Même canal que resume_et_profil ci-dessous (appel .chat() avec
+        # response_format) : l'analyse d'image (vm_centrale.
+        # analyse_pieces_jointes.image) est une sortie structurée au même
+        # titre, distinguée par son schéma plutôt que par un mécanisme dédié.
+        self._reponse_structuree = json.dumps(
+            {"contenu_extrait": contenu_extrait, "echec_analyse": echec_analyse}
+        )
+        self._exception = None
 
     def ocr(self, document: bytes, type_mime: str) -> str:
         with self._verrou:

@@ -158,6 +158,61 @@ def test_upload_xlsx_valide_renvoie_201_et_extrait_les_valeurs_de_cellules_sans_
     assert len(mistral_client_factice.messages_recus) == appels_chat_avant
 
 
+def test_upload_image_valide_renvoie_201_et_extrait_le_contenu_via_lappel_vision(
+    client, mistral_client_factice, jeton_valide, db_session, _repertoire_pieces_jointes
+):
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide)
+    mistral_client_factice.repondre_vision("Photocopie d'un plan de masse, échelle 1/200")
+
+    reponse = client.post(
+        f"/conversations/{conversation_id}/pieces-jointes",
+        files={"fichier": ("plan.png", b"contenu factice png", "image/png")},
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert reponse.status_code == 201
+    corps = reponse.json()
+    assert corps["piece_jointe"]["nom_fichier"] == "plan.png"
+    assert corps["piece_jointe"]["type_mime"] == "image/png"
+    assert corps["echec_analyse"] is False
+
+    piece_jointe = db_session.get(PieceJointe, corps["piece_jointe"]["id"])
+    assert piece_jointe.contenu_extrait == "Photocopie d'un plan de masse, échelle 1/200"
+    assert piece_jointe.echec_analyse is False
+
+    # L'appel vision passe par .chat() avec response_format (pas .ocr(),
+    # jamais utilisé pour une image) : aucun appel OCR ne doit être fait.
+    assert mistral_client_factice.appels_ocr == []
+
+
+def test_upload_image_dont_lanalyse_echoue_renvoie_201_avec_echec_analyse_a_true(
+    client, mistral_client_factice, jeton_valide, db_session
+):
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide)
+    mistral_client_factice.repondre_vision(
+        "Image illisible : trop floue pour en extraire quoi que ce soit d'exploitable",
+        echec_analyse=True,
+    )
+
+    reponse = client.post(
+        f"/conversations/{conversation_id}/pieces-jointes",
+        files={"fichier": ("photo.jpg", b"contenu factice jpg", "image/jpeg")},
+        headers=_autorisation(jeton_valide),
+    )
+
+    # Un échec d'analyse (rien d'exploitable dans l'image) reste un succès
+    # HTTP : jamais une erreur 4xx/5xx pour ce cas-là (spec 1.1.2).
+    assert reponse.status_code == 201
+    corps = reponse.json()
+    assert corps["echec_analyse"] is True
+
+    piece_jointe = db_session.get(PieceJointe, corps["piece_jointe"]["id"])
+    assert piece_jointe.echec_analyse is True
+    assert piece_jointe.contenu_extrait == (
+        "Image illisible : trop floue pour en extraire quoi que ce soit d'exploitable"
+    )
+
+
 def test_upload_dune_conversation_dun_autre_compte_renvoie_404(
     client, mistral_client_factice, jeton_valide, jeton_store
 ):
