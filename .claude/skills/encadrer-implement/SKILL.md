@@ -4,7 +4,8 @@ description: >-
   After /implement, when tests pass or fail, when about to /code-review or
   spawn Standards/Spec subagents, when closing a finished child ticket, or
   when choosing the next child issue on a PR. Wraps Matt Pocock /implement
-  for this repo: tests, then commit+push+close the issue, then next ticket
+  for this repo: tests, then commit+push+close the issue and remove
+  ready-for-agent, then next ticket
   or one branch review.
 ---
 
@@ -21,18 +22,22 @@ When the ticket code is in:
 - Run the full pytest suite for each package you touched (`vm-centrale` and/or `poste`), with that package’s venv.
 - If **any** test fails: stop. No commit, no push, no close. Report the failures.
 
-## 2. Tests green → commit, push, close
+## 2. Tests green → commit, push, close, drop `ready-for-agent`
 
-This path **is** permission to `git commit`, `git push`, and `gh issue close` for **this child**.
+This path **is** permission to `git commit`, `git push`, `gh issue edit --remove-label`, and `gh issue close` for **this child**.
 
 1. Stage only the ticket files. Never `.env`, `*.db`, `.venv/`, secrets.
 2. Commit with a short message that says **why** (repo style: French, one or two sentences).
 3. `git push` the current feature branch (`-u origin HEAD` if it has no upstream). No force-push.
-4. Close the **child** you just implemented:
+4. On the **child** you just implemented, remove `ready-for-agent` then close:
+
+   `gh issue edit <n> --remove-label "ready-for-agent"`
+
+   If GitHub says the label is already absent, continue.
 
    `gh issue close <n> --comment "Implémenté sur <branch> (<sha>). Tests verts."`
 
-   Do not add `wontfix`. Do not use a label for “coded but not on main”. There is no `awaiting-merge`.
+   Do not add `wontfix`. Do not use a label for “coded but not on main”. There is no `awaiting-merge`. A Closed child must not keep `ready-for-agent`.
 
 Do **not** close the **parent** spec issue here (e.g. #13). Squash-merge `Fixes #<parent>` does that.
 

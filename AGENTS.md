@@ -12,7 +12,7 @@ Canonical labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-hu
 
 ### After `/implement`
 
-Matt Pocock `/implement` for TDD. Then skill `encadrer-implement`: tests → commit + push + **close the child** (so GitHub blocked-by updates) → next unblocked Open child (`/clear` + `/implement`) **or**, if every PR child is Closed, `/code-review` once vs `main`.
+Matt Pocock `/implement` for TDD. Then skill `encadrer-implement`: tests → commit + push + **close the child** and **remove `ready-for-agent`** (so GitHub blocked-by updates) → next unblocked Open child (`/clear` + `/implement`) **or**, if every PR child is Closed, `/code-review` once vs `main`.
 
 ### Ouvre the version
 
@@ -28,7 +28,7 @@ Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/
 
 ## Git commits and pushes
 
-After a green `/implement` of a child ticket, skill `encadrer-implement` **does** commit, push, and close that child (no extra “say the word”). Still never force-push; never commit `.env`, `*.db`, `.venv`, or secrets.
+After a green `/implement` of a child ticket, skill `encadrer-implement` **does** commit, push, remove `ready-for-agent`, and close that child (no extra “say the word”). Still never force-push; never commit `.env`, `*.db`, `.venv`, or secrets.
 
 Do **not** commit or push for other reasons unless the **current user message** explicitly asks.
 
