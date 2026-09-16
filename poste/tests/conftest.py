@@ -10,6 +10,7 @@ from poste.vm_centrale_client import (
     Conversation,
     ConversationCree,
     ConversationDetail,
+    PieceJointeCreee,
     ProfilTravail,
     VerificationReussie,
     get_vm_centrale_client,
@@ -89,6 +90,16 @@ class VmCentraleClientFactice:
         self._exception_profil_travail: Exception | None = None
         self._jetons_profil_travail: list[str] = []
         self._identifiants_profil_travail: list[str] = []
+        self._pieces_jointes_id_creation_conversation: list[int | None] = []
+        self._pieces_jointes_id_envoi_message_conversation: list[int | None] = []
+        self._piece_jointe_creee: PieceJointeCreee | None = None
+        self._exception_televersement_piece_jointe: Exception | None = None
+        self._jetons_televersement_piece_jointe: list[str] = []
+        self._requetes_televersement_piece_jointe: list[dict] = []
+        self._piece_jointe_creee_sans_conversation: PieceJointeCreee | None = None
+        self._exception_televersement_piece_jointe_sans_conversation: Exception | None = None
+        self._jetons_televersement_piece_jointe_sans_conversation: list[str] = []
+        self._requetes_televersement_piece_jointe_sans_conversation: list[dict] = []
 
     def accepter(
         self,
@@ -311,11 +322,16 @@ class VmCentraleClientFactice:
         self._exception_creation_conversation = exception
 
     def creer_conversation(
-        self, jeton: str, message: str, cle_idempotence: str | None = None
+        self,
+        jeton: str,
+        message: str,
+        cle_idempotence: str | None = None,
+        piece_jointe_id: int | None = None,
     ) -> ConversationCree:
         self._jetons_creation_conversation.append(jeton)
         self._messages_creation_conversation.append(message)
         self._cles_idempotence_creation_conversation.append(cle_idempotence)
+        self._pieces_jointes_id_creation_conversation.append(piece_jointe_id)
         if self._exception_creation_conversation is not None:
             raise self._exception_creation_conversation
         assert self._conversation_creee is not None
@@ -388,15 +404,65 @@ class VmCentraleClientFactice:
         conversation_id: int,
         message: str,
         cle_idempotence: str | None = None,
+        piece_jointe_id: int | None = None,
     ) -> str:
         self._jetons_envoi_message_conversation.append(jeton)
         self._requetes_envoi_message_conversation.append(
             {"conversation_id": conversation_id, "message": message}
         )
         self._cles_idempotence_envoi_message_conversation.append(cle_idempotence)
+        self._pieces_jointes_id_envoi_message_conversation.append(piece_jointe_id)
         if self._exception_envoi_message_conversation is not None:
             raise self._exception_envoi_message_conversation
         return self._reponse_message_conversation
+
+    def televersement_piece_jointe_reussit(self, piece_jointe: PieceJointeCreee) -> None:
+        self._piece_jointe_creee = piece_jointe
+        self._exception_televersement_piece_jointe = None
+
+    def televersement_piece_jointe_echoue(self, exception: Exception) -> None:
+        self._exception_televersement_piece_jointe = exception
+
+    def televerser_piece_jointe(
+        self,
+        jeton: str,
+        conversation_id: int,
+        nom_fichier: str,
+        contenu: bytes,
+        type_mime: str,
+    ) -> PieceJointeCreee:
+        self._jetons_televersement_piece_jointe.append(jeton)
+        self._requetes_televersement_piece_jointe.append(
+            {
+                "conversation_id": conversation_id,
+                "nom_fichier": nom_fichier,
+                "contenu": contenu,
+                "type_mime": type_mime,
+            }
+        )
+        if self._exception_televersement_piece_jointe is not None:
+            raise self._exception_televersement_piece_jointe
+        assert self._piece_jointe_creee is not None
+        return self._piece_jointe_creee
+
+    def televersement_piece_jointe_sans_conversation_reussit(self, piece_jointe: PieceJointeCreee) -> None:
+        self._piece_jointe_creee_sans_conversation = piece_jointe
+        self._exception_televersement_piece_jointe_sans_conversation = None
+
+    def televersement_piece_jointe_sans_conversation_echoue(self, exception: Exception) -> None:
+        self._exception_televersement_piece_jointe_sans_conversation = exception
+
+    def televerser_piece_jointe_sans_conversation(
+        self, jeton: str, nom_fichier: str, contenu: bytes, type_mime: str
+    ) -> PieceJointeCreee:
+        self._jetons_televersement_piece_jointe_sans_conversation.append(jeton)
+        self._requetes_televersement_piece_jointe_sans_conversation.append(
+            {"nom_fichier": nom_fichier, "contenu": contenu, "type_mime": type_mime}
+        )
+        if self._exception_televersement_piece_jointe_sans_conversation is not None:
+            raise self._exception_televersement_piece_jointe_sans_conversation
+        assert self._piece_jointe_creee_sans_conversation is not None
+        return self._piece_jointe_creee_sans_conversation
 
     def profil_travail_retourne(self, profil: ProfilTravail) -> None:
         self._profil_travail = profil

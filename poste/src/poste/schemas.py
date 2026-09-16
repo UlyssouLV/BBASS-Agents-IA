@@ -37,6 +37,10 @@ class ConversationCreationRequest(BaseModel):
     message: str = Field(min_length=1, max_length=8000)
     # Optionnelle : voir vm_centrale.schemas.ConversationCreeRequest.cle_idempotence.
     cle_idempotence: str | None = None
+    # Optionnelle : id d'une pièce jointe déjà téléversée (POST
+    # /pieces-jointes, avant que cette conversation n'existe) à rattacher à
+    # ce premier message. Voir vm_centrale.schemas.ConversationCreeRequest.piece_jointe_id.
+    piece_jointe_id: int | None = None
 
 
 class ConversationResume(BaseModel):
@@ -78,10 +82,23 @@ class MessageEnvoyeRequest(BaseModel):
     message: str = Field(min_length=1, max_length=8000)
     # Voir ConversationCreationRequest.cle_idempotence.
     cle_idempotence: str | None = None
+    # Voir ConversationCreationRequest.piece_jointe_id.
+    piece_jointe_id: int | None = None
 
 
 class MessageEnvoyeResponse(BaseModel):
     reponse: str
+
+
+class PieceJointeResumeResponse(BaseModel):
+    id: int
+    nom_fichier: str
+    type_mime: str
+
+
+class PieceJointeCreeeResponse(BaseModel):
+    piece_jointe: PieceJointeResumeResponse
+    echec_analyse: bool
 
 
 class ProfilTravailResponse(BaseModel):

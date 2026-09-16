@@ -16,6 +16,8 @@ const chatChargement = document.getElementById("chat-chargement");
 const chatErreur = document.getElementById("chat-erreur");
 const formulaireChat = document.getElementById("formulaire-chat");
 const champMessage = document.getElementById("message");
+const pieceJointeMessage = document.getElementById("piece-jointe-message");
+const pieceJointeMessageStatut = document.getElementById("piece-jointe-message-statut");
 
 const conversationsErreur = document.getElementById("conversations-erreur");
 const listeConversations = document.getElementById("liste-conversations");
@@ -23,6 +25,10 @@ const boutonNouvelleConversation = document.getElementById("bouton-nouvelle-conv
 const nouvelleConversationZone = document.getElementById("nouvelle-conversation");
 const formulaireNouvelleConversation = document.getElementById("formulaire-nouvelle-conversation");
 const nouveauMessageConversation = document.getElementById("nouveau-message-conversation");
+const pieceJointeNouvelleConversation = document.getElementById("piece-jointe-nouvelle-conversation");
+const pieceJointeNouvelleConversationStatut = document.getElementById(
+  "piece-jointe-nouvelle-conversation-statut"
+);
 const nouvelleConversationErreur = document.getElementById("nouvelle-conversation-erreur");
 const conversationOuverte = document.getElementById("conversation-ouverte");
 const conversationTitre = document.getElementById("conversation-titre");
@@ -292,9 +298,19 @@ boutonDeconnexion.addEventListener("click", async () => {
   afficherEcranConnexion();
 });
 
+// Upload minimal, non stylisé (le style est le sujet de la 1.2.0) : un seul
+// fichier par message, transmis au champ "fichier" attendu par les
+// endpoints multipart du poste (voir poste.routers.conversations).
+async function televerserPieceJointe(url, fichier) {
+  const donnees = new FormData();
+  donnees.append("fichier", fichier);
+  return fetch(url, { method: "POST", body: donnees });
+}
+
 formulaireChat.addEventListener("submit", async (evenement) => {
   evenement.preventDefault();
   chatErreur.hidden = true;
+  pieceJointeMessageStatut.hidden = true;
 
   const message = champMessage.value;
   if (!message.trim() || conversationOuverteId === null || appelConversationEnCours) {
@@ -312,21 +328,59 @@ formulaireChat.addEventListener("submit", async (evenement) => {
   // au niveau réseau avant d'atteindre le poste, la VM centrale ne persiste
   // le message qu'une seule fois (voir vm_centrale.concurrence.CacheIdempotence).
   const cleIdempotence = crypto.randomUUID();
+  const fichierJoint = pieceJointeMessage.files[0] || null;
 
   appelConversationEnCours = true;
-  ajouterMessage("collaborateur", message);
-  champMessage.value = "";
   champMessage.disabled = true;
   formulaireChat.querySelector('button[type="submit"]').disabled = true;
-  chatChargement.hidden = false;
 
   try {
+    let pieceJointeId = null;
+    if (fichierJoint) {
+      let reponseUpload;
+      try {
+        reponseUpload = await televerserPieceJointe(
+          `/conversations/${idConversationCiblee}/pieces-jointes`,
+          fichierJoint
+        );
+      } catch {
+        chatErreur.textContent = "Impossible de joindre le service de pièces jointes. Réessayez plus tard.";
+        chatErreur.hidden = false;
+        return;
+      }
+
+      if (reponseUpload.status === 401) {
+        afficherEcranConnexion();
+        return;
+      }
+
+      if (!reponseUpload.ok) {
+        const detail = await reponseUpload.json().catch(() => null);
+        chatErreur.textContent =
+          detail && detail.detail ? detail.detail : "L'envoi de la pièce jointe a échoué. Réessayez plus tard.";
+        chatErreur.hidden = false;
+        return;
+      }
+
+      const corpsUpload = await reponseUpload.json();
+      pieceJointeId = corpsUpload.piece_jointe.id;
+      if (corpsUpload.echec_analyse) {
+        pieceJointeMessageStatut.textContent = `L'IA n'a pas pu analyser la pièce jointe « ${corpsUpload.piece_jointe.nom_fichier} ».`;
+        pieceJointeMessageStatut.hidden = false;
+      }
+    }
+
+    ajouterMessage("collaborateur", message);
+    champMessage.value = "";
+    pieceJointeMessage.value = "";
+    chatChargement.hidden = false;
+
     let reponse;
     try {
       reponse = await fetch(`/conversations/${idConversationCiblee}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message, cle_idempotence: cleIdempotence }),
+        body: JSON.stringify({ message, cle_idempotence: cleIdempotence, piece_jointe_id: pieceJointeId }),
       });
     } catch {
       chatErreur.textContent = "Impossible de joindre le service de conversations. Réessayez plus tard.";
@@ -369,6 +423,7 @@ function afficherNouvelleConversation() {
   conversationOuverte.hidden = true;
   nouvelleConversationZone.hidden = false;
   nouvelleConversationErreur.hidden = true;
+  pieceJointeNouvelleConversationStatut.hidden = true;
 }
 
 function afficherConversationOuverte(id, titre, messagesConversation) {
@@ -377,6 +432,8 @@ function afficherConversationOuverte(id, titre, messagesConversation) {
   conversationOuverte.hidden = false;
   conversationTitre.textContent = titre;
   chatErreur.hidden = true;
+  pieceJointeMessageStatut.hidden = true;
+  pieceJointeMessage.value = "";
   messages.replaceChildren();
   for (const message of messagesConversation) {
     ajouterMessage(message.role === "user" ? "collaborateur" : "reponse", message.contenu);
@@ -470,6 +527,7 @@ boutonNouvelleConversation.addEventListener("click", afficherNouvelleConversatio
 formulaireNouvelleConversation.addEventListener("submit", async (evenement) => {
   evenement.preventDefault();
   nouvelleConversationErreur.hidden = true;
+  pieceJointeNouvelleConversationStatut.hidden = true;
 
   const message = nouveauMessageConversation.value;
   if (!message.trim() || appelConversationEnCours) {
@@ -481,18 +539,54 @@ formulaireNouvelleConversation.addEventListener("submit", async (evenement) => {
   // réseau (cf. vm_centrale.concurrence.CacheIdempotence).
   const idConversationAvantEnvoi = conversationOuverteId;
   const cleIdempotence = crypto.randomUUID();
+  const fichierJoint = pieceJointeNouvelleConversation.files[0] || null;
 
   appelConversationEnCours = true;
   nouveauMessageConversation.disabled = true;
   formulaireNouvelleConversation.querySelector('button[type="submit"]').disabled = true;
 
   try {
+    let pieceJointeId = null;
+    if (fichierJoint) {
+      // Pas de conversation à l'URL : elle n'existe pas encore au moment de
+      // cet upload (voir POST /pieces-jointes côté poste).
+      let reponseUpload;
+      try {
+        reponseUpload = await televerserPieceJointe("/pieces-jointes", fichierJoint);
+      } catch {
+        nouvelleConversationErreur.textContent =
+          "Impossible de joindre le service de pièces jointes. Réessayez plus tard.";
+        nouvelleConversationErreur.hidden = false;
+        return;
+      }
+
+      if (reponseUpload.status === 401) {
+        afficherEcranConnexion();
+        return;
+      }
+
+      if (!reponseUpload.ok) {
+        const detail = await reponseUpload.json().catch(() => null);
+        nouvelleConversationErreur.textContent =
+          detail && detail.detail ? detail.detail : "L'envoi de la pièce jointe a échoué. Réessayez plus tard.";
+        nouvelleConversationErreur.hidden = false;
+        return;
+      }
+
+      const corpsUpload = await reponseUpload.json();
+      pieceJointeId = corpsUpload.piece_jointe.id;
+      if (corpsUpload.echec_analyse) {
+        pieceJointeNouvelleConversationStatut.textContent = `L'IA n'a pas pu analyser la pièce jointe « ${corpsUpload.piece_jointe.nom_fichier} ».`;
+        pieceJointeNouvelleConversationStatut.hidden = false;
+      }
+    }
+
     let reponse;
     try {
       reponse = await fetch("/conversations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message, cle_idempotence: cleIdempotence }),
+        body: JSON.stringify({ message, cle_idempotence: cleIdempotence, piece_jointe_id: pieceJointeId }),
       });
     } catch {
       nouvelleConversationErreur.textContent =
