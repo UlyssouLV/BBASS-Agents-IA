@@ -17,7 +17,7 @@ HTTP-boundary tests only (observable responses). Do not praise or require tests 
 
 ## When to run `/code-review`
 
-Not after each `/implement`. Once vs `main` when every child ticket for the PR is Closed. See skill `encadrer-implement`.
+Not after each `/implement`. Not automatically when every child is Closed (`encadrer-implement` then asks for human tests + « Finalise la version »). Run `/code-review` vs `main` only if the user asks.
 
 ## Out of this file
 

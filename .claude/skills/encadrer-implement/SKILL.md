@@ -5,8 +5,8 @@ description: >-
   spawn Standards/Spec subagents, when closing a finished child ticket, or
   when choosing the next child issue on a PR. Wraps Matt Pocock /implement
   for this repo: tests, then commit+push+close the issue and remove
-  ready-for-agent, then next ticket
-  or one branch review.
+  ready-for-agent, then next ticket or ask the user to test then
+  « Finalise la version ».
 ---
 
 # Wrap `/implement` (Matt Pocock)
@@ -58,8 +58,12 @@ A remaining ticket is **unblocked** when GitHub reports no open blockers (`issue
 
 **If no remaining children** (all PR children are Closed):
 
-- Run **`/code-review` once**, fixed point **`main`** (full branch diff). Standards sources: `CLAUDE.md`.
-- Then stop unless the user asks to undraft/merge the PR.
+- Do **not** run `/code-review`.
+- Stop after telling the user, in French, exactly this handoff (adapt only the parent/PR numbers if useful):
+
+  Tous les tickets ont été implémentés. Veuillez faire des tests pour valider que tout est fonctionnel ; lorsque ce sera bon, lancez le skill **Finalise la version** (`finaliser-la-version`).
+
+- Do not merge, tag, or start the next version.
 
 ## Not this skill
 
