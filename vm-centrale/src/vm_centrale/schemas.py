@@ -88,14 +88,6 @@ class StatutAdminRequest(BaseModel):
     est_admin: bool
 
 
-class RelaisRequest(BaseModel):
-    message: str = Field(min_length=1, max_length=8000)
-
-
-class RelaisResponse(BaseModel):
-    reponse: str
-
-
 class ConversationCreeRequest(BaseModel):
     message: str = Field(min_length=1, max_length=8000)
 
@@ -133,3 +125,11 @@ class ConversationDetailResponse(BaseModel):
 
 class ConversationRenommeeRequest(BaseModel):
     titre: str = Field(min_length=1)
+
+
+class MessageEnvoyeRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=8000)
+
+
+class MessageEnvoyeResponse(BaseModel):
+    reponse: str

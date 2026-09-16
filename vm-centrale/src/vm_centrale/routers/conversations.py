@@ -16,8 +16,12 @@ from vm_centrale.schemas import (
     ConversationRenommeeRequest,
     ConversationResponse,
     ConversationResume,
+    MessageEnvoyeRequest,
+    MessageEnvoyeResponse,
     MessageResponse,
 )
+
+_TAILLE_FENETRE_HISTORIQUE = 3
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -36,6 +40,21 @@ def _prompt_titrage(message_utilisateur: str, reponse_assistant: str) -> str:
         f"Utilisateur : {message_utilisateur}\n"
         f"Assistant : {reponse_assistant}"
     )
+
+
+def _construire_messages_pour_mistral(
+    conversation: Conversation, derniers_messages: list[Message], nouveau_message: str
+) -> list[dict[str, str]]:
+    # Historique borné (résumé glissant + fenêtre courte) plutôt que
+    # l'intégralité de la conversation, pour maîtriser le coût en tokens
+    # (facturation Mistral au token). Le profil de travail sera ajouté par
+    # le ticket suivant (#37).
+    messages: list[dict[str, str]] = []
+    if conversation.resume_contexte:
+        messages.append({"role": "system", "content": conversation.resume_contexte})
+    messages.extend({"role": m.role, "content": m.contenu} for m in derniers_messages)
+    messages.append({"role": "user", "content": nouveau_message})
+    return messages
 
 
 def _identifiant_compte_du_jeton(
@@ -211,3 +230,62 @@ def supprimer_conversation(
     db.query(Message).filter(Message.conversation_id == conversation.id).delete()
     db.delete(conversation)
     db.commit()
+
+
+@router.post(
+    "/conversations/{conversation_id}/messages", response_model=MessageEnvoyeResponse
+)
+def envoyer_message(
+    conversation_id: int,
+    requete: MessageEnvoyeRequest,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
+    client: MistralClient = Depends(get_mistral_client),
+    jetons: JetonStore = Depends(get_jeton_store),
+    db: Session = Depends(get_db),
+) -> MessageEnvoyeResponse:
+    identifiant_compte = _identifiant_compte_du_jeton(credentials, jetons)
+    conversation = _recuperer_conversation_du_compte(db, conversation_id, identifiant_compte)
+
+    derniers_messages = (
+        db.query(Message)
+        .filter(Message.conversation_id == conversation.id)
+        .order_by(Message.id.desc())
+        .limit(_TAILLE_FENETRE_HISTORIQUE)
+        .all()
+    )
+    derniers_messages.reverse()
+
+    messages_pour_mistral = _construire_messages_pour_mistral(
+        conversation, derniers_messages, requete.message
+    )
+
+    # Comme pour la création (cf. creer_conversation) : l'appel Mistral est
+    # fait avant toute écriture, pour ne jamais persister un message
+    # utilisateur sans sa réponse en cas d'échec.
+    try:
+        reponse = client.chat(messages_pour_mistral)
+    except Exception as erreur:
+        logger.error("Échec de l'appel au relais Mistral : %s", erreur)
+        raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
+
+    maintenant = datetime.now(timezone.utc)
+    db.add_all(
+        [
+            Message(
+                conversation_id=conversation.id,
+                role="user",
+                contenu=requete.message,
+                date_creation=maintenant,
+            ),
+            Message(
+                conversation_id=conversation.id,
+                role="assistant",
+                contenu=reponse,
+                date_creation=maintenant,
+            ),
+        ]
+    )
+    conversation.date_derniere_activite = maintenant
+    db.commit()
+
+    return MessageEnvoyeResponse(reponse=reponse)

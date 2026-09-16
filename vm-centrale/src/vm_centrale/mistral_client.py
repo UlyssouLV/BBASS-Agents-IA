@@ -12,14 +12,17 @@ class MistralClient:
     def __init__(self, modele: str = _MODELE) -> None:
         self._modele = modele
 
-    def chat(self, message: str) -> str:
+    def chat(self, messages: str | list[dict[str, str]]) -> str:
+        if isinstance(messages, str):
+            messages = [{"role": "user", "content": messages}]
+
         api_key = get_mistral_api_key()
         reponse = _http_client.post(
             _API_URL,
             headers={"Authorization": f"Bearer {api_key}"},
             json={
                 "model": self._modele,
-                "messages": [{"role": "user", "content": message}],
+                "messages": messages,
             },
         )
         reponse.raise_for_status()

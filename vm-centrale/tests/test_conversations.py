@@ -300,3 +300,156 @@ def test_supprimer_sans_jeton_est_refuse(client):
     reponse = client.delete("/conversations/1")
 
     assert reponse.status_code == 401
+
+
+def test_envoyer_message_persiste_le_message_et_la_reponse(
+    client, mistral_client_factice, jeton_valide, db_session
+):
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide, "Bonjour")
+    mistral_client_factice.repondre("Suite de la réponse")
+
+    reponse = client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Et ensuite ?"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert reponse.status_code == 200
+    assert reponse.json() == {"reponse": "Suite de la réponse"}
+
+    messages = (
+        db_session.query(Message)
+        .filter(Message.conversation_id == conversation_id)
+        .order_by(Message.id)
+        .all()
+    )
+    assert [(m.role, m.contenu) for m in messages] == [
+        ("user", "Bonjour"),
+        ("assistant", "Réponse assistant"),
+        ("user", "Et ensuite ?"),
+        ("assistant", "Suite de la réponse"),
+    ]
+
+
+def test_envoyer_message_met_a_jour_la_date_derniere_activite(
+    client, mistral_client_factice, jeton_valide, db_session
+):
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide)
+    conversation = db_session.get(Conversation, conversation_id)
+    conversation.date_derniere_activite = datetime(2020, 1, 1)
+    db_session.commit()
+
+    mistral_client_factice.repondre("Suite de la réponse")
+    client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Et ensuite ?"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    db_session.refresh(conversation)
+    assert conversation.date_derniere_activite > datetime(2020, 1, 1)
+
+
+def test_prompt_envoye_ne_contient_jamais_lintegralite_de_lhistorique(
+    client, mistral_client_factice, jeton_valide, db_session
+):
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide, "Message 1")
+    for i in range(2, 5):
+        mistral_client_factice.repondre(f"Réponse {i}")
+        client.post(
+            f"/conversations/{conversation_id}/messages",
+            json={"message": f"Message {i}"},
+            headers=_autorisation(jeton_valide),
+        )
+
+    conversation = db_session.get(Conversation, conversation_id)
+    conversation.resume_contexte = "Résumé glissant"
+    db_session.commit()
+
+    mistral_client_factice.repondre("Réponse finale")
+    client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Dernier message"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    messages_envoyes = mistral_client_factice.messages_recus[-1]
+    assert messages_envoyes[0] == {"role": "system", "content": "Résumé glissant"}
+    assert messages_envoyes[-1] == {"role": "user", "content": "Dernier message"}
+    contenus = [m["content"] for m in messages_envoyes]
+    assert "Message 1" not in contenus
+    # Résumé + au plus 3 derniers messages + le nouveau message.
+    assert len(messages_envoyes) <= 5
+
+
+def test_envoyer_message_echec_appel_mistral_ne_persiste_rien(
+    client, mistral_client_factice, jeton_valide, db_session
+):
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide)
+    mistral_client_factice.echouer(RuntimeError("service Mistral indisponible"))
+
+    reponse = client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Et ensuite ?"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert reponse.status_code == 502
+    assert (
+        db_session.query(Message).filter(Message.conversation_id == conversation_id).count() == 2
+    )
+
+
+def test_envoyer_message_dans_une_conversation_dun_autre_compte_renvoie_404(
+    client, mistral_client_factice, jeton_valide, jeton_store
+):
+    jeton_autre_compte = jeton_store.emettre("n.durand")
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_autre_compte)
+
+    reponse = client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Et ensuite ?"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert reponse.status_code == 404
+
+
+def test_envoyer_message_dans_une_conversation_inexistante_renvoie_404(client, jeton_valide):
+    reponse = client.post(
+        "/conversations/999/messages",
+        json={"message": "Et ensuite ?"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert reponse.status_code == 404
+
+
+def test_envoyer_message_sans_jeton_est_refuse(client):
+    reponse = client.post("/conversations/1/messages", json={"message": "Et ensuite ?"})
+
+    assert reponse.status_code == 401
+
+
+def test_envoyer_message_vide_est_rejete(client, mistral_client_factice, jeton_valide):
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide)
+
+    reponse = client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": ""},
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert reponse.status_code == 422
+
+
+def test_envoyer_message_trop_long_est_rejete(client, mistral_client_factice, jeton_valide):
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide)
+
+    reponse = client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "x" * 8001},
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert reponse.status_code == 422
