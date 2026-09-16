@@ -25,7 +25,8 @@ def _sans_init_db_reel(monkeypatch):
 
 class ClientMistralFactice:
     def __init__(self) -> None:
-        self.messages_recus: list[str] = []
+        self.messages_recus: list = []
+        self.response_formats_recus: list = []
         self._reponses: list[str] = []
         self._exception: Exception | None = None
 
@@ -39,8 +40,9 @@ class ClientMistralFactice:
     def echouer(self, exception: Exception) -> None:
         self._exception = exception
 
-    def chat(self, message: str) -> str:
-        self.messages_recus.append(message)
+    def chat(self, messages, response_format=None) -> str:
+        self.messages_recus.append(messages)
+        self.response_formats_recus.append(response_format)
         if self._exception is not None:
             raise self._exception
         assert self._reponses, "Aucune réponse configurée : appeler repondre() d'abord"

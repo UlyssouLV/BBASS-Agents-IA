@@ -1,3 +1,4 @@
+import json
 import logging
 from datetime import datetime, timezone
 
@@ -8,7 +9,7 @@ from sqlalchemy.orm import Session
 from vm_centrale.database import get_db
 from vm_centrale.jetons import JetonStore, get_jeton_store
 from vm_centrale.mistral_client import MistralClient, get_mistral_client
-from vm_centrale.models import Conversation, Message
+from vm_centrale.models import Compte, Conversation, Message, ProfilTravail
 from vm_centrale.schemas import (
     ConversationCreeRequest,
     ConversationCreeResponse,
@@ -32,6 +33,27 @@ _CONVERSATION_INTROUVABLE = "Conversation introuvable"
 
 _bearer_scheme = HTTPBearer(auto_error=False)
 
+# Sortie structurée stricte (spec V1.1.1) : un seul appel Mistral produit à la
+# fois le résumé glissant mis à jour et une éventuelle mise à jour du profil
+# de travail, pour ne payer le contexte partagé (résumé courant, profil
+# courant, message(s) sortant(s)) qu'une seule fois.
+_SCHEMA_RESUME_ET_PROFIL = {
+    "type": "json_schema",
+    "json_schema": {
+        "name": "resume_et_profil",
+        "strict": True,
+        "schema": {
+            "type": "object",
+            "properties": {
+                "resume_contexte": {"type": "string"},
+                "profil_travail_delta": {"type": ["string", "null"]},
+            },
+            "required": ["resume_contexte", "profil_travail_delta"],
+            "additionalProperties": False,
+        },
+    },
+}
+
 
 def _prompt_titrage(message_utilisateur: str, reponse_assistant: str) -> str:
     return (
@@ -47,14 +69,68 @@ def _construire_messages_pour_mistral(
 ) -> list[dict[str, str]]:
     # Historique borné (résumé glissant + fenêtre courte) plutôt que
     # l'intégralité de la conversation, pour maîtriser le coût en tokens
-    # (facturation Mistral au token). Le profil de travail sera ajouté par
-    # le ticket suivant (#37).
+    # (facturation Mistral au token). Le profil de travail n'est pas ajouté
+    # ici : il informe l'appel de résumé (ci-dessous), pas la réponse de chat
+    # elle-même.
     messages: list[dict[str, str]] = []
     if conversation.resume_contexte:
         messages.append({"role": "system", "content": conversation.resume_contexte})
     messages.extend({"role": m.role, "content": m.contenu} for m in derniers_messages)
     messages.append({"role": "user", "content": nouveau_message})
     return messages
+
+
+def _identite_connue(compte: Compte | None) -> str:
+    if compte is None:
+        return "(non disponible)"
+    poles = ", ".join(pole.pole for pole in compte.poles)
+    return f"{compte.prenom} {compte.nom}, pôle(s) : {poles}, agence : {compte.agence}"
+
+
+def _prompt_resume_et_profil(
+    resume_contexte: str,
+    profil_travail: str,
+    compte: Compte | None,
+    messages_sortants: list[Message],
+) -> str:
+    echange_sortant = "\n".join(f"{m.role} : {m.contenu}" for m in messages_sortants)
+    return (
+        "Tu maintiens deux mémoires pour ce compte : un résumé glissant de la "
+        "conversation en cours, et un profil de travail inter-conversationnel "
+        "décrivant sa façon de travailler.\n"
+        f"Identité déjà connue du compte, fait acquis — ne cherche jamais à la "
+        f"déterminer ni à la modifier : {_identite_connue(compte)}.\n"
+        f"Résumé glissant actuel : {resume_contexte or '(vide)'}\n"
+        f"Profil de travail actuel : {profil_travail or '(vide)'}\n"
+        "Message(s) qui sortent de la fenêtre des derniers messages, à "
+        f"absorber dans le résumé :\n{echange_sortant}\n\n"
+        "Renvoie un objet JSON avec resume_contexte (résumé glissant mis à "
+        "jour, incorporant ces messages sortants) et profil_travail_delta "
+        "(un ajout au profil de travail, vide si rien à ajouter). "
+        "N'inclus jamais dans profil_travail_delta un fait d'identité "
+        "(prénom, nom, pôle, agence) : ceux-ci sont déjà connus et ne "
+        "doivent jamais être réinférés ni modifiés depuis une conversation."
+    )
+
+
+def _contenu_profil_actuel(db: Session, identifiant_compte: str) -> str:
+    profil = db.get(ProfilTravail, identifiant_compte)
+    return profil.contenu if profil is not None else ""
+
+
+def _recuperer_ou_creer_profil(db: Session, identifiant_compte: str) -> ProfilTravail:
+    # N'ajoute à la session que lorsqu'une mise à jour va effectivement être
+    # persistée (jamais depuis _contenu_profil_actuel, une simple lecture
+    # utilisée avant l'appel Mistral) : pas de ligne fantôme en cas d'échec.
+    profil = db.get(ProfilTravail, identifiant_compte)
+    if profil is None:
+        profil = ProfilTravail(
+            identifiant_compte=identifiant_compte,
+            contenu="",
+            date_derniere_maj=datetime.now(timezone.utc),
+        )
+        db.add(profil)
+    return profil
 
 
 def _identifiant_compte_du_jeton(
@@ -259,16 +335,46 @@ def envoyer_message(
         conversation, derniers_messages, requete.message
     )
 
-    # Comme pour la création (cf. creer_conversation) : l'appel Mistral est
-    # fait avant toute écriture, pour ne jamais persister un message
+    # Un message sort de la fenêtre des 3 derniers dès que ce tour (2 nouveaux
+    # messages) ne laisse plus la place à tous les messages qui y étaient
+    # jusque-là : tous sauf le plus récent (qui reste dans la fenêtre aux
+    # côtés des 2 nouveaux, cf. spec V1.1.1).
+    messages_sortants = derniers_messages[:-1]
+
+    compte = db.query(Compte).filter(Compte.identifiant == identifiant_compte).first()
+
+    # Comme pour la création (cf. creer_conversation) : les appels Mistral
+    # sont faits avant toute écriture, pour ne jamais persister un message
     # utilisateur sans sa réponse en cas d'échec.
     try:
         reponse = client.chat(messages_pour_mistral)
+        resume_maj: str | None = None
+        profil_travail_delta: str | None = None
+        if messages_sortants:
+            contenu_json = client.chat(
+                _prompt_resume_et_profil(
+                    conversation.resume_contexte,
+                    _contenu_profil_actuel(db, identifiant_compte),
+                    compte,
+                    messages_sortants,
+                ),
+                response_format=_SCHEMA_RESUME_ET_PROFIL,
+            )
+            donnees = json.loads(contenu_json)
+            resume_maj = donnees["resume_contexte"]
+            profil_travail_delta = donnees.get("profil_travail_delta")
     except Exception as erreur:
         logger.error("Échec de l'appel au relais Mistral : %s", erreur)
         raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
 
     maintenant = datetime.now(timezone.utc)
+    if resume_maj is not None:
+        conversation.resume_contexte = resume_maj
+    if profil_travail_delta:
+        profil = _recuperer_ou_creer_profil(db, identifiant_compte)
+        profil.contenu = f"{profil.contenu}\n{profil_travail_delta}".strip()
+        profil.date_derniere_maj = maintenant
+
     db.add_all(
         [
             Message(

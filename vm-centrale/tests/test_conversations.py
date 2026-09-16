@@ -1,6 +1,7 @@
+import json
 from datetime import datetime
 
-from vm_centrale.models import Conversation, Message
+from vm_centrale.models import Conversation, Message, ProfilTravail
 
 
 def _autorisation(jeton: str) -> dict[str, str]:
@@ -13,6 +14,12 @@ def _creer_conversation(client, mistral_client_factice, jeton: str, message: str
         "/conversations", json={"message": message}, headers=_autorisation(jeton)
     )
     return reponse.json()["conversation"]["id"]
+
+
+def _reponse_resume_et_profil(resume_contexte: str, profil_travail_delta: str = "") -> str:
+    return json.dumps(
+        {"resume_contexte": resume_contexte, "profil_travail_delta": profil_travail_delta}
+    )
 
 
 def _jeton_admin(client, seed_compte, identifiant: str = "a.martin") -> str:
@@ -306,7 +313,7 @@ def test_envoyer_message_persiste_le_message_et_la_reponse(
     client, mistral_client_factice, jeton_valide, db_session
 ):
     conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide, "Bonjour")
-    mistral_client_factice.repondre("Suite de la réponse")
+    mistral_client_factice.repondre("Suite de la réponse", _reponse_resume_et_profil("Résumé"))
 
     reponse = client.post(
         f"/conversations/{conversation_id}/messages",
@@ -339,7 +346,7 @@ def test_envoyer_message_met_a_jour_la_date_derniere_activite(
     conversation.date_derniere_activite = datetime(2020, 1, 1)
     db_session.commit()
 
-    mistral_client_factice.repondre("Suite de la réponse")
+    mistral_client_factice.repondre("Suite de la réponse", _reponse_resume_et_profil("Résumé"))
     client.post(
         f"/conversations/{conversation_id}/messages",
         json={"message": "Et ensuite ?"},
@@ -355,7 +362,7 @@ def test_prompt_envoye_ne_contient_jamais_lintegralite_de_lhistorique(
 ):
     conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide, "Message 1")
     for i in range(2, 5):
-        mistral_client_factice.repondre(f"Réponse {i}")
+        mistral_client_factice.repondre(f"Réponse {i}", _reponse_resume_et_profil(f"Résumé {i}"))
         client.post(
             f"/conversations/{conversation_id}/messages",
             json={"message": f"Message {i}"},
@@ -366,14 +373,16 @@ def test_prompt_envoye_ne_contient_jamais_lintegralite_de_lhistorique(
     conversation.resume_contexte = "Résumé glissant"
     db_session.commit()
 
-    mistral_client_factice.repondre("Réponse finale")
+    mistral_client_factice.repondre("Réponse finale", _reponse_resume_et_profil("Résumé final"))
     client.post(
         f"/conversations/{conversation_id}/messages",
         json={"message": "Dernier message"},
         headers=_autorisation(jeton_valide),
     )
 
-    messages_envoyes = mistral_client_factice.messages_recus[-1]
+    # -2 : le dernier appel Mistral de ce tour est l'appel résumé+profil
+    # (l'appel de réponse de chat, celui vérifié ici, le précède).
+    messages_envoyes = mistral_client_factice.messages_recus[-2]
     assert messages_envoyes[0] == {"role": "system", "content": "Résumé glissant"}
     assert messages_envoyes[-1] == {"role": "user", "content": "Dernier message"}
     contenus = [m["content"] for m in messages_envoyes]
@@ -453,3 +462,134 @@ def test_envoyer_message_trop_long_est_rejete(client, mistral_client_factice, je
     )
 
     assert reponse.status_code == 422
+
+
+def test_resume_et_profil_se_mettent_a_jour_une_fois_le_seuil_de_3_messages_depasse(
+    client, mistral_client_factice, jeton_valide, db_session
+):
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide, "Bonjour")
+
+    mistral_client_factice.repondre(
+        "Suite", _reponse_resume_et_profil("Nouveau résumé", "Travaille sur des devis Foncier")
+    )
+    client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Et ensuite ?"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    conversation = db_session.get(Conversation, conversation_id)
+    assert conversation.resume_contexte == "Nouveau résumé"
+
+    profil = db_session.get(ProfilTravail, "j.dupont")
+    assert profil is not None
+    assert "Travaille sur des devis Foncier" in profil.contenu
+
+
+def test_resume_se_met_a_jour_meme_sans_delta_de_profil(
+    client, mistral_client_factice, jeton_valide, db_session
+):
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide, "Bonjour")
+
+    mistral_client_factice.repondre("Suite", _reponse_resume_et_profil("Nouveau résumé"))
+    client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Et ensuite ?"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    conversation = db_session.get(Conversation, conversation_id)
+    assert conversation.resume_contexte == "Nouveau résumé"
+    assert db_session.get(ProfilTravail, "j.dupont") is None
+
+
+def test_prompt_resume_et_profil_ninclut_jamais_lidentite_comme_a_determiner(
+    client, mistral_client_factice, jeton_valide, seed_compte
+):
+    seed_compte(
+        "j.dupont", "correcthorsebatterystaple", agence="Castries", poles=["Foncier"],
+        prenom="Jean", nom="Dupont",
+    )
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide, "Bonjour")
+
+    mistral_client_factice.repondre("Suite", _reponse_resume_et_profil("Résumé"))
+    client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Et ensuite ?"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    # Le dernier appel Mistral de ce tour est celui résumé+profil.
+    prompt_resume = mistral_client_factice.messages_recus[-1]
+    assert "Jean Dupont" in prompt_resume
+    assert "Foncier" in prompt_resume
+    assert "jamais" in prompt_resume
+    assert "identité" in prompt_resume
+    assert mistral_client_factice.response_formats_recus[-1] is not None
+
+
+def test_profil_travail_renvoie_le_contenu_du_compte_du_jeton(client, jeton_valide, db_session):
+    db_session.add(
+        ProfilTravail(
+            identifiant_compte="j.dupont",
+            contenu="Aime les tableaux de suivi",
+            date_derniere_maj=datetime(2024, 1, 1),
+        )
+    )
+    db_session.commit()
+
+    reponse = client.get("/comptes/j.dupont/profil-travail", headers=_autorisation(jeton_valide))
+
+    assert reponse.status_code == 200
+    assert reponse.json()["contenu"] == "Aime les tableaux de suivi"
+
+
+def test_profil_travail_vide_si_jamais_calcule(client, jeton_valide):
+    reponse = client.get("/comptes/j.dupont/profil-travail", headers=_autorisation(jeton_valide))
+
+    assert reponse.status_code == 200
+    assert reponse.json()["contenu"] == ""
+
+
+def test_profil_travail_dun_autre_compte_renvoie_403(client, jeton_store):
+    jeton_autre_compte = jeton_store.emettre("n.durand")
+
+    reponse = client.get(
+        "/comptes/j.dupont/profil-travail", headers=_autorisation(jeton_autre_compte)
+    )
+
+    assert reponse.status_code == 403
+
+
+def test_profil_travail_dun_autre_compte_renvoie_403_meme_avec_un_jeton_admin(
+    client, seed_compte
+):
+    jeton_admin = _jeton_admin(client, seed_compte)
+
+    reponse = client.get("/comptes/j.dupont/profil-travail", headers=_autorisation(jeton_admin))
+
+    assert reponse.status_code == 403
+
+
+def test_profil_travail_sans_jeton_est_refuse(client):
+    reponse = client.get("/comptes/j.dupont/profil-travail")
+
+    assert reponse.status_code == 401
+
+
+def test_profil_travail_patch_nexiste_pas(client, jeton_valide):
+    reponse = client.patch(
+        "/comptes/j.dupont/profil-travail",
+        json={"contenu": "x"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert reponse.status_code in (404, 405)
+
+
+def test_profil_travail_delete_nexiste_pas(client, jeton_valide):
+    reponse = client.delete(
+        "/comptes/j.dupont/profil-travail", headers=_autorisation(jeton_valide)
+    )
+
+    assert reponse.status_code in (404, 405)
