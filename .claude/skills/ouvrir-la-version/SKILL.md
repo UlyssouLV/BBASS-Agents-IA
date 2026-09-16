@@ -47,7 +47,12 @@ You are not wrong: next is **`/to-tickets`**. Follow its quiz: numbered tickets,
 
 Show the **implementation order**: tickets with no open blockers first (lowest number among that set).
 
-**Wait for an explicit yes** on that list. Then `gh issue create` each child (`Part of #<parent>`, `ready-for-agent`). Also set **GitHub native** blocked-by (see `docs/agents/issue-tracker.md`: POST `issues/<child>/dependencies/blocked_by` with the blocker’s **database id**). A body `Blocked by: #n` line is only a fallback. Closing a blocker must update the GitHub Blocking / Blocked by UI. Do not create tickets before that yes. Do not `/implement`.
+**Wait for an explicit yes** on that list. Then `gh issue create` each child (`Part of #<parent>`, `ready-for-agent`). Also set **GitHub native** blocked-by (see `docs/agents/issue-tracker.md`: POST `issues/<n>/dependencies/blocked_by` with JSON integer `issue_id` = the blocker’s **database id**):
+
+- **Between children**, as the quiz said (ticket B blocked by ticket A).
+- **Parent blocked by every child**: POST `issues/<parent>/dependencies/blocked_by` once per child. The parent spec stays **Blocked** until every child is **Closed**. Then `gh issue edit <parent> --remove-label "ready-for-agent"`. The parent is never an `/implement` ticket.
+
+A body `Blocked by: #n` line is only a fallback. Closing a blocker must update the GitHub Blocking / Blocked by UI. Do not create tickets before that yes. Do not `/implement`.
 
 ## 6. Pull request
 
@@ -62,7 +67,7 @@ Draft is OK until the user wants it ready.
 
 ## 7. Hand off to implement
 
-Propose: **`/clear`**, then **`/implement #<first>`** where `#first` is the first unblocked child (no blockers, or all blockers already created and none waiting on code — at open, that is “Blocked by: None”). Wait. Do not start `/implement` in this same window after a long grill.
+Propose: **`/clear`**, then **`/implement #<first>`** where `#first` is the first unblocked **child** (not the parent). Wait. Do not start `/implement` in this same window after a long grill.
 
 ## Not this skill
 

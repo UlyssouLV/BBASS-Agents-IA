@@ -16,7 +16,7 @@ Matt Pocock `/implement` for TDD. Then skill `encadrer-implement`: tests → com
 
 ### Ouvre the version
 
-When the user says **« Ouvre la version »** (must include **`X.Y.Z`**): skill `ouvrir-la-version`. Purpose → `/grill-with-docs` → `/to-spec` (parent issue; **no spec files on `main`**) → **branch from `main` → immediate init commit+push** (`docs/specs` + doc updates) → `/to-tickets` (propose, **yes**, then create with **native** blocked-by) → PR → propose `/clear` and `/implement` the first unblocked ticket.
+When the user says **« Ouvre la version »** (must include **`X.Y.Z`**): skill `ouvrir-la-version`. Purpose → `/grill-with-docs` → `/to-spec` (parent issue; **no spec files on `main`**) → **branch from `main` → immediate init commit+push** (`docs/specs` + doc updates) → `/to-tickets` (propose, **yes**, then create with **native** blocked-by **and parent blocked by every child**, then drop `ready-for-agent` on the parent) → PR → propose `/clear` and `/implement` the first unblocked **child**.
 
 ### Finalise the version
 

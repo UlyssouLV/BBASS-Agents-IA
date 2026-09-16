@@ -39,7 +39,7 @@ This path **is** permission to `git commit`, `git push`, `gh issue edit --remove
 
    Do not add `wontfix`. Do not use a label for “coded but not on main”. There is no `awaiting-merge`. A Closed child must not keep `ready-for-agent`.
 
-Do **not** close the **parent** spec issue here (e.g. #13). Squash-merge `Fixes #<parent>` does that.
+Do **not** close the **parent** spec issue here (e.g. #13). Squash-merge `Fixes #<parent>` does that. Do **not** `/implement` the parent: it has no `ready-for-agent` after tickets exist; it stays Blocked until every child is Closed.
 
 ## 3. More child tickets on this PR?
 
