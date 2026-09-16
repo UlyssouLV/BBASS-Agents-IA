@@ -32,6 +32,11 @@ _TAILLE_FENETRE_HISTORIQUE = 3
 # Fixée en dur (comme la fenêtre de 3 messages ci-dessus), indépendante des
 # plafonds propres à Mistral (spec 1.1.2).
 _TAILLE_MAX_PIECE_JOINTE = 20 * 1024 * 1024
+# Extrait (jamais l'intégralité) de contenu_extrait passé à l'appel
+# résumé+profil pour un message sortant portant une pièce jointe — juste
+# assez pour que le résumé glissant en tire une mention pertinente, façon
+# description de skill (spec 1.1.2).
+_TAILLE_EXTRAIT_PIECE_JOINTE_RESUME = 200
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -121,13 +126,32 @@ def _identite_connue(compte: Compte | None) -> str:
     return f"{compte.prenom} {compte.nom}, pôle(s) : {poles}, agence : {compte.agence}"
 
 
+def _ligne_message_sortant(message: Message, piece_jointe: PieceJointe | None) -> str:
+    ligne = f"{message.role} : {message.contenu}"
+    if piece_jointe is None:
+        return ligne
+    # Extrait court seulement (jamais l'intégralité de contenu_extrait) : le
+    # résumé glissant n'en garde qu'une mention, pas le document complet
+    # (spec 1.1.2).
+    extrait = (piece_jointe.contenu_extrait or "")[:_TAILLE_EXTRAIT_PIECE_JOINTE_RESUME]
+    return (
+        f"{ligne}\n"
+        f"(Pièce jointe « {piece_jointe.nom_fichier} », extrait pour situer le "
+        f"sujet : {extrait})"
+    )
+
+
 def _prompt_resume_et_profil(
     resume_contexte: str,
     profil_travail: str,
     compte: Compte | None,
     messages_sortants: list[Message],
+    pieces_jointes_sortantes: dict[int, PieceJointe] | None = None,
 ) -> str:
-    echange_sortant = "\n".join(f"{m.role} : {m.contenu}" for m in messages_sortants)
+    pieces_jointes_sortantes = pieces_jointes_sortantes or {}
+    echange_sortant = "\n".join(
+        _ligne_message_sortant(m, pieces_jointes_sortantes.get(m.id)) for m in messages_sortants
+    )
     return (
         "Tu maintiens deux mémoires pour ce compte : un résumé glissant de la "
         "conversation en cours, et un profil de travail inter-conversationnel "
@@ -143,7 +167,10 @@ def _prompt_resume_et_profil(
         "(un ajout au profil de travail, vide si rien à ajouter). "
         "N'inclus jamais dans profil_travail_delta un fait d'identité "
         "(prénom, nom, pôle, agence) : ceux-ci sont déjà connus et ne "
-        "doivent jamais être réinférés ni modifiés depuis une conversation."
+        "doivent jamais être réinférés ni modifiés depuis une conversation. "
+        "Si un message sortant porte une pièce jointe, n'en garde dans "
+        "resume_contexte qu'une mention courte (façon description de skill : "
+        "juste assez pour situer le sujet), jamais son contenu intégral."
     )
 
 
@@ -505,9 +532,12 @@ def _appeler_resume_et_profil(
     profil_actuel: str,
     compte: Compte | None,
     messages_sortants: list[Message],
+    pieces_jointes_sortantes: dict[int, PieceJointe],
 ) -> str:
     return client.chat(
-        _prompt_resume_et_profil(resume_contexte, profil_actuel, compte, messages_sortants),
+        _prompt_resume_et_profil(
+            resume_contexte, profil_actuel, compte, messages_sortants, pieces_jointes_sortantes
+        ),
         response_format=_SCHEMA_RESUME_ET_PROFIL,
     )
 
@@ -563,6 +593,21 @@ def envoyer_message(
         # côtés des 2 nouveaux, cf. spec V1.1.1).
         messages_sortants = derniers_messages[:-1]
 
+        # Résolues une seule fois, avant l'appel résumé+profil (jamais dans le
+        # thread de l'executor ci-dessous, la session SQLAlchemy n'étant pas
+        # thread-safe) : la pièce jointe déjà liée à un message sortant, si
+        # elle existe, pour n'en glisser qu'un extrait court dans le prompt
+        # (spec 1.1.2, jamais le contenu intégral de contenu_extrait).
+        pieces_jointes_sortantes: dict[int, PieceJointe] = {}
+        if messages_sortants:
+            pieces_jointes_sortantes = {
+                piece_jointe.message_id: piece_jointe
+                for piece_jointe in db.query(PieceJointe)
+                .filter(PieceJointe.message_id.in_([m.id for m in messages_sortants]))
+                .all()
+                if piece_jointe.message_id is not None
+            }
+
         compte = db.query(Compte).filter(Compte.identifiant == identifiant_compte).first()
 
         resume_maj: str | None = None
@@ -585,6 +630,7 @@ def envoyer_message(
                     profil_actuel,
                     compte,
                     messages_sortants,
+                    pieces_jointes_sortantes,
                 )
                 try:
                     reponse = futur_reponse.result()

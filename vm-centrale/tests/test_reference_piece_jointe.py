@@ -347,3 +347,41 @@ def test_envoyer_message_avec_piece_jointe_dun_autre_compte_renvoie_404_meme_ave
     )
 
     assert reponse.status_code == 404
+
+
+# --- Résumé glissant : mention courte d'une pièce jointe sortant de la fenêtre --
+
+
+def test_message_avec_piece_jointe_sortant_de_la_fenetre_najoute_quun_extrait_court_au_prompt_resume(
+    client, mistral_client_factice, jeton_valide
+):
+    contenu_extrait_long = "Plan de masse détaillé, avec cotes et emprise. " * 20
+    assert len(contenu_extrait_long) > 200
+
+    mistral_client_factice.repondre_ocr(contenu_extrait_long)
+    piece_jointe_id = _televerser_sans_conversation(client, jeton_valide)
+
+    mistral_client_factice.repondre("Bien reçu", "Titre pièce jointe")
+    conversation = client.post(
+        "/conversations",
+        json={"message": "Que penses-tu de ce document ?", "piece_jointe_id": piece_jointe_id},
+        headers=_autorisation(jeton_valide),
+    )
+    conversation_id = conversation.json()["conversation"]["id"]
+
+    # Ce deuxième tour fait sortir le premier message (celui qui porte la
+    # pièce jointe) de la fenêtre des derniers messages : c'est l'appel
+    # résumé+profil de CE tour qui doit recevoir l'extrait.
+    mistral_client_factice.repondre(
+        "Suite", resume_et_profil=_reponse_resume_et_profil("Nouveau résumé")
+    )
+    client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Et ensuite ?"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    prompt_resume = mistral_client_factice.appels_structures[-1]
+    assert "document.pdf" in prompt_resume
+    assert contenu_extrait_long[:100] in prompt_resume
+    assert contenu_extrait_long not in prompt_resume
