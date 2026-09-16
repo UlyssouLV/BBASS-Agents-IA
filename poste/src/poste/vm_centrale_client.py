@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 from urllib.parse import quote
 
 import httpx
@@ -37,6 +38,13 @@ class CleAdminInvalideError(Exception):
     # get_compte_admin), qui doit fermer la session côté poste alors que
     # celui-ci ne le doit pas (le jeton de session reste valide, seule la
     # confirmation par clé a échoué).
+    pass
+
+
+class ConversationIntrouvableError(Exception):
+    # 404 de la VM sur /conversations* : id inexistant ou n'appartenant pas au
+    # compte du jeton (la VM ne distingue jamais les deux, voir
+    # vm_centrale.routers.conversations).
     pass
 
 
@@ -86,6 +94,42 @@ class CompteCree(CompteAdmin):
     mot_de_passe: str
 
 
+@dataclass
+class ConversationResume:
+    id: int
+    titre: str
+
+
+@dataclass
+class ConversationCree:
+    conversation: ConversationResume
+    reponse: str
+
+
+@dataclass
+class Conversation:
+    id: int
+    titre: str
+    date_derniere_activite: datetime
+
+
+@dataclass
+class Message:
+    id: int
+    role: str
+    contenu: str
+    date_creation: datetime
+
+
+@dataclass
+class ConversationDetail:
+    id: int
+    titre: str
+    date_creation: datetime
+    date_derniere_activite: datetime
+    messages: list[Message]
+
+
 def _champs_compte_admin(corps: dict) -> dict:
     # Extraction partagée par lister_comptes/creer_compte/modifier_compte :
     # les trois construisent un CompteAdmin (ou un CompteCree, qui y ajoute
@@ -117,6 +161,36 @@ def _lever_si_jeton_ou_droits_refuses(reponse: httpx.Response) -> None:
 # PATCH .../est-admin), celle qui ne doit pas fermer la session de
 # l'administrateur (voir CleAdminInvalideError).
 _CLE_ADMIN_INVALIDE_DETAIL = "Clé d'administration manquante ou invalide"
+
+
+def _lever_si_jeton_invalide(reponse: httpx.Response) -> None:
+    # Partagée par les cinq endpoints /conversations* : un seul code d'erreur
+    # possible en dehors de 404 (pas de notion de droits admin ici, contrairement
+    # à _lever_si_jeton_ou_droits_refuses).
+    if reponse.status_code == 401:
+        raise JetonInvalideError()
+
+
+def _lever_si_conversation_introuvable(reponse: httpx.Response) -> None:
+    if reponse.status_code == 404:
+        raise ConversationIntrouvableError()
+
+
+def _vers_conversation(corps: dict) -> Conversation:
+    return Conversation(
+        id=corps["id"],
+        titre=corps["titre"],
+        date_derniere_activite=datetime.fromisoformat(corps["date_derniere_activite"]),
+    )
+
+
+def _vers_message(corps: dict) -> Message:
+    return Message(
+        id=corps["id"],
+        role=corps["role"],
+        contenu=corps["contenu"],
+        date_creation=datetime.fromisoformat(corps["date_creation"]),
+    )
 
 
 def _lever_si_action_avec_cle_admin_refusee(reponse: httpx.Response) -> None:
@@ -153,14 +227,74 @@ class VmCentraleClient:
             doit_changer_mot_de_passe=corps["doit_changer_mot_de_passe"],
         )
 
-    def envoyer_message(self, message: str, jeton: str) -> str:
+    def creer_conversation(self, jeton: str, message: str) -> ConversationCree:
         reponse = _http_client.post(
-            f"{VM_CENTRALE_BASE_URL}/relais",
+            f"{VM_CENTRALE_BASE_URL}/conversations",
             json={"message": message},
             headers={"Authorization": f"Bearer {jeton}"},
         )
-        if reponse.status_code == 401:
-            raise JetonInvalideError()
+        _lever_si_jeton_invalide(reponse)
+        reponse.raise_for_status()
+        corps = reponse.json()
+        return ConversationCree(
+            conversation=ConversationResume(**corps["conversation"]),
+            reponse=corps["reponse"],
+        )
+
+    def lister_conversations(self, jeton: str) -> list[Conversation]:
+        reponse = _http_client.get(
+            f"{VM_CENTRALE_BASE_URL}/conversations",
+            headers={"Authorization": f"Bearer {jeton}"},
+        )
+        _lever_si_jeton_invalide(reponse)
+        reponse.raise_for_status()
+        return [_vers_conversation(conversation) for conversation in reponse.json()]
+
+    def consulter_conversation(self, jeton: str, conversation_id: int) -> ConversationDetail:
+        reponse = _http_client.get(
+            f"{VM_CENTRALE_BASE_URL}/conversations/{conversation_id}",
+            headers={"Authorization": f"Bearer {jeton}"},
+        )
+        _lever_si_jeton_invalide(reponse)
+        _lever_si_conversation_introuvable(reponse)
+        reponse.raise_for_status()
+        corps = reponse.json()
+        return ConversationDetail(
+            id=corps["id"],
+            titre=corps["titre"],
+            date_creation=datetime.fromisoformat(corps["date_creation"]),
+            date_derniere_activite=datetime.fromisoformat(corps["date_derniere_activite"]),
+            messages=[_vers_message(message) for message in corps["messages"]],
+        )
+
+    def renommer_conversation(self, jeton: str, conversation_id: int, titre: str) -> Conversation:
+        reponse = _http_client.patch(
+            f"{VM_CENTRALE_BASE_URL}/conversations/{conversation_id}",
+            json={"titre": titre},
+            headers={"Authorization": f"Bearer {jeton}"},
+        )
+        _lever_si_jeton_invalide(reponse)
+        _lever_si_conversation_introuvable(reponse)
+        reponse.raise_for_status()
+        return _vers_conversation(reponse.json())
+
+    def supprimer_conversation(self, jeton: str, conversation_id: int) -> None:
+        reponse = _http_client.delete(
+            f"{VM_CENTRALE_BASE_URL}/conversations/{conversation_id}",
+            headers={"Authorization": f"Bearer {jeton}"},
+        )
+        _lever_si_jeton_invalide(reponse)
+        _lever_si_conversation_introuvable(reponse)
+        reponse.raise_for_status()
+
+    def envoyer_message(self, jeton: str, conversation_id: int, message: str) -> str:
+        reponse = _http_client.post(
+            f"{VM_CENTRALE_BASE_URL}/conversations/{conversation_id}/messages",
+            json={"message": message},
+            headers={"Authorization": f"Bearer {jeton}"},
+        )
+        _lever_si_jeton_invalide(reponse)
+        _lever_si_conversation_introuvable(reponse)
         reponse.raise_for_status()
         return reponse.json()["reponse"]
 

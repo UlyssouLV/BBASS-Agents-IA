@@ -62,15 +62,37 @@
     <p id="avertissement-session" role="alert" hidden></p>
 
     <section id="onglet-chat">
-      <div id="messages" role="log"></div>
-      <p id="chat-chargement" hidden>Envoi en cours…</p>
-      <p id="chat-erreur" role="alert" hidden></p>
+      <div id="conversations-panneau">
+        <h2>Conversations</h2>
+        <p id="conversations-erreur" role="alert" hidden></p>
+        <ul id="liste-conversations"></ul>
+        <button type="button" id="bouton-nouvelle-conversation">Nouvelle conversation</button>
+      </div>
 
-      <form id="formulaire-chat">
-        <label for="message" class="visually-hidden">Message</label>
-        <input type="text" id="message" name="message" autocomplete="off" required />
-        <button type="submit">Envoyer</button>
-      </form>
+      <div id="conversation-panneau">
+        <div id="nouvelle-conversation">
+          <h2>Nouvelle conversation</h2>
+          <form id="formulaire-nouvelle-conversation">
+            <label for="nouveau-message-conversation" class="visually-hidden">Premier message</label>
+            <input type="text" id="nouveau-message-conversation" name="message" autocomplete="off" required />
+            <button type="submit">Envoyer</button>
+          </form>
+          <p id="nouvelle-conversation-erreur" role="alert" hidden></p>
+        </div>
+
+        <div id="conversation-ouverte" hidden>
+          <h2 id="conversation-titre"></h2>
+          <div id="messages" role="log"></div>
+          <p id="chat-chargement" hidden>Envoi en cours…</p>
+          <p id="chat-erreur" role="alert" hidden></p>
+
+          <form id="formulaire-chat">
+            <label for="message" class="visually-hidden">Message</label>
+            <input type="text" id="message" name="message" autocomplete="off" required />
+            <button type="submit">Envoyer</button>
+          </form>
+        </div>
+      </div>
     </section>
 
     <section id="onglet-comptes" hidden>

@@ -17,6 +17,16 @@ const chatErreur = document.getElementById("chat-erreur");
 const formulaireChat = document.getElementById("formulaire-chat");
 const champMessage = document.getElementById("message");
 
+const conversationsErreur = document.getElementById("conversations-erreur");
+const listeConversations = document.getElementById("liste-conversations");
+const boutonNouvelleConversation = document.getElementById("bouton-nouvelle-conversation");
+const nouvelleConversationZone = document.getElementById("nouvelle-conversation");
+const formulaireNouvelleConversation = document.getElementById("formulaire-nouvelle-conversation");
+const nouveauMessageConversation = document.getElementById("nouveau-message-conversation");
+const nouvelleConversationErreur = document.getElementById("nouvelle-conversation-erreur");
+const conversationOuverte = document.getElementById("conversation-ouverte");
+const conversationTitre = document.getElementById("conversation-titre");
+
 const ongletBoutonChat = document.getElementById("onglet-bouton-chat");
 const ongletBoutonComptes = document.getElementById("onglet-bouton-comptes");
 const ongletChat = document.getElementById("onglet-chat");
@@ -61,10 +71,13 @@ let identifiantEnCoursDeModification = null;
 let identifiantEnCoursDeChangementStatutAdmin = null;
 let estAdminCibleEnCours = null;
 let identifiantEnCoursDeSuppression = null;
+let conversationOuverteId = null;
 
-function afficherOngletChat() {
+async function afficherOngletChat() {
   ongletChat.hidden = false;
   ongletComptes.hidden = true;
+  afficherNouvelleConversation();
+  await chargerConversations();
 }
 
 async function afficherOngletComptes() {
@@ -117,6 +130,7 @@ function afficherEcranConnexion() {
   messages.replaceChildren();
   chatErreur.hidden = true;
   ongletBoutonComptes.hidden = true;
+  conversationOuverteId = null;
 }
 
 function ajouterMessage(auteur, texte) {
@@ -221,7 +235,7 @@ formulaireChat.addEventListener("submit", async (evenement) => {
   chatErreur.hidden = true;
 
   const message = champMessage.value;
-  if (!message.trim()) {
+  if (!message.trim() || conversationOuverteId === null) {
     return;
   }
 
@@ -233,13 +247,13 @@ formulaireChat.addEventListener("submit", async (evenement) => {
   try {
     let reponse;
     try {
-      reponse = await fetch("/chat", {
+      reponse = await fetch(`/conversations/${conversationOuverteId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message }),
       });
     } catch {
-      chatErreur.textContent = "Impossible de joindre le service de chat. Réessayez plus tard.";
+      chatErreur.textContent = "Impossible de joindre le service de conversations. Réessayez plus tard.";
       chatErreur.hidden = false;
       return;
     }
@@ -269,6 +283,230 @@ formulaireChat.addEventListener("submit", async (evenement) => {
     }
   }
 });
+
+function afficherNouvelleConversation() {
+  conversationOuverteId = null;
+  conversationOuverte.hidden = true;
+  nouvelleConversationZone.hidden = false;
+  nouvelleConversationErreur.hidden = true;
+}
+
+function afficherConversationOuverte(id, titre, messagesConversation) {
+  conversationOuverteId = id;
+  nouvelleConversationZone.hidden = true;
+  conversationOuverte.hidden = false;
+  conversationTitre.textContent = titre;
+  chatErreur.hidden = true;
+  messages.replaceChildren();
+  for (const message of messagesConversation) {
+    ajouterMessage(message.role === "user" ? "collaborateur" : "reponse", message.contenu);
+  }
+}
+
+function ligneConversation(conversation) {
+  const ligne = document.createElement("li");
+
+  const boutonOuvrir = document.createElement("button");
+  boutonOuvrir.type = "button";
+  boutonOuvrir.textContent = conversation.titre;
+  boutonOuvrir.addEventListener("click", () => ouvrirConversation(conversation.id));
+  ligne.append(boutonOuvrir);
+
+  const boutonRenommer = document.createElement("button");
+  boutonRenommer.type = "button";
+  boutonRenommer.textContent = "Renommer";
+  boutonRenommer.addEventListener("click", () => renommerConversation(conversation.id, conversation.titre));
+  ligne.append(boutonRenommer);
+
+  const boutonSupprimer = document.createElement("button");
+  boutonSupprimer.type = "button";
+  boutonSupprimer.textContent = "Supprimer";
+  boutonSupprimer.addEventListener("click", () => supprimerConversation(conversation.id));
+  ligne.append(boutonSupprimer);
+
+  return ligne;
+}
+
+async function chargerConversations() {
+  conversationsErreur.hidden = true;
+
+  let reponse;
+  try {
+    reponse = await fetch("/conversations");
+  } catch {
+    conversationsErreur.textContent = "Impossible de joindre le service de conversations. Réessayez plus tard.";
+    conversationsErreur.hidden = false;
+    return;
+  }
+
+  if (reponse.status === 401) {
+    afficherEcranConnexion();
+    return;
+  }
+
+  if (!reponse.ok) {
+    const detail = await reponse.json().catch(() => null);
+    conversationsErreur.textContent =
+      detail && detail.detail ? detail.detail : "Le chargement des conversations a échoué. Réessayez plus tard.";
+    conversationsErreur.hidden = false;
+    return;
+  }
+
+  const conversations = await reponse.json();
+  listeConversations.replaceChildren(...conversations.map(ligneConversation));
+}
+
+async function ouvrirConversation(id) {
+  conversationsErreur.hidden = true;
+
+  let reponse;
+  try {
+    reponse = await fetch(`/conversations/${id}`);
+  } catch {
+    conversationsErreur.textContent = "Impossible de joindre le service de conversations. Réessayez plus tard.";
+    conversationsErreur.hidden = false;
+    return;
+  }
+
+  if (reponse.status === 401) {
+    afficherEcranConnexion();
+    return;
+  }
+
+  if (!reponse.ok) {
+    const detail = await reponse.json().catch(() => null);
+    conversationsErreur.textContent =
+      detail && detail.detail ? detail.detail : "L'ouverture de la conversation a échoué. Réessayez plus tard.";
+    conversationsErreur.hidden = false;
+    return;
+  }
+
+  const conversation = await reponse.json();
+  afficherConversationOuverte(conversation.id, conversation.titre, conversation.messages);
+}
+
+boutonNouvelleConversation.addEventListener("click", afficherNouvelleConversation);
+
+formulaireNouvelleConversation.addEventListener("submit", async (evenement) => {
+  evenement.preventDefault();
+  nouvelleConversationErreur.hidden = true;
+
+  const message = nouveauMessageConversation.value;
+  if (!message.trim()) {
+    return;
+  }
+
+  let reponse;
+  try {
+    reponse = await fetch("/conversations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message }),
+    });
+  } catch {
+    nouvelleConversationErreur.textContent =
+      "Impossible de joindre le service de conversations. Réessayez plus tard.";
+    nouvelleConversationErreur.hidden = false;
+    return;
+  }
+
+  if (reponse.status === 401) {
+    afficherEcranConnexion();
+    return;
+  }
+
+  if (!reponse.ok) {
+    const detail = await reponse.json().catch(() => null);
+    nouvelleConversationErreur.textContent =
+      detail && detail.detail ? detail.detail : "La création de la conversation a échoué. Réessayez plus tard.";
+    nouvelleConversationErreur.hidden = false;
+    return;
+  }
+
+  const corps = await reponse.json();
+  formulaireNouvelleConversation.reset();
+  afficherConversationOuverte(corps.conversation.id, corps.conversation.titre, [
+    { role: "user", contenu: message },
+    { role: "assistant", contenu: corps.reponse },
+  ]);
+  await chargerConversations();
+});
+
+async function renommerConversation(id, titreActuel) {
+  const nouveauTitre = window.prompt("Nouveau titre de la conversation :", titreActuel);
+  if (!nouveauTitre || !nouveauTitre.trim() || nouveauTitre === titreActuel) {
+    return;
+  }
+
+  conversationsErreur.hidden = true;
+
+  let reponse;
+  try {
+    reponse = await fetch(`/conversations/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ titre: nouveauTitre }),
+    });
+  } catch {
+    conversationsErreur.textContent = "Impossible de joindre le service de conversations. Réessayez plus tard.";
+    conversationsErreur.hidden = false;
+    return;
+  }
+
+  if (reponse.status === 401) {
+    afficherEcranConnexion();
+    return;
+  }
+
+  if (!reponse.ok) {
+    const detail = await reponse.json().catch(() => null);
+    conversationsErreur.textContent =
+      detail && detail.detail ? detail.detail : "Le renommage de la conversation a échoué. Réessayez plus tard.";
+    conversationsErreur.hidden = false;
+    return;
+  }
+
+  const conversation = await reponse.json();
+  if (conversationOuverteId === id) {
+    conversationTitre.textContent = conversation.titre;
+  }
+  await chargerConversations();
+}
+
+async function supprimerConversation(id) {
+  if (!window.confirm("Supprimer définitivement cette conversation ?")) {
+    return;
+  }
+
+  conversationsErreur.hidden = true;
+
+  let reponse;
+  try {
+    reponse = await fetch(`/conversations/${id}`, { method: "DELETE" });
+  } catch {
+    conversationsErreur.textContent = "Impossible de joindre le service de conversations. Réessayez plus tard.";
+    conversationsErreur.hidden = false;
+    return;
+  }
+
+  if (reponse.status === 401) {
+    afficherEcranConnexion();
+    return;
+  }
+
+  if (!reponse.ok) {
+    const detail = await reponse.json().catch(() => null);
+    conversationsErreur.textContent =
+      detail && detail.detail ? detail.detail : "La suppression de la conversation a échoué. Réessayez plus tard.";
+    conversationsErreur.hidden = false;
+    return;
+  }
+
+  if (conversationOuverteId === id) {
+    afficherNouvelleConversation();
+  }
+  await chargerConversations();
+}
 
 ongletBoutonChat.addEventListener("click", afficherOngletChat);
 ongletBoutonComptes.addEventListener("click", afficherOngletComptes);
