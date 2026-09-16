@@ -4,7 +4,7 @@ Logiciel d'agents IA pour le cabinet de géomètres-experts BBASS. L'objectif es
 
 ## État actuel
 
-Socle V1 en cours (branche `feat/v1-socle`) : backend local **poste** (interface HTML/CSS/JS) et API **VM centrale** (comptes PostgreSQL + relais Mistral). Les agents métiers ne sont pas encore construits.
+**V1.1.1** disponible : backend local **poste** (interface HTML/CSS/JS) et API **VM centrale** (comptes administrateurs PostgreSQL, relais Mistral, conversations persistées avec historique borné, résumé glissant et profil de travail). Les agents métiers ne sont pas encore construits.
 
 ## Ce qu'on construit
 
@@ -44,10 +44,10 @@ flowchart LR
 
 - **Lundi 14** — environnement (éditeur, Git), dépôt GitHub, glossaire, spécifications, ADR ; première interface de chat ; API Mistral via la VM avec des comptes de test.
 - **Mardi 15** — socle chat (Pay as you go Mistral) ; **V1.1.0** (comptes administrateurs, collaborateurs, pôles, mots de passe, révocation de session) et tests utilisateurs ; échange Topo sans suite immédiate.
+- **Mercredi 16** — **V1.1.1** (persistance des conversations côté VM centrale : PostgreSQL, plusieurs fils par compte, historique multi-tours borné, résumé glissant, profil de travail) et écrans poste correspondants (conversations, profil de travail en lecture seule).
 
 ### Reste à implémenter
 
-- **V1.1.1** — persistance des conversations côté cabinet (PostgreSQL sur la VM) : plusieurs fils, multi-tours, résumé glissant, profil de travail ; pas de stockage Mistral Conversations.
 - **V1.1.2** — pièces jointes : upload et envoi à Mistral (table déjà prévue en 1.1.1, encore vide).
 - **V1.1.3** — suivi de la consommation : tokens (entrée / sortie / total) par compte et par session, dates, modèle, coût ; API tarifs Mistral si elle existe.
 - **V1.2.0** — interface poste (modales, écran comptes, minimum de style ; framework ou HTML/CSS/JS à choisir).
