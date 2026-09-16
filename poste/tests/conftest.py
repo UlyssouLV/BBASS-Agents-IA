@@ -10,6 +10,7 @@ from poste.vm_centrale_client import (
     Conversation,
     ConversationCree,
     ConversationDetail,
+    ProfilTravail,
     VerificationReussie,
     get_vm_centrale_client,
 )
@@ -82,6 +83,10 @@ class VmCentraleClientFactice:
         self._exception_envoi_message_conversation: Exception | None = None
         self._jetons_envoi_message_conversation: list[str] = []
         self._requetes_envoi_message_conversation: list[dict] = []
+        self._profil_travail: ProfilTravail | None = None
+        self._exception_profil_travail: Exception | None = None
+        self._jetons_profil_travail: list[str] = []
+        self._identifiants_profil_travail: list[str] = []
 
     def accepter(
         self,
@@ -380,6 +385,21 @@ class VmCentraleClientFactice:
         if self._exception_envoi_message_conversation is not None:
             raise self._exception_envoi_message_conversation
         return self._reponse_message_conversation
+
+    def profil_travail_retourne(self, profil: ProfilTravail) -> None:
+        self._profil_travail = profil
+        self._exception_profil_travail = None
+
+    def profil_travail_echoue(self, exception: Exception) -> None:
+        self._exception_profil_travail = exception
+
+    def consulter_profil_travail(self, jeton: str, identifiant: str) -> ProfilTravail:
+        self._jetons_profil_travail.append(jeton)
+        self._identifiants_profil_travail.append(identifiant)
+        if self._exception_profil_travail is not None:
+            raise self._exception_profil_travail
+        assert self._profil_travail is not None
+        return self._profil_travail
 
 
 @pytest.fixture(autouse=True)

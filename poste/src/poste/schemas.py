@@ -80,6 +80,11 @@ class MessageEnvoyeResponse(BaseModel):
     reponse: str
 
 
+class ProfilTravailResponse(BaseModel):
+    contenu: str
+    date_derniere_maj: datetime | None
+
+
 class CompteAdminResponse(BaseModel):
     identifiant: str
     prenom: str

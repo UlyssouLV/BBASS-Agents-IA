@@ -47,3 +47,15 @@ def test_front_end_appelle_l_endpoint_de_changement_de_mot_de_passe(client):
 
     assert '"/mot-de-passe"' in js
     assert "nouveau_mot_de_passe" in js
+
+
+def test_front_end_expose_un_onglet_profil_de_travail_sans_action_de_modification(client):
+    # Issue #39 : lecture seule, aucune modale/formulaire de réinitialisation
+    # ne doit accompagner cet onglet (contrairement aux onglets Comptes).
+    html = client.get("/").text
+    js = client.get("/static/app.js").text
+
+    assert 'id="onglet-bouton-profil-travail"' in html
+    assert 'id="onglet-profil-travail" hidden' in html
+    assert '"/profil-travail"' in js
+    assert "afficherOngletProfilTravail" in js

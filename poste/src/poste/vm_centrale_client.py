@@ -130,6 +130,12 @@ class ConversationDetail:
     messages: list[Message]
 
 
+@dataclass
+class ProfilTravail:
+    contenu: str
+    date_derniere_maj: datetime | None
+
+
 def _champs_compte_admin(corps: dict) -> dict:
     # Extraction partagée par lister_comptes/creer_compte/modifier_compte :
     # les trois construisent un CompteAdmin (ou un CompteCree, qui y ajoute
@@ -190,6 +196,17 @@ def _vers_message(corps: dict) -> Message:
         role=corps["role"],
         contenu=corps["contenu"],
         date_creation=datetime.fromisoformat(corps["date_creation"]),
+    )
+
+
+def _vers_profil_travail(corps: dict) -> ProfilTravail:
+    return ProfilTravail(
+        contenu=corps["contenu"],
+        date_derniere_maj=(
+            datetime.fromisoformat(corps["date_derniere_maj"])
+            if corps["date_derniere_maj"] is not None
+            else None
+        ),
     )
 
 
@@ -297,6 +314,19 @@ class VmCentraleClient:
         _lever_si_conversation_introuvable(reponse)
         reponse.raise_for_status()
         return reponse.json()["reponse"]
+
+    def consulter_profil_travail(self, jeton: str, identifiant: str) -> ProfilTravail:
+        # Le poste ne demande jamais que le profil du compte propriétaire du
+        # jeton (voir routers/profil_travail.py) : le 403 que la VM renvoie
+        # pour un identifiant différent (spec V1.1.1) n'est donc jamais
+        # attendu ici, et retombe sur l'erreur générique via raise_for_status.
+        reponse = _http_client.get(
+            f"{VM_CENTRALE_BASE_URL}/comptes/{quote(identifiant, safe='')}/profil-travail",
+            headers={"Authorization": f"Bearer {jeton}"},
+        )
+        _lever_si_jeton_invalide(reponse)
+        reponse.raise_for_status()
+        return _vers_profil_travail(reponse.json())
 
     def changer_mot_de_passe(self, jeton: str, nouveau_mot_de_passe: str) -> None:
         reponse = _http_client.post(

@@ -28,9 +28,16 @@ const conversationOuverte = document.getElementById("conversation-ouverte");
 const conversationTitre = document.getElementById("conversation-titre");
 
 const ongletBoutonChat = document.getElementById("onglet-bouton-chat");
+const ongletBoutonProfilTravail = document.getElementById("onglet-bouton-profil-travail");
 const ongletBoutonComptes = document.getElementById("onglet-bouton-comptes");
 const ongletChat = document.getElementById("onglet-chat");
+const ongletProfilTravail = document.getElementById("onglet-profil-travail");
 const ongletComptes = document.getElementById("onglet-comptes");
+const profilTravailErreur = document.getElementById("profil-travail-erreur");
+const profilTravailVide = document.getElementById("profil-travail-vide");
+const profilTravailDonnees = document.getElementById("profil-travail-donnees");
+const profilTravailContenu = document.getElementById("profil-travail-contenu");
+const profilTravailDate = document.getElementById("profil-travail-date");
 const comptesErreur = document.getElementById("comptes-erreur");
 const corpsTableauComptes = document.getElementById("corps-tableau-comptes");
 const formulaireCreationCompte = document.getElementById("formulaire-creation-compte");
@@ -73,17 +80,70 @@ let estAdminCibleEnCours = null;
 let identifiantEnCoursDeSuppression = null;
 let conversationOuverteId = null;
 
-async function afficherOngletChat() {
-  ongletChat.hidden = false;
+function cacherTousLesOnglets() {
+  ongletChat.hidden = true;
+  ongletProfilTravail.hidden = true;
   ongletComptes.hidden = true;
+}
+
+async function afficherOngletChat() {
+  cacherTousLesOnglets();
+  ongletChat.hidden = false;
   afficherNouvelleConversation();
   await chargerConversations();
 }
 
+async function afficherOngletProfilTravail() {
+  cacherTousLesOnglets();
+  ongletProfilTravail.hidden = false;
+  await chargerProfilTravail();
+}
+
 async function afficherOngletComptes() {
-  ongletChat.hidden = true;
+  cacherTousLesOnglets();
   ongletComptes.hidden = false;
   await chargerComptes();
+}
+
+async function chargerProfilTravail() {
+  profilTravailErreur.hidden = true;
+  profilTravailVide.hidden = true;
+  profilTravailDonnees.hidden = true;
+
+  let reponse;
+  try {
+    reponse = await fetch("/profil-travail");
+  } catch {
+    profilTravailErreur.textContent =
+      "Impossible de joindre le service de profil de travail. Réessayez plus tard.";
+    profilTravailErreur.hidden = false;
+    return;
+  }
+
+  if (reponse.status === 401) {
+    afficherEcranConnexion();
+    return;
+  }
+
+  if (!reponse.ok) {
+    const detail = await reponse.json().catch(() => null);
+    profilTravailErreur.textContent =
+      detail && detail.detail ? detail.detail : "Le chargement du profil de travail a échoué. Réessayez plus tard.";
+    profilTravailErreur.hidden = false;
+    return;
+  }
+
+  const profil = await reponse.json();
+  if (!profil.contenu) {
+    profilTravailVide.hidden = false;
+    return;
+  }
+
+  profilTravailContenu.textContent = profil.contenu;
+  profilTravailDate.textContent = profil.date_derniere_maj
+    ? `Dernière mise à jour : ${new Date(profil.date_derniere_maj).toLocaleString()}`
+    : "";
+  profilTravailDonnees.hidden = false;
 }
 
 function afficherEcranCompte(compte) {
@@ -509,6 +569,7 @@ async function supprimerConversation(id) {
 }
 
 ongletBoutonChat.addEventListener("click", afficherOngletChat);
+ongletBoutonProfilTravail.addEventListener("click", afficherOngletProfilTravail);
 ongletBoutonComptes.addEventListener("click", afficherOngletComptes);
 
 function ligneCompte(compte) {
