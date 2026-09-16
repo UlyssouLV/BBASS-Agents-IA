@@ -95,6 +95,11 @@ class ConversationCreeRequest(BaseModel):
     # reçoit la réponse déjà produite au lieu de créer une seconde
     # conversation (cf. vm_centrale.concurrence.CacheIdempotence).
     cle_idempotence: str | None = None
+    # Optionnelle : id d'une pièce jointe déjà téléversée (POST
+    # /pieces-jointes, sans conversation au moment de l'upload — voir
+    # vm_centrale.models.PieceJointe.conversation_id) à rattacher à ce
+    # premier message (spec 1.1.2).
+    piece_jointe_id: int | None = None
 
 
 class ConversationResume(BaseModel):
@@ -136,6 +141,8 @@ class MessageEnvoyeRequest(BaseModel):
     message: str = Field(min_length=1, max_length=8000)
     # Voir ConversationCreeRequest.cle_idempotence.
     cle_idempotence: str | None = None
+    # Voir ConversationCreeRequest.piece_jointe_id.
+    piece_jointe_id: int | None = None
 
 
 class MessageEnvoyeResponse(BaseModel):

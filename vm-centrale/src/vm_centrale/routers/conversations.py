@@ -40,6 +40,8 @@ _ECHEC_RELAIS = "Le relais Mistral est indisponible"
 _CONVERSATION_INTROUVABLE = "Conversation introuvable"
 _TYPE_NON_SUPPORTE = "Type de fichier non supporté"
 _FICHIER_TROP_VOLUMINEUX = "Fichier trop volumineux (max 20 Mo)"
+_PIECE_JOINTE_INTROUVABLE = "Pièce jointe introuvable"
+_PIECE_JOINTE_DEJA_LIEE = "Pièce jointe déjà liée à un message"
 
 # Sortie structurée stricte (spec V1.1.1) : un seul appel Mistral produit à la
 # fois le résumé glissant mis à jour et une éventuelle mise à jour du profil
@@ -72,11 +74,24 @@ def _prompt_titrage(message_utilisateur: str, reponse_assistant: str) -> str:
     )
 
 
+def _message_systeme_piece_jointe(piece_jointe: PieceJointe) -> dict[str, str]:
+    # Même mécanisme que resume_contexte/profil_travail ci-dessous : un
+    # message system supplémentaire, propre à cet appel précis (spec 1.1.2).
+    return {
+        "role": "system",
+        "content": (
+            f"Contenu extrait de la pièce jointe « {piece_jointe.nom_fichier} » :\n"
+            f"{piece_jointe.contenu_extrait or ''}"
+        ),
+    }
+
+
 def _construire_messages_pour_mistral(
     conversation: Conversation,
     derniers_messages: list[Message],
     nouveau_message: str,
     profil_travail: str,
+    piece_jointe: PieceJointe | None = None,
 ) -> list[dict[str, str]]:
     # Historique borné (résumé glissant + fenêtre courte) plutôt que
     # l'intégralité de la conversation, pour maîtriser le coût en tokens
@@ -92,6 +107,8 @@ def _construire_messages_pour_mistral(
         messages.append(
             {"role": "system", "content": f"Profil de travail du compte : {profil_travail}"}
         )
+    if piece_jointe is not None:
+        messages.append(_message_systeme_piece_jointe(piece_jointe))
     messages.extend({"role": m.role, "content": m.contenu} for m in derniers_messages)
     messages.append({"role": "user", "content": nouveau_message})
     return messages
@@ -163,6 +180,44 @@ def _recuperer_conversation_du_compte(
     return conversation
 
 
+def _recuperer_piece_jointe_du_compte(
+    db: Session, identifiant_compte: str, piece_jointe_id: int, conversation_id: int
+) -> PieceJointe:
+    piece_jointe = db.get(PieceJointe, piece_jointe_id)
+    if (
+        piece_jointe is None
+        or piece_jointe.identifiant_compte != identifiant_compte
+        # None (pas encore rattachée) accepté ; rattachée à une AUTRE
+        # conversation refusé — jamais 403, même confidentialité que
+        # _recuperer_conversation_du_compte, y compris pour un jeton admin.
+        or (piece_jointe.conversation_id is not None and piece_jointe.conversation_id != conversation_id)
+    ):
+        raise HTTPException(status_code=404, detail=_PIECE_JOINTE_INTROUVABLE)
+    if piece_jointe.message_id is not None:
+        raise HTTPException(status_code=400, detail=_PIECE_JOINTE_DEJA_LIEE)
+    return piece_jointe
+
+
+def _lier_piece_jointe_a_la_conversation(piece_jointe: PieceJointe, conversation: Conversation) -> None:
+    if piece_jointe.conversation_id == conversation.id:
+        return
+
+    # Téléversée avant que la conversation n'existe (POST /pieces-jointes) :
+    # déplace le fichier vers le chemin canonique de la spec 1.1.2
+    # (<identifiant_compte>/<conversation_id>/<piece_jointe_id>-<nom_fichier>),
+    # jusqu'ici sous un répertoire de dépôt temporaire.
+    chemin_relatif = (
+        f"{conversation.identifiant_compte}/{conversation.id}/"
+        f"{piece_jointe.id}-{piece_jointe.nom_fichier}"
+    )
+    chemin_absolu = Path(PIECES_JOINTES_DIR) / chemin_relatif
+    chemin_absolu.parent.mkdir(parents=True, exist_ok=True)
+    Path(PIECES_JOINTES_DIR, piece_jointe.chemin_fichier).replace(chemin_absolu)
+
+    piece_jointe.chemin_fichier = chemin_relatif
+    piece_jointe.conversation_id = conversation.id
+
+
 def _vers_resume(conversation: Conversation) -> ConversationResponse:
     return ConversationResponse(
         id=conversation.id,
@@ -185,35 +240,59 @@ def creer_conversation(
                 assert isinstance(reponse_en_cache, ConversationCreeResponse)
                 return reponse_en_cache
 
-        # Les deux appels Mistral (réponse, puis titrage) sont faits avant toute
-        # écriture en base : en cas d'échec de l'un ou l'autre, aucune conversation
-        # fantôme n'est persistée (cf. "pas de création d'une conversation vide").
-        try:
-            reponse = client.chat(requete.message)
-            titre = client.chat(_prompt_titrage(requete.message, reponse))
-        except Exception as erreur:
-            logger.error("Échec de l'appel au relais Mistral : %s", erreur)
-            raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
-
         maintenant = datetime.now(timezone.utc)
         conversation = Conversation(
             identifiant_compte=identifiant_compte,
-            titre=titre,
+            titre="",
             resume_contexte="",
             date_creation=maintenant,
             date_derniere_activite=maintenant,
         )
         db.add(conversation)
+        # Flush (jamais commit) pour obtenir conversation.id : une pièce
+        # jointe téléversée avant que la conversation n'existe (POST
+        # /pieces-jointes) ne peut être rattachée qu'une fois cet id connu
+        # (spec 1.1.2, référencement dès le premier message). Un rollback
+        # explicite plus bas annule cette écriture si l'appel Mistral échoue
+        # — pas de conversation fantôme persistée (même garantie qu'avant).
         db.flush()
 
+        piece_jointe: PieceJointe | None = None
+        if requete.piece_jointe_id is not None:
+            piece_jointe = _recuperer_piece_jointe_du_compte(
+                db, identifiant_compte, requete.piece_jointe_id, conversation.id
+            )
+
+        message_pour_mistral: str | list[dict[str, str]] = requete.message
+        if piece_jointe is not None:
+            message_pour_mistral = [
+                _message_systeme_piece_jointe(piece_jointe),
+                {"role": "user", "content": requete.message},
+            ]
+
+        # Les deux appels Mistral (réponse, puis titrage) sont faits avant
+        # toute autre écriture en base : en cas d'échec de l'un ou l'autre,
+        # rollback (annule aussi la conversation flushée ci-dessus) — aucune
+        # conversation fantôme n'est persistée.
+        try:
+            reponse = client.chat(message_pour_mistral)
+            titre = client.chat(_prompt_titrage(requete.message, reponse))
+        except Exception as erreur:
+            db.rollback()
+            logger.error("Échec de l'appel au relais Mistral : %s", erreur)
+            raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
+
+        conversation.titre = titre
+
+        message_utilisateur = Message(
+            conversation_id=conversation.id,
+            role="user",
+            contenu=requete.message,
+            date_creation=maintenant,
+        )
         db.add_all(
             [
-                Message(
-                    conversation_id=conversation.id,
-                    role="user",
-                    contenu=requete.message,
-                    date_creation=maintenant,
-                ),
+                message_utilisateur,
                 Message(
                     conversation_id=conversation.id,
                     role="assistant",
@@ -222,6 +301,10 @@ def creer_conversation(
                 ),
             ]
         )
+        if piece_jointe is not None:
+            db.flush()
+            _lier_piece_jointe_a_la_conversation(piece_jointe, conversation)
+            piece_jointe.message_id = message_utilisateur.id
         db.commit()
         db.refresh(conversation)
 
@@ -312,20 +395,13 @@ def supprimer_conversation(
     db.commit()
 
 
-@router.post(
-    "/conversations/{conversation_id}/pieces-jointes",
-    response_model=PieceJointeCreeeResponse,
-    status_code=201,
-)
-def televerser_piece_jointe(
-    conversation_id: int,
-    fichier: UploadFile = File(...),
-    identifiant_compte: str = Depends(get_identifiant_compte_du_jeton),
-    client: MistralClient = Depends(get_mistral_client),
-    db: Session = Depends(get_db),
+def _creer_piece_jointe(
+    db: Session,
+    client: MistralClient,
+    identifiant_compte: str,
+    conversation_id: int | None,
+    fichier: UploadFile,
 ) -> PieceJointeCreeeResponse:
-    conversation = _recuperer_conversation_du_compte(db, conversation_id, identifiant_compte)
-
     # Type vérifié avant lecture du contenu (évite de lire en mémoire un
     # fichier volumineux d'un type de toute façon refusé).
     if fichier.content_type not in TYPES_SUPPORTES:
@@ -337,7 +413,8 @@ def televerser_piece_jointe(
 
     maintenant = datetime.now(timezone.utc)
     piece_jointe = PieceJointe(
-        conversation_id=conversation.id,
+        identifiant_compte=identifiant_compte,
+        conversation_id=conversation_id,
         message_id=None,
         nom_fichier=fichier.filename,
         type_mime=fichier.content_type,
@@ -351,8 +428,12 @@ def televerser_piece_jointe(
     db.flush()
 
     # <identifiant_compte>/<conversation_id>/<piece_jointe_id>-<nom_fichier>
-    # (spec 1.1.2) : relatif à PIECES_JOINTES_DIR, jamais absolu en base.
-    chemin_relatif = f"{identifiant_compte}/{conversation.id}/{piece_jointe.id}-{fichier.filename}"
+    # (spec 1.1.2) quand la conversation est déjà connue à l'upload ; sinon
+    # (POST /pieces-jointes, conversation_id=None) un répertoire de dépôt
+    # temporaire, déplacé au chemin canonique lors du rattachement — voir
+    # _lier_piece_jointe_a_la_conversation.
+    segment_conversation = str(conversation_id) if conversation_id is not None else "_sans_conversation"
+    chemin_relatif = f"{identifiant_compte}/{segment_conversation}/{piece_jointe.id}-{fichier.filename}"
     chemin_absolu = Path(PIECES_JOINTES_DIR) / chemin_relatif
     chemin_absolu.parent.mkdir(parents=True, exist_ok=True)
     chemin_absolu.write_bytes(contenu)
@@ -382,6 +463,36 @@ def televerser_piece_jointe(
         ),
         echec_analyse=piece_jointe.echec_analyse,
     )
+
+
+@router.post(
+    "/conversations/{conversation_id}/pieces-jointes",
+    response_model=PieceJointeCreeeResponse,
+    status_code=201,
+)
+def televerser_piece_jointe(
+    conversation_id: int,
+    fichier: UploadFile = File(...),
+    identifiant_compte: str = Depends(get_identifiant_compte_du_jeton),
+    client: MistralClient = Depends(get_mistral_client),
+    db: Session = Depends(get_db),
+) -> PieceJointeCreeeResponse:
+    conversation = _recuperer_conversation_du_compte(db, conversation_id, identifiant_compte)
+    return _creer_piece_jointe(db, client, identifiant_compte, conversation.id, fichier)
+
+
+@router.post("/pieces-jointes", response_model=PieceJointeCreeeResponse, status_code=201)
+def televerser_piece_jointe_sans_conversation(
+    fichier: UploadFile = File(...),
+    identifiant_compte: str = Depends(get_identifiant_compte_du_jeton),
+    client: MistralClient = Depends(get_mistral_client),
+    db: Session = Depends(get_db),
+) -> PieceJointeCreeeResponse:
+    # Pas de conversation à posséder ici : c'est la seule façon de joindre un
+    # fichier dès le tout premier message d'une conversation, qui n'existe
+    # pas encore au moment de l'upload (spec 1.1.2, référencement — voir
+    # ConversationCreeRequest.piece_jointe_id).
+    return _creer_piece_jointe(db, client, identifiant_compte, None, fichier)
 
 
 def _appeler_reponse_chat(client: MistralClient, messages_pour_mistral: list[dict[str, str]]) -> str:
@@ -420,6 +531,12 @@ def envoyer_message(
 
         conversation = _recuperer_conversation_du_compte(db, conversation_id, identifiant_compte)
 
+        piece_jointe: PieceJointe | None = None
+        if requete.piece_jointe_id is not None:
+            piece_jointe = _recuperer_piece_jointe_du_compte(
+                db, identifiant_compte, requete.piece_jointe_id, conversation.id
+            )
+
         derniers_messages = (
             db.query(Message)
             .filter(Message.conversation_id == conversation.id)
@@ -437,7 +554,7 @@ def envoyer_message(
         # puis écraser l'une des deux mises à jour au commit).
         profil_actuel = _contenu_profil_actuel(db, identifiant_compte)
         messages_pour_mistral = _construire_messages_pour_mistral(
-            conversation, derniers_messages, requete.message, profil_actuel
+            conversation, derniers_messages, requete.message, profil_actuel, piece_jointe
         )
 
         # Un message sort de la fenêtre des 3 derniers dès que ce tour (2 nouveaux
@@ -506,14 +623,15 @@ def envoyer_message(
             profil.contenu = f"{profil.contenu}\n{profil_travail_delta}".strip()
             profil.date_derniere_maj = maintenant
 
+        message_utilisateur = Message(
+            conversation_id=conversation.id,
+            role="user",
+            contenu=requete.message,
+            date_creation=maintenant,
+        )
         db.add_all(
             [
-                Message(
-                    conversation_id=conversation.id,
-                    role="user",
-                    contenu=requete.message,
-                    date_creation=maintenant,
-                ),
+                message_utilisateur,
                 Message(
                     conversation_id=conversation.id,
                     role="assistant",
@@ -522,6 +640,10 @@ def envoyer_message(
                 ),
             ]
         )
+        if piece_jointe is not None:
+            db.flush()
+            _lier_piece_jointe_a_la_conversation(piece_jointe, conversation)
+            piece_jointe.message_id = message_utilisateur.id
         conversation.date_derniere_activite = maintenant
         db.commit()
 

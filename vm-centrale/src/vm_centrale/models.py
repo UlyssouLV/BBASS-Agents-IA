@@ -73,10 +73,22 @@ class PieceJointe(Base):
     __tablename__ = "pieces_jointes"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    conversation_id: Mapped[int] = mapped_column(ForeignKey("conversations.id"), index=True)
+    # Toujours renseigné à l'upload (jeton du compte), indépendamment de
+    # conversation_id ci-dessous : seule façon de vérifier la propriété d'une
+    # pièce jointe pas encore rattachée à une conversation (voir
+    # conversation_id).
+    identifiant_compte: Mapped[str] = mapped_column(String, index=True)
+    # Nullable : une pièce jointe peut être téléversée avant même que la
+    # conversation qui la portera n'existe (POST /pieces-jointes, sans
+    # conversation_id dans l'URL) — nécessaire pour pouvoir en joindre une dès
+    # le tout premier message d'une conversation (spec 1.1.2, référencement).
+    # Renseigné au rattachement (création de la conversation, ou envoi d'un
+    # message) si elle ne l'était pas déjà.
+    conversation_id: Mapped[int | None] = mapped_column(
+        ForeignKey("conversations.id"), nullable=True, index=True
+    )
     # Nullable : renseigné seulement une fois la pièce jointe liée à un
-    # message envoyé (référencement dans l'envoi d'un message, hors
-    # périmètre de ce ticket — voir spec 1.1.2).
+    # message envoyé (référencement dans l'envoi d'un message — spec 1.1.2).
     message_id: Mapped[int | None] = mapped_column(ForeignKey("messages.id"), nullable=True)
     nom_fichier: Mapped[str] = mapped_column(String)
     type_mime: Mapped[str] = mapped_column(String)
