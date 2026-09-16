@@ -26,11 +26,14 @@ def _sans_init_db_reel(monkeypatch):
 class ClientMistralFactice:
     def __init__(self) -> None:
         self.messages_recus: list[str] = []
-        self._reponse: str | None = None
+        self._reponses: list[str] = []
         self._exception: Exception | None = None
 
-    def repondre(self, reponse: str) -> None:
-        self._reponse = reponse
+    def repondre(self, *reponses: str) -> None:
+        # Une file : un appel consomme la réponse suivante, sauf s'il n'en
+        # reste qu'une, alors répétée indéfiniment (cas d'usage historique à
+        # un seul `client.chat` par requête, ex. `/relais`).
+        self._reponses = list(reponses)
         self._exception = None
 
     def echouer(self, exception: Exception) -> None:
@@ -40,8 +43,10 @@ class ClientMistralFactice:
         self.messages_recus.append(message)
         if self._exception is not None:
             raise self._exception
-        assert self._reponse is not None
-        return self._reponse
+        assert self._reponses, "Aucune réponse configurée : appeler repondre() d'abord"
+        if len(self._reponses) > 1:
+            return self._reponses.pop(0)
+        return self._reponses[0]
 
 
 @pytest.fixture()

@@ -92,3 +92,17 @@ class RelaisRequest(BaseModel):
 
 class RelaisResponse(BaseModel):
     reponse: str
+
+
+class ConversationCreeRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=8000)
+
+
+class ConversationResume(BaseModel):
+    id: int
+    titre: str
+
+
+class ConversationCreeResponse(BaseModel):
+    conversation: ConversationResume
+    reponse: str

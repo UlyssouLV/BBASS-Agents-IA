@@ -41,3 +41,29 @@ class Jeton(Base):
     jeton: Mapped[str] = mapped_column(String, primary_key=True)
     identifiant_compte: Mapped[str] = mapped_column(String, index=True)
     date_emission: Mapped[datetime] = mapped_column(DateTime)
+
+
+class Conversation(Base):
+    __tablename__ = "conversations"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    # Pas de ForeignKey vers comptes.identifiant : même convention que Jeton
+    # ci-dessus (le compte du jeton est résolu via JetonStore, jamais rejoint
+    # en base).
+    identifiant_compte: Mapped[str] = mapped_column(String, index=True)
+    titre: Mapped[str] = mapped_column(String)
+    resume_contexte: Mapped[str] = mapped_column(String, default="")
+    date_creation: Mapped[datetime] = mapped_column(DateTime)
+    date_derniere_activite: Mapped[datetime] = mapped_column(DateTime)
+
+
+class Message(Base):
+    __tablename__ = "messages"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    conversation_id: Mapped[int] = mapped_column(
+        ForeignKey("conversations.id"), index=True
+    )
+    role: Mapped[str] = mapped_column(String)
+    contenu: Mapped[str] = mapped_column(String)
+    date_creation: Mapped[datetime] = mapped_column(DateTime)
