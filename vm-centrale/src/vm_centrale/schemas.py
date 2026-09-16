@@ -142,6 +142,17 @@ class MessageEnvoyeResponse(BaseModel):
     reponse: str
 
 
+class PieceJointeResume(BaseModel):
+    id: int
+    nom_fichier: str
+    type_mime: str
+
+
+class PieceJointeCreeeResponse(BaseModel):
+    piece_jointe: PieceJointeResume
+    echec_analyse: bool
+
+
 class ProfilTravailResponse(BaseModel):
     contenu: str
     date_derniere_maj: datetime | None

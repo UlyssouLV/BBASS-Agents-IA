@@ -60,6 +60,25 @@ class ClientMistralFactice:
         self._reponses: list[str] = []
         self._reponse_structuree: str | None = None
         self._exception: Exception | None = None
+        # Appels .ocr() reçus : (document, type_mime), distincts de
+        # messages_recus (appels .chat()) — voir televerser_piece_jointe.
+        self.appels_ocr: list[tuple[bytes, str]] = []
+        self._reponse_ocr = ""
+        self._exception_ocr: Exception | None = None
+
+    def repondre_ocr(self, texte: str) -> None:
+        self._reponse_ocr = texte
+        self._exception_ocr = None
+
+    def echouer_ocr(self, exception: Exception) -> None:
+        self._exception_ocr = exception
+
+    def ocr(self, document: bytes, type_mime: str) -> str:
+        with self._verrou:
+            self.appels_ocr.append((document, type_mime))
+            if self._exception_ocr is not None:
+                raise self._exception_ocr
+            return self._reponse_ocr
 
     def repondre(self, *reponses: str, resume_et_profil: str | None = None) -> None:
         # `reponses` : file pour les appels sans response_format (réponse de

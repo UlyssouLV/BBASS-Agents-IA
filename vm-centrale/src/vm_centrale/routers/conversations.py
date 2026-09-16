@@ -2,15 +2,18 @@ import json
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
+from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
+from vm_centrale.analyse_pieces_jointes import TYPES_SUPPORTES, analyser
 from vm_centrale.autorisation import get_identifiant_compte_du_jeton
 from vm_centrale.concurrence import cache_idempotence, verrous_comptes
+from vm_centrale.config import PIECES_JOINTES_DIR
 from vm_centrale.database import get_db
 from vm_centrale.mistral_client import MistralClient, get_mistral_client
-from vm_centrale.models import Compte, Conversation, Message, ProfilTravail
+from vm_centrale.models import Compte, Conversation, Message, PieceJointe, ProfilTravail
 from vm_centrale.schemas import (
     ConversationCreeRequest,
     ConversationCreeResponse,
@@ -21,15 +24,22 @@ from vm_centrale.schemas import (
     MessageEnvoyeRequest,
     MessageEnvoyeResponse,
     MessageResponse,
+    PieceJointeCreeeResponse,
+    PieceJointeResume,
 )
 
 _TAILLE_FENETRE_HISTORIQUE = 3
+# Fixée en dur (comme la fenêtre de 3 messages ci-dessus), indépendante des
+# plafonds propres à Mistral (spec 1.1.2).
+_TAILLE_MAX_PIECE_JOINTE = 20 * 1024 * 1024
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 _ECHEC_RELAIS = "Le relais Mistral est indisponible"
 _CONVERSATION_INTROUVABLE = "Conversation introuvable"
+_TYPE_NON_SUPPORTE = "Type de fichier non supporté"
+_FICHIER_TROP_VOLUMINEUX = "Fichier trop volumineux (max 20 Mo)"
 
 # Sortie structurée stricte (spec V1.1.1) : un seul appel Mistral produit à la
 # fois le résumé glissant mis à jour et une éventuelle mise à jour du profil
@@ -300,6 +310,78 @@ def supprimer_conversation(
     db.query(Message).filter(Message.conversation_id == conversation.id).delete()
     db.delete(conversation)
     db.commit()
+
+
+@router.post(
+    "/conversations/{conversation_id}/pieces-jointes",
+    response_model=PieceJointeCreeeResponse,
+    status_code=201,
+)
+def televerser_piece_jointe(
+    conversation_id: int,
+    fichier: UploadFile = File(...),
+    identifiant_compte: str = Depends(get_identifiant_compte_du_jeton),
+    client: MistralClient = Depends(get_mistral_client),
+    db: Session = Depends(get_db),
+) -> PieceJointeCreeeResponse:
+    conversation = _recuperer_conversation_du_compte(db, conversation_id, identifiant_compte)
+
+    # Type vérifié avant lecture du contenu (évite de lire en mémoire un
+    # fichier volumineux d'un type de toute façon refusé).
+    if fichier.content_type not in TYPES_SUPPORTES:
+        raise HTTPException(status_code=400, detail=_TYPE_NON_SUPPORTE)
+
+    contenu = fichier.file.read()
+    if len(contenu) > _TAILLE_MAX_PIECE_JOINTE:
+        raise HTTPException(status_code=400, detail=_FICHIER_TROP_VOLUMINEUX)
+
+    maintenant = datetime.now(timezone.utc)
+    piece_jointe = PieceJointe(
+        conversation_id=conversation.id,
+        message_id=None,
+        nom_fichier=fichier.filename,
+        type_mime=fichier.content_type,
+        taille_octets=len(contenu),
+        chemin_fichier="",
+        contenu_extrait=None,
+        echec_analyse=False,
+        date_creation=maintenant,
+    )
+    db.add(piece_jointe)
+    db.flush()
+
+    # <identifiant_compte>/<conversation_id>/<piece_jointe_id>-<nom_fichier>
+    # (spec 1.1.2) : relatif à PIECES_JOINTES_DIR, jamais absolu en base.
+    chemin_relatif = f"{identifiant_compte}/{conversation.id}/{piece_jointe.id}-{fichier.filename}"
+    chemin_absolu = Path(PIECES_JOINTES_DIR) / chemin_relatif
+    chemin_absolu.parent.mkdir(parents=True, exist_ok=True)
+    chemin_absolu.write_bytes(contenu)
+    piece_jointe.chemin_fichier = chemin_relatif
+
+    try:
+        resultat = analyser(contenu, fichier.content_type, client)
+    except Exception as erreur:
+        # Rollback + suppression du fichier déjà écrit : comme pour
+        # creer_conversation, aucune pièce jointe ni fichier fantôme ne doit
+        # survivre à un échec de l'appel Mistral.
+        db.rollback()
+        chemin_absolu.unlink(missing_ok=True)
+        logger.error("Échec de l'appel au relais Mistral (OCR) : %s", erreur)
+        raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
+
+    piece_jointe.contenu_extrait = resultat.contenu_extrait
+    piece_jointe.echec_analyse = resultat.echec_analyse
+    db.commit()
+    db.refresh(piece_jointe)
+
+    return PieceJointeCreeeResponse(
+        piece_jointe=PieceJointeResume(
+            id=piece_jointe.id,
+            nom_fichier=piece_jointe.nom_fichier,
+            type_mime=piece_jointe.type_mime,
+        ),
+        echec_analyse=piece_jointe.echec_analyse,
+    )
 
 
 def _appeler_reponse_chat(client: MistralClient, messages_pour_mistral: list[dict[str, str]]) -> str:
