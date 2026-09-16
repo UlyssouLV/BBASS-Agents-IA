@@ -9,7 +9,7 @@ from sqlalchemy.pool import StaticPool
 
 from vm_centrale.database import Base, get_db
 from vm_centrale.main import app
-from vm_centrale.mistral_client import get_mistral_client
+from vm_centrale.mistral_client import AppelOutil, AppelOutilDemande, get_mistral_client
 from vm_centrale.models import Compte, ComptePole
 from vm_centrale.security import hash_password
 from vm_centrale.jetons import JetonStore, get_jeton_store
@@ -57,6 +57,11 @@ class ClientMistralFactice:
         # résumé+profil », dont l'ordre d'arrivée relatif n'est pas garanti.
         self.appels_reponse: list = []
         self.appels_structures: list = []
+        # `tools` reçu par chaque appel de réponse de chat, même ordre et
+        # même longueur que appels_reponse (spec 1.1.2, tool calling) — une
+        # entrée par appel, y compris le second appel (tools=None) d'un
+        # aller-retour d'outil.
+        self.tools_appels_reponse: list = []
         self._verrou = threading.Lock()
         self._reponses: list[str] = []
         self._reponse_structuree: str | None = None
@@ -66,6 +71,7 @@ class ClientMistralFactice:
         self.appels_ocr: list[tuple[bytes, str]] = []
         self._reponse_ocr = ""
         self._exception_ocr: Exception | None = None
+        self._appel_outil_a_renvoyer: AppelOutil | None = None
 
     def repondre_ocr(self, texte: str) -> None:
         self._reponse_ocr = texte
@@ -106,7 +112,16 @@ class ClientMistralFactice:
     def echouer(self, exception: Exception) -> None:
         self._exception = exception
 
-    def chat(self, messages, response_format=None) -> str:
+    def repondre_avec_appel_outil(
+        self, nom_outil: str, arguments: dict, tool_call_id: str = "call_1"
+    ) -> None:
+        # Consommé une seule fois par le prochain appel .chat() portant
+        # `tools` (spec 1.1.2) : le second appel (celui qui relance avec le
+        # contenu de la pièce jointe) retombe sur la file `_reponses`
+        # normale, configurée via repondre() comme d'habitude.
+        self._appel_outil_a_renvoyer = AppelOutil(id=tool_call_id, nom=nom_outil, arguments=arguments)
+
+    def chat(self, messages, response_format=None, tools=None) -> str:
         with self._verrou:
             self.messages_recus.append(messages)
             self.response_formats_recus.append(response_format)
@@ -114,6 +129,7 @@ class ClientMistralFactice:
                 self.appels_structures.append(messages)
             else:
                 self.appels_reponse.append(messages)
+                self.tools_appels_reponse.append(tools)
 
             if self._exception is not None:
                 raise self._exception
@@ -123,6 +139,21 @@ class ClientMistralFactice:
                     "Aucune réponse structurée configurée : passer resume_et_profil= à repondre()"
                 )
                 return self._reponse_structuree
+
+            if tools and self._appel_outil_a_renvoyer is not None:
+                appel = self._appel_outil_a_renvoyer
+                self._appel_outil_a_renvoyer = None
+                message_assistant = {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": appel.id,
+                            "function": {"name": appel.nom, "arguments": json.dumps(appel.arguments)},
+                        }
+                    ],
+                }
+                raise AppelOutilDemande([appel], message_assistant)
 
             assert self._reponses, "Aucune réponse configurée : appeler repondre() d'abord"
             if len(self._reponses) > 1:

@@ -1,5 +1,6 @@
 import json
 import logging
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
@@ -12,7 +13,7 @@ from vm_centrale.autorisation import get_identifiant_compte_du_jeton
 from vm_centrale.concurrence import cache_idempotence, verrous_comptes
 from vm_centrale.config import PIECES_JOINTES_DIR
 from vm_centrale.database import get_db
-from vm_centrale.mistral_client import MistralClient, get_mistral_client
+from vm_centrale.mistral_client import AppelOutilDemande, MistralClient, get_mistral_client
 from vm_centrale.models import Compte, Conversation, Message, PieceJointe, ProfilTravail
 from vm_centrale.schemas import (
     ConversationCreeRequest,
@@ -47,6 +48,38 @@ _TYPE_NON_SUPPORTE = "Type de fichier non supporté"
 _FICHIER_TROP_VOLUMINEUX = "Fichier trop volumineux (max 20 Mo)"
 _PIECE_JOINTE_INTROUVABLE = "Pièce jointe introuvable"
 _PIECE_JOINTE_DEJA_LIEE = "Pièce jointe déjà liée à un message"
+_PIECE_JOINTE_OUTIL_INTROUVABLE = "Pièce jointe introuvable."
+
+_OUTIL_CONTENU_PIECE_JOINTE = "obtenir_contenu_piece_jointe"
+
+# Déclaré uniquement sur l'appel de réponse de chat principal (jamais
+# titrage ni résumé+profil), et seulement si la conversation a une pièce
+# jointe déjà liée à un message sorti de la fenêtre des derniers messages
+# (spec 1.1.2) : l'IA peut alors le redemander explicitement plutôt que de
+# répondre sans son contenu complet.
+_OUTILS_PIECE_JOINTE = [
+    {
+        "type": "function",
+        "function": {
+            "name": _OUTIL_CONTENU_PIECE_JOINTE,
+            "description": (
+                "Récupère le contenu complet d'une pièce jointe de cette "
+                "conversation dont le message n'est plus dans les derniers "
+                "messages."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "piece_jointe_id": {
+                        "type": "integer",
+                        "description": "Identifiant de la pièce jointe.",
+                    }
+                },
+                "required": ["piece_jointe_id"],
+            },
+        },
+    }
+]
 
 # Sortie structurée stricte (spec V1.1.1) : un seul appel Mistral produit à la
 # fois le résumé glissant mis à jour et une éventuelle mise à jour du profil
@@ -522,8 +555,78 @@ def televerser_piece_jointe_sans_conversation(
     return _creer_piece_jointe(db, client, identifiant_compte, None, fichier)
 
 
-def _appeler_reponse_chat(client: MistralClient, messages_pour_mistral: list[dict[str, str]]) -> str:
-    return client.chat(messages_pour_mistral)
+def _appeler_reponse_chat(
+    client: MistralClient,
+    messages_pour_mistral: list[dict[str, str]],
+    tools: list[dict] | None = None,
+) -> str:
+    return client.chat(messages_pour_mistral, tools=tools)
+
+
+def _piece_jointe_hors_fenetre_existe(
+    db: Session, conversation_id: int, ids_fenetre: set[int]
+) -> bool:
+    requete = db.query(PieceJointe.id).filter(
+        PieceJointe.conversation_id == conversation_id,
+        PieceJointe.message_id.isnot(None),
+    )
+    if ids_fenetre:
+        requete = requete.filter(~PieceJointe.message_id.in_(ids_fenetre))
+    return db.query(requete.exists()).scalar()
+
+
+def _traiter_appel_outil(
+    client: MistralClient,
+    messages_pour_mistral: list[dict[str, str]],
+    demande: AppelOutilDemande,
+    db: Session,
+    conversation_id: int,
+) -> str:
+    # Un seul outil déclaré pour cette version (spec 1.1.2) : seul le premier
+    # appel demandé est traité.
+    appel = demande.appels[0]
+    piece_jointe = db.get(PieceJointe, appel.arguments.get("piece_jointe_id"))
+    if piece_jointe is None or piece_jointe.conversation_id != conversation_id:
+        # Ne devrait pas arriver (l'IA ne voit que des piece_jointe_id réels
+        # dans son propre contexte), mais jamais de 500 sur une divergence :
+        # un contenu explicatif pour l'outil plutôt qu'une pièce jointe
+        # rattachée à une autre conversation, même confidentialité que
+        # _recuperer_piece_jointe_du_compte.
+        contenu_outil = _PIECE_JOINTE_OUTIL_INTROUVABLE
+    else:
+        contenu_outil = piece_jointe.contenu_extrait or ""
+
+    messages_second_appel = [
+        *messages_pour_mistral,
+        demande.message_assistant,
+        {"role": "tool", "tool_call_id": appel.id, "name": appel.nom, "content": contenu_outil},
+    ]
+    return client.chat(messages_second_appel)
+
+
+def _resoudre_reponse_chat(
+    obtenir_reponse: Callable[[], str],
+    client: MistralClient,
+    messages_pour_mistral: list[dict[str, str]],
+    db: Session,
+    conversation_id: int,
+) -> str:
+    # Centralise la gestion de AppelOutilDemande (et son propre échec
+    # éventuel) pour les deux façons d'obtenir la réponse de chat principale
+    # ci-dessous (directe, ou via un ThreadPoolExecutor) : `obtenir_reponse`
+    # est soit `futur_reponse.result`, soit un appel direct à
+    # _appeler_reponse_chat.
+    try:
+        return obtenir_reponse()
+    except AppelOutilDemande as demande:
+        try:
+            return _traiter_appel_outil(client, messages_pour_mistral, demande, db, conversation_id)
+        except Exception as erreur:
+            logger.error("Échec de l'appel au relais Mistral : %s", erreur)
+            raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
+    except Exception as erreur:
+        logger.error("Échec de l'appel au relais Mistral : %s", erreur)
+        raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
 
 
 def _appeler_resume_et_profil(
@@ -593,6 +696,18 @@ def envoyer_message(
         # côtés des 2 nouveaux, cf. spec V1.1.1).
         messages_sortants = derniers_messages[:-1]
 
+        # Outil déclaré uniquement sur l'appel de réponse de chat principal
+        # ci-dessous, jamais sur celui de résumé+profil (spec 1.1.2) : la
+        # fenêtre ici est celle des messages déjà en base avant ce tour
+        # (`derniers_messages`), pas `messages_sortants` (qui n'en retire que
+        # le plus ancien, propre à l'absorption de CE tour dans le résumé).
+        ids_fenetre = {m.id for m in derniers_messages}
+        tools = (
+            _OUTILS_PIECE_JOINTE
+            if _piece_jointe_hors_fenetre_existe(db, conversation.id, ids_fenetre)
+            else None
+        )
+
         # Résolues une seule fois, avant l'appel résumé+profil (jamais dans le
         # thread de l'executor ci-dessous, la session SQLAlchemy n'étant pas
         # thread-safe) : la pièce jointe déjà liée à un message sortant, si
@@ -622,7 +737,9 @@ def envoyer_message(
         # ce tour.
         if messages_sortants:
             with ThreadPoolExecutor(max_workers=2) as executor:
-                futur_reponse = executor.submit(_appeler_reponse_chat, client, messages_pour_mistral)
+                futur_reponse = executor.submit(
+                    _appeler_reponse_chat, client, messages_pour_mistral, tools
+                )
                 futur_resume = executor.submit(
                     _appeler_resume_et_profil,
                     client,
@@ -632,11 +749,9 @@ def envoyer_message(
                     messages_sortants,
                     pieces_jointes_sortantes,
                 )
-                try:
-                    reponse = futur_reponse.result()
-                except Exception as erreur:
-                    logger.error("Échec de l'appel au relais Mistral : %s", erreur)
-                    raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
+                reponse = _resoudre_reponse_chat(
+                    futur_reponse.result, client, messages_pour_mistral, db, conversation.id
+                )
                 try:
                     contenu_json = futur_resume.result()
                 except Exception as erreur:
@@ -655,11 +770,13 @@ def envoyer_message(
                 logger.error("Réponse résumé+profil de Mistral invalide : %s", erreur)
                 raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
         else:
-            try:
-                reponse = _appeler_reponse_chat(client, messages_pour_mistral)
-            except Exception as erreur:
-                logger.error("Échec de l'appel au relais Mistral : %s", erreur)
-                raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
+            reponse = _resoudre_reponse_chat(
+                lambda: _appeler_reponse_chat(client, messages_pour_mistral, tools),
+                client,
+                messages_pour_mistral,
+                db,
+                conversation.id,
+            )
 
         maintenant = datetime.now(timezone.utc)
         if resume_maj is not None:

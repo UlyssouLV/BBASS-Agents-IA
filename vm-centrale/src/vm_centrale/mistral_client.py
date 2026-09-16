@@ -1,5 +1,7 @@
 import base64
+import json
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 
 import httpx
 
@@ -9,6 +11,25 @@ _API_URL_CHAT = "https://api.mistral.ai/v1/chat/completions"
 _API_URL_OCR = "https://api.mistral.ai/v1/ocr"
 
 _http_client = httpx.Client(timeout=MISTRAL_HTTP_TIMEOUT)
+
+
+@dataclass(frozen=True)
+class AppelOutil:
+    id: str
+    nom: str
+    arguments: dict
+
+
+class AppelOutilDemande(Exception):
+    # Mistral répond par un appel d'outil plutôt qu'un contenu texte final
+    # (spec 1.1.2, tool calling) : le message assistant brut est conservé
+    # tel quel pour être réinjecté par l'appelant dans le second appel, comme
+    # l'exige le protocole (l'API attend ce message avant le rôle `tool` qui
+    # porte le résultat).
+    def __init__(self, appels: list[AppelOutil], message_assistant: dict) -> None:
+        super().__init__("Mistral a demandé un appel d'outil")
+        self.appels = appels
+        self.message_assistant = message_assistant
 
 
 class MistralClient:
@@ -28,6 +49,7 @@ class MistralClient:
         # parts à contenu mixte de l'appel vision.
         messages: str | Sequence[Mapping[str, object]],
         response_format: dict | None = None,
+        tools: Sequence[Mapping[str, object]] | None = None,
     ) -> str:
         if isinstance(messages, str):
             messages = [{"role": "user", "content": messages}]
@@ -39,6 +61,8 @@ class MistralClient:
         }
         if response_format is not None:
             payload["response_format"] = response_format
+        if tools is not None:
+            payload["tools"] = tools
 
         reponse = _http_client.post(
             _API_URL_CHAT,
@@ -46,7 +70,21 @@ class MistralClient:
             json=payload,
         )
         reponse.raise_for_status()
-        return reponse.json()["choices"][0]["message"]["content"]
+        message = reponse.json()["choices"][0]["message"]
+
+        tool_calls = message.get("tool_calls")
+        if tool_calls:
+            appels = [
+                AppelOutil(
+                    id=appel["id"],
+                    nom=appel["function"]["name"],
+                    arguments=json.loads(appel["function"]["arguments"]),
+                )
+                for appel in tool_calls
+            ]
+            raise AppelOutilDemande(appels, message)
+
+        return message["content"]
 
     def ocr(self, document: bytes, type_mime: str) -> str:
         # Appel stateless dédié à /v1/ocr (forme de requête/réponse distincte
