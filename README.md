@@ -74,4 +74,4 @@ Deux scripts à la racine du dépôt évitent de taper les commandes à la main 
 - `lancer-vm.bat` : démarre PostgreSQL puis la VM centrale seule (2 fenêtres : logs Postgres, VM centrale) — utile pour développer/tester la VM seule.
 - `lancer-logiciel.bat` : démarre PostgreSQL, la VM centrale et le poste (2 fenêtres : VM centrale, poste), puis ouvre le navigateur sur l'interface.
 
-Fermer les fenêtres arrête les processus correspondants (PostgreSQL continue de tourner en arrière-plan tant que `docker compose down` n'a pas été lancé).
+Fermer les fenêtres arrête les processus correspondants (PostgreSQL continue de tourner en arrière-plan tant que `docker compose down` n'a pas été lancé). Un `.env` à la racine (créé automatiquement depuis `.env.example` au premier lancement) porte les identifiants du PostgreSQL local — ne jamais commiter `.env`.

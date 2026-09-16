@@ -6,6 +6,11 @@ echo ============================================
 echo  Lancement du logiciel BBASS Agents IA
 echo ============================================
 echo.
+if not exist "%~dp0.env" (
+    echo Premiere utilisation : creation de .env a partir de .env.example...
+    copy /y "%~dp0.env.example" "%~dp0.env" >nul
+)
+
 echo [1/5] Verification / demarrage de PostgreSQL (Docker)...
 echo       (premier lancement : telechargement de l'image postgres, peut prendre quelques minutes)
 docker compose up -d --wait
