@@ -446,6 +446,16 @@ def supprimer_conversation(
 ) -> None:
     conversation = _recuperer_conversation_du_compte(db, conversation_id, identifiant_compte)
 
+    # Pièces jointes (base + fichier disque) supprimées avant les messages
+    # (spec 1.1.2) : PieceJointe.message_id référence Message, donc l'ordre
+    # inverse violerait l'intégrité référentielle. missing_ok=True car un
+    # fichier déjà absent ne doit jamais empêcher la suppression de la
+    # conversation elle-même.
+    pieces_jointes = db.query(PieceJointe).filter(PieceJointe.conversation_id == conversation.id).all()
+    for piece_jointe in pieces_jointes:
+        (Path(PIECES_JOINTES_DIR) / piece_jointe.chemin_fichier).unlink(missing_ok=True)
+    db.query(PieceJointe).filter(PieceJointe.conversation_id == conversation.id).delete()
+
     # Message n'a pas de cascade ORM déclarée sur Conversation (même
     # convention que Jeton/Compte, voir comptes.py) : la suppression des
     # messages associés doit donc être explicite, avant celle de la

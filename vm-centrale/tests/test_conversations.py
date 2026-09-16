@@ -1,12 +1,14 @@
 import json
 from datetime import datetime
+from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from vm_centrale.database import get_db
 from vm_centrale.jetons import JetonStore, get_jeton_store
 from vm_centrale.main import app
-from vm_centrale.models import Conversation, ProfilTravail
+from vm_centrale.models import Conversation, PieceJointe, ProfilTravail
 
 
 def _autorisation(jeton: str) -> dict[str, str]:
@@ -306,6 +308,38 @@ def test_supprimer_sans_jeton_est_refuse(client):
     reponse = client.delete("/conversations/1")
 
     assert reponse.status_code == 401
+
+
+@pytest.fixture()
+def _repertoire_pieces_jointes(tmp_path, monkeypatch):
+    # Isole les tests du répertoire par défaut (VM_CENTRALE_PIECES_JOINTES_DIR,
+    # ./pieces_jointes), même convention que test_pieces_jointes.py.
+    monkeypatch.setattr("vm_centrale.routers.conversations.PIECES_JOINTES_DIR", str(tmp_path))
+    return tmp_path
+
+
+def test_supprimer_efface_les_pieces_jointes_en_base_et_sur_disque(
+    client, mistral_client_factice, jeton_valide, db_session, _repertoire_pieces_jointes
+):
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide)
+    mistral_client_factice.repondre_ocr("Texte extrait du PDF")
+    upload = client.post(
+        f"/conversations/{conversation_id}/pieces-jointes",
+        files={"fichier": ("document.pdf", b"%PDF-1.4 contenu factice", "application/pdf")},
+        headers=_autorisation(jeton_valide),
+    )
+    piece_jointe_id = upload.json()["piece_jointe"]["id"]
+    piece_jointe = db_session.get(PieceJointe, piece_jointe_id)
+    chemin_fichier = Path(_repertoire_pieces_jointes) / piece_jointe.chemin_fichier
+    assert chemin_fichier.exists()
+
+    reponse = client.delete(
+        f"/conversations/{conversation_id}", headers=_autorisation(jeton_valide)
+    )
+
+    assert reponse.status_code == 204
+    assert db_session.get(PieceJointe, piece_jointe_id) is None
+    assert not chemin_fichier.exists()
 
 
 def test_envoyer_message_persiste_le_message_et_la_reponse(
