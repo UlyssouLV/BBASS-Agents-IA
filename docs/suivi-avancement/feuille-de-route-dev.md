@@ -8,23 +8,9 @@ Ce n’est **pas** une spec (ça vient après « Ouvre la version »).
 
 - **1.0.x** — Socle : comptes, connexion, chat, relais Mistral, session persistée (keyring), LAN Castries.
 - **1.1.0** — Comptes administrateurs, multi-pôles, mot de passe généré / changement forcé, révocation, affichage pôle/agence dans le chat.
+- **1.1.1** — Conversations persistées sur la VM (PostgreSQL) : plusieurs fils, reprise après rechargement / autre poste, historique borné (3 derniers messages + résumé glissant), profil de travail lecture seule ; pas de stockage Mistral Conversations.
 
-Le chat actuel envoie **un seul message** à Mistral à chaque tour : pas d’historique, pas de fils.
-
-## Prochaine : 1.1.1 — Persistance des conversations
-
-Travail **de recherche d’abord**, puis architecture (et implémentation une fois le grill / la spec faits).
-
-**Objectif.** Des fils de discussion qui survivent au rechargement, à la relance du poste, éventuellement à un autre poste du même compte : historique renvoyé pour un vrai multi-tours.
-
-**Recherche Mistral.**
-
-- Voir ce que Mistral propose pour une conversation persistante (API **Agents & Conversations**, ou autre) : ce qui est stocké chez eux, durée de vie, coût, confidentialité, identifiant de conversation à reprendre.
-- L’appel actuel (`POST /v1/chat/completions`) est **sans état** : si on reste sur cet endpoint, **on** doit stocker les messages (`user` / `assistant`, plus tard `system`) et les renvoyer à chaque tour.
-
-**Si on ne passe pas par le stockage Mistral.** Concevoir l’architecture côté cabinet : où vivent les fils (VM centrale vs poste), modèle (compte, fil, messages, dates), qui peut lire / supprimer, un fil vs plusieurs.
-
-## Ensuite : 1.1.2 — Pièces jointes
+## Prochaine : 1.1.2 — Pièces jointes
 
 Le schéma de données de la [1.1.1](../specs/v1.1.1-persistance-conversations.md) réserve déjà une table vide pour les pièces jointes (non exploitée). Cette version branche l'upload et l'exploitation réelle : ce que Mistral accepte comme document, formats, limites de taille, stockage côté VM centrale, envoi à Mistral.
 

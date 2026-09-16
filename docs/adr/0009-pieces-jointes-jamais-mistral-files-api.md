@@ -1,0 +1,9 @@
+# Pièces jointes : jamais stockées durablement chez Mistral
+
+À partir de la [1.1.2](../specs/v1.1.2-pieces-jointes.md), une pièce jointe (PDF, Word, Excel, image) n'est jamais transmise en tant que fichier brut à un appel de chat Mistral, et la Files API de Mistral (upload persistant, référencé ensuite par `file_id`) n'est jamais utilisée. Chaque pièce jointe passe par un pipeline d'extraction avant tout appel de chat : endpoint `/v1/ocr` (stateless, éligible Zero Data Retention) pour un PDF, extraction locale (`python-docx`, `openpyxl`) pour Word/Excel, et seul le cas de l'image passe par un appel vision Mistral direct (`document_url`/`image_url`), faute d'alternative locale fiable.
+
+Ce choix prolonge le raisonnement déjà posé par [ADR-0002](0002-relais-central-mistral.md) et par la spec [1.1.1](../specs/v1.1.1-persistance-conversations.md) (qui a écarté l'API Agents & Conversations de Mistral pour le même motif) : la VM centrale utilise une seule clé API Mistral partagée par tout le cabinet, sans notion de sous-compte côté Mistral. Un fichier stocké durablement chez Mistral via sa Files API reproduirait exactement le problème d'isolation entre comptes déjà écarté pour les conversations — un fichier potentiellement lié à un client du cabinet ne doit pas dépendre d'un stockage tiers sans garde-fou d'isolation.
+
+## Consequences
+
+Le pipeline d'extraction (module `vm_centrale/analyse_pieces_jointes/`) devient un passage obligé avant tout envoi de pièce jointe à Mistral, pour tout usage futur (y compris les futurs Agents IA par pôle, 1.3.0+) : aucun code ne doit transmettre un fichier brut ou l'identifiant d'un fichier Mistral persistant dans un appel de chat. Seule exception assumée : l'analyse d'image, qui reste hors Zero Data Retention par défaut faute d'alternative — à documenter explicitement à chaque nouvel usage qui s'appuierait dessus, jamais à généraliser silencieusement aux autres formats.

@@ -40,6 +40,11 @@ Read, against the parent spec / ADRs / code that this PR actually ships:
 - `CLAUDE.md` — Standards pointers still valid (files exist; `/code-review` rules still true).
 - `AGENTS.md` — skills named here exist under `.claude/skills/`; implement / finalise cycle matches those skills.
 - `docs/` — spec for this version under `docs/specs/` ; new ADRs under `docs/adr/` if decisions changed ; `docs/agents/` does not point at deleted skills.
+- **`docs/suivi-avancement/feuille-de-route-dev.md`** — must match the version just shipped:
+  - Move this **`X.Y.Z`** into **Déjà livré** (one short product line: what you can do now). Drop it from « Prochaine » / « Ensuite ».
+  - The **next** numbered version in that file becomes **Prochaine** (keep its objectif / recherche). Renumber « Ensuite » headings if needed.
+  - Delete leftover claims that this version has **not** delivered (e.g. « le chat n’a pas d’historique » after a persistence release).
+  - Do not invent new versions; only reshuffle what is already listed.
 
 If anything is stale: **stop the release**. Update those files on the **feature branch**, commit (French why-message), `git push`. Never `.env` / `*.db` / `.venv`. Then re-read this section. Do **not** create the tag or squash until this gate is green — the tag must include the docs.
 
