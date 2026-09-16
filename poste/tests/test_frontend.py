@@ -59,3 +59,10 @@ def test_front_end_expose_un_onglet_profil_de_travail_sans_action_de_modificatio
     assert 'id="onglet-profil-travail" hidden' in html
     assert '"/profil-travail"' in js
     assert "afficherOngletProfilTravail" in js
+
+
+def test_front_end_bloque_un_second_envoi_tant_que_mistral_n_a_pas_repondu(client):
+    js = client.get("/static/app.js").text
+
+    assert "appelConversationEnCours" in js
+    assert "|| appelConversationEnCours" in js

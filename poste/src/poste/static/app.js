@@ -27,6 +27,8 @@ const nouvelleConversationErreur = document.getElementById("nouvelle-conversatio
 const conversationOuverte = document.getElementById("conversation-ouverte");
 const conversationTitre = document.getElementById("conversation-titre");
 
+let appelConversationEnCours = false;
+
 const ongletBoutonChat = document.getElementById("onglet-bouton-chat");
 const ongletBoutonProfilTravail = document.getElementById("onglet-bouton-profil-travail");
 const ongletBoutonComptes = document.getElementById("onglet-bouton-comptes");
@@ -295,13 +297,15 @@ formulaireChat.addEventListener("submit", async (evenement) => {
   chatErreur.hidden = true;
 
   const message = champMessage.value;
-  if (!message.trim() || conversationOuverteId === null) {
+  if (!message.trim() || conversationOuverteId === null || appelConversationEnCours) {
     return;
   }
 
+  appelConversationEnCours = true;
   ajouterMessage("collaborateur", message);
   champMessage.value = "";
   champMessage.disabled = true;
+  formulaireChat.querySelector('button[type="submit"]').disabled = true;
   chatChargement.hidden = false;
 
   try {
@@ -337,8 +341,10 @@ formulaireChat.addEventListener("submit", async (evenement) => {
     chatChargement.hidden = true;
     // Un 401 a déjà basculé vers l'écran de connexion (champMessage n'y est
     // plus visible) : ne pas le réactiver/focaliser dans ce cas.
+    appelConversationEnCours = false;
     if (!ecranCompte.hidden) {
       champMessage.disabled = false;
+      formulaireChat.querySelector('button[type="submit"]').disabled = false;
       champMessage.focus();
     }
   }
@@ -452,44 +458,56 @@ formulaireNouvelleConversation.addEventListener("submit", async (evenement) => {
   nouvelleConversationErreur.hidden = true;
 
   const message = nouveauMessageConversation.value;
-  if (!message.trim()) {
+  if (!message.trim() || appelConversationEnCours) {
     return;
   }
 
-  let reponse;
+  appelConversationEnCours = true;
+  nouveauMessageConversation.disabled = true;
+  formulaireNouvelleConversation.querySelector('button[type="submit"]').disabled = true;
+
   try {
-    reponse = await fetch("/conversations", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message }),
-    });
-  } catch {
-    nouvelleConversationErreur.textContent =
-      "Impossible de joindre le service de conversations. Réessayez plus tard.";
-    nouvelleConversationErreur.hidden = false;
-    return;
-  }
+    let reponse;
+    try {
+      reponse = await fetch("/conversations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message }),
+      });
+    } catch {
+      nouvelleConversationErreur.textContent =
+        "Impossible de joindre le service de conversations. Réessayez plus tard.";
+      nouvelleConversationErreur.hidden = false;
+      return;
+    }
 
-  if (reponse.status === 401) {
-    afficherEcranConnexion();
-    return;
-  }
+    if (reponse.status === 401) {
+      afficherEcranConnexion();
+      return;
+    }
 
-  if (!reponse.ok) {
-    const detail = await reponse.json().catch(() => null);
-    nouvelleConversationErreur.textContent =
-      detail && detail.detail ? detail.detail : "La création de la conversation a échoué. Réessayez plus tard.";
-    nouvelleConversationErreur.hidden = false;
-    return;
-  }
+    if (!reponse.ok) {
+      const detail = await reponse.json().catch(() => null);
+      nouvelleConversationErreur.textContent =
+        detail && detail.detail ? detail.detail : "La création de la conversation a échoué. Réessayez plus tard.";
+      nouvelleConversationErreur.hidden = false;
+      return;
+    }
 
-  const corps = await reponse.json();
-  formulaireNouvelleConversation.reset();
-  afficherConversationOuverte(corps.conversation.id, corps.conversation.titre, [
-    { role: "user", contenu: message },
-    { role: "assistant", contenu: corps.reponse },
-  ]);
-  await chargerConversations();
+    const corps = await reponse.json();
+    formulaireNouvelleConversation.reset();
+    afficherConversationOuverte(corps.conversation.id, corps.conversation.titre, [
+      { role: "user", contenu: message },
+      { role: "assistant", contenu: corps.reponse },
+    ]);
+    await chargerConversations();
+  } finally {
+    appelConversationEnCours = false;
+    if (!ecranCompte.hidden) {
+      nouveauMessageConversation.disabled = false;
+      formulaireNouvelleConversation.querySelector('button[type="submit"]').disabled = false;
+    }
+  }
 });
 
 async function renommerConversation(id, titreActuel) {
