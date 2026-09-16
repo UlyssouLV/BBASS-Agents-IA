@@ -9,7 +9,7 @@ Read, in order:
 1. `docs/agents/domain.md` — which domain docs to load, glossary and ADR rules
 2. `CONTEXT.md` — required vocabulary (`Compte`, `pôle`, `compte administrateur`, …)
 3. `docs/adr/` — ADRs that touch the diff (contradictions must be named, not silently overridden)
-4. `AGENTS.md` — issues stay Open until merge to `main`; `/implement` commit/push is skill `encadrer-implement` only
+4. `AGENTS.md` — close each child after a green `/implement`; `/implement` commit/push/close is skill `encadrer-implement` only
 
 ## Tests
 
@@ -17,7 +17,7 @@ HTTP-boundary tests only (observable responses). Do not praise or require tests 
 
 ## When to run `/code-review`
 
-Not after each `/implement`. Once vs `main` when every child ticket for the PR is `awaiting-merge`. See skill `encadrer-implement`.
+Not after each `/implement`. Not automatically when every child is Closed (`encadrer-implement` then asks for human tests + « Finalise la version »). Run `/code-review` vs `main` only if the user asks.
 
 ## Out of this file
 

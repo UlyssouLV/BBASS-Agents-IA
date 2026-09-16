@@ -7,7 +7,10 @@ from poste.vm_centrale_client import (
     AuthentificationReussie,
     CompteAdmin,
     CompteCree,
-    JetonInvalideError,
+    Conversation,
+    ConversationCree,
+    ConversationDetail,
+    ProfilTravail,
     VerificationReussie,
     get_vm_centrale_client,
 )
@@ -16,14 +19,10 @@ from poste.vm_centrale_client import (
 class VmCentraleClientFactice:
     def __init__(self) -> None:
         self.appels: list[tuple[str, str]] = []
-        self.messages_recus: list[str] = []
-        self.jetons_recus: list[str] = []
         self.jetons_verifies: list[str] = []
         self.jetons_revoques: list[str] = []
         self._authentifie = False
         self._exception: Exception | None = None
-        self._jeton_rejete_par_le_relais = False
-        self._reponse_message = ""
         self._jeton = "jeton-factice"
         self._prenom = "Jean"
         self._nom = "Dupont"
@@ -62,6 +61,34 @@ class VmCentraleClientFactice:
         self._exception_suppression_compte: Exception | None = None
         self._jetons_suppression_compte: list[str] = []
         self._requetes_suppression_compte: list[dict] = []
+        self._conversation_creee: ConversationCree | None = None
+        self._exception_creation_conversation: Exception | None = None
+        self._jetons_creation_conversation: list[str] = []
+        self._messages_creation_conversation: list[str] = []
+        self._cles_idempotence_creation_conversation: list[str | None] = []
+        self._conversations: list[Conversation] = []
+        self._exception_liste_conversations: Exception | None = None
+        self._jetons_liste_conversations: list[str] = []
+        self._detail_conversation: ConversationDetail | None = None
+        self._exception_detail_conversation: Exception | None = None
+        self._jetons_detail_conversation: list[str] = []
+        self._ids_detail_conversation: list[int] = []
+        self._conversation_renommee: Conversation | None = None
+        self._exception_renommage_conversation: Exception | None = None
+        self._jetons_renommage_conversation: list[str] = []
+        self._requetes_renommage_conversation: list[dict] = []
+        self._exception_suppression_conversation: Exception | None = None
+        self._jetons_suppression_conversation: list[str] = []
+        self._ids_suppression_conversation: list[int] = []
+        self._reponse_message_conversation = ""
+        self._exception_envoi_message_conversation: Exception | None = None
+        self._jetons_envoi_message_conversation: list[str] = []
+        self._requetes_envoi_message_conversation: list[dict] = []
+        self._cles_idempotence_envoi_message_conversation: list[str | None] = []
+        self._profil_travail: ProfilTravail | None = None
+        self._exception_profil_travail: Exception | None = None
+        self._jetons_profil_travail: list[str] = []
+        self._identifiants_profil_travail: list[str] = []
 
     def accepter(
         self,
@@ -87,16 +114,6 @@ class VmCentraleClientFactice:
 
     def echouer(self, exception: Exception) -> None:
         self._exception = exception
-
-    def repondre(self, reponse: str) -> None:
-        self._reponse_message = reponse
-        self._exception = None
-        self._jeton_rejete_par_le_relais = False
-
-    def rejeter_le_jeton_au_relais(self) -> None:
-        # Simule un 401 renvoyé par /relais (jeton révoqué côté VM entre-temps).
-        self._jeton_rejete_par_le_relais = True
-        self._exception = None
 
     def verification_reussit(self, identifiant: str, est_admin: bool = False) -> None:
         self._identifiant_verifie = identifiant
@@ -128,15 +145,6 @@ class VmCentraleClientFactice:
             est_admin=self._est_admin,
             doit_changer_mot_de_passe=self._doit_changer_mot_de_passe,
         )
-
-    def envoyer_message(self, message: str, jeton: str) -> str:
-        self.messages_recus.append(message)
-        self.jetons_recus.append(jeton)
-        if self._jeton_rejete_par_le_relais:
-            raise JetonInvalideError()
-        if self._exception is not None:
-            raise self._exception
-        return self._reponse_message
 
     def verifier(self, jeton: str) -> VerificationReussie | None:
         self.jetons_verifies.append(jeton)
@@ -294,6 +302,116 @@ class VmCentraleClientFactice:
         )
         if self._exception_suppression_compte is not None:
             raise self._exception_suppression_compte
+
+    def creation_conversation_reussit(self, conversation: ConversationCree) -> None:
+        self._conversation_creee = conversation
+        self._exception_creation_conversation = None
+
+    def creation_conversation_echoue(self, exception: Exception) -> None:
+        self._exception_creation_conversation = exception
+
+    def creer_conversation(
+        self, jeton: str, message: str, cle_idempotence: str | None = None
+    ) -> ConversationCree:
+        self._jetons_creation_conversation.append(jeton)
+        self._messages_creation_conversation.append(message)
+        self._cles_idempotence_creation_conversation.append(cle_idempotence)
+        if self._exception_creation_conversation is not None:
+            raise self._exception_creation_conversation
+        assert self._conversation_creee is not None
+        return self._conversation_creee
+
+    def liste_conversations_retourne(self, conversations: list[Conversation]) -> None:
+        self._conversations = conversations
+        self._exception_liste_conversations = None
+
+    def liste_conversations_echoue(self, exception: Exception) -> None:
+        self._exception_liste_conversations = exception
+
+    def lister_conversations(self, jeton: str) -> list[Conversation]:
+        self._jetons_liste_conversations.append(jeton)
+        if self._exception_liste_conversations is not None:
+            raise self._exception_liste_conversations
+        return self._conversations
+
+    def detail_conversation_retourne(self, detail: ConversationDetail) -> None:
+        self._detail_conversation = detail
+        self._exception_detail_conversation = None
+
+    def detail_conversation_echoue(self, exception: Exception) -> None:
+        self._exception_detail_conversation = exception
+
+    def consulter_conversation(self, jeton: str, conversation_id: int) -> ConversationDetail:
+        self._jetons_detail_conversation.append(jeton)
+        self._ids_detail_conversation.append(conversation_id)
+        if self._exception_detail_conversation is not None:
+            raise self._exception_detail_conversation
+        assert self._detail_conversation is not None
+        return self._detail_conversation
+
+    def renommage_conversation_reussit(self, conversation: Conversation) -> None:
+        self._conversation_renommee = conversation
+        self._exception_renommage_conversation = None
+
+    def renommage_conversation_echoue(self, exception: Exception) -> None:
+        self._exception_renommage_conversation = exception
+
+    def renommer_conversation(self, jeton: str, conversation_id: int, titre: str) -> Conversation:
+        self._jetons_renommage_conversation.append(jeton)
+        self._requetes_renommage_conversation.append(
+            {"conversation_id": conversation_id, "titre": titre}
+        )
+        if self._exception_renommage_conversation is not None:
+            raise self._exception_renommage_conversation
+        assert self._conversation_renommee is not None
+        return self._conversation_renommee
+
+    def suppression_conversation_echoue(self, exception: Exception) -> None:
+        self._exception_suppression_conversation = exception
+
+    def supprimer_conversation(self, jeton: str, conversation_id: int) -> None:
+        self._jetons_suppression_conversation.append(jeton)
+        self._ids_suppression_conversation.append(conversation_id)
+        if self._exception_suppression_conversation is not None:
+            raise self._exception_suppression_conversation
+
+    def envoi_message_conversation_reussit(self, reponse: str) -> None:
+        self._reponse_message_conversation = reponse
+        self._exception_envoi_message_conversation = None
+
+    def envoi_message_conversation_echoue(self, exception: Exception) -> None:
+        self._exception_envoi_message_conversation = exception
+
+    def envoyer_message(
+        self,
+        jeton: str,
+        conversation_id: int,
+        message: str,
+        cle_idempotence: str | None = None,
+    ) -> str:
+        self._jetons_envoi_message_conversation.append(jeton)
+        self._requetes_envoi_message_conversation.append(
+            {"conversation_id": conversation_id, "message": message}
+        )
+        self._cles_idempotence_envoi_message_conversation.append(cle_idempotence)
+        if self._exception_envoi_message_conversation is not None:
+            raise self._exception_envoi_message_conversation
+        return self._reponse_message_conversation
+
+    def profil_travail_retourne(self, profil: ProfilTravail) -> None:
+        self._profil_travail = profil
+        self._exception_profil_travail = None
+
+    def profil_travail_echoue(self, exception: Exception) -> None:
+        self._exception_profil_travail = exception
+
+    def consulter_profil_travail(self, jeton: str, identifiant: str) -> ProfilTravail:
+        self._jetons_profil_travail.append(jeton)
+        self._identifiants_profil_travail.append(identifiant)
+        if self._exception_profil_travail is not None:
+            raise self._exception_profil_travail
+        assert self._profil_travail is not None
+        return self._profil_travail
 
 
 @pytest.fixture(autouse=True)

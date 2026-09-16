@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <title>Brouillon — Suivi d’avancement — semaine du 14 au 18 septembre 2026</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 12mm 14mm 12mm 14mm;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #fff;
+      color: #1c1917;
+      font-family: "Segoe UI", Calibri, "Liberation Sans", sans-serif;
+      font-size: 9.2pt;
+      line-height: 1.34;
+    }
+    .sheet {
+      max-width: 180mm;
+      margin: 0 auto;
+      position: relative;
+    }
+    .semaine {
+      display: inline-block;
+      margin-top: 10pt;
+      font-size: 8.5pt;
+      font-weight: 650;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #1e3a5f;
+      border: 1pt solid #1e3a5f;
+      padding: 3pt 7pt;
+      background: #fff;
+    }
+    .couverture {
+      page-break-after: always;
+      break-after: page;
+      padding-bottom: 8mm;
+    }
+    .couverture-identite {
+      text-align: center;
+      padding-top: 10mm;
+    }
+    .couverture .toc {
+      margin-top: 16pt;
+    }
+    .couverture .logo {
+      height: 22mm;
+      margin: 0 auto 14pt;
+    }
+    .couverture .kicker {
+      margin-bottom: 8pt;
+    }
+    .couverture h1 {
+      font-size: 22pt;
+      margin: 0 0 10pt;
+    }
+    .couverture .meta {
+      font-size: 10.5pt;
+      line-height: 1.5;
+    }
+    .toc {
+      margin: 0;
+      padding: 14pt 16pt 16pt;
+      background: #f5f3ef;
+      border-left: 4pt solid #1e3a5f;
+    }
+    .toc-label {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 13pt;
+      font-weight: 600;
+      letter-spacing: 0;
+      text-transform: none;
+      color: #1e3a5f;
+      margin: 0 0 12pt;
+    }
+    .toc ol {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      counter-reset: toc;
+    }
+    .toc > ol > li {
+      counter-increment: toc;
+      margin-bottom: 9pt;
+    }
+    .toc-row {
+      display: flex;
+      align-items: baseline;
+      gap: 0;
+      font-size: 10.5pt;
+    }
+    .toc-row::before {
+      content: counter(toc, decimal-leading-zero);
+      flex-shrink: 0;
+      width: 22pt;
+      font-weight: 650;
+      color: #1e3a5f;
+      font-variant-numeric: tabular-nums;
+    }
+    .toc-row a {
+      color: #1c1917;
+      text-decoration: none;
+      flex-shrink: 0;
+    }
+    .toc-row a:hover {
+      color: #1e3a5f;
+      text-decoration: underline;
+    }
+    .toc-dots {
+      flex: 1;
+      border-bottom: 1pt dotted #a8a29e;
+      margin: 0 8pt 3pt;
+      min-width: 12pt;
+    }
+    .toc ol ol {
+      margin: 5pt 0 0 22pt;
+      padding: 0;
+      list-style: none;
+      counter-reset: tocsub;
+    }
+    .toc ol ol li {
+      counter-increment: tocsub;
+      margin-bottom: 4pt;
+      font-size: 9.5pt;
+      color: #44403c;
+    }
+    .toc ol ol li::before {
+      content: counter(toc) "." counter(tocsub) "  ";
+      color: #1e3a5f;
+      font-weight: 650;
+    }
+    .toc ol ol a {
+      color: inherit;
+      text-decoration: none;
+    }
+    .toc ol ol a:hover {
+      color: #1e3a5f;
+      text-decoration: underline;
+    }
+    .toc-ref {
+      flex-shrink: 0;
+      font-size: 9pt;
+      color: #57534e;
+      font-variant-numeric: tabular-nums;
+    }
+    .bloc {
+      margin-top: 14pt;
+      padding-top: 10pt;
+      border-top: 1.5pt solid #1e3a5f;
+    }
+    .bloc:first-of-type {
+      border-top: none;
+      padding-top: 8pt;
+      margin-top: 8pt;
+    }
+    h2 {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 11pt;
+      font-weight: 600;
+      color: #1e3a5f;
+      margin: 0 0 6pt;
+      padding-top: 0;
+    }
+    .logo {
+      display: block;
+      height: 14mm;
+      width: auto;
+      margin: 0 auto 10pt;
+    }
+    .kicker {
+      font-size: 8.5pt;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: #57534e;
+      margin: 0 0 4pt;
+    }
+    h1 {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 16.5pt;
+      font-weight: 400;
+      color: #1e3a5f;
+      margin: 0 0 6pt;
+      line-height: 1.2;
+    }
+    .meta {
+      font-size: 9.5pt;
+      color: #44403c;
+      margin: 0;
+    }
+    p { margin: 0 0 6pt; }
+    .lead {
+      font-size: 10pt;
+      color: #292524;
+      margin-bottom: 8pt;
+    }
+    ul {
+      margin: 0 0 6pt;
+      padding-left: 1.1em;
+    }
+    li { margin-bottom: 2pt; }
+    .recap {
+      background: #f5f3ef;
+      border-left: 3.5pt solid #1e3a5f;
+      padding: 8pt 12pt 10pt;
+      margin: 0;
+    }
+    .recap > p,
+    .recap p.recap-intro {
+      margin: 0 0 6pt;
+      font-size: 9.5pt;
+    }
+    .recap h3 {
+      font-family: "Segoe UI", Calibri, sans-serif;
+      font-size: 9.5pt;
+      font-weight: 650;
+      color: #1e3a5f;
+      margin: 8pt 0 3pt;
+    }
+    .recap h3:first-of-type { margin-top: 2pt; }
+    .recap ul {
+      margin: 0 0 2pt;
+    }
+    .versions {
+      page-break-before: always;
+      break-before: page;
+      margin-top: 0;
+      padding-top: 0;
+      border-top: none;
+    }
+    .versions .version {
+      margin-top: 12pt;
+      background: #f5f3ef;
+      border-left: 4pt solid #1e3a5f;
+      padding: 0;
+    }
+    .versions .version-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12pt;
+      margin: 0;
+      padding: 8pt 12pt;
+      background: #e7e5e0;
+      border-bottom: 0.75pt solid #d6d3d1;
+    }
+    .versions .version h3 {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 11pt;
+      font-weight: 600;
+      color: #1e3a5f;
+      margin: 0;
+    }
+    .versions .deploye {
+      flex-shrink: 0;
+      font-size: 8pt;
+      font-weight: 650;
+      letter-spacing: 0.03em;
+      color: #fff;
+      background: #1e3a5f;
+      border: none;
+      padding: 3pt 8pt;
+      white-space: nowrap;
+    }
+    .versions .version-body {
+      padding: 8pt 12pt 10pt;
+    }
+    .versions .version p {
+      margin: 0 0 6pt;
+      font-size: 9.5pt;
+    }
+    .versions .version p:last-child {
+      margin-bottom: 0;
+    }
+    .jour {
+      margin-bottom: 5pt;
+      page-break-inside: avoid;
+    }
+    .jour h3 {
+      font-size: 10.5pt;
+      font-weight: 650;
+      margin: 0 0 4pt;
+      color: #1c1917;
+    }
+    .echeance {
+      color: #1e3a5f;
+      font-weight: 650;
+    }
+    footer {
+      margin-top: 10pt;
+      padding-top: 6pt;
+      border-top: 0.75pt solid #d6d3d1;
+      font-size: 8pt;
+      color: #78716c;
+    }
+    @media print {
+      body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body>
+  <div class="sheet">
+    <header class="couverture">
+      <div class="couverture-identite">
+        <img class="logo" src="../logo-bbass.png" alt="BBASS géomètre-expert" />
+        <p class="kicker">Alternance Agents IA · 2026–2027</p>
+        <h1>Suivi d’avancement (brouillon)</h1>
+        <p class="meta">Semaine du 14 au 18 septembre 2026 · Ulysse Long<br />
+        Dépôt : github.com/UlyssouLV/BBASS-Agents-IA</p>
+        <div class="semaine">14–18 sept. 2026</div>
+      </div>
+      <nav class="toc" aria-label="Table des matières">
+        <p class="toc-label">Table des matières</p>
+        <ol>
+          <li>
+            <div class="toc-row">
+              <a href="#travail-realise">Travail réalisé</a>
+              <span class="toc-dots" aria-hidden="true"></span>
+              <span class="toc-ref">14–15 sept.</span>
+            </div>
+          </li>
+          <li>
+            <div class="toc-row">
+              <a href="#reste-a-implementer">Reste à implémenter</a>
+              <span class="toc-dots" aria-hidden="true"></span>
+              <span class="toc-ref">V1.1.1 à V1.3.0</span>
+            </div>
+          </li>
+          <li>
+            <div class="toc-row">
+              <a href="#attendu-fin-de-semaine">Attendu pour la fin de semaine</a>
+              <span class="toc-dots" aria-hidden="true"></span>
+              <span class="toc-ref">vendredi 18 sept.</span>
+            </div>
+          </li>
+          <li>
+            <div class="toc-row">
+              <a href="#descriptif-versions">Descriptif des versions</a>
+              <span class="toc-dots" aria-hidden="true"></span>
+              <span class="toc-ref">livraisons</span>
+            </div>
+            <ol>
+              <li><a href="#version-1-0-0">V1.0.0 — Socle</a></li>
+              <li><a href="#version-1-1-0">V1.1.0 — Gestion des comptes</a></li>
+            </ol>
+          </li>
+        </ol>
+      </nav>
+    </header>
+
+    <section class="bloc" id="travail-realise">
+    <h2>Travail réalisé</h2>
+
+    <div class="jour">
+      <h3>Lundi 14 septembre</h3>
+      <ul>
+        <li>Installation de l’environnement de travail (éditeur, Git, outillage).</li>
+        <li>Initialisation du dépôt GitHub, du glossaire métier, des spécifications et des décisions d’architecture.</li>
+        <li>Première livraison : une interface pour échanger avec Mistral.</li>
+        <li>Vérification : l’API Mistral répond via la VM, avec des comptes de test.</li>
+      </ul>
+    </div>
+
+    <div class="jour">
+      <h3>Mardi 15 septembre</h3>
+      <ul>
+        <li>Finalisation du socle de chat (connexion Pay as you go Mistral).</li>
+        <li>Conception puis développement de la <strong>V1.1.0</strong> : comptes administrateurs, gestion des comptes collaborateurs, pôles, mots de passe, révocation de session.</li>
+        <li>Tests utilisateurs de la V1.1.0.</li>
+        <li>Premier échange avec l’équipe Topo sur les outils susceptibles d’être branchés plus tard (sans suite immédiate).</li>
+      </ul>
+    </div>
+
+    </section>
+
+    <section class="bloc" id="reste-a-implementer">
+    <h2>Reste à implémenter</h2>
+    <ul>
+      <li><strong>V1.1.1</strong> — persistance des conversations côté cabinet (PostgreSQL sur la VM) : plusieurs fils, multi-tours, résumé glissant, profil de travail ; pas de stockage Mistral Conversations.</li>
+      <li><strong>V1.1.2</strong> — pièces jointes : upload et envoi à Mistral (table déjà prévue en 1.1.1, encore vide).</li>
+      <li><strong>V1.1.3</strong> — suivi de la consommation : tokens (entrée / sortie / total) par compte et par session, dates, modèle, coût ; API tarifs Mistral si elle existe.</li>
+      <li><strong>V1.2.0</strong> — interface poste (modales, écran comptes, minimum de style ; framework ou HTML/CSS/JS à choisir).</li>
+      <li><strong>V1.3.0</strong> — premier agent, pôle Administration, Moduléo (API, serveur de test, lecture seule, plan d’automatisme sans écriture ni exécution).</li>
+    </ul>
+    </section>
+
+    <section class="bloc" id="attendu-fin-de-semaine">
+    <h2>Attendu pour la fin de semaine</h2>
+    <div class="recap">
+      <p><strong>Point vendredi 18 septembre — version attendue : V1.3.0</strong></p>
+      <h3>Architecture</h3>
+      <ul>
+        <li>Logiciel sur le poste (interface web locale) ; VM à Castries, réseau interne seulement.</li>
+        <li>La VM détient les comptes, les conversations et la clé API Mistral ; le poste n’appelle jamais Mistral directement.</li>
+        <li>Base PostgreSQL sur la VM (plus SQLite) ; Postgres local via Docker pour le développement.</li>
+      </ul>
+      <h3>Connexion et chat</h3>
+      <ul>
+        <li>Identifiant et mot de passe ; session conservée (identifiants Windows) jusqu’à déconnexion ou révocation.</li>
+        <li>Chat vers Mistral ; affichage prénom, nom, identifiant, agence et pôle(s).</li>
+        <li>Plusieurs conversations par compte, persistées sur la VM : reprise après rechargement, relance du poste, autre machine du même compte. Titre auto, renommage, suppression. Historique borné (3 derniers messages + résumé). Profil de travail consultable, sans modifier l’identité du compte. Conversations privées (y compris vis-à-vis d’un compte administrateur).</li>
+        <li>Pièces jointes : documents joints au chat, stockés côté VM, transmis à Mistral.</li>
+        <li>Suivi de la consommation : tokens (entrée, sortie, total) par compte et par session, dates, modèle, estimation du coût.</li>
+        <li>Interface poste : minimum d’UX (modales, écran comptes).</li>
+      </ul>
+      <h3>Comptes administrateurs</h3>
+      <ul>
+        <li>Droit global, distinct du pôle Administration. Premier administrateur créé en base à la main.</li>
+        <li>Depuis le poste : liste, création, modification (identité, email, agence, un ou plusieurs des six pôles).</li>
+        <li>Mot de passe aléatoire à la création ou à la réinitialisation ; obligation de le changer avant le chat.</li>
+        <li>Déconnexion forcée. Promotion, rétrogradation et suppression définitive : clé d’administration VM en plus ; impossible de supprimer ou rétrograder le dernier administrateur.</li>
+      </ul>
+      <h3>Premier agent</h3>
+      <ul>
+        <li>Pôle Administration, logiciel Moduléo, serveur de test : version minimale pour montrer que ça marche.</li>
+      </ul>
+    </div>
+    </section>
+
+    <section class="bloc versions" id="descriptif-versions">
+      <h2>Descriptif des versions</h2>
+      <div class="version" id="version-1-0-0">
+        <div class="version-head">
+          <h3>V1.0.0 — Socle</h3>
+          <span class="deploye">Déployé le 15/09/2026 à 10:05</span>
+        </div>
+        <div class="version-body">
+        <p>Le cabinet n’avait pas encore de point d’entrée vers une IA. Cette version pose le socle, déployé à Castries (maison mère) : un collaborateur se connecte, ouvre un chat sobre, et obtient une vraie réponse Mistral. Le champ agence du compte est déjà enregistré, mais il ne bloque personne : un compte rattaché à une autre agence pourrait chatter s’il accède à la machine centrale. La limite, c’est le réseau : seuls les postes du LAN de Castries joignent cette machine, pas Internet ni les agences satellites. Les agents métiers (Administration, Foncier, etc.) ne sont pas encore là ; la réponse est générique, volontairement, pour valider d’abord que le dispositif fonctionne.</p>
+        <p>Le logiciel s’exécute sur le poste. Les comptes et la clé d’accès à Mistral restent sur une machine centrale à Castries, joignable uniquement depuis le réseau interne. Ainsi un poste perdu ou inspecté n’expose pas la clé payante, et personne n’appelle Mistral sans être authentifié — donc sans consommer de crédit indûment. Le modèle Mistral utilisé est choisi uniquement côté central, pas depuis le poste, pour garder la maîtrise des coûts.</p>
+        <p>On installe un logiciel sur chaque poste plutôt qu’une page web hébergée sur un serveur : chaque machine a ainsi son propre backend, ce qui évite d’exposer les sessions et secrets de connexion comme le ferait un site consultable à distance. Le programme peut aussi continuer à s’ouvrir sur le poste si le lien avec la machine centrale est coupé. La connexion reste active après fermeture du logiciel (compte Windows) ; une déconnexion explicite permet de changer de collaborateur sur un poste partagé. Les comptes de cette version sont créés à la main côté central. Les conversations ne sont pas encore mémorisées : on a d’abord voulu sécuriser le socle avant de traiter conservation et confidentialité des échanges.</p>
+        </div>
+      </div>
+
+      <div class="version" id="version-1-1-0">
+        <div class="version-head">
+          <h3>V1.1.0 — Gestion des comptes</h3>
+          <span class="deploye">Déployé le 15/09/2026 à 16:24</span>
+        </div>
+        <div class="version-body">
+        <p>En V1.0.0, chaque compte devait encore être créé à la main sur la machine centrale. Cette version permet à certains collaborateurs — les comptes administrateurs — de gérer les comptes depuis le logiciel : liste, création, modification (identité, email, agence, pôles), mot de passe généré automatiquement, déconnexion forcée, promotion ou rétrogradation d’un administrateur, suppression définitive. Le premier administrateur reste créé une fois à la main, pour amorcer le dispositif.</p>
+        <p>Le droit d’administrateur est global (tout le cabinet), distinct du pôle nommé « Administration ». Un compte peut appartenir à plusieurs pôles, car des collaborateurs couvrent plusieurs domaines. Pôle et agence s’affichent désormais dans le chat. À la création ou à la réinitialisation du mot de passe, le collaborateur doit en choisir un nouveau avant d’accéder au chat ; il ne peut pas changer son mot de passe de sa propre initiative en dehors de ce cas. La suppression et le changement de statut d’administrateur demandent, en plus, la clé d’administration de la machine centrale, saisie au moment de l’action — pour que ces gestes irréversibles restent délibérés. On ne peut pas supprimer ni rétrograder le dernier administrateur.</p>
+        <p>Réinitialiser un mot de passe n’expulse pas les sessions déjà ouvertes : seule la déconnexion forcée le fait, pour que les deux actions restent distinctes. Un administrateur rétrogradé perd l’écran Comptes dès la prochaine vérification au lancement du logiciel.</p>
+        </div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

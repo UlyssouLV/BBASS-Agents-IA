@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 
@@ -31,12 +33,60 @@ class ChangerMotDePasseRequest(BaseModel):
     nouveau_mot_de_passe: str = Field(min_length=1)
 
 
-class MessageRequest(BaseModel):
+class ConversationCreationRequest(BaseModel):
     message: str = Field(min_length=1, max_length=8000)
+    # Optionnelle : voir vm_centrale.schemas.ConversationCreeRequest.cle_idempotence.
+    cle_idempotence: str | None = None
+
+
+class ConversationResume(BaseModel):
+    id: int
+    titre: str
+
+
+class ConversationCreeResponse(BaseModel):
+    conversation: ConversationResume
+    reponse: str
+
+
+class ConversationResponse(BaseModel):
+    id: int
+    titre: str
+    date_derniere_activite: datetime
 
 
 class MessageResponse(BaseModel):
+    id: int
+    role: str
+    contenu: str
+    date_creation: datetime
+
+
+class ConversationDetailResponse(BaseModel):
+    id: int
+    titre: str
+    date_creation: datetime
+    date_derniere_activite: datetime
+    messages: list[MessageResponse]
+
+
+class ConversationRenommeeRequest(BaseModel):
+    titre: str = Field(min_length=1)
+
+
+class MessageEnvoyeRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=8000)
+    # Voir ConversationCreationRequest.cle_idempotence.
+    cle_idempotence: str | None = None
+
+
+class MessageEnvoyeResponse(BaseModel):
     reponse: str
+
+
+class ProfilTravailResponse(BaseModel):
+    contenu: str
+    date_derniere_maj: datetime | None
 
 
 class CompteAdminResponse(BaseModel):

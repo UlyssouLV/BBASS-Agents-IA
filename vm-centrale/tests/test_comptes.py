@@ -403,10 +403,10 @@ def test_reinitialisation_ne_revoque_pas_les_jetons_actifs_du_compte(
     )
     assert reponse.status_code == 200
 
-    reponse_relais = client.post(
-        "/relais", json={"message": "Bonjour"}, headers=_autorisation(ancien_jeton)
+    reponse_conversation = client.post(
+        "/conversations", json={"message": "Bonjour"}, headers=_autorisation(ancien_jeton)
     )
-    assert reponse_relais.status_code == 200
+    assert reponse_conversation.status_code == 200
 
 
 def test_reinitialisation_echoue_avec_un_identifiant_inconnu(client, seed_compte):
@@ -485,7 +485,7 @@ def test_deconnexion_forcee_ne_revoque_pas_les_jetons_des_autres_comptes(
     )
 
 
-def test_deconnexion_forcee_rejette_le_relais_avec_l_ancien_jeton(
+def test_deconnexion_forcee_rejette_lancien_jeton(
     client, seed_compte, mistral_client_factice
 ):
     jeton_admin = _jeton_admin(client, seed_compte)
@@ -501,11 +501,11 @@ def test_deconnexion_forcee_rejette_le_relais_avec_l_ancien_jeton(
 
     client.post("/comptes/n.durand/deconnexion-forcee", headers=_autorisation(jeton_admin))
 
-    reponse_relais = client.post(
-        "/relais", json={"message": "Bonjour"}, headers=_autorisation(jeton_compte)
+    reponse_conversation = client.post(
+        "/conversations", json={"message": "Bonjour"}, headers=_autorisation(jeton_compte)
     )
 
-    assert reponse_relais.status_code == 401
+    assert reponse_conversation.status_code == 401
     assert mistral_client_factice.messages_recus == []
 
 

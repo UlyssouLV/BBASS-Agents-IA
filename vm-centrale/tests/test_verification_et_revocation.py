@@ -84,12 +84,12 @@ def test_deconnexion_sans_jeton_ne_plante_pas(client):
     assert reponse.status_code == 204
 
 
-def test_relais_rejette_un_jeton_revoque(client, mistral_client_factice, jeton_valide):
+def test_jeton_revoque_est_rejete(client, mistral_client_factice, jeton_valide):
     mistral_client_factice.repondre("Ne devrait jamais être retournée")
     client.delete("/auth/jeton", headers=_autorisation(jeton_valide))
 
     reponse = client.post(
-        "/relais", json={"message": "Bonjour"}, headers=_autorisation(jeton_valide)
+        "/conversations", json={"message": "Bonjour"}, headers=_autorisation(jeton_valide)
     )
 
     assert reponse.status_code == 401

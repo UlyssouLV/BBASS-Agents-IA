@@ -4,7 +4,7 @@ Logiciel d'agents IA pour le cabinet de géomètres-experts BBASS. L'objectif es
 
 ## État actuel
 
-Socle V1 en cours (branche `feat/v1-socle`) : backend local **poste** (interface HTML/CSS/JS) et API **VM centrale** (comptes SQLite + relais Mistral). Les agents métiers ne sont pas encore construits.
+**V1.1.1** disponible : backend local **poste** (interface HTML/CSS/JS) et API **VM centrale** (comptes administrateurs PostgreSQL, relais Mistral, conversations persistées avec historique borné, résumé glissant et profil de travail). Les agents métiers ne sont pas encore construits.
 
 ## Ce qu'on construit
 
@@ -19,90 +19,73 @@ Une application composée d'un backend Python et d'une interface web (HTML/CSS/J
 - Urbanisme
 - Détection de réseaux
 
-## Priorité du moment
+## Semaine du 14 au 18 septembre 2026
 
-Le travail actuel porte sur l'interface (chat, comptes, accès aux agents) et sur le système de déploiement sur les postes des agences. La configuration fine de chaque agent métier viendra dans un second temps.
+Point visé vendredi 18 septembre : **V1.3.0**.
 
-## Suite
+```mermaid
+flowchart LR
+  L14["Lundi 14<br/>socle chat"] --> M15["Mardi 15<br/>V1.1.0 comptes"]
+  M15 --> V111["V1.1.1<br/>persistance"]
+  V111 --> V112["V1.1.2<br/>pièces jointes"]
+  V112 --> V113["V1.1.3<br/>consommation"]
+  V113 --> V120["V1.2.0<br/>interface poste"]
+  V120 --> V130["V1.3.0<br/>agent Moduléo"]
+```
 
-Le développement des agents métiers eux-mêmes suivra, une fois l'interface et le déploiement en place.
+```mermaid
+flowchart LR
+  P["Poste<br/>UI locale"] -->|"jamais Mistral"| VM["VM Castries<br/>réseau interne"]
+  VM --> PG[("PostgreSQL")]
+  VM --> M["API Mistral"]
+```
 
-## Lancer en local
+### Travail réalisé
 
-Deux processus : la **VM centrale** (port 8000) puis le **poste** (port 8100). Le poste n'appelle jamais Mistral directement.
+- **Lundi 14** — environnement (éditeur, Git), dépôt GitHub, glossaire, spécifications, ADR ; première interface de chat ; API Mistral via la VM avec des comptes de test.
+- **Mardi 15** — socle chat (Pay as you go Mistral) ; **V1.1.0** (comptes administrateurs, collaborateurs, pôles, mots de passe, révocation de session) et tests utilisateurs ; échange Topo sans suite immédiate.
+- **Mercredi 16** — **V1.1.1** (persistance des conversations côté VM centrale : PostgreSQL, plusieurs fils par compte, historique multi-tours borné, résumé glissant, profil de travail) et écrans poste correspondants (conversations, profil de travail en lecture seule).
 
-### Prérequis
+### Reste à implémenter
 
-- **Python 3.11** (série figée : pas 3.12 / 3.13 / 3.14). Dernier installeur Windows officiel : [Python 3.11.9](https://www.python.org/downloads/release/python-3119/) — prendre *Windows installer (64-bit)*. Cocher **Add python.exe to PATH**. Les correctifs 3.11.x plus récents n'ont plus d'installeur (source only).
+- **V1.1.2** — pièces jointes : upload et envoi à Mistral (table déjà prévue en 1.1.1, encore vide).
+- **V1.1.3** — suivi de la consommation : tokens (entrée / sortie / total) par compte et par session, dates, modèle, coût ; API tarifs Mistral si elle existe.
+- **V1.2.0** — interface poste (modales, écran comptes, minimum de style ; framework ou HTML/CSS/JS à choisir).
+- **V1.3.0** — premier agent, pôle Administration, Moduléo (API, serveur de test, lecture seule, plan d’automatisme sans écriture ni exécution).
+
+### Attendu pour la fin de semaine (V1.3.0)
+
+- **Architecture** — logiciel sur le poste (interface web locale) ; VM à Castries, réseau interne seulement. La VM détient les comptes, les conversations et la clé API Mistral. PostgreSQL sur la VM (plus SQLite) ; Postgres local via Docker en développement.
+- **Connexion et chat** — identifiant / mot de passe ; session conservée (compte Windows) jusqu’à déconnexion ou révocation. Chat vers Mistral ; affichage prénom, nom, identifiant, agence et pôle(s). Plusieurs conversations par compte, persistées sur la VM (reprise après rechargement, relance, autre machine). Titre auto, renommage, suppression. Historique borné (3 derniers messages + résumé). Profil de travail consultable, sans modifier l’identité du compte. Conversations privées (y compris vis-à-vis d’un administrateur). Pièces jointes stockées sur la VM et transmises à Mistral. Suivi de consommation (tokens, dates, modèle, coût). UX poste minimale (modales, écran comptes).
+- **Comptes administrateurs** — droit global, distinct du pôle Administration. Premier administrateur créé en base à la main ; ensuite liste / création / modification depuis le poste (identité, email, agence, un ou plusieurs des six pôles). Mot de passe aléatoire à la création ou réinitialisation, à changer avant le chat. Déconnexion forcée. Promotion, rétrogradation et suppression : clé d’administration VM en plus ; impossible de supprimer ou rétrograder le dernier administrateur.
+- **Premier agent** — pôle Administration, Moduléo, serveur de test : version minimale pour montrer que ça marche.
+
+## Prérequis
+
+- **Python 3.11** (série figée : pas 3.12 / 3.13 / 3.14).
+  - Windows : dernier installeur officiel [Python 3.11.9](https://www.python.org/downloads/release/python-3119/) — prendre *Windows installer (64-bit)*. Cocher **Add python.exe to PATH**. Les correctifs 3.11.x plus récents n'ont plus d'installeur (source only).
+  - macOS : `brew install python@3.11` (Homebrew), ou l'installeur officiel [Python 3.11.9](https://www.python.org/downloads/release/python-3119/) (*macOS 64-bit universal2 installer*).
+- **Docker Desktop** pour le PostgreSQL local de la VM centrale ([ADR-0008](docs/adr/0008-postgresql-vm-centrale.md)) — pas nécessaire pour lancer les tests pytest (SQLite en mémoire).
 - Une clé API Mistral (console [La Plateforme](https://console.mistral.ai)) pour un vrai chat ; les tests pytest n'en ont pas besoin
-- Windows / PowerShell (chemins avec espaces : rester dans le dossier, ou tout quotter)
 
-### Une fois par machine (dépendances)
+## Démarrer
 
-Les paquets listés dans chaque `pyproject.toml` sont **épinglés en version exacte** (`==`), d’après l’environnement qui a fait tourner les tests. Pour les faire évoluer : changer le `pyproject.toml` à dessein, réinstaller, relancer pytest — pas un `pip install` « tout dernier ».
+Après avoir installé les prérequis ci-dessus (Python 3.11, Docker Desktop lancé), le parcours officiel est : cloner le dépôt, puis double-cliquer sur l'un des deux scripts à la racine correspondant à ton OS — aucune autre commande à taper.
 
-À la racine du clone, créer un venv **dans chaque** package et installer le projet + pytest :
+**Windows** (`.bat`) :
 
-```powershell
-cd vm-centrale
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -e ".[test]"
-copy .env.example .env
-```
+- `lancer-vm.bat` : démarre PostgreSQL puis la VM centrale seule (2 fenêtres : logs Postgres, VM centrale) — utile pour développer/tester la VM seule.
+- `lancer-logiciel.bat` : démarre PostgreSQL, la VM centrale et le poste (2 fenêtres : VM centrale, poste), puis ouvre le navigateur sur l'interface.
 
-Dans `vm-centrale/.env` : coller `MISTRAL_API_KEY=...` (jamais Git). `VM_ADMIN_KEY` sert à la révocation admin des jetons ; pour un simple chat local tu peux la laisser vide tant que tu n'appelles pas ces routes.
+**macOS** (`.command`, équivalents des `.bat` ci-dessus) :
 
-```powershell
-cd ..\poste
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -e ".[test]"
-copy .env.example .env
-```
+- `lancer-vm.command` : démarre PostgreSQL puis la VM centrale seule (2 fenêtres Terminal : logs Postgres, VM centrale).
+- `lancer-logiciel.command` : démarre PostgreSQL, la VM centrale et le poste (2 fenêtres Terminal : VM centrale, poste), puis ouvre le navigateur sur l'interface.
 
-`poste/.env` n'a **pas** de clé Mistral. Par défaut le poste joint `http://localhost:8000`.
+  Premier lancement : si un clic droit → *Ouvrir* est nécessaire (Gatekeeper, seulement si le dépôt a été téléchargé en `.zip` plutôt que cloné avec `git clone`), ou si le double-clic ne fait rien, exécute une fois dans un Terminal (à la racine du dépôt) `chmod +x lancer-vm.command lancer-logiciel.command` puis retente le double-clic.
 
-### Compte de test
+Les deux jeux de scripts sont autonomes : au besoin, ils créent les environnements virtuels (`vm-centrale/.venv`, et `poste/.venv` pour `lancer-logiciel.*`), installent les dépendances (`pip install -e .`) et créent les fichiers `.env` manquants à partir des `.env.example` correspondants (racine, `vm-centrale/`, `poste/`). Rien de manuel à faire au premier clone, ni après un `git pull` qui modifie un `pyproject.toml`. La logique commune aux deux scripts d'une même plateforme vit dans `scripts/` (`*.bat` pour Windows, `*.sh` pour macOS) afin d'éviter deux copies divergentes.
 
-Au premier lancement, `create_all` crée les tables **vides**. Il n'y a pas d'écran d'inscription : insérer un compte à la main (identifiant, hash PBKDF2, prénom, nom, agence, pôle). Depuis `vm-centrale`, après `pip install` :
+Pour un vrai chat (pas seulement le compte de test), colle ta clé API Mistral dans `MISTRAL_API_KEY` du fichier `vm-centrale/.env` — jamais dans Git.
 
-```powershell
-$env:PYTHONPATH = "src"
-.\.venv\Scripts\python.exe -c @"
-from vm_centrale.database import SessionLocal, init_db
-from vm_centrale.models import Compte
-from vm_centrale.security import hash_password
-init_db()
-db = SessionLocal()
-db.add(Compte(
-    identifiant='j.dupont',
-    mot_de_passe_hash=hash_password('azerty'),
-    prenom='Jean', nom='Dupont',
-    agence='Castries', pole='Foncier',
-))
-db.commit()
-"@
-```
-
-Si le schéma SQLite a changé (`create_all` n'ajoute pas de colonnes), supprimer `vm-centrale/vm_centrale.db` et ré-insérer le compte. Lancer la VM **depuis** `vm-centrale` pour que `.env` et `./vm_centrale.db` soient trouvés.
-
-### Démarrer (deux terminaux)
-
-Terminal 1 — VM :
-
-```powershell
-cd vm-centrale
-$env:PYTHONPATH = "src"
-.\.venv\Scripts\python.exe -m vm_centrale.main
-```
-
-Terminal 2 — poste :
-
-```powershell
-cd poste
-$env:PYTHONPATH = "src"
-.\.venv\Scripts\python.exe -m poste.main
-```
-
-Interface : [http://127.0.0.1:8100](http://127.0.0.1:8100) — connexion avec le compte seedé. Relancer la VM après toute modification de `.env`.
-
-Tests : dans `vm-centrale` puis dans `poste`, `.\.venv\Scripts\python.exe -m pytest`.
+Fermer les fenêtres arrête les processus correspondants (PostgreSQL continue de tourner en arrière-plan tant que `docker compose down` n'a pas été lancé). Les `.env` (racine, `vm-centrale/`, `poste/`) portent des identifiants/secrets locaux — ne jamais les commiter (déjà dans `.gitignore`).

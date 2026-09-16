@@ -17,10 +17,29 @@ const chatErreur = document.getElementById("chat-erreur");
 const formulaireChat = document.getElementById("formulaire-chat");
 const champMessage = document.getElementById("message");
 
+const conversationsErreur = document.getElementById("conversations-erreur");
+const listeConversations = document.getElementById("liste-conversations");
+const boutonNouvelleConversation = document.getElementById("bouton-nouvelle-conversation");
+const nouvelleConversationZone = document.getElementById("nouvelle-conversation");
+const formulaireNouvelleConversation = document.getElementById("formulaire-nouvelle-conversation");
+const nouveauMessageConversation = document.getElementById("nouveau-message-conversation");
+const nouvelleConversationErreur = document.getElementById("nouvelle-conversation-erreur");
+const conversationOuverte = document.getElementById("conversation-ouverte");
+const conversationTitre = document.getElementById("conversation-titre");
+
+let appelConversationEnCours = false;
+
 const ongletBoutonChat = document.getElementById("onglet-bouton-chat");
+const ongletBoutonProfilTravail = document.getElementById("onglet-bouton-profil-travail");
 const ongletBoutonComptes = document.getElementById("onglet-bouton-comptes");
 const ongletChat = document.getElementById("onglet-chat");
+const ongletProfilTravail = document.getElementById("onglet-profil-travail");
 const ongletComptes = document.getElementById("onglet-comptes");
+const profilTravailErreur = document.getElementById("profil-travail-erreur");
+const profilTravailVide = document.getElementById("profil-travail-vide");
+const profilTravailDonnees = document.getElementById("profil-travail-donnees");
+const profilTravailContenu = document.getElementById("profil-travail-contenu");
+const profilTravailDate = document.getElementById("profil-travail-date");
 const comptesErreur = document.getElementById("comptes-erreur");
 const corpsTableauComptes = document.getElementById("corps-tableau-comptes");
 const formulaireCreationCompte = document.getElementById("formulaire-creation-compte");
@@ -61,16 +80,72 @@ let identifiantEnCoursDeModification = null;
 let identifiantEnCoursDeChangementStatutAdmin = null;
 let estAdminCibleEnCours = null;
 let identifiantEnCoursDeSuppression = null;
+let conversationOuverteId = null;
 
-function afficherOngletChat() {
-  ongletChat.hidden = false;
+function cacherTousLesOnglets() {
+  ongletChat.hidden = true;
+  ongletProfilTravail.hidden = true;
   ongletComptes.hidden = true;
 }
 
+async function afficherOngletChat() {
+  cacherTousLesOnglets();
+  ongletChat.hidden = false;
+  afficherNouvelleConversation();
+  await chargerConversations();
+}
+
+async function afficherOngletProfilTravail() {
+  cacherTousLesOnglets();
+  ongletProfilTravail.hidden = false;
+  await chargerProfilTravail();
+}
+
 async function afficherOngletComptes() {
-  ongletChat.hidden = true;
+  cacherTousLesOnglets();
   ongletComptes.hidden = false;
   await chargerComptes();
+}
+
+async function chargerProfilTravail() {
+  profilTravailErreur.hidden = true;
+  profilTravailVide.hidden = true;
+  profilTravailDonnees.hidden = true;
+
+  let reponse;
+  try {
+    reponse = await fetch("/profil-travail");
+  } catch {
+    profilTravailErreur.textContent =
+      "Impossible de joindre le service de profil de travail. Réessayez plus tard.";
+    profilTravailErreur.hidden = false;
+    return;
+  }
+
+  if (reponse.status === 401) {
+    afficherEcranConnexion();
+    return;
+  }
+
+  if (!reponse.ok) {
+    const detail = await reponse.json().catch(() => null);
+    profilTravailErreur.textContent =
+      detail && detail.detail ? detail.detail : "Le chargement du profil de travail a échoué. Réessayez plus tard.";
+    profilTravailErreur.hidden = false;
+    return;
+  }
+
+  const profil = await reponse.json();
+  if (!profil.contenu) {
+    profilTravailVide.hidden = false;
+    return;
+  }
+
+  profilTravailContenu.textContent = profil.contenu;
+  profilTravailDate.textContent = profil.date_derniere_maj
+    ? `Dernière mise à jour : ${new Date(profil.date_derniere_maj).toLocaleString()}`
+    : "";
+  profilTravailDonnees.hidden = false;
 }
 
 function afficherEcranCompte(compte) {
@@ -117,6 +192,7 @@ function afficherEcranConnexion() {
   messages.replaceChildren();
   chatErreur.hidden = true;
   ongletBoutonComptes.hidden = true;
+  conversationOuverteId = null;
 }
 
 function ajouterMessage(auteur, texte) {
@@ -221,25 +297,39 @@ formulaireChat.addEventListener("submit", async (evenement) => {
   chatErreur.hidden = true;
 
   const message = champMessage.value;
-  if (!message.trim()) {
+  if (!message.trim() || conversationOuverteId === null || appelConversationEnCours) {
     return;
   }
 
+  // Capturée avant l'attente réseau : si l'utilisateur bascule vers une
+  // autre conversation pendant que cette requête est en vol (bouton
+  // réactivé après le tour précédent, ou une autre voie), la réponse de
+  // *cette* requête ne doit s'afficher que si la conversation ouverte est
+  // toujours celle-ci à son retour — jamais dans la conversation maintenant
+  // affichée à l'écran.
+  const idConversationCiblee = conversationOuverteId;
+  // Clé d'idempotence par tentative d'envoi : si cette requête est rejouée
+  // au niveau réseau avant d'atteindre le poste, la VM centrale ne persiste
+  // le message qu'une seule fois (voir vm_centrale.concurrence.CacheIdempotence).
+  const cleIdempotence = crypto.randomUUID();
+
+  appelConversationEnCours = true;
   ajouterMessage("collaborateur", message);
   champMessage.value = "";
   champMessage.disabled = true;
+  formulaireChat.querySelector('button[type="submit"]').disabled = true;
   chatChargement.hidden = false;
 
   try {
     let reponse;
     try {
-      reponse = await fetch("/chat", {
+      reponse = await fetch(`/conversations/${idConversationCiblee}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({ message, cle_idempotence: cleIdempotence }),
       });
     } catch {
-      chatErreur.textContent = "Impossible de joindre le service de chat. Réessayez plus tard.";
+      chatErreur.textContent = "Impossible de joindre le service de conversations. Réessayez plus tard.";
       chatErreur.hidden = false;
       return;
     }
@@ -258,19 +348,268 @@ formulaireChat.addEventListener("submit", async (evenement) => {
     }
 
     const corps = await reponse.json();
-    ajouterMessage("reponse", corps.reponse);
+    if (conversationOuverteId === idConversationCiblee) {
+      ajouterMessage("reponse", corps.reponse);
+    }
   } finally {
     chatChargement.hidden = true;
     // Un 401 a déjà basculé vers l'écran de connexion (champMessage n'y est
     // plus visible) : ne pas le réactiver/focaliser dans ce cas.
+    appelConversationEnCours = false;
     if (!ecranCompte.hidden) {
       champMessage.disabled = false;
+      formulaireChat.querySelector('button[type="submit"]').disabled = false;
       champMessage.focus();
     }
   }
 });
 
+function afficherNouvelleConversation() {
+  conversationOuverteId = null;
+  conversationOuverte.hidden = true;
+  nouvelleConversationZone.hidden = false;
+  nouvelleConversationErreur.hidden = true;
+}
+
+function afficherConversationOuverte(id, titre, messagesConversation) {
+  conversationOuverteId = id;
+  nouvelleConversationZone.hidden = true;
+  conversationOuverte.hidden = false;
+  conversationTitre.textContent = titre;
+  chatErreur.hidden = true;
+  messages.replaceChildren();
+  for (const message of messagesConversation) {
+    ajouterMessage(message.role === "user" ? "collaborateur" : "reponse", message.contenu);
+  }
+}
+
+function ligneConversation(conversation) {
+  const ligne = document.createElement("li");
+
+  const boutonOuvrir = document.createElement("button");
+  boutonOuvrir.type = "button";
+  boutonOuvrir.textContent = conversation.titre;
+  boutonOuvrir.addEventListener("click", () => ouvrirConversation(conversation.id));
+  ligne.append(boutonOuvrir);
+
+  const boutonRenommer = document.createElement("button");
+  boutonRenommer.type = "button";
+  boutonRenommer.textContent = "Renommer";
+  boutonRenommer.addEventListener("click", () => renommerConversation(conversation.id, conversation.titre));
+  ligne.append(boutonRenommer);
+
+  const boutonSupprimer = document.createElement("button");
+  boutonSupprimer.type = "button";
+  boutonSupprimer.textContent = "Supprimer";
+  boutonSupprimer.addEventListener("click", () => supprimerConversation(conversation.id));
+  ligne.append(boutonSupprimer);
+
+  return ligne;
+}
+
+async function chargerConversations() {
+  conversationsErreur.hidden = true;
+
+  let reponse;
+  try {
+    reponse = await fetch("/conversations");
+  } catch {
+    conversationsErreur.textContent = "Impossible de joindre le service de conversations. Réessayez plus tard.";
+    conversationsErreur.hidden = false;
+    return;
+  }
+
+  if (reponse.status === 401) {
+    afficherEcranConnexion();
+    return;
+  }
+
+  if (!reponse.ok) {
+    const detail = await reponse.json().catch(() => null);
+    conversationsErreur.textContent =
+      detail && detail.detail ? detail.detail : "Le chargement des conversations a échoué. Réessayez plus tard.";
+    conversationsErreur.hidden = false;
+    return;
+  }
+
+  const conversations = await reponse.json();
+  listeConversations.replaceChildren(...conversations.map(ligneConversation));
+}
+
+async function ouvrirConversation(id) {
+  conversationsErreur.hidden = true;
+
+  let reponse;
+  try {
+    reponse = await fetch(`/conversations/${id}`);
+  } catch {
+    conversationsErreur.textContent = "Impossible de joindre le service de conversations. Réessayez plus tard.";
+    conversationsErreur.hidden = false;
+    return;
+  }
+
+  if (reponse.status === 401) {
+    afficherEcranConnexion();
+    return;
+  }
+
+  if (!reponse.ok) {
+    const detail = await reponse.json().catch(() => null);
+    conversationsErreur.textContent =
+      detail && detail.detail ? detail.detail : "L'ouverture de la conversation a échoué. Réessayez plus tard.";
+    conversationsErreur.hidden = false;
+    return;
+  }
+
+  const conversation = await reponse.json();
+  afficherConversationOuverte(conversation.id, conversation.titre, conversation.messages);
+}
+
+boutonNouvelleConversation.addEventListener("click", afficherNouvelleConversation);
+
+formulaireNouvelleConversation.addEventListener("submit", async (evenement) => {
+  evenement.preventDefault();
+  nouvelleConversationErreur.hidden = true;
+
+  const message = nouveauMessageConversation.value;
+  if (!message.trim() || appelConversationEnCours) {
+    return;
+  }
+
+  // Voir formulaireChat : même garde contre une conversation ouverte entre
+  // temps, et même clé d'idempotence contre une requête rejouée au niveau
+  // réseau (cf. vm_centrale.concurrence.CacheIdempotence).
+  const idConversationAvantEnvoi = conversationOuverteId;
+  const cleIdempotence = crypto.randomUUID();
+
+  appelConversationEnCours = true;
+  nouveauMessageConversation.disabled = true;
+  formulaireNouvelleConversation.querySelector('button[type="submit"]').disabled = true;
+
+  try {
+    let reponse;
+    try {
+      reponse = await fetch("/conversations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message, cle_idempotence: cleIdempotence }),
+      });
+    } catch {
+      nouvelleConversationErreur.textContent =
+        "Impossible de joindre le service de conversations. Réessayez plus tard.";
+      nouvelleConversationErreur.hidden = false;
+      return;
+    }
+
+    if (reponse.status === 401) {
+      afficherEcranConnexion();
+      return;
+    }
+
+    if (!reponse.ok) {
+      const detail = await reponse.json().catch(() => null);
+      nouvelleConversationErreur.textContent =
+        detail && detail.detail ? detail.detail : "La création de la conversation a échoué. Réessayez plus tard.";
+      nouvelleConversationErreur.hidden = false;
+      return;
+    }
+
+    const corps = await reponse.json();
+    formulaireNouvelleConversation.reset();
+    if (conversationOuverteId === idConversationAvantEnvoi) {
+      afficherConversationOuverte(corps.conversation.id, corps.conversation.titre, [
+        { role: "user", contenu: message },
+        { role: "assistant", contenu: corps.reponse },
+      ]);
+    }
+    await chargerConversations();
+  } finally {
+    appelConversationEnCours = false;
+    if (!ecranCompte.hidden) {
+      nouveauMessageConversation.disabled = false;
+      formulaireNouvelleConversation.querySelector('button[type="submit"]').disabled = false;
+    }
+  }
+});
+
+async function renommerConversation(id, titreActuel) {
+  const nouveauTitre = window.prompt("Nouveau titre de la conversation :", titreActuel);
+  if (!nouveauTitre || !nouveauTitre.trim() || nouveauTitre === titreActuel) {
+    return;
+  }
+
+  conversationsErreur.hidden = true;
+
+  let reponse;
+  try {
+    reponse = await fetch(`/conversations/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ titre: nouveauTitre }),
+    });
+  } catch {
+    conversationsErreur.textContent = "Impossible de joindre le service de conversations. Réessayez plus tard.";
+    conversationsErreur.hidden = false;
+    return;
+  }
+
+  if (reponse.status === 401) {
+    afficherEcranConnexion();
+    return;
+  }
+
+  if (!reponse.ok) {
+    const detail = await reponse.json().catch(() => null);
+    conversationsErreur.textContent =
+      detail && detail.detail ? detail.detail : "Le renommage de la conversation a échoué. Réessayez plus tard.";
+    conversationsErreur.hidden = false;
+    return;
+  }
+
+  const conversation = await reponse.json();
+  if (conversationOuverteId === id) {
+    conversationTitre.textContent = conversation.titre;
+  }
+  await chargerConversations();
+}
+
+async function supprimerConversation(id) {
+  if (!window.confirm("Supprimer définitivement cette conversation ?")) {
+    return;
+  }
+
+  conversationsErreur.hidden = true;
+
+  let reponse;
+  try {
+    reponse = await fetch(`/conversations/${id}`, { method: "DELETE" });
+  } catch {
+    conversationsErreur.textContent = "Impossible de joindre le service de conversations. Réessayez plus tard.";
+    conversationsErreur.hidden = false;
+    return;
+  }
+
+  if (reponse.status === 401) {
+    afficherEcranConnexion();
+    return;
+  }
+
+  if (!reponse.ok) {
+    const detail = await reponse.json().catch(() => null);
+    conversationsErreur.textContent =
+      detail && detail.detail ? detail.detail : "La suppression de la conversation a échoué. Réessayez plus tard.";
+    conversationsErreur.hidden = false;
+    return;
+  }
+
+  if (conversationOuverteId === id) {
+    afficherNouvelleConversation();
+  }
+  await chargerConversations();
+}
+
 ongletBoutonChat.addEventListener("click", afficherOngletChat);
+ongletBoutonProfilTravail.addEventListener("click", afficherOngletProfilTravail);
 ongletBoutonComptes.addEventListener("click", afficherOngletComptes);
 
 function ligneCompte(compte) {

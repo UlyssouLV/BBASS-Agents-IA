@@ -2,44 +2,53 @@
 name: encadrer-implement
 description: >-
   After /implement, when tests pass or fail, when about to /code-review or
-  spawn Standards/Spec subagents, when labelling awaiting-merge, or when
-  choosing the next child issue on a PR. Wraps Matt Pocock /implement for
-  this repo: tests, then commit+push+awaiting-merge, then next ticket or
-  one branch review.
+  spawn Standards/Spec subagents, when closing a finished child ticket, or
+  when choosing the next child issue on a PR. Wraps Matt Pocock /implement
+  for this repo: tests, then commit+push+close the issue and remove
+  ready-for-agent, then next ticket or ask the user to test then
+  « Finalise la version ».
 ---
 
 # Wrap `/implement` (Matt Pocock)
 
 Use the plugin **`/implement`** for TDD and the ticket body. **This skill owns the end of the run.** If the plugin says to `/code-review` after one child issue, **skip it**.
 
-Do **not** `gh issue close` because a ticket is coded. Issues stay **Open** until merge to `main` (`Fixes` on the PR). See `docs/agents/triage-labels.md`.
+Closing a finished **child** ticket is required: GitHub **Blocked by** / **Blocking** only unblocks dependents when the blocker is **Closed**.
 
 ## 1. Tests
 
 When the ticket code is in:
 
 - Run the full pytest suite for each package you touched (`vm-centrale` and/or `poste`), with that package’s venv.
-- If **any** test fails: stop. No commit, no push, no label change. Report the failures.
+- If **any** test fails: stop. No commit, no push, no close. Report the failures.
 
-## 2. Tests green → commit, push, label
+## 2. Tests green → commit, push, close, drop `ready-for-agent`
 
-This path **is** permission to `git commit` and `git push` (unlike a random “the work is ready”).
+This path **is** permission to `git commit`, `git push`, `gh issue edit --remove-label`, and `gh issue close` for **this child**.
 
 1. Stage only the ticket files. Never `.env`, `*.db`, `.venv/`, secrets.
 2. Commit with a short message that says **why** (repo style: French, one or two sentences).
 3. `git push` the current feature branch (`-u origin HEAD` if it has no upstream). No force-push.
-4. Keep the GitHub issue **Open**. Add `awaiting-merge`. Remove `ready-for-agent` and `ready-for-human` if present (omit a `--remove-label` that would 404). Do not add `wontfix`.
+4. On the **child** you just implemented, remove `ready-for-agent` then close:
 
-Skip labelling the **parent** spec issue (e.g. #13) until every child for that PR is on the branch.
+   `gh issue edit <n> --remove-label "ready-for-agent"`
+
+   If GitHub says the label is already absent, continue.
+
+   `gh issue close <n> --comment "Implémenté sur <branch> (<sha>). Tests verts."`
+
+   Do not add `wontfix`. Do not use a label for “coded but not on main”. There is no `awaiting-merge`. A Closed child must not keep `ready-for-agent`.
+
+Do **not** close the **parent** spec issue here (e.g. #13). Squash-merge `Fixes #<parent>` does that. Do **not** `/implement` the parent: it has no `ready-for-agent` after tickets exist; it stays Blocked until every child is Closed.
 
 ## 3. More child tickets on this PR?
 
 Find the parent (`## Parent` / `Part of #n` on the issue you just finished). List **open** children of that parent.
 
-- **Done:** `awaiting-merge` (or already merged/closed on `main`).
-- **Still to build:** `ready-for-agent` (and not `wontfix`).
+- **Done:** Closed.
+- **Still to build:** Open, `ready-for-agent` (and not `wontfix`).
 
-A remaining ticket is **unblocked** when every issue named under **Blocked by** is done (treat a “Blocked by #1” *slice index* as the matching child if GitHub numbers differ — prefer an explicit `#14` style id when present).
+A remaining ticket is **unblocked** when GitHub reports no open blockers (`issue_dependencies_summary.blocked_by` is 0), or every issue in a fallback **Blocked by** body line is Closed.
 
 **If at least one unblocked child remains:**
 
@@ -47,13 +56,17 @@ A remaining ticket is **unblocked** when every issue named under **Blocked by** 
 - Propose the **next** unblocked child (lowest issue number among unblocked `ready-for-agent`).
 - Ask the user to `/clear` then `/implement #<next>`. Wait. Do not start the next implement in this same compacted window.
 
-**If no remaining children** (all PR children are `awaiting-merge` or on `main`):
+**If no remaining children** (all PR children are Closed):
 
-- Run **`/code-review` once**, fixed point **`main`** (full branch diff). Standards sources: `CLAUDE.md`.
-- Then stop unless the user asks to undraft/merge the PR.
+- Do **not** run `/code-review`.
+- Stop after telling the user, in French, exactly this handoff (adapt only the parent/PR numbers if useful):
+
+  Tous les tickets ont été implémentés. Veuillez faire des tests pour valider que tout est fonctionnel ; lorsque ce sera bon, lancez le skill **Finalise la version** (`finaliser-la-version`).
+
+- Do not merge, tag, or start the next version.
 
 ## Not this skill
 
 - Opening or merging the PR, GitHub Release, deleting the branch: skill `finaliser-la-version` (« Finalise la version »).
-- Re-implementing `awaiting-merge` tickets.
+- Re-implementing Closed children.
 - `needs-triage` work (e.g. #6) that is not a child of this PR.

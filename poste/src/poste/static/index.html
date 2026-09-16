@@ -55,6 +55,7 @@
       </span>
       <nav id="onglets-compte">
         <button type="button" id="onglet-bouton-chat">Discussion</button>
+        <button type="button" id="onglet-bouton-profil-travail">Profil de travail</button>
         <button type="button" id="onglet-bouton-comptes" hidden>Comptes</button>
       </nav>
       <button type="button" id="bouton-deconnexion">Se déconnecter</button>
@@ -62,15 +63,47 @@
     <p id="avertissement-session" role="alert" hidden></p>
 
     <section id="onglet-chat">
-      <div id="messages" role="log"></div>
-      <p id="chat-chargement" hidden>Envoi en cours…</p>
-      <p id="chat-erreur" role="alert" hidden></p>
+      <div id="conversations-panneau">
+        <h2>Conversations</h2>
+        <p id="conversations-erreur" role="alert" hidden></p>
+        <ul id="liste-conversations"></ul>
+        <button type="button" id="bouton-nouvelle-conversation">Nouvelle conversation</button>
+      </div>
 
-      <form id="formulaire-chat">
-        <label for="message" class="visually-hidden">Message</label>
-        <input type="text" id="message" name="message" autocomplete="off" required />
-        <button type="submit">Envoyer</button>
-      </form>
+      <div id="conversation-panneau">
+        <div id="nouvelle-conversation">
+          <h2>Nouvelle conversation</h2>
+          <form id="formulaire-nouvelle-conversation">
+            <label for="nouveau-message-conversation" class="visually-hidden">Premier message</label>
+            <input type="text" id="nouveau-message-conversation" name="message" autocomplete="off" required />
+            <button type="submit">Envoyer</button>
+          </form>
+          <p id="nouvelle-conversation-erreur" role="alert" hidden></p>
+        </div>
+
+        <div id="conversation-ouverte" hidden>
+          <h2 id="conversation-titre"></h2>
+          <div id="messages" role="log"></div>
+          <p id="chat-chargement" hidden>Envoi en cours…</p>
+          <p id="chat-erreur" role="alert" hidden></p>
+
+          <form id="formulaire-chat">
+            <label for="message" class="visually-hidden">Message</label>
+            <input type="text" id="message" name="message" autocomplete="off" required />
+            <button type="submit">Envoyer</button>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <section id="onglet-profil-travail" hidden>
+      <h2>Profil de travail</h2>
+      <p id="profil-travail-erreur" role="alert" hidden></p>
+      <p id="profil-travail-vide" hidden>Aucun profil de travail enregistré pour le moment.</p>
+      <div id="profil-travail-donnees" hidden>
+        <p id="profil-travail-contenu"></p>
+        <p id="profil-travail-date"></p>
+      </div>
     </section>
 
     <section id="onglet-comptes" hidden>

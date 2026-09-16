@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, Field, field_validator
 
 from vm_centrale.poles import POLES_VALIDES
@@ -86,9 +88,60 @@ class StatutAdminRequest(BaseModel):
     est_admin: bool
 
 
-class RelaisRequest(BaseModel):
+class ConversationCreeRequest(BaseModel):
     message: str = Field(min_length=1, max_length=8000)
+    # Optionnelle (compatibilité avec un appelant qui n'en fournit pas) :
+    # si fournie, une requête rejouée avec la même clé pour le même compte
+    # reçoit la réponse déjà produite au lieu de créer une seconde
+    # conversation (cf. vm_centrale.concurrence.CacheIdempotence).
+    cle_idempotence: str | None = None
 
 
-class RelaisResponse(BaseModel):
+class ConversationResume(BaseModel):
+    id: int
+    titre: str
+
+
+class ConversationCreeResponse(BaseModel):
+    conversation: ConversationResume
     reponse: str
+
+
+class ConversationResponse(BaseModel):
+    id: int
+    titre: str
+    date_derniere_activite: datetime
+
+
+class MessageResponse(BaseModel):
+    id: int
+    role: str
+    contenu: str
+    date_creation: datetime
+
+
+class ConversationDetailResponse(BaseModel):
+    id: int
+    titre: str
+    date_creation: datetime
+    date_derniere_activite: datetime
+    messages: list[MessageResponse]
+
+
+class ConversationRenommeeRequest(BaseModel):
+    titre: str = Field(min_length=1)
+
+
+class MessageEnvoyeRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=8000)
+    # Voir ConversationCreeRequest.cle_idempotence.
+    cle_idempotence: str | None = None
+
+
+class MessageEnvoyeResponse(BaseModel):
+    reponse: str
+
+
+class ProfilTravailResponse(BaseModel):
+    contenu: str
+    date_derniere_maj: datetime | None

@@ -2,16 +2,21 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
-from vm_centrale.autorisation import exiger_cle_admin_vm, get_compte_admin
+from vm_centrale.autorisation import (
+    exiger_cle_admin_vm,
+    get_compte_admin,
+    get_identifiant_compte_du_jeton,
+)
 from vm_centrale.database import get_db
 from vm_centrale.jetons import JetonStore, get_jeton_store
-from vm_centrale.models import Compte, ComptePole
+from vm_centrale.models import Compte, ComptePole, ProfilTravail
 from vm_centrale.schemas import (
     CompteCreeRequest,
     CompteCreeResponse,
     CompteModifieRequest,
     CompteResponse,
     MotDePasseReinitialiseResponse,
+    ProfilTravailResponse,
     StatutAdminRequest,
 )
 from vm_centrale.security import generer_mot_de_passe_aleatoire, hash_password
@@ -24,6 +29,7 @@ _DERNIER_ADMINISTRATEUR = "Impossible de retirer le dernier compte administrateu
 _DERNIER_ADMINISTRATEUR_SUPPRESSION = (
     "Impossible de supprimer le dernier compte administrateur restant"
 )
+_ACCES_PROFIL_TRAVAIL_REFUSE = "Le profil de travail n'est consultable que par son propre compte"
 
 
 def _vers_reponse(compte: Compte) -> CompteResponse:
@@ -215,3 +221,24 @@ def modifier_statut_admin(
     db.refresh(compte)
 
     return _vers_reponse(compte)
+
+
+@router.get("/{identifiant}/profil-travail", response_model=ProfilTravailResponse)
+def consulter_profil_travail(
+    identifiant: str,
+    identifiant_du_jeton: str = Depends(get_identifiant_compte_du_jeton),
+    db: Session = Depends(get_db),
+) -> ProfilTravailResponse:
+    # Lecture seule, strictement réservée au compte propriétaire : le droit de
+    # compte administrateur porte sur la gestion des comptes, jamais sur le
+    # contenu des conversations/profils (spec V1.1.1) — 403 même pour un
+    # jeton est_admin=true, y compris celui du compte propriétaire s'il ne
+    # correspond pas à `identifiant`.
+    if identifiant_du_jeton != identifiant:
+        raise HTTPException(status_code=403, detail=_ACCES_PROFIL_TRAVAIL_REFUSE)
+
+    profil = db.get(ProfilTravail, identifiant)
+    if profil is None:
+        return ProfilTravailResponse(contenu="", date_derniere_maj=None)
+
+    return ProfilTravailResponse(contenu=profil.contenu, date_derniere_maj=profil.date_derniere_maj)

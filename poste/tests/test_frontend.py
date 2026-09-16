@@ -47,3 +47,41 @@ def test_front_end_appelle_l_endpoint_de_changement_de_mot_de_passe(client):
 
     assert '"/mot-de-passe"' in js
     assert "nouveau_mot_de_passe" in js
+
+
+def test_front_end_expose_un_onglet_profil_de_travail_sans_action_de_modification(client):
+    # Issue #39 : lecture seule, aucune modale/formulaire de réinitialisation
+    # ne doit accompagner cet onglet (contrairement aux onglets Comptes).
+    html = client.get("/").text
+    js = client.get("/static/app.js").text
+
+    assert 'id="onglet-bouton-profil-travail"' in html
+    assert 'id="onglet-profil-travail" hidden' in html
+    assert '"/profil-travail"' in js
+    assert "afficherOngletProfilTravail" in js
+
+
+def test_front_end_bloque_un_second_envoi_tant_que_mistral_n_a_pas_repondu(client):
+    js = client.get("/static/app.js").text
+
+    assert "appelConversationEnCours" in js
+    assert "|| appelConversationEnCours" in js
+
+
+def test_front_end_envoie_une_cle_idempotence_a_chaque_envoi(client):
+    # Défense en profondeur côté poste (cf. vm_centrale.concurrence.CacheIdempotence)
+    # contre une requête rejouée au niveau réseau : une clé aléatoire par
+    # tentative, jamais réutilisée d'un envoi à l'autre.
+    js = client.get("/static/app.js").text
+
+    assert js.count("crypto.randomUUID()") >= 2
+    assert "cle_idempotence: cleIdempotence" in js
+
+
+def test_front_end_naffiche_pas_la_reponse_dans_la_mauvaise_conversation(client):
+    # La réponse d'un envoi ne doit s'afficher que si la conversation ouverte
+    # à la résolution du fetch est toujours celle ciblée par la requête.
+    js = client.get("/static/app.js").text
+
+    assert "idConversationCiblee" in js
+    assert "conversationOuverteId === idConversationCiblee" in js
