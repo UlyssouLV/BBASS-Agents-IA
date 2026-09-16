@@ -11,7 +11,7 @@ description: >-
 
 Triggered by **« Finalise la version »** (or equivalent). This **is** permission to create a Release, squash-merge the PR into `main`, and delete the feature branch — **after** the checks below pass.
 
-A version = one feature branch + one PR that ships a **set** of child issues (parent spec). Starting a version (create branch/PR) is **out of this skill**.
+A version = one feature branch + one PR that ships a **set** of child issues (parent spec). Starting a version is skill `ouvrir-la-version` (« Ouvre la version »).
 
 ## 0. Locate the PR
 
@@ -19,17 +19,29 @@ Current branch must not be `main`. Resolve the open PR for this branch (`gh pr v
 
 ## 1. Every related issue is published
 
-Related = listed in the PR body (`Fixes` / `Part of`) **and** open children of the parent spec (e.g. #13) that are in scope for this PR. Ignore `wontfix` and issues explicitly out of the version (e.g. #6).
+Related = listed in the PR body (`Fixes` / `Part of`) **and** children of the parent spec that are in scope for this PR. Ignore `wontfix` and issues explicitly out of the version (e.g. #6).
 
-**Published** = each child is `awaiting-merge` (still Open) or already Closed because it landed on `main`.
+**Published** = each in-scope **child** is **Closed** (closed by `encadrer-implement` after green tests, or already on `main`).
 
-If any in-scope child is still `ready-for-agent` / `ready-for-human` / `needs-info`: **stop**. List what’s missing. Do not tag, merge, or delete.
+If any in-scope child is still **Open**: **stop**. List what’s missing. Do not tag, merge, or delete.
 
-When every in-scope **child** is `awaiting-merge`, label the **parent spec** (e.g. #13) the same way: Open, `awaiting-merge`, remove `ready-for-agent`. That is “the version’s spec is complete on the branch”, not a GitHub close.
+The **parent** spec may still be Open until squash. Leave it Open here.
 
-If the PR body’s `Fixes` line would not close every in-scope child **and the parent** on squash, **edit the PR body first** (`Fixes #n` repeated per issue, not a single `Fixes #1 #2`). Include `Fixes #13` (or whatever the parent number is).
+If the PR body’s `Fixes` line would not close the **parent** on squash, **edit the PR body first** (`Fixes #n` once per issue; include `Fixes #<parent>`). Children already Closed are fine to leave in `Fixes` (no-op).
 
-Do **not** `gh issue close` by hand.
+Do **not** `gh issue close` children at this step (they should already be Closed). Do **not** close the parent by hand — squash `Fixes` does that.
+
+## 1b. Docs must match this version (before tag and squash)
+
+Read, against the parent spec / ADRs / code that this PR actually ships:
+
+- `README.md` — « État actuel », lancement, comptes de test : no leftover previous-version branch names or « not built yet » for features this version delivered.
+- `CONTEXT.md` — glossary and ADR links match the model (new terms, reversed V1 decisions).
+- `CLAUDE.md` — Standards pointers still valid (files exist; `/code-review` rules still true).
+- `AGENTS.md` — skills named here exist under `.claude/skills/`; implement / finalise cycle matches those skills.
+- `docs/` — spec for this version under `docs/specs/` ; new ADRs under `docs/adr/` if decisions changed ; `docs/agents/` does not point at deleted skills.
+
+If anything is stale: **stop the release**. Update those files on the **feature branch**, commit (French why-message), `git push`. Never `.env` / `*.db` / `.venv`. Then re-read this section. Do **not** create the tag or squash until this gate is green — the tag must include the docs.
 
 ## 2. Tag + Release **before** squash (keeps branch history)
 
@@ -45,8 +57,9 @@ Notes are for a human who did not watch the PR (French unless the repo’s user-
 
 - What this version is for (problem / parent spec).
 - What you can **do** now (features, not a dump of commit subjects).
+- **Link to the PR** (`https://github.com/<owner>/<repo>/pull/<n>` and `/commits`) so the ticket-by-ticket history is one click after squash.
 - Child issues included (`Fixes`).
-- What is **not** in this version if it could be confused.
+- What is **not** in this version if it could be confused. For each ADR named, a **markdown link** to the file on this tag (`https://github.com/<owner>/<repo>/blob/vX.Y.Z/docs/adr/NNNN-….md`). Same for leftover issues (`#6`).
 
 The tag must be **pushed** and the release **visible** before step 3. After the branch is deleted, `git log vX.Y.Z` still shows the development commits.
 

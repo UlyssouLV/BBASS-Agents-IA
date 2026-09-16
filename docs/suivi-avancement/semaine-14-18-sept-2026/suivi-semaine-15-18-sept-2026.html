@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <title>Brouillon — Suivi d’avancement — semaine du 14 au 18 septembre 2026</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 12mm 14mm 12mm 14mm;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #fff;
+      color: #1c1917;
+      font-family: "Segoe UI", Calibri, "Liberation Sans", sans-serif;
+      font-size: 9.2pt;
+      line-height: 1.34;
+    }
+    .sheet {
+      max-width: 180mm;
+      margin: 0 auto;
+      position: relative;
+    }
+    .semaine {
+      position: absolute;
+      top: 0;
+      right: 0;
+      font-size: 8.5pt;
+      font-weight: 650;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #1e3a5f;
+      border: 1pt solid #1e3a5f;
+      padding: 3pt 7pt;
+      background: #fff;
+    }
+    header {
+      border-bottom: 2.5pt solid #1e3a5f;
+      padding-bottom: 7pt;
+      margin-bottom: 10pt;
+    }
+    .logo {
+      display: block;
+      height: 14mm;
+      width: auto;
+      margin: 0 auto 10pt;
+    }
+    .kicker {
+      font-size: 8.5pt;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: #57534e;
+      margin: 0 0 4pt;
+    }
+    h1 {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 16.5pt;
+      font-weight: 400;
+      color: #1e3a5f;
+      margin: 0 0 6pt;
+      line-height: 1.2;
+    }
+    .meta {
+      font-size: 9.5pt;
+      color: #44403c;
+      margin: 0;
+    }
+    h2 {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 11pt;
+      font-weight: 600;
+      color: #1e3a5f;
+      margin: 8pt 0 4pt;
+      padding-top: 2pt;
+    }
+    p { margin: 0 0 6pt; }
+    .lead {
+      font-size: 10pt;
+      color: #292524;
+      margin-bottom: 8pt;
+    }
+    ul {
+      margin: 0 0 6pt;
+      padding-left: 1.1em;
+    }
+    li { margin-bottom: 2pt; }
+    .recap {
+      background: #f5f3ef;
+      border-left: 3.5pt solid #1e3a5f;
+      padding: 8pt 12pt 10pt;
+      margin: 0 0 8pt;
+    }
+    .recap > p,
+    .recap p.recap-intro {
+      margin: 0 0 6pt;
+      font-size: 9.5pt;
+    }
+    .recap h3 {
+      font-family: "Segoe UI", Calibri, sans-serif;
+      font-size: 9.5pt;
+      font-weight: 650;
+      color: #1e3a5f;
+      margin: 8pt 0 3pt;
+    }
+    .recap h3:first-of-type { margin-top: 2pt; }
+    .recap ul {
+      margin: 0 0 2pt;
+    }
+    .recap .hors {
+      margin-top: 8pt;
+      padding-top: 6pt;
+      border-top: 0.75pt solid #d6d3d1;
+      font-size: 9pt;
+      color: #44403c;
+    }
+    .jour {
+      margin-bottom: 5pt;
+      page-break-inside: avoid;
+    }
+    .jour h3 {
+      font-size: 10.5pt;
+      font-weight: 650;
+      margin: 0 0 4pt;
+      color: #1c1917;
+    }
+    .echeance {
+      color: #1e3a5f;
+      font-weight: 650;
+    }
+    footer {
+      margin-top: 10pt;
+      padding-top: 6pt;
+      border-top: 0.75pt solid #d6d3d1;
+      font-size: 8pt;
+      color: #78716c;
+    }
+    @media print {
+      body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body>
+  <div class="sheet">
+    <div class="semaine">14–18 sept. 2026</div>
+    <header>
+      <img class="logo" src="../logo-bbass.png" alt="BBASS géomètre-expert" />
+      <p class="kicker">Alternance Agents IA · 2026–2027</p>
+      <h1>Suivi d’avancement (brouillon)</h1>
+      <p class="meta">Semaine du 14 au 18 septembre 2026 · Ulysse Long<br />
+      Dépôt : github.com/UlyssouLV/BBASS-Agents-IA</p>
+    </header>
+
+    <h2>Réalisé</h2>
+
+    <div class="jour">
+      <h3>Lundi 14 septembre</h3>
+      <ul>
+        <li>Installation de l’environnement de travail (éditeur, Git, outillage).</li>
+        <li>Initialisation du dépôt GitHub, du glossaire métier, des spécifications et des décisions d’architecture.</li>
+        <li>Première livraison : une interface pour échanger avec Mistral.</li>
+        <li>Vérification : l’API Mistral répond via la VM, avec des comptes de test.</li>
+      </ul>
+    </div>
+
+    <div class="jour">
+      <h3>Mardi 15 septembre</h3>
+      <ul>
+        <li>Finalisation du socle de chat (connexion Pay as you go Mistral).</li>
+        <li>Conception puis développement de la <strong>V1.1.0</strong> : comptes administrateurs, gestion des comptes collaborateurs, pôles, mots de passe, révocation de session.</li>
+        <li>Tests utilisateurs de la V1.1.0.</li>
+        <li>Premier échange avec l’équipe Topo sur les outils susceptibles d’être branchés plus tard (sans suite immédiate).</li>
+      </ul>
+    </div>
+
+    <h2>À implémenter (à partir de mercredi)</h2>
+    <ul>
+      <li><strong>V1.1.1</strong> — persistance des conversations (recherche Mistral ; historique multi-tours si ce n’est pas stocké chez eux).</li>
+      <li><strong>V1.1.2</strong> — consommation : tokens (entrée / sortie / total) par compte et par session, dates, modèle, coût ; API tarifs Mistral si elle existe.</li>
+      <li><strong>V1.2.0</strong> — interface poste (modales, écran comptes, minimum de style ; framework ou HTML/CSS/JS à choisir).</li>
+      <li><strong>V1.3.0</strong> — premier agent, pôle Administration, Moduléo (API, serveur de test, lecture seule, plan d’automatisme sans écriture ni exécution).</li>
+    </ul>
+
+    <div class="recap">
+      <p><strong>Point vendredi 18 septembre — version attendue : V1.3.0</strong></p>
+      <h3>Architecture</h3>
+      <ul>
+        <li>Logiciel sur le poste (interface web locale) ; VM à Castries, réseau interne seulement.</li>
+        <li>La VM détient la base des comptes et la clé API Mistral ; le poste n’appelle jamais Mistral directement.</li>
+      </ul>
+      <h3>Connexion et chat</h3>
+      <ul>
+        <li>Identifiant et mot de passe ; session conservée (identifiants Windows) jusqu’à déconnexion ou révocation.</li>
+        <li>Chat vers Mistral ; affichage prénom, nom, identifiant, agence et pôle(s).</li>
+        <li>Fils de discussion persistés (historique multi-tours).</li>
+        <li>Consommation enregistrée : tokens (entrée, sortie, total) par compte et par session, dates, modèle, estimation du coût.</li>
+        <li>Interface poste : minimum d’UX (modales, écran comptes).</li>
+      </ul>
+      <h3>Comptes administrateurs</h3>
+      <ul>
+        <li>Droit global, distinct du pôle Administration. Premier administrateur créé en base à la main.</li>
+        <li>Depuis le poste : liste, création, modification (identité, email, agence, un ou plusieurs des six pôles).</li>
+        <li>Mot de passe aléatoire à la création ou à la réinitialisation ; obligation de le changer avant le chat.</li>
+        <li>Déconnexion forcée. Promotion, rétrogradation et suppression définitive : clé d’administration VM en plus ; impossible de supprimer ou rétrograder le dernier administrateur.</li>
+      </ul>
+      <h3>Premier agent</h3>
+      <ul>
+        <li>Pôle Administration, logiciel Moduléo, serveur de test : version minimale pour montrer que ça marche.</li>
+      </ul>
+    </div>
+  </div>
+</body>
+</html>

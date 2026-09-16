@@ -12,14 +12,12 @@ The skills speak in terms of five canonical triage roles. This file maps those r
 
 When a skill mentions a role (e.g. "apply the AFK-ready triage label"), use the corresponding label string from this table.
 
-## Lifecycle (not a Matt Pocock triage role)
+## Lifecycle
 
-GitHub issues are only **Open** or **Closed**. This extra label marks work that is **coded on a feature branch** but **not yet in `main`**. Do not `gh issue close` for that.
+GitHub issues are **Open** or **Closed**. There is **no** `awaiting-merge` label.
 
-| Label in our tracker | Meaning |
-| -------------------- | ------- |
-| `awaiting-merge`     | Implemented on the feature branch. Issue stays **Open**. Remove `ready-for-agent` / `ready-for-human` so agents do not re-implement it. GitHub closes the issue at PR merge via `Fixes #n`. |
+When `/implement` finishes green: skill `encadrer-implement` commits, pushes, then **`gh issue close`** on that **child**. Closing the blocker updates GitHub **Blocking** / **Blocked by** so the next tickets can start.
 
-When `/implement` finishes green: skill `encadrer-implement` commits, pushes, adds `awaiting-merge` and removes the ready-* labels.
+The **parent** spec stays Open until squash-merge (`Fixes #<parent>`). Code can still exist only on the feature branch until « Finalise la version ».
 
 Edit the right-hand column of the triage table to match whatever vocabulary you actually use.

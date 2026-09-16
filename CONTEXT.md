@@ -46,3 +46,11 @@ _Avoid_: clé admin (seul, ambigu avec compte administrateur)
 **Session**:
 L'état de connexion d'un compte sur un poste. Persiste au-delà de la fermeture/relance de l'appli et d'un redémarrage complet du poste : l'identifiant et le jeton sont conservés via le gestionnaire d'identifiants Windows (chiffré, lié au compte Windows courant) côté poste, et le jeton est lui-même persisté côté VM centrale (survit à un redémarrage de la VM). Se termine par une déconnexion explicite depuis le poste (qui invalide aussi le jeton côté VM) ou par une déconnexion forcée déclenchée côté VM (invalide tous les jetons actifs du compte) ; jamais par expiration automatique en V1. Si le gestionnaire d'identifiants Windows est indisponible, le poste dégrade silencieusement vers une session en mémoire pour la durée du processus.
 _Avoid_: session applicative limitée au process (ancien comportement, remplacé)
+
+**Conversation**:
+Un fil d'échanges avec l'IA rattaché à un compte, nommé automatiquement à partir de son premier message. Un compte peut avoir plusieurs conversations. Persistée par la VM centrale ([ADR-0008](docs/adr/0008-postgresql-vm-centrale.md)), jamais par le stockage propre de Mistral — voir la Solution de [la spec 1.1.1](docs/specs/v1.1.1-persistance-conversations.md) pour les raisons (confidentialité, isolation entre comptes). Strictement privée à son compte : ni un autre compte ni un compte administrateur n'y accède.
+_Avoid_: fil, thread, session de chat (Session ci-dessus a déjà un sens différent)
+
+**Profil de travail**:
+Un résumé synthétique par compte de sa façon de travailler, construit au fil de ses conversations pour donner à l'IA un contexte sur qui lui parle. Distinct de l'historique d'une conversation donnée. Ne porte jamais de fait d'identité (prénom, nom, pôle, agence) : ceux-ci restent uniquement portés par Compte, jamais réinférés depuis une conversation. Consultable en lecture seule par le compte concerné ; pas par un compte administrateur.
+_Avoid_: mémoire (ambigu avec le résumé propre à chaque conversation, voir la spec 1.1.1), profil utilisateur
