@@ -53,7 +53,7 @@ def creer_conversation(
 ) -> ConversationCreeResponse:
     jeton = _jeton_de_session(session)
     try:
-        cree = client.creer_conversation(jeton, requete.message)
+        cree = client.creer_conversation(jeton, requete.message, requete.cle_idempotence)
     except Exception as erreur:
         raise _erreur_vm_vers_http(session, erreur) from erreur
 
@@ -155,7 +155,9 @@ def envoyer_message(
 ) -> MessageEnvoyeResponse:
     jeton = _jeton_de_session(session)
     try:
-        reponse = client.envoyer_message(jeton, conversation_id, requete.message)
+        reponse = client.envoyer_message(
+            jeton, conversation_id, requete.message, requete.cle_idempotence
+        )
     except Exception as erreur:
         raise _erreur_vm_vers_http(session, erreur) from erreur
 

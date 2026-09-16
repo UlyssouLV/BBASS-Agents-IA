@@ -66,3 +66,22 @@ def test_front_end_bloque_un_second_envoi_tant_que_mistral_n_a_pas_repondu(clien
 
     assert "appelConversationEnCours" in js
     assert "|| appelConversationEnCours" in js
+
+
+def test_front_end_envoie_une_cle_idempotence_a_chaque_envoi(client):
+    # Défense en profondeur côté poste (cf. vm_centrale.concurrence.CacheIdempotence)
+    # contre une requête rejouée au niveau réseau : une clé aléatoire par
+    # tentative, jamais réutilisée d'un envoi à l'autre.
+    js = client.get("/static/app.js").text
+
+    assert js.count("crypto.randomUUID()") >= 2
+    assert "cle_idempotence: cleIdempotence" in js
+
+
+def test_front_end_naffiche_pas_la_reponse_dans_la_mauvaise_conversation(client):
+    # La réponse d'un envoi ne doit s'afficher que si la conversation ouverte
+    # à la résolution du fetch est toujours celle ciblée par la requête.
+    js = client.get("/static/app.js").text
+
+    assert "idConversationCiblee" in js
+    assert "conversationOuverteId === idConversationCiblee" in js

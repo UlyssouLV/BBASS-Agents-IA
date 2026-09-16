@@ -16,6 +16,21 @@ _CLE_ADMIN_INVALIDE = "Clé d'administration manquante ou invalide"
 _bearer_scheme = HTTPBearer(auto_error=False)
 
 
+def get_identifiant_compte_du_jeton(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
+    jetons: JetonStore = Depends(get_jeton_store),
+) -> str:
+    # Dépendance partagée par tout endpoint qui n'exige qu'un jeton valide,
+    # sans droit de compte administrateur (routers/conversations.py, et
+    # GET /comptes/{identifiant}/profil-travail) : get_compte_admin ci-dessous
+    # ne convient pas à ces endpoints, qui autorisent n'importe quel compte,
+    # pas seulement un administrateur.
+    identifiant = jetons.identifiant_pour(credentials.credentials) if credentials is not None else None
+    if identifiant is None:
+        raise HTTPException(status_code=401, detail=_JETON_INVALIDE)
+    return identifiant
+
+
 def get_compte_admin(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
     db: Session = Depends(get_db),

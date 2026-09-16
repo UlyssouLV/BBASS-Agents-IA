@@ -90,6 +90,11 @@ class StatutAdminRequest(BaseModel):
 
 class ConversationCreeRequest(BaseModel):
     message: str = Field(min_length=1, max_length=8000)
+    # Optionnelle (compatibilité avec un appelant qui n'en fournit pas) :
+    # si fournie, une requête rejouée avec la même clé pour le même compte
+    # reçoit la réponse déjà produite au lieu de créer une seconde
+    # conversation (cf. vm_centrale.concurrence.CacheIdempotence).
+    cle_idempotence: str | None = None
 
 
 class ConversationResume(BaseModel):
@@ -129,6 +134,8 @@ class ConversationRenommeeRequest(BaseModel):
 
 class MessageEnvoyeRequest(BaseModel):
     message: str = Field(min_length=1, max_length=8000)
+    # Voir ConversationCreeRequest.cle_idempotence.
+    cle_idempotence: str | None = None
 
 
 class MessageEnvoyeResponse(BaseModel):

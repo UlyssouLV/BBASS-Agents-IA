@@ -244,10 +244,12 @@ class VmCentraleClient:
             doit_changer_mot_de_passe=corps["doit_changer_mot_de_passe"],
         )
 
-    def creer_conversation(self, jeton: str, message: str) -> ConversationCree:
+    def creer_conversation(
+        self, jeton: str, message: str, cle_idempotence: str | None = None
+    ) -> ConversationCree:
         reponse = _http_client.post(
             f"{VM_CENTRALE_BASE_URL}/conversations",
-            json={"message": message},
+            json={"message": message, "cle_idempotence": cle_idempotence},
             headers={"Authorization": f"Bearer {jeton}"},
         )
         _lever_si_jeton_invalide(reponse)
@@ -304,10 +306,16 @@ class VmCentraleClient:
         _lever_si_conversation_introuvable(reponse)
         reponse.raise_for_status()
 
-    def envoyer_message(self, jeton: str, conversation_id: int, message: str) -> str:
+    def envoyer_message(
+        self,
+        jeton: str,
+        conversation_id: int,
+        message: str,
+        cle_idempotence: str | None = None,
+    ) -> str:
         reponse = _http_client.post(
             f"{VM_CENTRALE_BASE_URL}/conversations/{conversation_id}/messages",
-            json={"message": message},
+            json={"message": message, "cle_idempotence": cle_idempotence},
             headers={"Authorization": f"Bearer {jeton}"},
         )
         _lever_si_jeton_invalide(reponse)

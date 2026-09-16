@@ -1,7 +1,12 @@
 import json
 from datetime import datetime
 
-from vm_centrale.models import Conversation, Message, ProfilTravail
+from fastapi.testclient import TestClient
+
+from vm_centrale.database import get_db
+from vm_centrale.jetons import JetonStore, get_jeton_store
+from vm_centrale.main import app
+from vm_centrale.models import Conversation, ProfilTravail
 
 
 def _autorisation(jeton: str) -> dict[str, str]:
@@ -34,7 +39,7 @@ def _jeton_admin(client, seed_compte, identifiant: str = "a.martin") -> str:
 
 
 def test_premier_message_cree_la_conversation_persiste_les_messages_et_titre(
-    client, mistral_client_factice, jeton_valide, db_session
+    client, mistral_client_factice, jeton_valide
 ):
     mistral_client_factice.repondre("Bonjour, comment puis-je vous aider ?", "Salutations")
 
@@ -49,18 +54,10 @@ def test_premier_message_cree_la_conversation_persiste_les_messages_et_titre(
     assert mistral_client_factice.messages_recus[0] == "Bonjour"
 
     conversation_id = corps["conversation"]["id"]
-    conversation = db_session.get(Conversation, conversation_id)
-    assert conversation is not None
-    assert conversation.identifiant_compte == "j.dupont"
-    assert conversation.titre == "Salutations"
-
-    messages = (
-        db_session.query(Message)
-        .filter(Message.conversation_id == conversation_id)
-        .order_by(Message.id)
-        .all()
-    )
-    assert [(m.role, m.contenu) for m in messages] == [
+    detail = client.get(f"/conversations/{conversation_id}", headers=_autorisation(jeton_valide))
+    assert detail.status_code == 200
+    assert detail.json()["titre"] == "Salutations"
+    assert [(m["role"], m["contenu"]) for m in detail.json()["messages"]] == [
         ("user", "Bonjour"),
         ("assistant", "Bonjour, comment puis-je vous aider ?"),
     ]
@@ -85,19 +82,21 @@ def test_titre_genere_par_un_appel_mistral_dedie_a_partir_du_premier_echange(
 
 
 def test_sans_jeton_est_refuse_et_aucune_conversation_nest_creee(
-    client, mistral_client_factice, db_session
+    client, mistral_client_factice
 ):
     mistral_client_factice.repondre("Ne devrait jamais être retournée")
 
     reponse = client.post("/conversations", json={"message": "Bonjour"})
 
     assert reponse.status_code == 401
+    # Aucun appel Mistral : le code ne persiste jamais de conversation sans
+    # être passé par cet appel en premier (cf. creer_conversation), donc
+    # cette absence suffit à garantir qu'aucune conversation n'a été créée.
     assert mistral_client_factice.messages_recus == []
-    assert db_session.query(Conversation).count() == 0
 
 
 def test_jeton_invalide_est_refuse_et_aucune_conversation_nest_creee(
-    client, mistral_client_factice, db_session
+    client, mistral_client_factice
 ):
     mistral_client_factice.repondre("Ne devrait jamais être retournée")
 
@@ -107,11 +106,10 @@ def test_jeton_invalide_est_refuse_et_aucune_conversation_nest_creee(
 
     assert reponse.status_code == 401
     assert mistral_client_factice.messages_recus == []
-    assert db_session.query(Conversation).count() == 0
 
 
 def test_echec_appel_mistral_ne_cree_aucune_conversation(
-    client, mistral_client_factice, jeton_valide, db_session
+    client, mistral_client_factice, jeton_valide
 ):
     mistral_client_factice.echouer(RuntimeError("service Mistral indisponible"))
 
@@ -120,8 +118,7 @@ def test_echec_appel_mistral_ne_cree_aucune_conversation(
     )
 
     assert reponse.status_code == 502
-    assert db_session.query(Conversation).count() == 0
-    assert db_session.query(Message).count() == 0
+    assert client.get("/conversations", headers=_autorisation(jeton_valide)).json() == []
 
 
 def test_message_vide_est_rejete(client, jeton_valide):
@@ -230,7 +227,7 @@ def test_detail_sans_jeton_est_refuse(client):
     assert reponse.status_code == 401
 
 
-def test_renommer_change_le_titre(client, mistral_client_factice, jeton_valide, db_session):
+def test_renommer_change_le_titre(client, mistral_client_factice, jeton_valide):
     conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide)
 
     reponse = client.patch(
@@ -241,7 +238,8 @@ def test_renommer_change_le_titre(client, mistral_client_factice, jeton_valide, 
 
     assert reponse.status_code == 200
     assert reponse.json()["titre"] == "Nouveau titre"
-    assert db_session.get(Conversation, conversation_id).titre == "Nouveau titre"
+    detail = client.get(f"/conversations/{conversation_id}", headers=_autorisation(jeton_valide))
+    assert detail.json()["titre"] == "Nouveau titre"
 
 
 def test_renommer_une_conversation_dun_autre_compte_renvoie_404_meme_avec_un_jeton_admin(
@@ -278,7 +276,7 @@ def test_renommer_sans_jeton_est_refuse(client):
 
 
 def test_supprimer_efface_la_conversation_et_ses_messages(
-    client, mistral_client_factice, jeton_valide, db_session
+    client, mistral_client_factice, jeton_valide
 ):
     conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide)
 
@@ -287,12 +285,12 @@ def test_supprimer_efface_la_conversation_et_ses_messages(
     )
 
     assert reponse.status_code == 204
-    assert db_session.get(Conversation, conversation_id) is None
-    assert db_session.query(Message).filter(Message.conversation_id == conversation_id).count() == 0
+    detail = client.get(f"/conversations/{conversation_id}", headers=_autorisation(jeton_valide))
+    assert detail.status_code == 404
 
 
 def test_supprimer_une_conversation_dun_autre_compte_renvoie_404_meme_avec_un_jeton_admin(
-    client, mistral_client_factice, jeton_valide, seed_compte, db_session
+    client, mistral_client_factice, jeton_valide, seed_compte
 ):
     jeton_admin = _jeton_admin(client, seed_compte)
     conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide)
@@ -300,7 +298,8 @@ def test_supprimer_une_conversation_dun_autre_compte_renvoie_404_meme_avec_un_je
     reponse = client.delete(f"/conversations/{conversation_id}", headers=_autorisation(jeton_admin))
 
     assert reponse.status_code == 404
-    assert db_session.get(Conversation, conversation_id) is not None
+    detail = client.get(f"/conversations/{conversation_id}", headers=_autorisation(jeton_valide))
+    assert detail.status_code == 200
 
 
 def test_supprimer_sans_jeton_est_refuse(client):
@@ -310,10 +309,12 @@ def test_supprimer_sans_jeton_est_refuse(client):
 
 
 def test_envoyer_message_persiste_le_message_et_la_reponse(
-    client, mistral_client_factice, jeton_valide, db_session
+    client, mistral_client_factice, jeton_valide
 ):
     conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide, "Bonjour")
-    mistral_client_factice.repondre("Suite de la réponse", _reponse_resume_et_profil("Résumé"))
+    mistral_client_factice.repondre(
+        "Suite de la réponse", resume_et_profil=_reponse_resume_et_profil("Résumé")
+    )
 
     reponse = client.post(
         f"/conversations/{conversation_id}/messages",
@@ -324,13 +325,8 @@ def test_envoyer_message_persiste_le_message_et_la_reponse(
     assert reponse.status_code == 200
     assert reponse.json() == {"reponse": "Suite de la réponse"}
 
-    messages = (
-        db_session.query(Message)
-        .filter(Message.conversation_id == conversation_id)
-        .order_by(Message.id)
-        .all()
-    )
-    assert [(m.role, m.contenu) for m in messages] == [
+    detail = client.get(f"/conversations/{conversation_id}", headers=_autorisation(jeton_valide))
+    assert [(m["role"], m["contenu"]) for m in detail.json()["messages"]] == [
         ("user", "Bonjour"),
         ("assistant", "Réponse assistant"),
         ("user", "Et ensuite ?"),
@@ -346,15 +342,17 @@ def test_envoyer_message_met_a_jour_la_date_derniere_activite(
     conversation.date_derniere_activite = datetime(2020, 1, 1)
     db_session.commit()
 
-    mistral_client_factice.repondre("Suite de la réponse", _reponse_resume_et_profil("Résumé"))
+    mistral_client_factice.repondre(
+        "Suite de la réponse", resume_et_profil=_reponse_resume_et_profil("Résumé")
+    )
     client.post(
         f"/conversations/{conversation_id}/messages",
         json={"message": "Et ensuite ?"},
         headers=_autorisation(jeton_valide),
     )
 
-    db_session.refresh(conversation)
-    assert conversation.date_derniere_activite > datetime(2020, 1, 1)
+    detail = client.get(f"/conversations/{conversation_id}", headers=_autorisation(jeton_valide))
+    assert detail.json()["date_derniere_activite"] > "2020-01-01T00:00:00"
 
 
 def test_prompt_envoye_ne_contient_jamais_lintegralite_de_lhistorique(
@@ -362,7 +360,9 @@ def test_prompt_envoye_ne_contient_jamais_lintegralite_de_lhistorique(
 ):
     conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide, "Message 1")
     for i in range(2, 5):
-        mistral_client_factice.repondre(f"Réponse {i}", _reponse_resume_et_profil(f"Résumé {i}"))
+        mistral_client_factice.repondre(
+            f"Réponse {i}", resume_et_profil=_reponse_resume_et_profil(f"Résumé {i}")
+        )
         client.post(
             f"/conversations/{conversation_id}/messages",
             json={"message": f"Message {i}"},
@@ -373,26 +373,31 @@ def test_prompt_envoye_ne_contient_jamais_lintegralite_de_lhistorique(
     conversation.resume_contexte = "Résumé glissant"
     db_session.commit()
 
-    mistral_client_factice.repondre("Réponse finale", _reponse_resume_et_profil("Résumé final"))
+    mistral_client_factice.repondre(
+        "Réponse finale", resume_et_profil=_reponse_resume_et_profil("Résumé final")
+    )
     client.post(
         f"/conversations/{conversation_id}/messages",
         json={"message": "Dernier message"},
         headers=_autorisation(jeton_valide),
     )
 
-    # -2 : le dernier appel Mistral de ce tour est l'appel résumé+profil
-    # (l'appel de réponse de chat, celui vérifié ici, le précède).
-    messages_envoyes = mistral_client_factice.messages_recus[-2]
+    # Appel de réponse de chat de ce tour (distinct de l'appel résumé+profil,
+    # lancé en parallèle — voir ClientMistralFactice.appels_reponse) :
+    # l'ordre d'arrivée entre les deux n'est pas garanti, donc pas question
+    # d'indexer messages_recus par position ici.
+    messages_envoyes = mistral_client_factice.appels_reponse[-1]
     assert messages_envoyes[0] == {"role": "system", "content": "Résumé glissant"}
     assert messages_envoyes[-1] == {"role": "user", "content": "Dernier message"}
     contenus = [m["content"] for m in messages_envoyes]
     assert "Message 1" not in contenus
-    # Résumé + au plus 3 derniers messages + le nouveau message.
+    # Résumé + au plus 3 derniers messages + le nouveau message (le profil de
+    # travail est vide dans ce test, donc pas de message système en plus).
     assert len(messages_envoyes) <= 5
 
 
 def test_envoyer_message_echec_appel_mistral_ne_persiste_rien(
-    client, mistral_client_factice, jeton_valide, db_session
+    client, mistral_client_factice, jeton_valide
 ):
     conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide)
     mistral_client_factice.echouer(RuntimeError("service Mistral indisponible"))
@@ -404,9 +409,8 @@ def test_envoyer_message_echec_appel_mistral_ne_persiste_rien(
     )
 
     assert reponse.status_code == 502
-    assert (
-        db_session.query(Message).filter(Message.conversation_id == conversation_id).count() == 2
-    )
+    detail = client.get(f"/conversations/{conversation_id}", headers=_autorisation(jeton_valide))
+    assert len(detail.json()["messages"]) == 2
 
 
 def test_envoyer_message_dans_une_conversation_dun_autre_compte_renvoie_404(
@@ -470,7 +474,8 @@ def test_resume_et_profil_se_mettent_a_jour_une_fois_le_seuil_de_3_messages_depa
     conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide, "Bonjour")
 
     mistral_client_factice.repondre(
-        "Suite", _reponse_resume_et_profil("Nouveau résumé", "Travaille sur des devis Foncier")
+        "Suite",
+        resume_et_profil=_reponse_resume_et_profil("Nouveau résumé", "Travaille sur des devis Foncier"),
     )
     client.post(
         f"/conversations/{conversation_id}/messages",
@@ -478,12 +483,13 @@ def test_resume_et_profil_se_mettent_a_jour_une_fois_le_seuil_de_3_messages_depa
         headers=_autorisation(jeton_valide),
     )
 
+    # resume_contexte n'est exposé par aucun endpoint (mémoire de travail
+    # interne, jamais affichée) : seule façon de l'observer ici.
     conversation = db_session.get(Conversation, conversation_id)
     assert conversation.resume_contexte == "Nouveau résumé"
 
-    profil = db_session.get(ProfilTravail, "j.dupont")
-    assert profil is not None
-    assert "Travaille sur des devis Foncier" in profil.contenu
+    profil = client.get("/comptes/j.dupont/profil-travail", headers=_autorisation(jeton_valide))
+    assert "Travaille sur des devis Foncier" in profil.json()["contenu"]
 
 
 def test_resume_se_met_a_jour_meme_sans_delta_de_profil(
@@ -491,7 +497,7 @@ def test_resume_se_met_a_jour_meme_sans_delta_de_profil(
 ):
     conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide, "Bonjour")
 
-    mistral_client_factice.repondre("Suite", _reponse_resume_et_profil("Nouveau résumé"))
+    mistral_client_factice.repondre("Suite", resume_et_profil=_reponse_resume_et_profil("Nouveau résumé"))
     client.post(
         f"/conversations/{conversation_id}/messages",
         json={"message": "Et ensuite ?"},
@@ -500,7 +506,8 @@ def test_resume_se_met_a_jour_meme_sans_delta_de_profil(
 
     conversation = db_session.get(Conversation, conversation_id)
     assert conversation.resume_contexte == "Nouveau résumé"
-    assert db_session.get(ProfilTravail, "j.dupont") is None
+    profil = client.get("/comptes/j.dupont/profil-travail", headers=_autorisation(jeton_valide))
+    assert profil.json()["contenu"] == ""
 
 
 def test_prompt_resume_et_profil_ninclut_jamais_lidentite_comme_a_determiner(
@@ -512,20 +519,20 @@ def test_prompt_resume_et_profil_ninclut_jamais_lidentite_comme_a_determiner(
     )
     conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide, "Bonjour")
 
-    mistral_client_factice.repondre("Suite", _reponse_resume_et_profil("Résumé"))
+    mistral_client_factice.repondre("Suite", resume_et_profil=_reponse_resume_et_profil("Résumé"))
     client.post(
         f"/conversations/{conversation_id}/messages",
         json={"message": "Et ensuite ?"},
         headers=_autorisation(jeton_valide),
     )
 
-    # Le dernier appel Mistral de ce tour est celui résumé+profil.
-    prompt_resume = mistral_client_factice.messages_recus[-1]
+    # L'appel résumé+profil de ce tour (distinct de l'appel de réponse de
+    # chat, lancé en parallèle — voir ClientMistralFactice.appels_structures).
+    prompt_resume = mistral_client_factice.appels_structures[-1]
     assert "Jean Dupont" in prompt_resume
     assert "Foncier" in prompt_resume
     assert "jamais" in prompt_resume
     assert "identité" in prompt_resume
-    assert mistral_client_factice.response_formats_recus[-1] is not None
 
 
 def test_profil_travail_renvoie_le_contenu_du_compte_du_jeton(client, jeton_valide, db_session):
@@ -593,3 +600,163 @@ def test_profil_travail_delete_nexiste_pas(client, jeton_valide):
     )
 
     assert reponse.status_code in (404, 405)
+
+
+# --- Profil de travail inclus dans le prompt de réponse de chat -------------
+
+
+def test_profil_de_travail_est_inclus_dans_le_prompt_de_reponse_de_chat(
+    client, mistral_client_factice, jeton_valide, db_session
+):
+    db_session.add(
+        ProfilTravail(
+            identifiant_compte="j.dupont",
+            contenu="Travaille sur des dossiers Foncier",
+            date_derniere_maj=datetime(2024, 1, 1),
+        )
+    )
+    db_session.commit()
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide, "Bonjour")
+
+    mistral_client_factice.repondre("Suite", resume_et_profil=_reponse_resume_et_profil("Résumé"))
+    client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Et ensuite ?"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    messages_envoyes = mistral_client_factice.appels_reponse[-1]
+    contenus_systeme = [m["content"] for m in messages_envoyes if m["role"] == "system"]
+    assert any("Travaille sur des dossiers Foncier" in contenu for contenu in contenus_systeme)
+
+
+# --- Réponse résumé+profil malformée -----------------------------------------
+
+
+def test_envoyer_message_reponse_resume_et_profil_malformee_retourne_une_erreur_propre(
+    client, mistral_client_factice, jeton_valide
+):
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide, "Bonjour")
+    mistral_client_factice.repondre("Suite", resume_et_profil="ceci n'est pas du JSON valide")
+
+    reponse = client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Et ensuite ?"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert reponse.status_code == 502
+    detail = client.get(f"/conversations/{conversation_id}", headers=_autorisation(jeton_valide))
+    assert len(detail.json()["messages"]) == 2
+
+
+# --- Clé d'idempotence (déduplication d'une requête rejouée) ----------------
+
+
+def test_creer_conversation_avec_la_meme_cle_idempotence_ne_cree_quune_conversation(
+    client, mistral_client_factice, jeton_valide
+):
+    mistral_client_factice.repondre("Bonjour, comment puis-je vous aider ?", "Salutations")
+
+    premiere = client.post(
+        "/conversations",
+        json={"message": "Bonjour", "cle_idempotence": "cle-1"},
+        headers=_autorisation(jeton_valide),
+    )
+    seconde = client.post(
+        "/conversations",
+        json={"message": "Bonjour", "cle_idempotence": "cle-1"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert premiere.status_code == 200
+    assert seconde.status_code == 200
+    assert seconde.json() == premiere.json()
+    # Un seul tour d'appels Mistral (réponse + titrage) : la seconde requête
+    # n'a rien rejoué.
+    assert len(mistral_client_factice.messages_recus) == 2
+    assert len(client.get("/conversations", headers=_autorisation(jeton_valide)).json()) == 1
+
+
+def test_envoyer_message_avec_la_meme_cle_idempotence_ne_persiste_quune_fois(
+    client, mistral_client_factice, jeton_valide
+):
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide, "Bonjour")
+    mistral_client_factice.repondre("Suite", resume_et_profil=_reponse_resume_et_profil("Résumé"))
+
+    premiere = client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Et ensuite ?", "cle_idempotence": "cle-msg-1"},
+        headers=_autorisation(jeton_valide),
+    )
+    seconde = client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Et ensuite ?", "cle_idempotence": "cle-msg-1"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert premiere.status_code == 200
+    assert seconde.json() == premiere.json()
+    detail = client.get(f"/conversations/{conversation_id}", headers=_autorisation(jeton_valide))
+    assert [(m["role"], m["contenu"]) for m in detail.json()["messages"]] == [
+        ("user", "Bonjour"),
+        ("assistant", "Réponse assistant"),
+        ("user", "Et ensuite ?"),
+        ("assistant", "Suite"),
+    ]
+
+
+# --- La clé API Mistral ne fuite jamais --------------------------------------
+# Restaure la couverture de l'ancien test_relais.py (retiré avec /relais,
+# #36) : le même bloc except Exception large existe toujours ici
+# (creer_conversation, envoyer_message).
+
+
+def test_creer_conversation_echec_mistral_ne_revele_jamais_la_cle_api(
+    client, mistral_client_factice, jeton_valide
+):
+    mistral_client_factice.echouer(RuntimeError("401 Unauthorized: Bearer sk-secrete-cle-api-mistral"))
+
+    reponse = client.post(
+        "/conversations", json={"message": "Bonjour"}, headers=_autorisation(jeton_valide)
+    )
+
+    assert "sk-secrete-cle-api-mistral" not in reponse.text
+
+
+def test_envoyer_message_echec_mistral_ne_revele_jamais_la_cle_api(
+    client, mistral_client_factice, jeton_valide
+):
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide)
+    mistral_client_factice.echouer(RuntimeError("401 Unauthorized: Bearer sk-secrete-cle-api-mistral"))
+
+    reponse = client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Et ensuite ?"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert "sk-secrete-cle-api-mistral" not in reponse.text
+
+
+def test_cle_api_manquante_retourne_une_erreur_propre_et_pas_un_plantage(db_session, monkeypatch):
+    monkeypatch.delenv("MISTRAL_API_KEY", raising=False)
+
+    def override_get_db():
+        yield db_session
+
+    jeton_store = JetonStore(db_session)
+    jeton = jeton_store.emettre("j.dupont")
+
+    app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_jeton_store] = lambda: jeton_store
+    try:
+        with TestClient(app) as test_client:
+            reponse = test_client.post(
+                "/conversations", json={"message": "Bonjour"}, headers=_autorisation(jeton)
+            )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert reponse.status_code == 502
+    assert "MISTRAL_API_KEY" not in reponse.text

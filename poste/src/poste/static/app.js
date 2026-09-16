@@ -301,6 +301,18 @@ formulaireChat.addEventListener("submit", async (evenement) => {
     return;
   }
 
+  // Capturée avant l'attente réseau : si l'utilisateur bascule vers une
+  // autre conversation pendant que cette requête est en vol (bouton
+  // réactivé après le tour précédent, ou une autre voie), la réponse de
+  // *cette* requête ne doit s'afficher que si la conversation ouverte est
+  // toujours celle-ci à son retour — jamais dans la conversation maintenant
+  // affichée à l'écran.
+  const idConversationCiblee = conversationOuverteId;
+  // Clé d'idempotence par tentative d'envoi : si cette requête est rejouée
+  // au niveau réseau avant d'atteindre le poste, la VM centrale ne persiste
+  // le message qu'une seule fois (voir vm_centrale.concurrence.CacheIdempotence).
+  const cleIdempotence = crypto.randomUUID();
+
   appelConversationEnCours = true;
   ajouterMessage("collaborateur", message);
   champMessage.value = "";
@@ -311,10 +323,10 @@ formulaireChat.addEventListener("submit", async (evenement) => {
   try {
     let reponse;
     try {
-      reponse = await fetch(`/conversations/${conversationOuverteId}/messages`, {
+      reponse = await fetch(`/conversations/${idConversationCiblee}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({ message, cle_idempotence: cleIdempotence }),
       });
     } catch {
       chatErreur.textContent = "Impossible de joindre le service de conversations. Réessayez plus tard.";
@@ -336,7 +348,9 @@ formulaireChat.addEventListener("submit", async (evenement) => {
     }
 
     const corps = await reponse.json();
-    ajouterMessage("reponse", corps.reponse);
+    if (conversationOuverteId === idConversationCiblee) {
+      ajouterMessage("reponse", corps.reponse);
+    }
   } finally {
     chatChargement.hidden = true;
     // Un 401 a déjà basculé vers l'écran de connexion (champMessage n'y est
@@ -462,6 +476,12 @@ formulaireNouvelleConversation.addEventListener("submit", async (evenement) => {
     return;
   }
 
+  // Voir formulaireChat : même garde contre une conversation ouverte entre
+  // temps, et même clé d'idempotence contre une requête rejouée au niveau
+  // réseau (cf. vm_centrale.concurrence.CacheIdempotence).
+  const idConversationAvantEnvoi = conversationOuverteId;
+  const cleIdempotence = crypto.randomUUID();
+
   appelConversationEnCours = true;
   nouveauMessageConversation.disabled = true;
   formulaireNouvelleConversation.querySelector('button[type="submit"]').disabled = true;
@@ -472,7 +492,7 @@ formulaireNouvelleConversation.addEventListener("submit", async (evenement) => {
       reponse = await fetch("/conversations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({ message, cle_idempotence: cleIdempotence }),
       });
     } catch {
       nouvelleConversationErreur.textContent =
@@ -496,10 +516,12 @@ formulaireNouvelleConversation.addEventListener("submit", async (evenement) => {
 
     const corps = await reponse.json();
     formulaireNouvelleConversation.reset();
-    afficherConversationOuverte(corps.conversation.id, corps.conversation.titre, [
-      { role: "user", contenu: message },
-      { role: "assistant", contenu: corps.reponse },
-    ]);
+    if (conversationOuverteId === idConversationAvantEnvoi) {
+      afficherConversationOuverte(corps.conversation.id, corps.conversation.titre, [
+        { role: "user", contenu: message },
+        { role: "assistant", contenu: corps.reponse },
+      ]);
+    }
     await chargerConversations();
   } finally {
     appelConversationEnCours = false;

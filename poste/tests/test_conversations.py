@@ -276,3 +276,39 @@ def test_envoyer_un_message_jeton_revoque_pendant_l_usage_ferme_la_session(
 
     assert reponse_message.status_code == 401
     assert reponse_compte.status_code == 401
+
+
+def test_creer_une_conversation_relaie_la_cle_idempotence_a_la_vm(client, vm_centrale_client_factice):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.creation_conversation_reussit(
+        ConversationCree(conversation=ConversationResume(id=1, titre="Salutations"), reponse="Bonjour")
+    )
+
+    client.post("/conversations", json={"message": "Bonjour", "cle_idempotence": "cle-1"})
+
+    assert vm_centrale_client_factice._cles_idempotence_creation_conversation == ["cle-1"]
+
+
+def test_creer_une_conversation_sans_cle_idempotence_en_relaie_labsence(
+    client, vm_centrale_client_factice
+):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.creation_conversation_reussit(
+        ConversationCree(conversation=ConversationResume(id=1, titre="Salutations"), reponse="Bonjour")
+    )
+
+    client.post("/conversations", json={"message": "Bonjour"})
+
+    assert vm_centrale_client_factice._cles_idempotence_creation_conversation == [None]
+
+
+def test_envoyer_un_message_relaie_la_cle_idempotence_a_la_vm(client, vm_centrale_client_factice):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.envoi_message_conversation_reussit("Réponse")
+
+    client.post(
+        "/conversations/1/messages",
+        json={"message": "Et ensuite ?", "cle_idempotence": "cle-msg-1"},
+    )
+
+    assert vm_centrale_client_factice._cles_idempotence_envoi_message_conversation == ["cle-msg-1"]

@@ -1,9 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
-from vm_centrale.autorisation import exiger_cle_admin_vm, get_compte_admin
+from vm_centrale.autorisation import (
+    exiger_cle_admin_vm,
+    get_compte_admin,
+    get_identifiant_compte_du_jeton,
+)
 from vm_centrale.database import get_db
 from vm_centrale.jetons import JetonStore, get_jeton_store
 from vm_centrale.models import Compte, ComptePole, ProfilTravail
@@ -26,10 +29,7 @@ _DERNIER_ADMINISTRATEUR = "Impossible de retirer le dernier compte administrateu
 _DERNIER_ADMINISTRATEUR_SUPPRESSION = (
     "Impossible de supprimer le dernier compte administrateur restant"
 )
-_JETON_INVALIDE = "Jeton d'authentification manquant ou invalide"
 _ACCES_PROFIL_TRAVAIL_REFUSE = "Le profil de travail n'est consultable que par son propre compte"
-
-_bearer_scheme = HTTPBearer(auto_error=False)
 
 
 def _vers_reponse(compte: Compte) -> CompteResponse:
@@ -226,16 +226,9 @@ def modifier_statut_admin(
 @router.get("/{identifiant}/profil-travail", response_model=ProfilTravailResponse)
 def consulter_profil_travail(
     identifiant: str,
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
-    jetons: JetonStore = Depends(get_jeton_store),
+    identifiant_du_jeton: str = Depends(get_identifiant_compte_du_jeton),
     db: Session = Depends(get_db),
 ) -> ProfilTravailResponse:
-    identifiant_du_jeton = (
-        jetons.identifiant_pour(credentials.credentials) if credentials is not None else None
-    )
-    if identifiant_du_jeton is None:
-        raise HTTPException(status_code=401, detail=_JETON_INVALIDE)
-
     # Lecture seule, strictement réservée au compte propriétaire : le droit de
     # compte administrateur porte sur la gestion des comptes, jamais sur le
     # contenu des conversations/profils (spec V1.1.1) — 403 même pour un

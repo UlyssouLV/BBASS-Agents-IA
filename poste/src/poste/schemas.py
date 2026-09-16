@@ -35,6 +35,8 @@ class ChangerMotDePasseRequest(BaseModel):
 
 class ConversationCreationRequest(BaseModel):
     message: str = Field(min_length=1, max_length=8000)
+    # Optionnelle : voir vm_centrale.schemas.ConversationCreeRequest.cle_idempotence.
+    cle_idempotence: str | None = None
 
 
 class ConversationResume(BaseModel):
@@ -74,6 +76,8 @@ class ConversationRenommeeRequest(BaseModel):
 
 class MessageEnvoyeRequest(BaseModel):
     message: str = Field(min_length=1, max_length=8000)
+    # Voir ConversationCreationRequest.cle_idempotence.
+    cle_idempotence: str | None = None
 
 
 class MessageEnvoyeResponse(BaseModel):

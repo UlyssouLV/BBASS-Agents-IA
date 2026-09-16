@@ -65,6 +65,7 @@ class VmCentraleClientFactice:
         self._exception_creation_conversation: Exception | None = None
         self._jetons_creation_conversation: list[str] = []
         self._messages_creation_conversation: list[str] = []
+        self._cles_idempotence_creation_conversation: list[str | None] = []
         self._conversations: list[Conversation] = []
         self._exception_liste_conversations: Exception | None = None
         self._jetons_liste_conversations: list[str] = []
@@ -83,6 +84,7 @@ class VmCentraleClientFactice:
         self._exception_envoi_message_conversation: Exception | None = None
         self._jetons_envoi_message_conversation: list[str] = []
         self._requetes_envoi_message_conversation: list[dict] = []
+        self._cles_idempotence_envoi_message_conversation: list[str | None] = []
         self._profil_travail: ProfilTravail | None = None
         self._exception_profil_travail: Exception | None = None
         self._jetons_profil_travail: list[str] = []
@@ -308,9 +310,12 @@ class VmCentraleClientFactice:
     def creation_conversation_echoue(self, exception: Exception) -> None:
         self._exception_creation_conversation = exception
 
-    def creer_conversation(self, jeton: str, message: str) -> ConversationCree:
+    def creer_conversation(
+        self, jeton: str, message: str, cle_idempotence: str | None = None
+    ) -> ConversationCree:
         self._jetons_creation_conversation.append(jeton)
         self._messages_creation_conversation.append(message)
+        self._cles_idempotence_creation_conversation.append(cle_idempotence)
         if self._exception_creation_conversation is not None:
             raise self._exception_creation_conversation
         assert self._conversation_creee is not None
@@ -377,11 +382,18 @@ class VmCentraleClientFactice:
     def envoi_message_conversation_echoue(self, exception: Exception) -> None:
         self._exception_envoi_message_conversation = exception
 
-    def envoyer_message(self, jeton: str, conversation_id: int, message: str) -> str:
+    def envoyer_message(
+        self,
+        jeton: str,
+        conversation_id: int,
+        message: str,
+        cle_idempotence: str | None = None,
+    ) -> str:
         self._jetons_envoi_message_conversation.append(jeton)
         self._requetes_envoi_message_conversation.append(
             {"conversation_id": conversation_id, "message": message}
         )
+        self._cles_idempotence_envoi_message_conversation.append(cle_idempotence)
         if self._exception_envoi_message_conversation is not None:
             raise self._exception_envoi_message_conversation
         return self._reponse_message_conversation
