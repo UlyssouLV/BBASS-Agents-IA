@@ -12,7 +12,7 @@ Canonical labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-hu
 
 ### After `/implement`
 
-Matt Pocock `/implement` for TDD. Then skill `encadrer-implement`: tests → commit + push + **close the child** and **remove `ready-for-agent`** (so GitHub blocked-by updates) → next unblocked Open child (`/clear` + `/implement`) **or**, if every PR child is Closed, ask the user to **test functionally** then **« Finalise la version »**. Do **not** auto-run `/code-review` at that point.
+Matt Pocock `/implement` for TDD. **Next action** (the plugin’s closing step, in this repo): skill `encadrer-implement` — tests → commit + push + **close the child** and **remove `ready-for-agent`** → next unblocked Open child (`/clear` + `/implement`) **or**, if every PR child is Closed, ask the user to **test functionally** then **« Finalise la version »**. A repo hook blocks `/code-review` unless the current user message asks for it.
 
 ### Ouvre the version
 

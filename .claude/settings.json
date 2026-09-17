@@ -1,5 +1,32 @@
 {
   "enabledPlugins": {
     "frontend-design@claude-plugins-official": true
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Skill|Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": [".claude/hooks/gate-code-review.py"],
+            "statusMessage": "Vérifie que /code-review est bien demandé"
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": [".claude/hooks/gate-code-review.py"],
+            "statusMessage": "Vérifie que /code-review est bien demandé"
+          }
+        ]
+      }
+    ]
   }
 }

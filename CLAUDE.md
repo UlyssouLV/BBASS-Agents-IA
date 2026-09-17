@@ -1,8 +1,14 @@
 # Claude Code
 
-This file is the coding-standards entry for `/code-review` (Standards axis). There is no `CODING_STANDARDS.md`.
+## Fin d’un `/implement` (enfant)
+
+La dernière action du plugin `/implement` est, dans ce dépôt, le skill **`encadrer-implement`** : pytest vert → commit → push → fermer l’enfant → proposer `/clear` puis `/implement` du suivant, **ou** demander les tests humains puis « Finalise la version ».
+
+Un hook (`.claude/hooks/gate-code-review.py`) refuse le skill `/code-review` tant que le message utilisateur courant ne le demande pas. Pour un vrai review vs `main`, tape `/code-review` toi-même.
 
 ## When reviewing Standards
+
+This file is the coding-standards entry for `/code-review` (Standards axis). There is no `CODING_STANDARDS.md`.
 
 Read, in order:
 
@@ -14,10 +20,6 @@ Read, in order:
 ## Tests
 
 HTTP-boundary tests only (observable responses). Do not praise or require tests of internal function calls. Same convention as V1 and `docs/specs/`.
-
-## When to run `/code-review`
-
-Not after each `/implement`. Not automatically when every child is Closed (`encadrer-implement` then asks for human tests + « Finalise la version »). Run `/code-review` vs `main` only if the user asks.
 
 ## Out of this file
 

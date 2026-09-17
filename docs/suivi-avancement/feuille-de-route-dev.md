@@ -48,6 +48,15 @@ S’appuie sur la [1.1.2](../specs/v1.1.2-pieces-jointes.md) (pipeline d’extra
 
 ## Plus tard (pas encore numéroté)
 
+### Agent IA de continuation du développement, validation par compte administrateur
+
+Constat (grilling 1.2.0) : à terme, plus aucune personne qualifiée ne sera sur place pour faire évoluer le logiciel elle-même. L'évolution du code (nouvelles versions, corrections, nouveaux Agents métier) serait alors portée par un agent IA dédié à la continuation du développement, avec un compte administrateur qui ne fait que **valider** (approuver/refuser) les changements proposés, sans avoir à coder ni à relire le code en détail.
+
+Implications déjà identifiées à creuser plus tard :
+- Cette contrainte pèse sur les choix techniques pris dès 1.2.0 (ex. TypeScript plutôt que JS nu, pour donner un filet de sécurité à la compilation en l'absence de relecture humaine technique).
+- Reste à définir : à quoi ressemble concrètement le flux de validation (où/comment un compte administrateur voit et approuve un changement), le périmètre de ce que l'agent peut faire seul vs ce qui nécessite une validation, et les garde-fous (rollback, tests obligatoires avant validation, etc.).
+- Tests front (grilling 1.2.0) : pas de tests dédiés côté UI React en 1.2.0 (on reste sur les tests pytest HTTP-boundary existants + validation visuelle par l'admin). À une version pas encore numérotée : ajouter un filet de sécurité automatisé côté UI (ex. Playwright) puisque seul un agent IA maintient ce code sans relecture humaine technique — pertinent surtout quand le volume d'écrans aura grossi (1.3.0, 1.4.0 et au-delà).
+
 ### Lanceur poste (exécutable, pywebview)
 
 Un exécutable qui ouvre une fenêtre (pages web du backend local). Fermer la fenêtre ne tuerait pas le process : accès encore possible dans le navigateur (`localhost` du poste).
@@ -59,3 +68,5 @@ Recherche : empaquetage Windows, icône / démarrage du backend, barre d’état
 Déployer pour avoir des retours. Automatiser depuis GitHub Actions / un hébergeur type Netlify.
 
 Contraintes déjà vues : pas de VM centrale physique pour un CD du relais ; Netlify (Internet) vs poste local + LAN ; Actions pour pytest seulement ; pilote sur une machine en attendant.
+
+Ajout (grilling 1.2.0) : depuis 1.2.0, le front `poste` passe par un build Vite/React — en attendant cette CI, le dossier compilé (`dist/`) est committé directement dans git (comme `static/` aujourd'hui), aucune étape de build sur le poste. Quand cette CI/CD sera mise en place, elle devra aussi prendre en charge le build du front (au lieu du commit direct du `dist/` compilé).
