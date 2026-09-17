@@ -3,7 +3,7 @@ import logging
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
@@ -258,6 +258,15 @@ def _recuperer_piece_jointe_du_compte(
     return piece_jointe
 
 
+def _nom_fichier_sur_disque(nom_fichier: str | None) -> str:
+    # Le nom de fichier vient du client (en-tête multipart, jamais de
+    # confiance) : sans ça, un nom du type "../../../etc/cron.d/x" ou
+    # "..\\..\\x" (Path Traversal, CWE-22) écrirait hors de
+    # PIECES_JOINTES_DIR. Normalise les antislashs puis ne garde que le
+    # dernier segment (équivalent d'un basename indépendant de l'OS).
+    return PurePosixPath((nom_fichier or "").replace("\\", "/")).name or "fichier"
+
+
 def _lier_piece_jointe_a_la_conversation(piece_jointe: PieceJointe, conversation: Conversation) -> None:
     if piece_jointe.conversation_id == conversation.id:
         return
@@ -268,7 +277,7 @@ def _lier_piece_jointe_a_la_conversation(piece_jointe: PieceJointe, conversation
     # jusqu'ici sous un répertoire de dépôt temporaire.
     chemin_relatif = (
         f"{conversation.identifiant_compte}/{conversation.id}/"
-        f"{piece_jointe.id}-{piece_jointe.nom_fichier}"
+        f"{piece_jointe.id}-{_nom_fichier_sur_disque(piece_jointe.nom_fichier)}"
     )
     chemin_absolu = Path(PIECES_JOINTES_DIR) / chemin_relatif
     chemin_absolu.parent.mkdir(parents=True, exist_ok=True)
@@ -503,7 +512,10 @@ def _creer_piece_jointe(
     # temporaire, déplacé au chemin canonique lors du rattachement — voir
     # _lier_piece_jointe_a_la_conversation.
     segment_conversation = str(conversation_id) if conversation_id is not None else "_sans_conversation"
-    chemin_relatif = f"{identifiant_compte}/{segment_conversation}/{piece_jointe.id}-{fichier.filename}"
+    chemin_relatif = (
+        f"{identifiant_compte}/{segment_conversation}/"
+        f"{piece_jointe.id}-{_nom_fichier_sur_disque(fichier.filename)}"
+    )
     chemin_absolu = Path(PIECES_JOINTES_DIR) / chemin_relatif
     chemin_absolu.parent.mkdir(parents=True, exist_ok=True)
     chemin_absolu.write_bytes(contenu)
