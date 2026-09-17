@@ -15,7 +15,12 @@ from vm_centrale.autorisation import get_identifiant_compte_du_jeton
 from vm_centrale.concurrence import cache_idempotence, verrous_comptes
 from vm_centrale.config import PIECES_JOINTES_DIR
 from vm_centrale.database import get_db
-from vm_centrale.mistral_client import AppelOutilDemande, MistralClient, get_mistral_client
+from vm_centrale.mistral_client import (
+    AppelOutilDemande,
+    MistralClient,
+    ReponseChat,
+    get_mistral_client,
+)
 from vm_centrale.models import Compte, Conversation, Message, PieceJointe, ProfilTravail
 from vm_centrale.schemas import (
     ConversationCreeRequest,
@@ -392,8 +397,9 @@ def creer_conversation(
         # rollback (annule aussi la conversation flushée ci-dessus) — aucune
         # conversation fantôme n'est persistée.
         try:
-            reponse = client.chat(message_pour_mistral)
-            titre = client.chat(_prompt_titrage(requete.message, reponse))
+            reponse_chat = client.chat(message_pour_mistral)
+            reponse = reponse_chat.contenu
+            titre = client.chat(_prompt_titrage(requete.message, reponse)).contenu
         except Exception as erreur:
             db.rollback()
             logger.error("Échec de l'appel au relais Mistral : %s", erreur)
@@ -629,7 +635,7 @@ def _appeler_reponse_chat(
     client: MistralClient,
     messages_pour_mistral: list[dict[str, str]],
     tools: list[dict] | None = None,
-) -> str:
+) -> ReponseChat:
     return client.chat(messages_pour_mistral, tools=tools)
 
 
@@ -651,7 +657,7 @@ def _traiter_appel_outil(
     demande: AppelOutilDemande,
     db: Session,
     conversation_id: int,
-) -> str:
+) -> ReponseChat:
     # Un seul outil déclaré pour cette version (spec 1.1.2) : seul le premier
     # appel demandé est traité.
     appel = demande.appels[0]
@@ -675,12 +681,12 @@ def _traiter_appel_outil(
 
 
 def _resoudre_reponse_chat(
-    obtenir_reponse: Callable[[], str],
+    obtenir_reponse: Callable[[], ReponseChat],
     client: MistralClient,
     messages_pour_mistral: list[dict[str, str]],
     db: Session,
     conversation_id: int,
-) -> str:
+) -> ReponseChat:
     # Centralise la gestion de AppelOutilDemande (et son propre échec
     # éventuel) pour les deux façons d'obtenir la réponse de chat principale
     # ci-dessous (directe, ou via un ThreadPoolExecutor) : `obtenir_reponse`
@@ -706,7 +712,7 @@ def _appeler_resume_et_profil(
     compte: Compte | None,
     messages_sortants: list[Message],
     pieces_jointes_sortantes: dict[int, PieceJointe],
-) -> str:
+) -> ReponseChat:
     return client.chat(
         _prompt_resume_et_profil(
             resume_contexte, profil_actuel, compte, messages_sortants, pieces_jointes_sortantes
@@ -816,17 +822,17 @@ def envoyer_message(
                     messages_sortants,
                     pieces_jointes_sortantes,
                 )
-                reponse = _resoudre_reponse_chat(
+                reponse_chat = _resoudre_reponse_chat(
                     futur_reponse.result, client, messages_pour_mistral, db, conversation.id
                 )
                 try:
-                    contenu_json = futur_resume.result()
+                    reponse_resume = futur_resume.result()
                 except Exception as erreur:
                     logger.error("Échec de l'appel au relais Mistral : %s", erreur)
                     raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
 
             try:
-                donnees = json.loads(contenu_json)
+                donnees = json.loads(reponse_resume.contenu)
                 resume_maj = donnees["resume_contexte"]
                 profil_travail_delta = donnees.get("profil_travail_delta")
             except (json.JSONDecodeError, KeyError, TypeError) as erreur:
@@ -837,13 +843,15 @@ def envoyer_message(
                 logger.error("Réponse résumé+profil de Mistral invalide : %s", erreur)
                 raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
         else:
-            reponse = _resoudre_reponse_chat(
+            reponse_chat = _resoudre_reponse_chat(
                 lambda: _appeler_reponse_chat(client, messages_pour_mistral, tools),
                 client,
                 messages_pour_mistral,
                 db,
                 conversation.id,
             )
+
+        reponse = reponse_chat.contenu
 
         maintenant = datetime.now(timezone.utc)
         if resume_maj is not None:

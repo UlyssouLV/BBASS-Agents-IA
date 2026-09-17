@@ -20,16 +20,50 @@ class AppelOutil:
     arguments: dict
 
 
+@dataclass(frozen=True)
+class Usage:
+    # Tokens de l'appel qui vient d'être fait (spec 1.1.3) — jamais un
+    # cumul : chaque appel Mistral porte le sien, à tracer un par un par le
+    # ticket suivant (table Consommation).
+    tokens_entree: int
+    tokens_sortie: int
+    tokens_total: int
+
+
+@dataclass(frozen=True)
+class ReponseChat:
+    contenu: str
+    usage: Usage
+
+
+@dataclass(frozen=True)
+class ReponseOcr:
+    contenu: str
+    pages_processed: int
+
+
 class AppelOutilDemande(Exception):
     # Mistral répond par un appel d'outil plutôt qu'un contenu texte final
     # (spec 1.1.2, tool calling) : le message assistant brut est conservé
     # tel quel pour être réinjecté par l'appelant dans le second appel, comme
     # l'exige le protocole (l'API attend ce message avant le rôle `tool` qui
     # porte le résultat).
-    def __init__(self, appels: list[AppelOutil], message_assistant: dict) -> None:
+    def __init__(self, appels: list[AppelOutil], message_assistant: dict, usage: Usage) -> None:
         super().__init__("Mistral a demandé un appel d'outil")
         self.appels = appels
         self.message_assistant = message_assistant
+        # L'appel qui décide d'invoquer l'outil a déjà consommé des tokens
+        # (spec 1.1.3) même sans contenu texte final : à tracer au même titre
+        # qu'un appel de chat normal par le ticket suivant.
+        self.usage = usage
+
+
+def _usage_depuis_reponse(usage_brut: Mapping[str, int]) -> Usage:
+    return Usage(
+        tokens_entree=usage_brut["prompt_tokens"],
+        tokens_sortie=usage_brut["completion_tokens"],
+        tokens_total=usage_brut["total_tokens"],
+    )
 
 
 class MistralClient:
@@ -50,7 +84,7 @@ class MistralClient:
         messages: str | Sequence[Mapping[str, object]],
         response_format: dict | None = None,
         tools: Sequence[Mapping[str, object]] | None = None,
-    ) -> str:
+    ) -> ReponseChat:
         if isinstance(messages, str):
             messages = [{"role": "user", "content": messages}]
 
@@ -70,7 +104,9 @@ class MistralClient:
             json=payload,
         )
         reponse.raise_for_status()
-        message = reponse.json()["choices"][0]["message"]
+        corps = reponse.json()
+        message = corps["choices"][0]["message"]
+        usage = _usage_depuis_reponse(corps["usage"])
 
         tool_calls = message.get("tool_calls")
         if tool_calls:
@@ -82,11 +118,11 @@ class MistralClient:
                 )
                 for appel in tool_calls
             ]
-            raise AppelOutilDemande(appels, message)
+            raise AppelOutilDemande(appels, message, usage)
 
-        return message["content"]
+        return ReponseChat(contenu=message["content"], usage=usage)
 
-    def ocr(self, document: bytes, type_mime: str) -> str:
+    def ocr(self, document: bytes, type_mime: str) -> ReponseOcr:
         # Appel stateless dédié à /v1/ocr (forme de requête/réponse distincte
         # de .chat() ci-dessus) : le fichier est transmis inline en base64,
         # jamais via la Files API Mistral (ADR-0009) — aucun file_id
@@ -104,8 +140,11 @@ class MistralClient:
             json=payload,
         )
         reponse.raise_for_status()
-        pages = reponse.json()["pages"]
-        return "\n\n".join(page["markdown"] for page in pages)
+        corps = reponse.json()
+        contenu = "\n\n".join(page["markdown"] for page in corps["pages"])
+        return ReponseOcr(
+            contenu=contenu, pages_processed=corps["usage_info"]["pages_processed"]
+        )
 
 
 def get_mistral_client() -> MistralClient:

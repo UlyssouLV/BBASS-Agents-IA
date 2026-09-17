@@ -51,8 +51,8 @@ def analyser(fichier: bytes, type_mime: str, client: MistralClient) -> ResultatA
             ],
         }
     ]
-    contenu_json = client.chat(messages, response_format=_SCHEMA_ANALYSE_IMAGE)
-    donnees = json.loads(contenu_json)
+    reponse = client.chat(messages, response_format=_SCHEMA_ANALYSE_IMAGE)
+    donnees = json.loads(reponse.contenu)
     return ResultatAnalyse(
         contenu_extrait=donnees["contenu_extrait"], echec_analyse=donnees["echec_analyse"]
     )

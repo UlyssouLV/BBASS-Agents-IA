@@ -3,7 +3,7 @@ from vm_centrale.mistral_client import MistralClient
 
 
 def analyser(fichier: bytes, type_mime: str, client: MistralClient) -> ResultatAnalyse:
-    contenu_extrait = client.ocr(fichier, type_mime=type_mime)
+    reponse = client.ocr(fichier, type_mime=type_mime)
     return ResultatAnalyse(
-        contenu_extrait=contenu_extrait, echec_analyse=not contenu_extrait.strip()
+        contenu_extrait=reponse.contenu, echec_analyse=not reponse.contenu.strip()
     )
