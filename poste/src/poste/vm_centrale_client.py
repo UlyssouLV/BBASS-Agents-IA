@@ -190,6 +190,16 @@ class Consommation:
     conversations: list[ConversationConsommation]
 
 
+@dataclass
+class CompteConsommation:
+    identifiant: str
+    prenom: str
+    nom: str
+    cout_usd: Decimal
+    chat: DetailConsommationCategorie
+    piece_jointe: DetailConsommationCategorie
+
+
 def _champs_compte_admin(corps: dict) -> dict:
     # Extraction partagée par lister_comptes/creer_compte/modifier_compte :
     # les trois construisent un CompteAdmin (ou un CompteCree, qui y ajoute
@@ -325,6 +335,17 @@ def _vers_consommation(corps: dict) -> Consommation:
         chat=_vers_detail_consommation(corps["chat"]),
         piece_jointe=_vers_detail_consommation(corps["piece_jointe"]),
         conversations=[_vers_conversation_consommation(c) for c in corps["conversations"]],
+    )
+
+
+def _vers_compte_consommation(corps: dict) -> CompteConsommation:
+    return CompteConsommation(
+        identifiant=corps["identifiant"],
+        prenom=corps["prenom"],
+        nom=corps["nom"],
+        cout_usd=Decimal(corps["cout_usd"]),
+        chat=_vers_detail_consommation(corps["chat"]),
+        piece_jointe=_vers_detail_consommation(corps["piece_jointe"]),
     )
 
 
@@ -549,6 +570,18 @@ class VmCentraleClient:
         _lever_si_jeton_ou_droits_refuses(reponse)
         reponse.raise_for_status()
         return [CompteAdmin(**_champs_compte_admin(compte)) for compte in reponse.json()]
+
+    def lister_consommation_comptes(self, jeton: str) -> list[CompteConsommation]:
+        # Même régime que lister_comptes ci-dessus (jeton est_admin=true) :
+        # jamais de détail par conversation individuelle, voir
+        # vm_centrale.routers.comptes.lister_consommation_comptes.
+        reponse = _http_client.get(
+            f"{VM_CENTRALE_BASE_URL}/comptes/consommation",
+            headers={"Authorization": f"Bearer {jeton}"},
+        )
+        _lever_si_jeton_ou_droits_refuses(reponse)
+        reponse.raise_for_status()
+        return [_vers_compte_consommation(compte) for compte in reponse.json()]
 
     def creer_compte(
         self,

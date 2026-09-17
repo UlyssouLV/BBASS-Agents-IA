@@ -127,6 +127,20 @@ def test_front_end_signale_un_echec_danalyse_sans_bloquer_lenvoi(client):
     assert "pieceJointeNouvelleConversationStatut" in js
 
 
+def test_front_end_expose_un_onglet_consommations_administrateur_separe_de_l_onglet_comptes(client):
+    # Issue #59 : onglet séparé de l'onglet Comptes, masqué par défaut comme
+    # lui (voir test_liste_avec_session_admin_retourne_les_comptes côté
+    # backend pour l'API consommée), jamais de détail par conversation.
+    html = client.get("/").text
+    js = client.get("/static/app.js").text
+
+    assert 'id="onglet-bouton-consommations" hidden' in html
+    assert 'id="onglet-consommations" hidden' in html
+    assert "ongletBoutonConsommations.hidden = !compte.est_admin" in js
+    assert '"/comptes/consommation"' in js
+    assert "afficherOngletConsommations" in js
+
+
 def test_front_end_naffiche_pas_la_reponse_dans_la_mauvaise_conversation(client):
     # La réponse d'un envoi ne doit s'afficher que si la conversation ouverte
     # à la résolution du fetch est toujours celle ciblée par la requête.

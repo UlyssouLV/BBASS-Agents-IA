@@ -1,12 +1,16 @@
+from decimal import Decimal
+
 import httpx
 
 from poste.vm_centrale_client import (
     AccesAdminRequisError,
     CleAdminInvalideError,
     CompteAdmin,
+    CompteConsommation,
     CompteCree,
     CompteInexistantError,
     DernierAdministrateurError,
+    DetailConsommationCategorie,
     IdentifiantDejaUtiliseError,
     JetonInvalideError,
 )
@@ -90,6 +94,116 @@ def test_liste_avec_vm_centrale_injoignable_retourne_une_erreur_propre(client, v
     vm_centrale_client_factice.liste_comptes_echoue(httpx.ConnectError("connexion refusée"))
 
     reponse = client.get("/comptes")
+
+    assert reponse.status_code == 502
+    assert reponse.json()["detail"]
+
+
+# --- GET /comptes/consommation ------------------------------------------------
+
+
+def _detail_consommation(tokens_total=0, pages_traitees=0, cout_usd="0", nombre_requetes=0):
+    return DetailConsommationCategorie(
+        tokens_total=tokens_total,
+        pages_traitees=pages_traitees,
+        cout_usd=Decimal(cout_usd),
+        nombre_requetes=nombre_requetes,
+    )
+
+
+def _compte_consommation(**overrides) -> CompteConsommation:
+    base = dict(
+        identifiant="j.dupont",
+        prenom="Jean",
+        nom="Dupont",
+        cout_usd=Decimal("1.50"),
+        chat=_detail_consommation(tokens_total=100, cout_usd="1.00", nombre_requetes=1),
+        piece_jointe=_detail_consommation(pages_traitees=2, cout_usd="0.50", nombre_requetes=1),
+    )
+    base.update(overrides)
+    return CompteConsommation(**base)
+
+
+def test_consommation_comptes_avec_session_admin_retourne_les_comptes_tries_par_cout(
+    client, vm_centrale_client_factice
+):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.consommation_comptes_retournee(
+        [
+            _compte_consommation(identifiant="p.leroy", cout_usd=Decimal("5.00")),
+            _compte_consommation(identifiant="j.dupont", cout_usd=Decimal("1.50")),
+        ]
+    )
+
+    reponse = client.get("/comptes/consommation")
+
+    assert reponse.status_code == 200
+    corps = reponse.json()
+    assert [compte["identifiant"] for compte in corps] == ["p.leroy", "j.dupont"]
+    dupont = corps[1]
+    assert Decimal(dupont["cout_usd"]) == Decimal("1.50")
+    assert dupont["chat"]["nombre_requetes"] == 1
+    assert dupont["piece_jointe"]["pages_traitees"] == 2
+
+
+def test_consommation_comptes_ne_renvoie_jamais_de_detail_par_conversation(
+    client, vm_centrale_client_factice
+):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.consommation_comptes_retournee([_compte_consommation()])
+
+    reponse = client.get("/comptes/consommation")
+
+    assert reponse.status_code == 200
+    assert "conversations" not in reponse.json()[0]
+
+
+def test_consommation_comptes_transmet_le_jeton_de_la_session(client, vm_centrale_client_factice):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.consommation_comptes_retournee([])
+
+    client.get("/comptes/consommation")
+
+    assert vm_centrale_client_factice._jetons_consommation_comptes == ["jeton-factice"]
+
+
+def test_consommation_comptes_sans_session_active_est_refusee(client):
+    reponse = client.get("/comptes/consommation")
+
+    assert reponse.status_code == 401
+    assert reponse.json()["detail"]
+
+
+def test_consommation_comptes_avec_session_non_admin_est_refusee(client, vm_centrale_client_factice):
+    _connecter(client, vm_centrale_client_factice, est_admin=False)
+    vm_centrale_client_factice.consommation_comptes_echoue(AccesAdminRequisError())
+
+    reponse = client.get("/comptes/consommation")
+
+    assert reponse.status_code == 403
+    assert reponse.json()["detail"]
+
+
+def test_consommation_comptes_avec_jeton_revoque_renvoie_401_et_efface_la_session(
+    client, vm_centrale_client_factice
+):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.consommation_comptes_echoue(JetonInvalideError())
+
+    reponse_liste = client.get("/comptes/consommation")
+    reponse_compte = client.get("/compte")
+
+    assert reponse_liste.status_code == 401
+    assert reponse_compte.status_code == 401
+
+
+def test_consommation_comptes_avec_vm_centrale_injoignable_retourne_une_erreur_propre(
+    client, vm_centrale_client_factice
+):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.consommation_comptes_echoue(httpx.ConnectError("connexion refusée"))
+
+    reponse = client.get("/comptes/consommation")
 
     assert reponse.status_code == 502
     assert reponse.json()["detail"]

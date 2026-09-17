@@ -173,3 +173,12 @@ class ConsommationResponse(BaseModel):
     chat: DetailConsommationCategorieResponse
     piece_jointe: DetailConsommationCategorieResponse
     conversations: list[ConversationConsommationResponse]
+
+
+class CompteConsommationResponse(BaseModel):
+    identifiant: str
+    prenom: str
+    nom: str
+    cout_usd: Decimal
+    chat: DetailConsommationCategorieResponse
+    piece_jointe: DetailConsommationCategorieResponse

@@ -6,6 +6,7 @@ from poste.session import SessionStore, get_session_store
 from poste.vm_centrale_client import (
     AuthentificationReussie,
     CompteAdmin,
+    CompteConsommation,
     CompteCree,
     Consommation,
     Conversation,
@@ -39,6 +40,9 @@ class VmCentraleClientFactice:
         self._comptes: list[CompteAdmin] = []
         self._exception_liste_comptes: Exception | None = None
         self._jetons_liste_comptes: list[str] = []
+        self._consommation_comptes: list[CompteConsommation] = []
+        self._exception_consommation_comptes: Exception | None = None
+        self._jetons_consommation_comptes: list[str] = []
         self._compte_cree: CompteCree | None = None
         self._exception_creation_compte: Exception | None = None
         self._requetes_creation_compte: list[dict] = []
@@ -189,6 +193,19 @@ class VmCentraleClientFactice:
         if self._exception_liste_comptes is not None:
             raise self._exception_liste_comptes
         return self._comptes
+
+    def consommation_comptes_retournee(self, comptes: list[CompteConsommation]) -> None:
+        self._consommation_comptes = comptes
+        self._exception_consommation_comptes = None
+
+    def consommation_comptes_echoue(self, exception: Exception) -> None:
+        self._exception_consommation_comptes = exception
+
+    def lister_consommation_comptes(self, jeton: str) -> list[CompteConsommation]:
+        self._jetons_consommation_comptes.append(jeton)
+        if self._exception_consommation_comptes is not None:
+            raise self._exception_consommation_comptes
+        return self._consommation_comptes
 
     def creation_compte_reussit(self, compte: CompteCree) -> None:
         self._compte_cree = compte

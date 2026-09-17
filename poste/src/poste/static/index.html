@@ -58,6 +58,7 @@
         <button type="button" id="onglet-bouton-consommation">Consommation</button>
         <button type="button" id="onglet-bouton-profil-travail">Profil de travail</button>
         <button type="button" id="onglet-bouton-comptes" hidden>Comptes</button>
+        <button type="button" id="onglet-bouton-consommations" hidden>Consommations</button>
       </nav>
       <button type="button" id="bouton-deconnexion">Se déconnecter</button>
     </header>
@@ -289,6 +290,24 @@
       <p id="suppression-confirmation" role="status" hidden>
         Compte <strong id="suppression-confirmation-identifiant"></strong> supprimé définitivement.
       </p>
+    </section>
+
+    <section id="onglet-consommations" hidden>
+      <h2>Consommations</h2>
+      <p id="consommations-erreur" role="alert" hidden></p>
+      <table id="tableau-consommations">
+        <thead>
+          <tr>
+            <th>Identifiant</th>
+            <th>Prénom</th>
+            <th>Nom</th>
+            <th>Coût total</th>
+            <th>Chat</th>
+            <th>Pièce jointe</th>
+          </tr>
+        </thead>
+        <tbody id="corps-tableau-consommations"></tbody>
+      </table>
     </section>
   </main>
 
