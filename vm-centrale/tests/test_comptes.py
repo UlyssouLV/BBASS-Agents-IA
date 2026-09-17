@@ -1,5 +1,34 @@
+from datetime import datetime, timezone
+from decimal import Decimal
+
+from vm_centrale.models import Consommation
+
+
 def _autorisation(jeton: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {jeton}"}
+
+
+def _creer_ligne_consommation(
+    db_session,
+    identifiant_compte: str,
+    type_appel: str,
+    cout_usd: str,
+    conversation_id: int | None = None,
+) -> None:
+    db_session.add(
+        Consommation(
+            identifiant_compte=identifiant_compte,
+            conversation_id=conversation_id,
+            type_appel=type_appel,
+            modele="mistral-small-latest",
+            tokens_entree=10,
+            tokens_sortie=5,
+            tokens_total=15,
+            cout_usd=Decimal(cout_usd),
+            date_creation=datetime.now(timezone.utc),
+        )
+    )
+    db_session.commit()
 
 
 def _jeton_admin(client, seed_compte, identifiant: str = "a.martin") -> str:
@@ -888,3 +917,105 @@ def test_suppression_d_un_administrateur_reussit_quand_un_autre_subsiste(
     from vm_centrale.models import Compte
 
     assert db_session.query(Compte).filter(Compte.identifiant == "n.durand").first() is None
+
+
+# --- GET /comptes/consommation ----------------------------------------------
+
+
+def test_consommation_comptes_echoue_sans_jeton(client):
+    reponse = client.get("/comptes/consommation")
+
+    assert reponse.status_code == 401
+
+
+def test_consommation_comptes_echoue_avec_jeton_d_un_compte_non_admin(client, seed_compte):
+    jeton = _jeton_non_admin(client, seed_compte)
+
+    reponse = client.get("/comptes/consommation", headers=_autorisation(jeton))
+
+    assert reponse.status_code == 403
+
+
+def test_consommation_comptes_reussit_triee_par_cout_decroissant_avec_detail_chat_et_piece_jointe(
+    client, seed_compte, db_session
+):
+    jeton = _jeton_admin(client, seed_compte, identifiant="a.martin")
+    seed_compte(
+        "j.dupont", "correcthorsebatterystaple", agence="Castries", poles=["Foncier"],
+        prenom="Jean", nom="Dupont",
+    )
+    seed_compte(
+        "p.leroy", "correcthorsebatterystaple", agence="Castries", poles=["DAO"],
+        prenom="Paul", nom="Leroy",
+    )
+    _creer_ligne_consommation(db_session, "j.dupont", "chat", "1.00")
+    _creer_ligne_consommation(db_session, "j.dupont", "ocr", "0.50")
+    _creer_ligne_consommation(db_session, "p.leroy", "vision", "5.00")
+
+    reponse = client.get("/comptes/consommation", headers=_autorisation(jeton))
+
+    assert reponse.status_code == 200
+    corps = reponse.json()
+    identifiants = [compte["identifiant"] for compte in corps]
+    assert identifiants == ["p.leroy", "j.dupont"]
+
+    dupont = next(compte for compte in corps if compte["identifiant"] == "j.dupont")
+    assert dupont["prenom"] == "Jean"
+    assert dupont["nom"] == "Dupont"
+    assert Decimal(dupont["cout_usd"]) == Decimal("1.50")
+    assert dupont["chat"]["nombre_requetes"] == 1
+    assert Decimal(dupont["chat"]["cout_usd"]) == Decimal("1.00")
+    assert dupont["piece_jointe"]["nombre_requetes"] == 1
+    assert Decimal(dupont["piece_jointe"]["cout_usd"]) == Decimal("0.50")
+
+    leroy = next(compte for compte in corps if compte["identifiant"] == "p.leroy")
+    assert Decimal(leroy["cout_usd"]) == Decimal("5.00")
+
+
+def test_consommation_comptes_omet_un_compte_supprime_sans_affecter_les_autres_totaux(
+    client, seed_compte, db_session
+):
+    jeton = _jeton_admin(client, seed_compte, identifiant="a.martin")
+    seed_compte(
+        "j.dupont", "correcthorsebatterystaple", agence="Castries", poles=["Foncier"],
+        prenom="Jean", nom="Dupont",
+    )
+    seed_compte(
+        "p.leroy", "correcthorsebatterystaple", agence="Castries", poles=["DAO"],
+        prenom="Paul", nom="Leroy",
+    )
+    _creer_ligne_consommation(db_session, "j.dupont", "chat", "1.00")
+    _creer_ligne_consommation(db_session, "p.leroy", "vision", "5.00")
+
+    from vm_centrale.models import Compte
+
+    db_session.delete(db_session.query(Compte).filter(Compte.identifiant == "p.leroy").first())
+    db_session.commit()
+
+    reponse = client.get("/comptes/consommation", headers=_autorisation(jeton))
+
+    assert reponse.status_code == 200
+    corps = reponse.json()
+    identifiants = {compte["identifiant"] for compte in corps}
+    assert identifiants == {"j.dupont"}
+    dupont = next(compte for compte in corps if compte["identifiant"] == "j.dupont")
+    assert Decimal(dupont["cout_usd"]) == Decimal("1.00")
+
+
+def test_consommation_comptes_ne_renvoie_jamais_de_detail_par_conversation(
+    client, seed_compte, db_session
+):
+    jeton = _jeton_admin(client, seed_compte, identifiant="a.martin")
+    seed_compte(
+        "j.dupont", "correcthorsebatterystaple", agence="Castries", poles=["Foncier"],
+        prenom="Jean", nom="Dupont",
+    )
+    _creer_ligne_consommation(db_session, "j.dupont", "chat", "1.00", conversation_id=42)
+
+    reponse = client.get("/comptes/consommation", headers=_autorisation(jeton))
+
+    assert reponse.status_code == 200
+    corps = reponse.json()
+    dupont = next(compte for compte in corps if compte["identifiant"] == "j.dupont")
+    assert "conversations" not in dupont
+    assert "conversation_id" not in dupont

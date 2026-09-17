@@ -191,3 +191,12 @@ class ConsommationResponse(BaseModel):
     # encore existantes ayant au moins une ligne Consommation rattachée
     # (spec 1.1.3).
     conversations: list[ConversationConsommationResponse]
+
+
+class CompteConsommationResponse(BaseModel):
+    identifiant: str
+    prenom: str
+    nom: str
+    cout_usd: Decimal
+    chat: DetailConsommationCategorie
+    piece_jointe: DetailConsommationCategorie

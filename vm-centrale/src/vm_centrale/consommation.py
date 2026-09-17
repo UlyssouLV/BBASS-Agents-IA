@@ -1,10 +1,34 @@
 from datetime import datetime, timezone
+from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
 from vm_centrale.config import calculer_cout
 from vm_centrale.mistral_client import Usage
 from vm_centrale.models import Consommation
+from vm_centrale.schemas import DetailConsommationCategorie
+
+# Catégorisation à l'affichage (spec 1.1.3), calculée côté lecture — jamais
+# stockée comme colonne dérivée sur Consommation. Partagée par les deux
+# endpoints de lecture (vue collaborateur et vue administrateur).
+TYPES_CHAT = frozenset({"chat", "titrage", "resume_et_profil"})
+
+
+def detail_vide() -> DetailConsommationCategorie:
+    return DetailConsommationCategorie(
+        tokens_total=0, pages_traitees=0, cout_usd=Decimal(0), nombre_requetes=0
+    )
+
+
+def accumuler(
+    detail: DetailConsommationCategorie, ligne: Consommation
+) -> DetailConsommationCategorie:
+    return DetailConsommationCategorie(
+        tokens_total=detail.tokens_total + (ligne.tokens_total or 0),
+        pages_traitees=detail.pages_traitees + (ligne.pages_traitees or 0),
+        cout_usd=detail.cout_usd + ligne.cout_usd,
+        nombre_requetes=detail.nombre_requetes + 1,
+    )
 
 
 def enregistrer_consommation(
