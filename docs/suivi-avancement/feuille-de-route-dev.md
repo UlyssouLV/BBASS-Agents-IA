@@ -9,17 +9,9 @@ Ce n’est **pas** une spec (ça vient après « Ouvre la version »).
 - **1.0.x** — Socle : comptes, connexion, chat, relais Mistral, session persistée (keyring), LAN Castries.
 - **1.1.0** — Comptes administrateurs, multi-pôles, mot de passe généré / changement forcé, révocation, affichage pôle/agence dans le chat.
 - **1.1.1** — Conversations persistées sur la VM (PostgreSQL) : plusieurs fils, reprise après rechargement / autre poste, historique borné (3 derniers messages + résumé glissant), profil de travail lecture seule ; pas de stockage Mistral Conversations.
+- **1.1.2** — Pièces jointes : upload PDF/Word/Excel/image sur un message (une par message), extraction (OCR Mistral, locale pour Word/Excel, vision Mistral pour l'image), contenu injecté dans le chat, mention courte dans le résumé glissant, rappel via un outil si la pièce jointe sort de la fenêtre ; jamais la Files API Mistral.
 
-## Prochaine : 1.1.2 — Pièces jointes
-
-Le schéma de données de la [1.1.1](../specs/v1.1.1-persistance-conversations.md) réserve déjà une table vide pour les pièces jointes (non exploitée). Cette version branche l'upload et l'exploitation réelle : ce que Mistral accepte comme document, formats, limites de taille, stockage côté VM centrale, envoi à Mistral.
-
-**Recherche.**
-
-- API/document Mistral : formats acceptés, limites de taille, comment un document est transmis dans un appel de chat (URL, upload dédié, encodage).
-- Stockage du fichier lui-même côté VM centrale (base vs système de fichiers).
-
-## Ensuite : 1.1.3 — Consommation (tokens, modèles, coûts)
+## Prochaine : 1.1.3 — Consommation (tokens, modèles, coûts)
 
 S’appuie sur des **sessions de chat** datées (1.1.1).
 
