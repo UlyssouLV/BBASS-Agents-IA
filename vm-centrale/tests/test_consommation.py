@@ -278,3 +278,144 @@ def test_calculer_cout_chat_est_token_based(db_session):
     cout = calculer_cout("chat", MODELE_CHAT, 1_000_000, 1_000_000, None)
     cout_attendu = Decimal("0.15") + Decimal("0.60")
     assert abs(cout - cout_attendu) < _TAUX_TOLERANCE
+
+
+def test_get_consommation_apres_premier_message_puis_message_suivant(
+    client, mistral_client_factice, jeton_valide, db_session
+):
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide)
+
+    mistral_client_factice.repondre(
+        "Suite", resume_et_profil=_reponse_resume_et_profil("Nouveau résumé")
+    )
+    client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Et ensuite ?"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    reponse = client.get("/consommation", headers=_autorisation(jeton_valide))
+    assert reponse.status_code == 200
+    corps = reponse.json()
+
+    lignes = _lignes_consommation(db_session)
+    lignes_chat = [l for l in lignes if l.type_appel in ("chat", "titrage", "resume_et_profil")]
+    assert corps["chat"]["nombre_requetes"] == len(lignes_chat)
+    assert corps["chat"]["tokens_total"] == sum(l.tokens_total or 0 for l in lignes_chat)
+    assert Decimal(corps["chat"]["cout_usd"]) == sum((l.cout_usd for l in lignes_chat), Decimal(0))
+    assert corps["piece_jointe"] == {
+        "tokens_total": 0,
+        "pages_traitees": 0,
+        "cout_usd": "0",
+        "nombre_requetes": 0,
+    }
+
+    assert len(corps["conversations"]) == 1
+    conversation = corps["conversations"][0]
+    assert conversation["id"] == conversation_id
+    assert conversation["chat"]["nombre_requetes"] == len(lignes_chat)
+
+
+def test_get_consommation_distingue_pages_et_tokens_pour_piece_jointe(
+    client, mistral_client_factice, jeton_valide
+):
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide)
+
+    mistral_client_factice.repondre_ocr("Texte extrait du PDF")
+    client.post(
+        f"/conversations/{conversation_id}/pieces-jointes",
+        files={"fichier": ("document.pdf", b"%PDF-1.4 contenu factice", "application/pdf")},
+        headers=_autorisation(jeton_valide),
+    )
+    mistral_client_factice.repondre_vision("Photocopie d'un plan de masse")
+    client.post(
+        f"/conversations/{conversation_id}/pieces-jointes",
+        files={"fichier": ("plan.png", b"contenu factice png", "image/png")},
+        headers=_autorisation(jeton_valide),
+    )
+
+    reponse = client.get("/consommation", headers=_autorisation(jeton_valide))
+    assert reponse.status_code == 200
+    corps = reponse.json()
+
+    assert corps["piece_jointe"]["nombre_requetes"] == 2
+    # Une ligne "ocr" (1 page, spec 1.1.3) et une ligne "vision" (tokens
+    # factices du double de test : tokens_total=15).
+    assert corps["piece_jointe"]["pages_traitees"] == 1
+    assert corps["piece_jointe"]["tokens_total"] == 15
+
+    conversation = corps["conversations"][0]
+    assert conversation["piece_jointe"]["pages_traitees"] == 1
+    assert conversation["piece_jointe"]["tokens_total"] == 15
+
+
+def test_get_consommation_inclut_lappel_de_chat_declenche_par_tool_calling(
+    client, mistral_client_factice, jeton_valide
+):
+    mistral_client_factice.repondre_ocr("Plan de masse détaillé")
+    piece_jointe_id = client.post(
+        "/pieces-jointes",
+        files={"fichier": ("document.pdf", b"%PDF-1.4 plan factice", "application/pdf")},
+        headers=_autorisation(jeton_valide),
+    ).json()["piece_jointe"]["id"]
+
+    mistral_client_factice.repondre("Première réponse", "Titre")
+    conversation_id = client.post(
+        "/conversations",
+        json={"message": "Regarde ce document", "piece_jointe_id": piece_jointe_id},
+        headers=_autorisation(jeton_valide),
+    ).json()["conversation"]["id"]
+
+    mistral_client_factice.repondre(
+        "Deuxième réponse", resume_et_profil=_reponse_resume_et_profil()
+    )
+    client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Et ensuite ?"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    nombre_requetes_chat_avant = client.get(
+        "/consommation", headers=_autorisation(jeton_valide)
+    ).json()["chat"]["nombre_requetes"]
+
+    mistral_client_factice.repondre_avec_appel_outil(
+        "obtenir_contenu_piece_jointe", {"piece_jointe_id": piece_jointe_id}
+    )
+    mistral_client_factice.repondre(
+        "Réponse finale après relecture du plan", resume_et_profil=_reponse_resume_et_profil()
+    )
+    reponse = client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Rappelle-moi le contenu exact du plan"},
+        headers=_autorisation(jeton_valide),
+    )
+    assert reponse.status_code == 200
+
+    corps = client.get("/consommation", headers=_autorisation(jeton_valide)).json()
+    # Le premier appel (qui déclenche AppelOutilDemande) et le second appel
+    # (qui répond une fois le contenu injecté) comptent chacun comme une
+    # ligne "chat" de plus (spec V1.1.3), plus la ligne "resume_et_profil" de
+    # ce même tour (messages_sortants non vide) — la catégorie Chat regroupe
+    # chat/titrage/resume_et_profil (spec 1.1.3), donc ces trois lignes
+    # apparaissent ensemble dans son total.
+    assert corps["chat"]["nombre_requetes"] - nombre_requetes_chat_avant == 3
+
+
+def test_get_consommation_401_sans_jeton(client):
+    reponse = client.get("/consommation")
+    assert reponse.status_code == 401
+
+
+def test_get_consommation_ne_voit_que_ses_propres_donnees(
+    client, mistral_client_factice, jeton_valide, jeton_store
+):
+    _creer_conversation(client, mistral_client_factice, jeton_valide)
+
+    autre_jeton = jeton_store.emettre("a.autre")
+    reponse = client.get("/consommation", headers=_autorisation(autre_jeton))
+    assert reponse.status_code == 200
+    corps = reponse.json()
+
+    assert corps["chat"]["nombre_requetes"] == 0
+    assert corps["conversations"] == []
