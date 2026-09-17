@@ -36,11 +36,19 @@ const conversationTitre = document.getElementById("conversation-titre");
 let appelConversationEnCours = false;
 
 const ongletBoutonChat = document.getElementById("onglet-bouton-chat");
+const ongletBoutonConsommation = document.getElementById("onglet-bouton-consommation");
 const ongletBoutonProfilTravail = document.getElementById("onglet-bouton-profil-travail");
 const ongletBoutonComptes = document.getElementById("onglet-bouton-comptes");
 const ongletChat = document.getElementById("onglet-chat");
+const ongletConsommation = document.getElementById("onglet-consommation");
 const ongletProfilTravail = document.getElementById("onglet-profil-travail");
 const ongletComptes = document.getElementById("onglet-comptes");
+const consommationErreur = document.getElementById("consommation-erreur");
+const consommationDonnees = document.getElementById("consommation-donnees");
+const consommationChatDetail = document.getElementById("consommation-chat-detail");
+const consommationPieceJointeDetail = document.getElementById("consommation-piece-jointe-detail");
+const consommationConversationsVide = document.getElementById("consommation-conversations-vide");
+const corpsConsommationConversations = document.getElementById("corps-consommation-conversations");
 const profilTravailErreur = document.getElementById("profil-travail-erreur");
 const profilTravailVide = document.getElementById("profil-travail-vide");
 const profilTravailDonnees = document.getElementById("profil-travail-donnees");
@@ -90,6 +98,7 @@ let conversationOuverteId = null;
 
 function cacherTousLesOnglets() {
   ongletChat.hidden = true;
+  ongletConsommation.hidden = true;
   ongletProfilTravail.hidden = true;
   ongletComptes.hidden = true;
 }
@@ -99,6 +108,74 @@ async function afficherOngletChat() {
   ongletChat.hidden = false;
   afficherNouvelleConversation();
   await chargerConversations();
+}
+
+async function afficherOngletConsommation() {
+  cacherTousLesOnglets();
+  ongletConsommation.hidden = false;
+  await chargerConsommation();
+}
+
+function formaterDetailConsommation(detail) {
+  const parties = [`${detail.nombre_requetes} requête(s)`];
+  if (detail.tokens_total) {
+    parties.push(`${detail.tokens_total} tokens`);
+  }
+  if (detail.pages_traitees) {
+    parties.push(`${detail.pages_traitees} page(s)`);
+  }
+  parties.push(`${detail.cout_usd} $`);
+  return parties.join(" · ");
+}
+
+async function chargerConsommation() {
+  consommationErreur.hidden = true;
+  consommationDonnees.hidden = true;
+
+  let reponse;
+  try {
+    reponse = await fetch("/consommation");
+  } catch {
+    consommationErreur.textContent =
+      "Impossible de joindre le service de consommation. Réessayez plus tard.";
+    consommationErreur.hidden = false;
+    return;
+  }
+
+  if (reponse.status === 401) {
+    afficherEcranConnexion();
+    return;
+  }
+
+  if (!reponse.ok) {
+    const detail = await reponse.json().catch(() => null);
+    consommationErreur.textContent =
+      detail && detail.detail ? detail.detail : "Le chargement de la consommation a échoué. Réessayez plus tard.";
+    consommationErreur.hidden = false;
+    return;
+  }
+
+  const consommation = await reponse.json();
+  consommationChatDetail.textContent = formaterDetailConsommation(consommation.chat);
+  consommationPieceJointeDetail.textContent = formaterDetailConsommation(consommation.piece_jointe);
+
+  corpsConsommationConversations.replaceChildren();
+  consommationConversationsVide.hidden = consommation.conversations.length !== 0;
+  for (const conversation of consommation.conversations) {
+    const ligne = document.createElement("tr");
+    const celluleTitre = document.createElement("td");
+    celluleTitre.textContent = conversation.titre;
+    const celluleCout = document.createElement("td");
+    celluleCout.textContent = `${conversation.cout_usd} $`;
+    const celluleChat = document.createElement("td");
+    celluleChat.textContent = formaterDetailConsommation(conversation.chat);
+    const cellulePieceJointe = document.createElement("td");
+    cellulePieceJointe.textContent = formaterDetailConsommation(conversation.piece_jointe);
+    ligne.append(celluleTitre, celluleCout, celluleChat, cellulePieceJointe);
+    corpsConsommationConversations.append(ligne);
+  }
+
+  consommationDonnees.hidden = false;
 }
 
 async function afficherOngletProfilTravail() {
@@ -703,6 +780,7 @@ async function supprimerConversation(id) {
 }
 
 ongletBoutonChat.addEventListener("click", afficherOngletChat);
+ongletBoutonConsommation.addEventListener("click", afficherOngletConsommation);
 ongletBoutonProfilTravail.addEventListener("click", afficherOngletProfilTravail);
 ongletBoutonComptes.addEventListener("click", afficherOngletComptes);
 

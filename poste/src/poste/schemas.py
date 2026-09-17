@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 
 from pydantic import BaseModel, Field
 
@@ -151,3 +152,24 @@ class StatutAdminRequest(BaseModel):
 
 class SuppressionCompteRequest(BaseModel):
     cle_admin_vm: str = Field(min_length=1)
+
+
+class DetailConsommationCategorieResponse(BaseModel):
+    tokens_total: int
+    pages_traitees: int
+    cout_usd: Decimal
+    nombre_requetes: int
+
+
+class ConversationConsommationResponse(BaseModel):
+    id: int
+    titre: str
+    cout_usd: Decimal
+    chat: DetailConsommationCategorieResponse
+    piece_jointe: DetailConsommationCategorieResponse
+
+
+class ConsommationResponse(BaseModel):
+    chat: DetailConsommationCategorieResponse
+    piece_jointe: DetailConsommationCategorieResponse
+    conversations: list[ConversationConsommationResponse]

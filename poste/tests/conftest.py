@@ -7,6 +7,7 @@ from poste.vm_centrale_client import (
     AuthentificationReussie,
     CompteAdmin,
     CompteCree,
+    Consommation,
     Conversation,
     ConversationCree,
     ConversationDetail,
@@ -90,6 +91,9 @@ class VmCentraleClientFactice:
         self._exception_profil_travail: Exception | None = None
         self._jetons_profil_travail: list[str] = []
         self._identifiants_profil_travail: list[str] = []
+        self._consommation: Consommation | None = None
+        self._exception_consommation: Exception | None = None
+        self._jetons_consommation: list[str] = []
         self._pieces_jointes_id_creation_conversation: list[int | None] = []
         self._pieces_jointes_id_envoi_message_conversation: list[int | None] = []
         self._piece_jointe_creee: PieceJointeCreee | None = None
@@ -478,6 +482,20 @@ class VmCentraleClientFactice:
             raise self._exception_profil_travail
         assert self._profil_travail is not None
         return self._profil_travail
+
+    def consommation_retournee(self, consommation: Consommation) -> None:
+        self._consommation = consommation
+        self._exception_consommation = None
+
+    def consommation_echoue(self, exception: Exception) -> None:
+        self._exception_consommation = exception
+
+    def consulter_consommation(self, jeton: str) -> Consommation:
+        self._jetons_consommation.append(jeton)
+        if self._exception_consommation is not None:
+            raise self._exception_consommation
+        assert self._consommation is not None
+        return self._consommation
 
 
 @pytest.fixture(autouse=True)

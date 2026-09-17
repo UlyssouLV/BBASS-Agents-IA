@@ -61,6 +61,18 @@ def test_front_end_expose_un_onglet_profil_de_travail_sans_action_de_modificatio
     assert "afficherOngletProfilTravail" in js
 
 
+def test_front_end_expose_un_onglet_consommation_sans_action_de_modification(client):
+    # Issue #58 : lecture seule, comme l'onglet Profil de travail — un total
+    # global et un classement des conversations par coût, jamais d'action.
+    html = client.get("/").text
+    js = client.get("/static/app.js").text
+
+    assert 'id="onglet-bouton-consommation"' in html
+    assert 'id="onglet-consommation" hidden' in html
+    assert '"/consommation"' in js
+    assert "afficherOngletConsommation" in js
+
+
 def test_front_end_bloque_un_second_envoi_tant_que_mistral_n_a_pas_repondu(client):
     js = client.get("/static/app.js").text
 

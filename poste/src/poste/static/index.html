@@ -55,6 +55,7 @@
       </span>
       <nav id="onglets-compte">
         <button type="button" id="onglet-bouton-chat">Discussion</button>
+        <button type="button" id="onglet-bouton-consommation">Consommation</button>
         <button type="button" id="onglet-bouton-profil-travail">Profil de travail</button>
         <button type="button" id="onglet-bouton-comptes" hidden>Comptes</button>
       </nav>
@@ -109,6 +110,46 @@
             <button type="submit">Envoyer</button>
           </form>
         </div>
+      </div>
+    </section>
+
+    <section id="onglet-consommation" hidden>
+      <h2>Consommation</h2>
+      <p id="consommation-erreur" role="alert" hidden></p>
+      <div id="consommation-donnees" hidden>
+        <h3>Total</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Catégorie</th>
+              <th>Détail</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Chat</td>
+              <td id="consommation-chat-detail"></td>
+            </tr>
+            <tr>
+              <td>Pièce jointe</td>
+              <td id="consommation-piece-jointe-detail"></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Conversations</h3>
+        <p id="consommation-conversations-vide" hidden>Aucune conversation avec de la consommation enregistrée.</p>
+        <table id="tableau-consommation-conversations">
+          <thead>
+            <tr>
+              <th>Conversation</th>
+              <th>Coût total</th>
+              <th>Chat</th>
+              <th>Pièce jointe</th>
+            </tr>
+          </thead>
+          <tbody id="corps-consommation-conversations"></tbody>
+        </table>
       </div>
     </section>
 
