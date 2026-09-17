@@ -60,29 +60,44 @@ _OUTIL_CONTENU_PIECE_JOINTE = "obtenir_contenu_piece_jointe"
 # jointe déjà liée à un message sorti de la fenêtre des derniers messages
 # (spec 1.1.2) : l'IA peut alors le redemander explicitement plutôt que de
 # répondre sans son contenu complet.
-_OUTILS_PIECE_JOINTE = [
-    {
-        "type": "function",
-        "function": {
-            "name": _OUTIL_CONTENU_PIECE_JOINTE,
-            "description": (
-                "Récupère le contenu complet d'une pièce jointe de cette "
-                "conversation dont le message n'est plus dans les derniers "
-                "messages."
-            ),
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "piece_jointe_id": {
-                        "type": "integer",
-                        "description": "Identifiant de la pièce jointe.",
-                    }
+def _outils_piece_jointe(pieces_jointes_hors_fenetre: list[PieceJointe]) -> list[dict]:
+    # La description est générée à chaque appel à partir des pièces jointes
+    # réellement éligibles de la conversation courante (jamais une liste
+    # statique figée dans le schéma) : sans le nom de fichier en face de
+    # chaque id, le modèle doit deviner quel entier correspond à quel
+    # document (ticket #50 — cause du mauvais choix de pièce jointe observé
+    # dans l'essai du 2026-09-17).
+    liste_pieces_jointes = "\n".join(
+        f"- id {piece_jointe.id} : {piece_jointe.nom_fichier}"
+        for piece_jointe in pieces_jointes_hors_fenetre
+    )
+    return [
+        {
+            "type": "function",
+            "function": {
+                "name": _OUTIL_CONTENU_PIECE_JOINTE,
+                "description": (
+                    "Récupère le contenu complet d'une pièce jointe de cette "
+                    "conversation dont le message n'est plus dans les derniers "
+                    "messages. Pièces jointes éligibles (id — nom de fichier) "
+                    f":\n{liste_pieces_jointes}"
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "piece_jointe_id": {
+                            "type": "integer",
+                            "description": (
+                                "Identifiant de la pièce jointe à récupérer, "
+                                "parmi ceux listés ci-dessus."
+                            ),
+                        }
+                    },
+                    "required": ["piece_jointe_id"],
                 },
-                "required": ["piece_jointe_id"],
             },
-        },
-    }
-]
+        }
+    ]
 
 # Sortie structurée stricte (spec V1.1.1) : un seul appel Mistral produit à la
 # fois le résumé glissant mis à jour et une éventuelle mise à jour du profil
@@ -118,10 +133,16 @@ def _prompt_titrage(message_utilisateur: str, reponse_assistant: str) -> str:
 def _message_systeme_piece_jointe(piece_jointe: PieceJointe) -> dict[str, str]:
     # Même mécanisme que resume_contexte/profil_travail ci-dessous : un
     # message system supplémentaire, propre à cet appel précis (spec 1.1.2).
+    # Framing explicite du "ce tour précis" (ticket #50) : dans l'essai du
+    # 2026-09-17, le modèle traitait cet extrait comme un exemple ou un
+    # rappel d'un tour antérieur plutôt que comme le fichier que le compte
+    # vient d'envoyer avec le message de ce tour.
     return {
         "role": "system",
         "content": (
-            f"Contenu extrait de la pièce jointe « {piece_jointe.nom_fichier} » :\n"
+            f"Pièce jointe « {piece_jointe.nom_fichier} » du message que le "
+            "compte vient d'envoyer à ce tour précis — ce n'est ni un "
+            "exemple, ni un rappel d'un tour antérieur. Contenu extrait :\n"
             f"{piece_jointe.contenu_extrait or ''}"
         ),
     }
@@ -206,7 +227,12 @@ def _prompt_resume_et_profil(
         "doivent jamais être réinférés ni modifiés depuis une conversation. "
         "Si un message sortant porte une pièce jointe, n'en garde dans "
         "resume_contexte qu'une mention courte (façon description de skill : "
-        "juste assez pour situer le sujet), jamais son contenu intégral."
+        "juste assez pour situer le sujet), jamais son contenu intégral. "
+        "N'inclus jamais non plus dans profil_travail_delta un trait "
+        "décrivant ton propre comportement d'assistant (ton adopté, "
+        "réflexes de réponse, suggestions d'outils externes que tu "
+        "formules) : seul un trait observé chez le compte lui-même, sa "
+        "façon à lui de travailler, y a sa place."
     )
 
 
@@ -607,16 +633,16 @@ def _appeler_reponse_chat(
     return client.chat(messages_pour_mistral, tools=tools)
 
 
-def _piece_jointe_hors_fenetre_existe(
+def _pieces_jointes_hors_fenetre(
     db: Session, conversation_id: int, ids_fenetre: set[int]
-) -> bool:
-    requete = db.query(PieceJointe.id).filter(
+) -> list[PieceJointe]:
+    requete = db.query(PieceJointe).filter(
         PieceJointe.conversation_id == conversation_id,
         PieceJointe.message_id.isnot(None),
     )
     if ids_fenetre:
         requete = requete.filter(~PieceJointe.message_id.in_(ids_fenetre))
-    return db.query(requete.exists()).scalar()
+    return requete.all()
 
 
 def _traiter_appel_outil(
@@ -746,11 +772,8 @@ def envoyer_message(
         # (`derniers_messages`), pas `messages_sortants` (qui n'en retire que
         # le plus ancien, propre à l'absorption de CE tour dans le résumé).
         ids_fenetre = {m.id for m in derniers_messages}
-        tools = (
-            _OUTILS_PIECE_JOINTE
-            if _piece_jointe_hors_fenetre_existe(db, conversation.id, ids_fenetre)
-            else None
-        )
+        pieces_jointes_hors_fenetre = _pieces_jointes_hors_fenetre(db, conversation.id, ids_fenetre)
+        tools = _outils_piece_jointe(pieces_jointes_hors_fenetre) if pieces_jointes_hors_fenetre else None
 
         # Résolues une seule fois, avant l'appel résumé+profil (jamais dans le
         # thread de l'executor ci-dessous, la session SQLAlchemy n'étant pas

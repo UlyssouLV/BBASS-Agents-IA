@@ -569,6 +569,27 @@ def test_prompt_resume_et_profil_ninclut_jamais_lidentite_comme_a_determiner(
     assert "identité" in prompt_resume
 
 
+def test_prompt_resume_et_profil_exclut_les_traits_de_comportement_de_lassistant(
+    client, mistral_client_factice, jeton_valide
+):
+    # Ticket #50 : l'essai du 2026-09-17 a montré le profil s'auto-renforcer
+    # sur les tics de l'IA elle-même (ton coach, suggestions d'outils
+    # externes) plutôt que sur une caractéristique observée chez le compte.
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide, "Bonjour")
+
+    mistral_client_factice.repondre("Suite", resume_et_profil=_reponse_resume_et_profil("Résumé"))
+    client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Et ensuite ?"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    prompt_resume = mistral_client_factice.appels_structures[-1]
+    assert "comportement" in prompt_resume
+    assert "assistant" in prompt_resume
+    assert "profil_travail_delta" in prompt_resume
+
+
 def test_profil_travail_renvoie_le_contenu_du_compte_du_jeton(client, jeton_valide, db_session):
     db_session.add(
         ProfilTravail(
