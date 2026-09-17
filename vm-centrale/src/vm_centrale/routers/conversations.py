@@ -22,7 +22,7 @@ from vm_centrale.mistral_client import (
     ReponseChat,
     get_mistral_client,
 )
-from vm_centrale.models import Compte, Conversation, Message, PieceJointe, ProfilTravail
+from vm_centrale.models import Compte, Consommation, Conversation, Message, PieceJointe, ProfilTravail
 from vm_centrale.schemas import (
     ConversationCreeRequest,
     ConversationCreeResponse,
@@ -516,6 +516,15 @@ def supprimer_conversation(
     db: Session = Depends(get_db),
 ) -> None:
     conversation = _recuperer_conversation_du_compte(db, conversation_id, identifiant_compte)
+
+    # Consommation n'a pas de cascade ORM déclarée sur Conversation (spec
+    # 1.1.3) : la ligne survit à la conversation qui l'a produite, seul le
+    # rattachement disparaît — jamais de suppression en cascade comme pour
+    # les messages/pièces jointes ci-dessous. Même transaction que le reste
+    # de la suppression.
+    db.query(Consommation).filter(Consommation.conversation_id == conversation.id).update(
+        {Consommation.conversation_id: None}
+    )
 
     # Pièces jointes (base + fichier disque) supprimées avant les messages
     # (spec 1.1.2) : PieceJointe.message_id référence Message, donc l'ordre

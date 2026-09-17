@@ -407,6 +407,25 @@ def test_get_consommation_401_sans_jeton(client):
     assert reponse.status_code == 401
 
 
+def test_supprimer_conversation_ne_change_pas_le_total_mais_disparait_du_classement(
+    client, mistral_client_factice, jeton_valide
+):
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide)
+
+    avant = client.get("/consommation", headers=_autorisation(jeton_valide)).json()
+    assert any(c["id"] == conversation_id for c in avant["conversations"])
+
+    reponse = client.delete(
+        f"/conversations/{conversation_id}", headers=_autorisation(jeton_valide)
+    )
+    assert reponse.status_code == 204
+
+    apres = client.get("/consommation", headers=_autorisation(jeton_valide)).json()
+    assert apres["chat"] == avant["chat"]
+    assert apres["piece_jointe"] == avant["piece_jointe"]
+    assert all(c["id"] != conversation_id for c in apres["conversations"])
+
+
 def test_get_consommation_ne_voit_que_ses_propres_donnees(
     client, mistral_client_factice, jeton_valide, jeton_store
 ):
