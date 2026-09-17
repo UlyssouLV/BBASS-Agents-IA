@@ -7,6 +7,7 @@ import type { Compte } from "@/hooks/useSession";
 import { OngletChat } from "@/onglets/OngletChat";
 import { OngletComptes } from "@/onglets/OngletComptes";
 import { OngletConsommation } from "@/onglets/OngletConsommation";
+import { OngletConsommations } from "@/onglets/OngletConsommations";
 import { OngletProfilTravail } from "@/onglets/OngletProfilTravail";
 
 interface EcranCompteProps {
@@ -14,10 +15,6 @@ interface EcranCompteProps {
   deconnexion: UseMutationResult<void, Error, void>;
 }
 
-// OngletConsommations (admin) encore vide pour cette version, hors
-// Discussion/Consommation/Profil de travail/Comptes : rempli par le ticket
-// suivant (voir docs/specs/v1.2.0-interface-poste.md, Implementation
-// Decisions).
 export function EcranCompte({ compte, deconnexion }: EcranCompteProps) {
   const [onglet, setOnglet] = useState("chat");
 
@@ -66,7 +63,11 @@ export function EcranCompte({ compte, deconnexion }: EcranCompteProps) {
             <OngletComptes />
           </TabsContent>
         )}
-        {compte.est_admin && <TabsContent value="consommations" />}
+        {compte.est_admin && (
+          <TabsContent value="consommations">
+            <OngletConsommations />
+          </TabsContent>
+        )}
       </Tabs>
     </main>
   );

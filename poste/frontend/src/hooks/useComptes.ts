@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { appelApi, ErreurApi } from "@/lib/api";
 import { marquerSessionExpiree } from "@/hooks/useSession";
+import type { DetailConsommationCategorie } from "@/hooks/useConsommation";
 
 // Même forme que poste.schemas.CompteAdminResponse (routers/comptes.py) :
 // vue admin d'un compte, avec email, sans le mot de passe.
@@ -39,6 +40,43 @@ async function _chargerComptes(): Promise<CompteAdmin[]> {
     _MSG_ERREUR_RESEAU,
     "Le chargement des comptes a échoué. Réessayez plus tard."
   );
+}
+
+// Même forme que poste.schemas.CompteConsommationResponse : détail agrégé
+// par compte (chat/pièce jointe), jamais par conversation individuelle
+// (confidentialité, spec 1.1.3/1.2.0) — classé par coût décroissant côté VM
+// centrale (voir vm_centrale.routers.comptes.lister_consommation_comptes).
+export interface CompteConsommation {
+  identifiant: string;
+  prenom: string;
+  nom: string;
+  cout_usd: string;
+  chat: DetailConsommationCategorie;
+  piece_jointe: DetailConsommationCategorie;
+}
+
+async function _chargerConsommationComptes(): Promise<CompteConsommation[]> {
+  return appelApi<CompteConsommation[]>(
+    "/comptes/consommation",
+    undefined,
+    _MSG_ERREUR_RESEAU,
+    "Le chargement de la consommation des comptes a échoué. Réessayez plus tard."
+  );
+}
+
+export function useComptesConsommationQuery() {
+  const queryClient = useQueryClient();
+  return useQuery({
+    queryKey: ["comptes", "consommation"],
+    queryFn: async () => {
+      try {
+        return await _chargerConsommationComptes();
+      } catch (erreur) {
+        _surErreurSession(queryClient, erreur);
+        throw erreur;
+      }
+    },
+  });
 }
 
 export interface CreationCompteVariables {
