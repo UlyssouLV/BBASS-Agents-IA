@@ -5,14 +5,16 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Compte } from "@/hooks/useSession";
 import { OngletChat } from "@/onglets/OngletChat";
+import { OngletConsommation } from "@/onglets/OngletConsommation";
+import { OngletProfilTravail } from "@/onglets/OngletProfilTravail";
 
 interface EcranCompteProps {
   compte: Compte;
   deconnexion: UseMutationResult<void, Error, void>;
 }
 
-// Onglets encore vides pour cette version, hors Discussion : remplis par les
-// tickets suivants (OngletConsommation, OngletProfilTravail, OngletComptes,
+// Onglets encore vides pour cette version, hors Discussion/Consommation/
+// Profil de travail : remplis par les tickets suivants (OngletComptes,
 // OngletConsommations — voir docs/specs/v1.2.0-interface-poste.md,
 // Implementation Decisions).
 export function EcranCompte({ compte, deconnexion }: EcranCompteProps) {
@@ -52,8 +54,12 @@ export function EcranCompte({ compte, deconnexion }: EcranCompteProps) {
         <TabsContent value="chat">
           <OngletChat />
         </TabsContent>
-        <TabsContent value="consommation" />
-        <TabsContent value="profil-travail" />
+        <TabsContent value="consommation">
+          <OngletConsommation />
+        </TabsContent>
+        <TabsContent value="profil-travail">
+          <OngletProfilTravail />
+        </TabsContent>
         {compte.est_admin && <TabsContent value="comptes" />}
         {compte.est_admin && <TabsContent value="consommations" />}
       </Tabs>
