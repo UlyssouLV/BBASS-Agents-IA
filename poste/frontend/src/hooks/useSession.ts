@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 
 import { appelApi, ErreurApi } from "@/lib/api";
 
@@ -16,7 +16,15 @@ export interface Compte {
   avertissement?: string | null;
 }
 
-const CLE_SESSION = ["session", "compte"] as const;
+export const CLE_SESSION = ["session", "compte"] as const;
+
+// Réutilisé par les autres hooks de ressource (voir useConversations.ts) :
+// un 401 sur n'importe quel appel signifie un jeton devenu invalide, même
+// traitement que verifierSessionActive/afficherEcranConnexion dans app.js —
+// bascule immédiate vers l'écran de connexion en vidant le compte du cache.
+export function marquerSessionExpiree(queryClient: QueryClient): void {
+  queryClient.setQueryData(CLE_SESSION, null);
+}
 
 async function chargerCompteConnecte(): Promise<Compte | null> {
   try {
