@@ -13,7 +13,8 @@ from sqlalchemy.orm import Session
 from vm_centrale.analyse_pieces_jointes import TYPES_SUPPORTES, analyser
 from vm_centrale.autorisation import get_identifiant_compte_du_jeton
 from vm_centrale.concurrence import cache_idempotence, verrous_comptes
-from vm_centrale.config import PIECES_JOINTES_DIR
+from vm_centrale.config import MODELE_CHAT, PIECES_JOINTES_DIR
+from vm_centrale.consommation import enregistrer_consommation
 from vm_centrale.database import get_db
 from vm_centrale.mistral_client import (
     AppelOutilDemande,
@@ -399,13 +400,20 @@ def creer_conversation(
         try:
             reponse_chat = client.chat(message_pour_mistral)
             reponse = reponse_chat.contenu
-            titre = client.chat(_prompt_titrage(requete.message, reponse)).contenu
+            reponse_titrage = client.chat(_prompt_titrage(requete.message, reponse))
+            titre = reponse_titrage.contenu
         except Exception as erreur:
             db.rollback()
             logger.error("Échec de l'appel au relais Mistral : %s", erreur)
             raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
 
         conversation.titre = titre
+        enregistrer_consommation(
+            db, identifiant_compte, conversation.id, "chat", MODELE_CHAT, usage=reponse_chat.usage
+        )
+        enregistrer_consommation(
+            db, identifiant_compte, conversation.id, "titrage", MODELE_CHAT, usage=reponse_titrage.usage
+        )
 
         message_utilisateur = Message(
             conversation_id=conversation.id,
@@ -588,6 +596,16 @@ def _creer_piece_jointe(
 
     piece_jointe.contenu_extrait = resultat.contenu_extrait
     piece_jointe.echec_analyse = resultat.echec_analyse
+    if resultat.consommation is not None:
+        enregistrer_consommation(
+            db,
+            identifiant_compte,
+            conversation_id,
+            resultat.consommation.type_appel,
+            resultat.consommation.modele,
+            usage=resultat.consommation.usage,
+            pages_traitees=resultat.consommation.pages_traitees,
+        )
     db.commit()
     db.refresh(piece_jointe)
 
@@ -686,6 +704,7 @@ def _resoudre_reponse_chat(
     messages_pour_mistral: list[dict[str, str]],
     db: Session,
     conversation_id: int,
+    identifiant_compte: str,
 ) -> ReponseChat:
     # Centralise la gestion de AppelOutilDemande (et son propre échec
     # éventuel) pour les deux façons d'obtenir la réponse de chat principale
@@ -693,16 +712,28 @@ def _resoudre_reponse_chat(
     # est soit `futur_reponse.result`, soit un appel direct à
     # _appeler_reponse_chat.
     try:
-        return obtenir_reponse()
+        reponse = obtenir_reponse()
     except AppelOutilDemande as demande:
+        # L'appel qui a décidé d'invoquer l'outil a déjà consommé des tokens
+        # (spec V1.1.3), même si sa réponse n'est pas la réponse finale de ce
+        # tour : une ligne "chat" à part entière, en plus de celle du second
+        # appel ci-dessous.
+        enregistrer_consommation(
+            db, identifiant_compte, conversation_id, "chat", MODELE_CHAT, usage=demande.usage
+        )
         try:
-            return _traiter_appel_outil(client, messages_pour_mistral, demande, db, conversation_id)
+            reponse = _traiter_appel_outil(client, messages_pour_mistral, demande, db, conversation_id)
         except Exception as erreur:
             logger.error("Échec de l'appel au relais Mistral : %s", erreur)
             raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
     except Exception as erreur:
         logger.error("Échec de l'appel au relais Mistral : %s", erreur)
         raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
+
+    enregistrer_consommation(
+        db, identifiant_compte, conversation_id, "chat", MODELE_CHAT, usage=reponse.usage
+    )
+    return reponse
 
 
 def _appeler_resume_et_profil(
@@ -823,7 +854,12 @@ def envoyer_message(
                     pieces_jointes_sortantes,
                 )
                 reponse_chat = _resoudre_reponse_chat(
-                    futur_reponse.result, client, messages_pour_mistral, db, conversation.id
+                    futur_reponse.result,
+                    client,
+                    messages_pour_mistral,
+                    db,
+                    conversation.id,
+                    identifiant_compte,
                 )
                 try:
                     reponse_resume = futur_resume.result()
@@ -831,6 +867,14 @@ def envoyer_message(
                     logger.error("Échec de l'appel au relais Mistral : %s", erreur)
                     raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
 
+            enregistrer_consommation(
+                db,
+                identifiant_compte,
+                conversation.id,
+                "resume_et_profil",
+                MODELE_CHAT,
+                usage=reponse_resume.usage,
+            )
             try:
                 donnees = json.loads(reponse_resume.contenu)
                 resume_maj = donnees["resume_contexte"]
@@ -849,6 +893,7 @@ def envoyer_message(
                 messages_pour_mistral,
                 db,
                 conversation.id,
+                identifiant_compte,
             )
 
         reponse = reponse_chat.contenu
