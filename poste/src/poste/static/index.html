@@ -76,8 +76,16 @@
           <form id="formulaire-nouvelle-conversation">
             <label for="nouveau-message-conversation" class="visually-hidden">Premier message</label>
             <input type="text" id="nouveau-message-conversation" name="message" autocomplete="off" required />
+            <label for="piece-jointe-nouvelle-conversation">Pièce jointe (optionnel)</label>
+            <input
+              type="file"
+              id="piece-jointe-nouvelle-conversation"
+              name="piece_jointe"
+              accept=".pdf,.docx,.xlsx,image/jpeg,image/png,image/webp,image/gif"
+            />
             <button type="submit">Envoyer</button>
           </form>
+          <p id="piece-jointe-nouvelle-conversation-statut" role="status" hidden></p>
           <p id="nouvelle-conversation-erreur" role="alert" hidden></p>
         </div>
 
@@ -85,11 +93,19 @@
           <h2 id="conversation-titre"></h2>
           <div id="messages" role="log"></div>
           <p id="chat-chargement" hidden>Envoi en cours…</p>
+          <p id="piece-jointe-message-statut" role="status" hidden></p>
           <p id="chat-erreur" role="alert" hidden></p>
 
           <form id="formulaire-chat">
             <label for="message" class="visually-hidden">Message</label>
             <input type="text" id="message" name="message" autocomplete="off" required />
+            <label for="piece-jointe-message">Pièce jointe (optionnel)</label>
+            <input
+              type="file"
+              id="piece-jointe-message"
+              name="piece_jointe"
+              accept=".pdf,.docx,.xlsx,image/jpeg,image/png,image/webp,image/gif"
+            />
             <button type="submit">Envoyer</button>
           </form>
         </div>

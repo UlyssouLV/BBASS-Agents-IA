@@ -319,14 +319,14 @@
             <div class="toc-row">
               <a href="#travail-realise">Travail réalisé</a>
               <span class="toc-dots" aria-hidden="true"></span>
-              <span class="toc-ref">14–15 sept.</span>
+              <span class="toc-ref">14–16 sept.</span>
             </div>
           </li>
           <li>
             <div class="toc-row">
               <a href="#reste-a-implementer">Reste à implémenter</a>
               <span class="toc-dots" aria-hidden="true"></span>
-              <span class="toc-ref">V1.1.1 à V1.3.0</span>
+              <span class="toc-ref">V1.1.2 à V1.3.0</span>
             </div>
           </li>
           <li>
@@ -345,6 +345,7 @@
             <ol>
               <li><a href="#version-1-0-0">V1.0.0 — Socle</a></li>
               <li><a href="#version-1-1-0">V1.1.0 — Gestion des comptes</a></li>
+              <li><a href="#version-1-1-1">V1.1.1 — Persistance des conversations</a></li>
             </ol>
           </li>
         </ol>
@@ -374,13 +375,22 @@
       </ul>
     </div>
 
+    <div class="jour">
+      <h3>Mercredi 16 septembre</h3>
+      <ul>
+        <li>Livraison de la <strong>V1.1.1</strong> : le chat a une mémoire d’un message à l’autre (ce n’était pas le cas en V1.1.0) ; conversations mémorisées sur la VM (plusieurs fils, reprise après rechargement ou autre poste), résumé glissant, profil de travail en lecture seule, PostgreSQL. Les échanges ne sont pas stockés chez Mistral.</li>
+        <li>Lanceurs Windows et macOS : un double-clic installe les dépendances au besoin et démarre le logiciel (Docker + Postgres local).</li>
+        <li>Tests manuels du chat persisté (fils, résumé, profil).</li>
+        <li>Ouverture de la <strong>V1.1.2</strong> (pièces jointes) : spec et décision d’architecture (fichier jamais stocké durablement chez Mistral ; OCR pour les PDF, extraction locale Word/Excel, vision pour les images).</li>
+      </ul>
+    </div>
+
     </section>
 
     <section class="bloc" id="reste-a-implementer">
     <h2>Reste à implémenter</h2>
     <ul>
-      <li><strong>V1.1.1</strong> — persistance des conversations côté cabinet (PostgreSQL sur la VM) : plusieurs fils, multi-tours, résumé glissant, profil de travail ; pas de stockage Mistral Conversations.</li>
-      <li><strong>V1.1.2</strong> — pièces jointes : upload et envoi à Mistral (table déjà prévue en 1.1.1, encore vide).</li>
+      <li><strong>V1.1.2</strong> — pièces jointes : une par message ; PDF (OCR Mistral), Word et Excel (extraction sur la VM), image (analyse visuelle Mistral). Fichier original sur disque côté VM ; jamais d’upload durable chez Mistral (pas de Files API). En cours de spec / tickets.</li>
       <li><strong>V1.1.3</strong> — suivi de la consommation : tokens (entrée / sortie / total) par compte et par session, dates, modèle, coût ; API tarifs Mistral si elle existe.</li>
       <li><strong>V1.2.0</strong> — interface poste (modales, écran comptes, minimum de style ; framework ou HTML/CSS/JS à choisir).</li>
       <li><strong>V1.3.0</strong> — premier agent, pôle Administration, Moduléo (API, serveur de test, lecture seule, plan d’automatisme sans écriture ni exécution).</li>
@@ -401,8 +411,8 @@
       <ul>
         <li>Identifiant et mot de passe ; session conservée (identifiants Windows) jusqu’à déconnexion ou révocation.</li>
         <li>Chat vers Mistral ; affichage prénom, nom, identifiant, agence et pôle(s).</li>
-        <li>Plusieurs conversations par compte, persistées sur la VM : reprise après rechargement, relance du poste, autre machine du même compte. Titre auto, renommage, suppression. Historique borné (3 derniers messages + résumé). Profil de travail consultable, sans modifier l’identité du compte. Conversations privées (y compris vis-à-vis d’un compte administrateur).</li>
-        <li>Pièces jointes : documents joints au chat, stockés côté VM, transmis à Mistral.</li>
+        <li>Mémoire d’un message à l’autre (livré en V1.1.1) ; plusieurs conversations par compte, persistées sur la VM : reprise après rechargement, relance du poste, autre machine du même compte. Titre auto, renommage, suppression. Historique borné (3 derniers messages + résumé). Profil de travail consultable, sans modifier l’identité du compte. Conversations privées (y compris vis-à-vis d’un compte administrateur).</li>
+        <li>Pièces jointes (V1.1.2, pas encore livrée) : un document par message (PDF, Word, Excel ou image), stocké côté VM ; le fichier n’est pas conservé chez Mistral. OCR pour les PDF, extraction locale pour Word/Excel, analyse visuelle pour les images.</li>
         <li>Suivi de la consommation : tokens (entrée, sortie, total) par compte et par session, dates, modèle, estimation du coût.</li>
         <li>Interface poste : minimum d’UX (modales, écran comptes).</li>
       </ul>
@@ -443,6 +453,18 @@
         <p>En V1.0.0, chaque compte devait encore être créé à la main sur la machine centrale. Cette version permet à certains collaborateurs — les comptes administrateurs — de gérer les comptes depuis le logiciel : liste, création, modification (identité, email, agence, pôles), mot de passe généré automatiquement, déconnexion forcée, promotion ou rétrogradation d’un administrateur, suppression définitive. Le premier administrateur reste créé une fois à la main, pour amorcer le dispositif.</p>
         <p>Le droit d’administrateur est global (tout le cabinet), distinct du pôle nommé « Administration ». Un compte peut appartenir à plusieurs pôles, car des collaborateurs couvrent plusieurs domaines. Pôle et agence s’affichent désormais dans le chat. À la création ou à la réinitialisation du mot de passe, le collaborateur doit en choisir un nouveau avant d’accéder au chat ; il ne peut pas changer son mot de passe de sa propre initiative en dehors de ce cas. La suppression et le changement de statut d’administrateur demandent, en plus, la clé d’administration de la machine centrale, saisie au moment de l’action — pour que ces gestes irréversibles restent délibérés. On ne peut pas supprimer ni rétrograder le dernier administrateur.</p>
         <p>Réinitialiser un mot de passe n’expulse pas les sessions déjà ouvertes : seule la déconnexion forcée le fait, pour que les deux actions restent distinctes. Un administrateur rétrogradé perd l’écran Comptes dès la prochaine vérification au lancement du logiciel.</p>
+        </div>
+      </div>
+
+      <div class="version" id="version-1-1-1">
+        <div class="version-head">
+          <h3>V1.1.1 — Persistance des conversations</h3>
+          <span class="deploye">Déployé le 16/09/2026 à 14:06</span>
+        </div>
+        <div class="version-body">
+        <p>En V1.1.0, chaque message partait vers Mistral sans mémoire : le modèle ne voyait pas les messages précédents, même dans le même échange, sans recharger la page. Cette version enregistre les conversations sur la machine centrale à Castries (PostgreSQL) : le fil se poursuit d’un message à l’autre, un collaborateur peut avoir plusieurs fils, les retrouver le lendemain, et les reprendre depuis un autre poste avec le même compte. Le titre est proposé automatiquement à partir du premier échange ; on peut le renommer ou supprimer un fil. Un administrateur ne lit pas les conversations des autres.</p>
+        <p>Pour maîtriser le coût (Mistral facture au token), on n’envoie plus tout l’historique à chaque tour : seulement les trois derniers messages, plus un résumé de ce qui est plus ancien. Un profil de travail, consultable en lecture seule, retient des habitudes de méthode — jamais le prénom, le nom, le pôle ou l’agence, qui restent sur le compte. Rien n’est stocké dans l’offre « Conversations » de Mistral : tout reste au cabinet.</p>
+        <p>Le logiciel se lance par un script (Windows ou macOS) qui démarre Postgres en local pour le développement. La vraie VM à Castries n’est pas encore créée ; le schéma est déjà celui de la production.</p>
         </div>
       </div>
     </section>

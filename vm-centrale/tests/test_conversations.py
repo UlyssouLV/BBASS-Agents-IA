@@ -1,12 +1,14 @@
 import json
 from datetime import datetime
+from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from vm_centrale.database import get_db
 from vm_centrale.jetons import JetonStore, get_jeton_store
 from vm_centrale.main import app
-from vm_centrale.models import Conversation, ProfilTravail
+from vm_centrale.models import Conversation, PieceJointe, ProfilTravail
 
 
 def _autorisation(jeton: str) -> dict[str, str]:
@@ -308,6 +310,38 @@ def test_supprimer_sans_jeton_est_refuse(client):
     assert reponse.status_code == 401
 
 
+@pytest.fixture()
+def _repertoire_pieces_jointes(tmp_path, monkeypatch):
+    # Isole les tests du répertoire par défaut (VM_CENTRALE_PIECES_JOINTES_DIR,
+    # ./pieces_jointes), même convention que test_pieces_jointes.py.
+    monkeypatch.setattr("vm_centrale.routers.conversations.PIECES_JOINTES_DIR", str(tmp_path))
+    return tmp_path
+
+
+def test_supprimer_efface_les_pieces_jointes_en_base_et_sur_disque(
+    client, mistral_client_factice, jeton_valide, db_session, _repertoire_pieces_jointes
+):
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide)
+    mistral_client_factice.repondre_ocr("Texte extrait du PDF")
+    upload = client.post(
+        f"/conversations/{conversation_id}/pieces-jointes",
+        files={"fichier": ("document.pdf", b"%PDF-1.4 contenu factice", "application/pdf")},
+        headers=_autorisation(jeton_valide),
+    )
+    piece_jointe_id = upload.json()["piece_jointe"]["id"]
+    piece_jointe = db_session.get(PieceJointe, piece_jointe_id)
+    chemin_fichier = Path(_repertoire_pieces_jointes) / piece_jointe.chemin_fichier
+    assert chemin_fichier.exists()
+
+    reponse = client.delete(
+        f"/conversations/{conversation_id}", headers=_autorisation(jeton_valide)
+    )
+
+    assert reponse.status_code == 204
+    assert db_session.get(PieceJointe, piece_jointe_id) is None
+    assert not chemin_fichier.exists()
+
+
 def test_envoyer_message_persiste_le_message_et_la_reponse(
     client, mistral_client_factice, jeton_valide
 ):
@@ -533,6 +567,27 @@ def test_prompt_resume_et_profil_ninclut_jamais_lidentite_comme_a_determiner(
     assert "Foncier" in prompt_resume
     assert "jamais" in prompt_resume
     assert "identité" in prompt_resume
+
+
+def test_prompt_resume_et_profil_exclut_les_traits_de_comportement_de_lassistant(
+    client, mistral_client_factice, jeton_valide
+):
+    # Ticket #50 : l'essai du 2026-09-17 a montré le profil s'auto-renforcer
+    # sur les tics de l'IA elle-même (ton coach, suggestions d'outils
+    # externes) plutôt que sur une caractéristique observée chez le compte.
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide, "Bonjour")
+
+    mistral_client_factice.repondre("Suite", resume_et_profil=_reponse_resume_et_profil("Résumé"))
+    client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Et ensuite ?"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    prompt_resume = mistral_client_factice.appels_structures[-1]
+    assert "comportement" in prompt_resume
+    assert "assistant" in prompt_resume
+    assert "profil_travail_delta" in prompt_resume
 
 
 def test_profil_travail_renvoie_le_contenu_du_compte_du_jeton(client, jeton_valide, db_session):

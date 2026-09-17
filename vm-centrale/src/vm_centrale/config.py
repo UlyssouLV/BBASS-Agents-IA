@@ -7,9 +7,20 @@ load_dotenv()
 VM_CENTRALE_HOST = os.environ.get("VM_CENTRALE_HOST", "0.0.0.0")
 VM_CENTRALE_PORT = int(os.environ.get("VM_CENTRALE_PORT", "8000"))
 DATABASE_URL = os.environ.get("VM_CENTRALE_DATABASE_URL", "sqlite:///./vm_centrale.db")
+# Racine du stockage fichier des pièces jointes (spec V1.1.2), même
+# convention que DATABASE_URL ci-dessus.
+PIECES_JOINTES_DIR = os.environ.get("VM_CENTRALE_PIECES_JOINTES_DIR", "./pieces_jointes")
 # Doit rester <= au timeout HTTP du poste (POSTE_HTTP_TIMEOUT, 35s par
 # défaut) : voir poste/src/poste/config.py.
 MISTRAL_HTTP_TIMEOUT = float(os.environ.get("MISTRAL_HTTP_TIMEOUT", "30"))
+
+# Tags de modèle centralisés par fonction (spec V1.1.2), pas par valeur : tout
+# code appelant Mistral référence l'une de ces constantes plutôt qu'une
+# chaîne en dur, pour qu'un changement de modèle futur se fasse à un seul
+# endroit. Forme de requête/réponse différente entre les deux (chat
+# completions vs. OCR), pas un simple changement de paramètre.
+MODELE_CHAT = "mistral-small-latest"
+MODELE_OCR = "mistral-ocr-latest"
 
 
 def get_mistral_api_key() -> str:

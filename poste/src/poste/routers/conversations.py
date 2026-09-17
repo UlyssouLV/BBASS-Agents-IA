@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
 from poste.schemas import (
     ConversationCreationRequest,
@@ -10,11 +10,16 @@ from poste.schemas import (
     MessageEnvoyeRequest,
     MessageEnvoyeResponse,
     MessageResponse,
+    PieceJointeCreeeResponse,
+    PieceJointeResumeResponse,
 )
 from poste.session import SessionStore, get_session_store
 from poste.vm_centrale_client import (
     ConversationIntrouvableError,
     JetonInvalideError,
+    PieceJointeCreee,
+    PieceJointeIntrouvableError,
+    PieceJointeRefuseeError,
     VmCentraleClient,
     get_vm_centrale_client,
 )
@@ -23,6 +28,8 @@ router = APIRouter()
 
 _AUCUNE_SESSION = "Aucune session active"
 _CONVERSATION_INTROUVABLE = "Conversation introuvable"
+_PIECE_JOINTE_INTROUVABLE = "Pièce jointe introuvable"
+_PIECE_JOINTE_REFUSEE = "Pièce jointe refusée"
 _VM_CENTRALE_INDISPONIBLE = "Le service de conversations de la VM centrale est indisponible"
 
 
@@ -42,6 +49,14 @@ def _erreur_vm_vers_http(session: SessionStore, erreur: Exception) -> HTTPExcept
         return HTTPException(status_code=401, detail=_AUCUNE_SESSION)
     if isinstance(erreur, ConversationIntrouvableError):
         return HTTPException(status_code=404, detail=_CONVERSATION_INTROUVABLE)
+    if isinstance(erreur, PieceJointeIntrouvableError):
+        return HTTPException(status_code=404, detail=str(erreur) or _PIECE_JOINTE_INTROUVABLE)
+    if isinstance(erreur, PieceJointeRefuseeError):
+        # Relaie le texte de la VM (type non supporté, fichier trop
+        # volumineux, ou déjà liée à un autre message — voir
+        # PieceJointeRefuseeError), même principe que DernierAdministrateurError
+        # côté comptes.py.
+        return HTTPException(status_code=400, detail=str(erreur) or _PIECE_JOINTE_REFUSEE)
     return HTTPException(status_code=502, detail=_VM_CENTRALE_INDISPONIBLE)
 
 
@@ -53,7 +68,9 @@ def creer_conversation(
 ) -> ConversationCreeResponse:
     jeton = _jeton_de_session(session)
     try:
-        cree = client.creer_conversation(jeton, requete.message, requete.cle_idempotence)
+        cree = client.creer_conversation(
+            jeton, requete.message, requete.cle_idempotence, requete.piece_jointe_id
+        )
     except Exception as erreur:
         raise _erreur_vm_vers_http(session, erreur) from erreur
 
@@ -156,9 +173,74 @@ def envoyer_message(
     jeton = _jeton_de_session(session)
     try:
         reponse = client.envoyer_message(
-            jeton, conversation_id, requete.message, requete.cle_idempotence
+            jeton, conversation_id, requete.message, requete.cle_idempotence, requete.piece_jointe_id
         )
     except Exception as erreur:
         raise _erreur_vm_vers_http(session, erreur) from erreur
 
     return MessageEnvoyeResponse(reponse=reponse)
+
+
+def _piece_jointe_creee_response(cree: PieceJointeCreee) -> PieceJointeCreeeResponse:
+    return PieceJointeCreeeResponse(
+        piece_jointe=PieceJointeResumeResponse(
+            id=cree.piece_jointe.id,
+            nom_fichier=cree.piece_jointe.nom_fichier,
+            type_mime=cree.piece_jointe.type_mime,
+        ),
+        echec_analyse=cree.echec_analyse,
+    )
+
+
+def _nom_et_type_du_fichier(fichier: UploadFile) -> tuple[str, str]:
+    # Un fichier multipart sans nom ni type ne peut de toute façon
+    # correspondre à aucun des types supportés par la VM (spec 1.1.2) : rejet
+    # immédiat côté poste plutôt qu'un relais d'un None que la VM refuserait
+    # de la même façon.
+    if fichier.filename is None or fichier.content_type is None:
+        raise HTTPException(status_code=400, detail=_PIECE_JOINTE_REFUSEE)
+    return fichier.filename, fichier.content_type
+
+
+@router.post(
+    "/conversations/{conversation_id}/pieces-jointes",
+    response_model=PieceJointeCreeeResponse,
+    status_code=201,
+)
+def televerser_piece_jointe(
+    conversation_id: int,
+    fichier: UploadFile = File(...),
+    client: VmCentraleClient = Depends(get_vm_centrale_client),
+    session: SessionStore = Depends(get_session_store),
+) -> PieceJointeCreeeResponse:
+    jeton = _jeton_de_session(session)
+    nom_fichier, type_mime = _nom_et_type_du_fichier(fichier)
+    try:
+        cree = client.televerser_piece_jointe(
+            jeton, conversation_id, nom_fichier, fichier.file.read(), type_mime
+        )
+    except Exception as erreur:
+        raise _erreur_vm_vers_http(session, erreur) from erreur
+
+    return _piece_jointe_creee_response(cree)
+
+
+@router.post("/pieces-jointes", response_model=PieceJointeCreeeResponse, status_code=201)
+def televerser_piece_jointe_sans_conversation(
+    fichier: UploadFile = File(...),
+    client: VmCentraleClient = Depends(get_vm_centrale_client),
+    session: SessionStore = Depends(get_session_store),
+) -> PieceJointeCreeeResponse:
+    # Pas de conversation dans l'URL : seule façon de joindre un fichier dès
+    # le tout premier message d'une conversation, qui n'existe pas encore au
+    # moment de l'upload (spec 1.1.2 — voir ConversationCreationRequest.piece_jointe_id).
+    jeton = _jeton_de_session(session)
+    nom_fichier, type_mime = _nom_et_type_du_fichier(fichier)
+    try:
+        cree = client.televerser_piece_jointe_sans_conversation(
+            jeton, nom_fichier, fichier.file.read(), type_mime
+        )
+    except Exception as erreur:
+        raise _erreur_vm_vers_http(session, erreur) from erreur
+
+    return _piece_jointe_creee_response(cree)

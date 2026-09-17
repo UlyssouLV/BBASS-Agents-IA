@@ -4,7 +4,7 @@ Logiciel d'agents IA pour le cabinet de géomètres-experts BBASS. L'objectif es
 
 ## État actuel
 
-**V1.1.1** disponible : backend local **poste** (interface HTML/CSS/JS) et API **VM centrale** (comptes administrateurs PostgreSQL, relais Mistral, conversations persistées avec historique borné, résumé glissant et profil de travail). Les agents métiers ne sont pas encore construits.
+**V1.1.2** disponible : backend local **poste** (interface HTML/CSS/JS) et API **VM centrale** (comptes administrateurs PostgreSQL, relais Mistral, conversations persistées avec historique borné, résumé glissant et profil de travail, pièces jointes PDF/Word/Excel/image avec extraction et rappel via outil hors fenêtre). Les agents métiers ne sont pas encore construits.
 
 ## Ce qu'on construit
 
@@ -45,10 +45,10 @@ flowchart LR
 - **Lundi 14** — environnement (éditeur, Git), dépôt GitHub, glossaire, spécifications, ADR ; première interface de chat ; API Mistral via la VM avec des comptes de test.
 - **Mardi 15** — socle chat (Pay as you go Mistral) ; **V1.1.0** (comptes administrateurs, collaborateurs, pôles, mots de passe, révocation de session) et tests utilisateurs ; échange Topo sans suite immédiate.
 - **Mercredi 16** — **V1.1.1** (persistance des conversations côté VM centrale : PostgreSQL, plusieurs fils par compte, historique multi-tours borné, résumé glissant, profil de travail) et écrans poste correspondants (conversations, profil de travail en lecture seule).
+- **Jeudi 17** — **V1.1.2** (pièces jointes : upload PDF/Word/Excel/image, extraction OCR/locale/vision, contenu injecté dans le chat, mention courte dans le résumé glissant, rappel via outil hors fenêtre) et zone de dépôt minimale côté poste.
 
 ### Reste à implémenter
 
-- **V1.1.2** — pièces jointes : upload et envoi à Mistral (table déjà prévue en 1.1.1, encore vide).
 - **V1.1.3** — suivi de la consommation : tokens (entrée / sortie / total) par compte et par session, dates, modèle, coût ; API tarifs Mistral si elle existe.
 - **V1.2.0** — interface poste (modales, écran comptes, minimum de style ; framework ou HTML/CSS/JS à choisir).
 - **V1.3.0** — premier agent, pôle Administration, Moduléo (API, serveur de test, lecture seule, plan d’automatisme sans écriture ni exécution).
@@ -65,8 +65,8 @@ flowchart LR
 - **Python 3.11** (série figée : pas 3.12 / 3.13 / 3.14).
   - Windows : dernier installeur officiel [Python 3.11.9](https://www.python.org/downloads/release/python-3119/) — prendre *Windows installer (64-bit)*. Cocher **Add python.exe to PATH**. Les correctifs 3.11.x plus récents n'ont plus d'installeur (source only).
   - macOS : `brew install python@3.11` (Homebrew), ou l'installeur officiel [Python 3.11.9](https://www.python.org/downloads/release/python-3119/) (*macOS 64-bit universal2 installer*).
-- **Docker Desktop** pour le PostgreSQL local de la VM centrale ([ADR-0008](docs/adr/0008-postgresql-vm-centrale.md)) — pas nécessaire pour lancer les tests pytest (SQLite en mémoire).
-- Une clé API Mistral (console [La Plateforme](https://console.mistral.ai)) pour un vrai chat ; les tests pytest n'en ont pas besoin
+- **Docker Desktop** pour le PostgreSQL local de la VM centrale ([ADR-0008](docs/adr/0008-postgresql-vm-centrale.md)).
+- Une clé API Mistral (console [La Plateforme](https://console.mistral.ai)) pour un vrai chat
 
 ## Démarrer
 

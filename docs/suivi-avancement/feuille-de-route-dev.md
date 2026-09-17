@@ -8,32 +8,10 @@ Ce n’est **pas** une spec (ça vient après « Ouvre la version »).
 
 - **1.0.x** — Socle : comptes, connexion, chat, relais Mistral, session persistée (keyring), LAN Castries.
 - **1.1.0** — Comptes administrateurs, multi-pôles, mot de passe généré / changement forcé, révocation, affichage pôle/agence dans le chat.
+- **1.1.1** — Conversations persistées sur la VM (PostgreSQL) : plusieurs fils, reprise après rechargement / autre poste, historique borné (3 derniers messages + résumé glissant), profil de travail lecture seule ; pas de stockage Mistral Conversations.
+- **1.1.2** — Pièces jointes : upload PDF/Word/Excel/image sur un message (une par message), extraction (OCR Mistral, locale pour Word/Excel, vision Mistral pour l'image), contenu injecté dans le chat, mention courte dans le résumé glissant, rappel via un outil si la pièce jointe sort de la fenêtre ; jamais la Files API Mistral.
 
-Le chat actuel envoie **un seul message** à Mistral à chaque tour : pas d’historique, pas de fils.
-
-## Prochaine : 1.1.1 — Persistance des conversations
-
-Travail **de recherche d’abord**, puis architecture (et implémentation une fois le grill / la spec faits).
-
-**Objectif.** Des fils de discussion qui survivent au rechargement, à la relance du poste, éventuellement à un autre poste du même compte : historique renvoyé pour un vrai multi-tours.
-
-**Recherche Mistral.**
-
-- Voir ce que Mistral propose pour une conversation persistante (API **Agents & Conversations**, ou autre) : ce qui est stocké chez eux, durée de vie, coût, confidentialité, identifiant de conversation à reprendre.
-- L’appel actuel (`POST /v1/chat/completions`) est **sans état** : si on reste sur cet endpoint, **on** doit stocker les messages (`user` / `assistant`, plus tard `system`) et les renvoyer à chaque tour.
-
-**Si on ne passe pas par le stockage Mistral.** Concevoir l’architecture côté cabinet : où vivent les fils (VM centrale vs poste), modèle (compte, fil, messages, dates), qui peut lire / supprimer, un fil vs plusieurs.
-
-## Ensuite : 1.1.2 — Pièces jointes
-
-Le schéma de données de la [1.1.1](../specs/v1.1.1-persistance-conversations.md) réserve déjà une table vide pour les pièces jointes (non exploitée). Cette version branche l'upload et l'exploitation réelle : ce que Mistral accepte comme document, formats, limites de taille, stockage côté VM centrale, envoi à Mistral.
-
-**Recherche.**
-
-- API/document Mistral : formats acceptés, limites de taille, comment un document est transmis dans un appel de chat (URL, upload dédié, encodage).
-- Stockage du fichier lui-même côté VM centrale (base vs système de fichiers).
-
-## Ensuite : 1.1.3 — Consommation (tokens, modèles, coûts)
+## Prochaine : 1.1.3 — Consommation (tokens, modèles, coûts)
 
 S’appuie sur des **sessions de chat** datées (1.1.1).
 
@@ -65,6 +43,19 @@ Premier **Agent** métier. Pôle **Administration**. Premier périmètre logicie
 - API Moduléo : ce qu’elle permet, limites, auth.
 - Essais uniquement sur un **serveur de test**.
 - Comment on branchera (plus tard) des automatismes sans les activer trop tôt en prod.
+
+## Ensuite : 1.4.0 — Analyse et traitement des pièces jointes, approfondis
+
+S’appuie sur la [1.1.2](../specs/v1.1.2-pieces-jointes.md) (pipeline d’extraction, une pièce jointe par message) et sur le premier **Agent** métier livré en 1.3.0. Deux limites actées volontairement en 1.1.2 sont à lever ici, pas avant : **plusieurs pièces jointes par message**, et un **traitement spécifique par pôle** (un agent Foncier ne traite pas un document comme un agent Urbanisme) — demande explicite du cabinet dès le grilling de 1.1.2, remise à plus tard faute d’Agent réel pour la justifier.
+
+**Objectif.** Une pièce jointe mieux exploitée dans la durée d’une conversation (le contenu retrouvé reste fiable une fois hors de la fenêtre des derniers messages, cf. les essais fonctionnels 1.1.2) et mieux exploitée selon qui la reçoit (le pôle de l’Agent destinataire).
+
+**Recherche.**
+
+- Plusieurs pièces jointes par message : impact sur le schéma `PieceJointe` (déjà pensé pour ne pas bloquer ça), sur l’outil `obtenir_contenu_piece_jointe` (choisir parmi plusieurs plutôt qu’une seule hors fenêtre), sur le résumé glissant (une mention courte par pièce jointe, pas une agrégée).
+- Traitement par pôle : qu’est-ce qui change concrètement pour un même format (PDF, image, …) selon le pôle de l’Agent qui le reçoit — nouveau prompt d’extraction, post-traitement dédié, ou simple différence de consigne à l’IA plutôt qu’un pipeline dupliqué.
+- Fiabilité de l’analyse elle-même, au-delà de la plomberie : enseignements des essais fonctionnels 1.1.2 (ex. liens inventés entre pièces jointes sans preuve, confusions de vocabulaire métier propre à un document) qui ne relèvent ni de la fenêtre de 3 messages ni du profil de travail.
+- Conservation d’une pièce jointe au-delà de sa conversation d’origine (usage multi-conversationnel, matière pour entraîner les futurs Agents) : piste évoquée dès le grilling 1.1.2, pas tranchée.
 
 ## Plus tard (pas encore numéroté)
 

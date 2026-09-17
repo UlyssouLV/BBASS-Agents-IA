@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from vm_centrale.database import Base
@@ -66,6 +66,38 @@ class Message(Base):
     )
     role: Mapped[str] = mapped_column(String)
     contenu: Mapped[str] = mapped_column(String)
+    date_creation: Mapped[datetime] = mapped_column(DateTime)
+
+
+class PieceJointe(Base):
+    __tablename__ = "pieces_jointes"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    # Toujours renseigné à l'upload (jeton du compte), indépendamment de
+    # conversation_id ci-dessous : seule façon de vérifier la propriété d'une
+    # pièce jointe pas encore rattachée à une conversation (voir
+    # conversation_id).
+    identifiant_compte: Mapped[str] = mapped_column(String, index=True)
+    # Nullable : une pièce jointe peut être téléversée avant même que la
+    # conversation qui la portera n'existe (POST /pieces-jointes, sans
+    # conversation_id dans l'URL) — nécessaire pour pouvoir en joindre une dès
+    # le tout premier message d'une conversation (spec 1.1.2, référencement).
+    # Renseigné au rattachement (création de la conversation, ou envoi d'un
+    # message) si elle ne l'était pas déjà.
+    conversation_id: Mapped[int | None] = mapped_column(
+        ForeignKey("conversations.id"), nullable=True, index=True
+    )
+    # Nullable : renseigné seulement une fois la pièce jointe liée à un
+    # message envoyé (référencement dans l'envoi d'un message — spec 1.1.2).
+    message_id: Mapped[int | None] = mapped_column(ForeignKey("messages.id"), nullable=True)
+    nom_fichier: Mapped[str] = mapped_column(String)
+    type_mime: Mapped[str] = mapped_column(String)
+    taille_octets: Mapped[int] = mapped_column(Integer)
+    # Chemin relatif sous VM_CENTRALE_PIECES_JOINTES_DIR, jamais absolu (le
+    # fichier physique, lui, vit sur disque — voir ADR-0009).
+    chemin_fichier: Mapped[str] = mapped_column(String)
+    contenu_extrait: Mapped[str | None] = mapped_column(String, nullable=True)
+    echec_analyse: Mapped[bool] = mapped_column(Boolean, default=False)
     date_creation: Mapped[datetime] = mapped_column(DateTime)
 
 

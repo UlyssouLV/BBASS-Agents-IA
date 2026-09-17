@@ -78,6 +78,43 @@ def test_front_end_envoie_une_cle_idempotence_a_chaque_envoi(client):
     assert "cle_idempotence: cleIdempotence" in js
 
 
+def test_front_end_expose_une_zone_de_depot_de_fichier_pour_les_deux_formulaires_denvoi(client):
+    # Issue #49 : zone de dépôt minimale, non stylisée (le style est le sujet
+    # de la 1.2.0) sur le premier message d'une conversation et sur l'envoi
+    # dans une conversation déjà ouverte.
+    html = client.get("/").text
+
+    assert 'id="piece-jointe-nouvelle-conversation"' in html
+    assert 'id="piece-jointe-message"' in html
+    assert 'type="file"' in html
+
+
+def test_front_end_televerse_la_piece_jointe_avant_denvoyer_le_message(client):
+    js = client.get("/static/app.js").text
+
+    assert "/conversations/${idConversationCiblee}/pieces-jointes" in js
+    assert "televerserPieceJointe" in js
+    assert "piece_jointe_id: pieceJointeId" in js
+
+
+def test_front_end_televerse_la_piece_jointe_sans_conversation_pour_le_premier_message(client):
+    # Ticket #45 : POST /pieces-jointes, sans conversation, seule façon de
+    # joindre un fichier dès le tout premier message.
+    js = client.get("/static/app.js").text
+
+    assert '"/pieces-jointes"' in js
+
+
+def test_front_end_signale_un_echec_danalyse_sans_bloquer_lenvoi(client):
+    # User Story 2 : un échec d'analyse (ex. image ambiguë) doit être signalé
+    # au collaborateur, jamais ignoré silencieusement.
+    js = client.get("/static/app.js").text
+
+    assert "echec_analyse" in js
+    assert "pieceJointeMessageStatut" in js
+    assert "pieceJointeNouvelleConversationStatut" in js
+
+
 def test_front_end_naffiche_pas_la_reponse_dans_la_mauvaise_conversation(client):
     # La réponse d'un envoi ne doit s'afficher que si la conversation ouverte
     # à la résolution du fetch est toujours celle ciblée par la requête.

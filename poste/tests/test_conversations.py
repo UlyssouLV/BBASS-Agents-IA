@@ -10,6 +10,10 @@ from poste.vm_centrale_client import (
     ConversationResume,
     JetonInvalideError,
     Message,
+    PieceJointeCreee,
+    PieceJointeIntrouvableError,
+    PieceJointeRefuseeError,
+    PieceJointeResume,
 )
 
 
@@ -312,3 +316,193 @@ def test_envoyer_un_message_relaie_la_cle_idempotence_a_la_vm(client, vm_central
     )
 
     assert vm_centrale_client_factice._cles_idempotence_envoi_message_conversation == ["cle-msg-1"]
+
+
+def test_creer_une_conversation_relaie_le_piece_jointe_id_a_la_vm(client, vm_centrale_client_factice):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.creation_conversation_reussit(
+        ConversationCree(conversation=ConversationResume(id=1, titre="Salutations"), reponse="Bonjour")
+    )
+
+    client.post("/conversations", json={"message": "Bonjour", "piece_jointe_id": 7})
+
+    assert vm_centrale_client_factice._pieces_jointes_id_creation_conversation == [7]
+
+
+def test_creer_une_conversation_sans_piece_jointe_en_relaie_labsence(client, vm_centrale_client_factice):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.creation_conversation_reussit(
+        ConversationCree(conversation=ConversationResume(id=1, titre="Salutations"), reponse="Bonjour")
+    )
+
+    client.post("/conversations", json={"message": "Bonjour"})
+
+    assert vm_centrale_client_factice._pieces_jointes_id_creation_conversation == [None]
+
+
+def test_creer_une_conversation_piece_jointe_refusee_retourne_400(client, vm_centrale_client_factice):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.creation_conversation_echoue(
+        PieceJointeRefuseeError("Pièce jointe déjà liée à un message")
+    )
+
+    reponse = client.post("/conversations", json={"message": "Bonjour", "piece_jointe_id": 7})
+
+    assert reponse.status_code == 400
+    assert reponse.json()["detail"] == "Pièce jointe déjà liée à un message"
+
+
+def test_envoyer_un_message_relaie_le_piece_jointe_id_a_la_vm(client, vm_centrale_client_factice):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.envoi_message_conversation_reussit("Réponse")
+
+    client.post("/conversations/1/messages", json={"message": "Et ensuite ?", "piece_jointe_id": 9})
+
+    assert vm_centrale_client_factice._pieces_jointes_id_envoi_message_conversation == [9]
+
+
+def test_envoyer_un_message_piece_jointe_introuvable_retourne_404(client, vm_centrale_client_factice):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.envoi_message_conversation_echoue(
+        PieceJointeIntrouvableError("Pièce jointe introuvable")
+    )
+
+    reponse = client.post("/conversations/1/messages", json={"message": "Et ensuite ?", "piece_jointe_id": 9})
+
+    assert reponse.status_code == 404
+    assert reponse.json()["detail"] == "Pièce jointe introuvable"
+
+
+def test_televerser_une_piece_jointe_dans_une_conversation_existante(client, vm_centrale_client_factice):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.televersement_piece_jointe_reussit(
+        PieceJointeCreee(
+            piece_jointe=PieceJointeResume(id=3, nom_fichier="devis.pdf", type_mime="application/pdf"),
+            echec_analyse=False,
+        )
+    )
+
+    reponse = client.post(
+        "/conversations/1/pieces-jointes",
+        files={"fichier": ("devis.pdf", b"%PDF-1.4 contenu factice", "application/pdf")},
+    )
+
+    assert reponse.status_code == 201
+    assert reponse.json() == {
+        "piece_jointe": {"id": 3, "nom_fichier": "devis.pdf", "type_mime": "application/pdf"},
+        "echec_analyse": False,
+    }
+    assert vm_centrale_client_factice._requetes_televersement_piece_jointe == [
+        {
+            "conversation_id": 1,
+            "nom_fichier": "devis.pdf",
+            "contenu": b"%PDF-1.4 contenu factice",
+            "type_mime": "application/pdf",
+        }
+    ]
+    assert vm_centrale_client_factice._jetons_televersement_piece_jointe == ["jeton-factice"]
+
+
+def test_televerser_une_piece_jointe_signale_un_echec_danalyse_sans_erreur_http(
+    client, vm_centrale_client_factice
+):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.televersement_piece_jointe_reussit(
+        PieceJointeCreee(
+            piece_jointe=PieceJointeResume(id=4, nom_fichier="scan.png", type_mime="image/png"),
+            echec_analyse=True,
+        )
+    )
+
+    reponse = client.post(
+        "/conversations/1/pieces-jointes",
+        files={"fichier": ("scan.png", b"donnees-image-factices", "image/png")},
+    )
+
+    assert reponse.status_code == 201
+    assert reponse.json()["echec_analyse"] is True
+
+
+def test_televerser_une_piece_jointe_sans_session_active_est_refuse(client):
+    reponse = client.post(
+        "/conversations/1/pieces-jointes",
+        files={"fichier": ("devis.pdf", b"contenu", "application/pdf")},
+    )
+
+    assert reponse.status_code == 401
+
+
+def test_televerser_une_piece_jointe_dans_une_conversation_dun_autre_compte_retourne_404(
+    client, vm_centrale_client_factice
+):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.televersement_piece_jointe_echoue(ConversationIntrouvableError())
+
+    reponse = client.post(
+        "/conversations/1/pieces-jointes",
+        files={"fichier": ("devis.pdf", b"contenu", "application/pdf")},
+    )
+
+    assert reponse.status_code == 404
+
+
+def test_televerser_une_piece_jointe_type_non_supporte_retourne_400(client, vm_centrale_client_factice):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.televersement_piece_jointe_echoue(
+        PieceJointeRefuseeError("Type de fichier non supporté")
+    )
+
+    reponse = client.post(
+        "/conversations/1/pieces-jointes",
+        files={"fichier": ("archive.zip", b"contenu", "application/zip")},
+    )
+
+    assert reponse.status_code == 400
+    assert reponse.json()["detail"] == "Type de fichier non supporté"
+
+
+def test_televerser_une_piece_jointe_sans_conversation(client, vm_centrale_client_factice):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.televersement_piece_jointe_sans_conversation_reussit(
+        PieceJointeCreee(
+            piece_jointe=PieceJointeResume(id=5, nom_fichier="notes.docx", type_mime="application/msword"),
+            echec_analyse=False,
+        )
+    )
+
+    reponse = client.post(
+        "/pieces-jointes",
+        files={"fichier": ("notes.docx", b"contenu-docx-factice", "application/msword")},
+    )
+
+    assert reponse.status_code == 201
+    assert reponse.json()["piece_jointe"]["id"] == 5
+    assert vm_centrale_client_factice._requetes_televersement_piece_jointe_sans_conversation == [
+        {"nom_fichier": "notes.docx", "contenu": b"contenu-docx-factice", "type_mime": "application/msword"}
+    ]
+
+
+def test_televerser_une_piece_jointe_sans_conversation_sans_session_active_est_refuse(client):
+    reponse = client.post(
+        "/pieces-jointes",
+        files={"fichier": ("notes.docx", b"contenu", "application/msword")},
+    )
+
+    assert reponse.status_code == 401
+
+
+def test_televerser_une_piece_jointe_sans_conversation_fichier_trop_volumineux_retourne_400(
+    client, vm_centrale_client_factice
+):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.televersement_piece_jointe_sans_conversation_echoue(
+        PieceJointeRefuseeError("Fichier trop volumineux (max 20 Mo)")
+    )
+
+    reponse = client.post(
+        "/pieces-jointes",
+        files={"fichier": ("gros.pdf", b"contenu", "application/pdf")},
+    )
+
+    assert reponse.status_code == 400
+    assert reponse.json()["detail"] == "Fichier trop volumineux (max 20 Mo)"

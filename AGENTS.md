@@ -16,11 +16,11 @@ Matt Pocock `/implement` for TDD. Then skill `encadrer-implement`: tests → com
 
 ### Ouvre the version
 
-When the user says **« Ouvre la version »** (must include **`X.Y.Z`**): skill `ouvrir-la-version`. Purpose → `/grill-with-docs` → `/to-spec` (parent issue; **no spec files on `main`**) → **branch from `main` → immediate init commit+push** (`docs/specs` + doc updates) → `/to-tickets` (propose, **yes**, then create with **native** blocked-by **and parent blocked by every child**, then drop `ready-for-agent` on the parent) → PR → propose `/clear` and `/implement` the first unblocked **child**.
+When the user says **« Ouvre la version »** (must include **`X.Y.Z`**): skill `ouvrir-la-version`. Purpose from **`docs/suivi-avancement/feuille-de-route-dev.md`** when that version is already listed (otherwise ask) → `/grill-with-docs` → `/to-spec` (parent issue; **no spec files on `main`**) → **branch from `main` → immediate init commit+push** (uncommitted leftover on `main` goes on that branch, **never** a commit on `main` ; `docs/specs` + doc updates) → `/to-tickets` (propose, **yes**, then create with **native** blocked-by **and parent blocked by every child**, then drop `ready-for-agent` on the parent) → PR → propose `/clear` and `/implement` the first unblocked **child**.
 
 ### Finalise the version
 
-When the user says **« Finalise la version »**: skill `finaliser-la-version`. Check every PR **child** is **Closed**, **docs** (`README.md`, `CONTEXT.md`, `CLAUDE.md`, `AGENTS.md`, `docs/`) match the version, **then** GitHub Release (semver tag on the **feature branch** SHA), **then** squash-merge into `main` and delete the feature branch.
+When the user says **« Finalise la version »**: skill `finaliser-la-version`. Check every PR **child** is **Closed**, **docs** (`README.md`, `CONTEXT.md`, `CLAUDE.md`, `AGENTS.md`, `docs/` including **`docs/suivi-avancement/feuille-de-route-dev.md`**) match the version, **then** GitHub Release (semver tag on the **feature branch** SHA), **then** squash-merge into `main` and delete the feature branch.
 
 ### Domain docs
 

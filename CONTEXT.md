@@ -54,3 +54,7 @@ _Avoid_: fil, thread, session de chat (Session ci-dessus a déjà un sens diffé
 **Profil de travail**:
 Un résumé synthétique par compte de sa façon de travailler, construit au fil de ses conversations pour donner à l'IA un contexte sur qui lui parle. Distinct de l'historique d'une conversation donnée. Ne porte jamais de fait d'identité (prénom, nom, pôle, agence) : ceux-ci restent uniquement portés par Compte, jamais réinférés depuis une conversation. Consultable en lecture seule par le compte concerné ; pas par un compte administrateur.
 _Avoid_: mémoire (ambigu avec le résumé propre à chaque conversation, voir la spec 1.1.1), profil utilisateur
+
+**Pièce jointe**:
+Un fichier (PDF, Word, Excel ou image) joint par un collaborateur à un message d'une [Conversation](#language) ([ADR-0009](docs/adr/0009-pieces-jointes-jamais-mistral-files-api.md), [spec 1.1.2](docs/specs/v1.1.2-pieces-jointes.md)). Le fichier original est stocké sur la VM centrale (jamais chez Mistral, jamais via sa Files API) ; son contenu est extrait avant tout envoi à Mistral (OCR pour un PDF, extraction locale pour Word/Excel, appel vision Mistral pour une image, seul cas sans Zero Data Retention par défaut). Strictement privée à la conversation qui la porte, au même titre que le reste de son contenu : ni un autre compte ni un compte administrateur n'y accède. Une seule par message pour cette version.
+_Avoid_: document, fichier (seul, ambigu avec le fichier physique sur disque), attachment

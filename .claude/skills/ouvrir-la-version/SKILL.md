@@ -10,11 +10,20 @@ description: >-
 
 Triggered by **« Ouvre la version »**. The user **must** give a semver **`X.Y.Z`** (e.g. `1.2.0`). If they omit it, ask and **wait** — do not invent a number.
 
-This path **is** permission to commit **docs** on the new feature branch, `git push -u`, and `gh pr create`. Never `.env`, `*.db`, `.venv`, secrets. No force-push. Do **not** `/implement` here. Do **not** merge.
+This path **is** permission to commit **docs** on the new **feature branch**, `git push -u`, and `gh pr create`. Never `.env`, `*.db`, `.venv`, secrets. No force-push. Do **not** `/implement` here. Do **not** merge. Do **not** `git commit` on **`main`**.
+
+## 0. Working tree on `main`
+
+If `main` has uncommitted changes (docs, skills, roadmap, leftover from the previous version, anything simple): **do not ask**. **Do not commit them to `main`.** Carry them onto `vX.Y.Z-…` (they stay in the working tree when you `checkout -b`) and include them in the **init commit** of that branch. Never stash « to keep main clean » in order to commit on `main` afterwards.
 
 ## 1. Purpose
 
-Ask: **what is this version for?** (one job, in product language). Wait.
+Read **`docs/suivi-avancement/feuille-de-route-dev.md`**. If that file already describes version **`X.Y.Z`** (heading « Prochaine : X.Y.Z », « Ensuite : X.Y.Z », or equivalent):
+
+- That section **is** the purpose (one job, product language). State it back in one sentence, then go to step 2. Do **not** ask « what is this version for? ».
+- The file is a roadmap, not a spec: grilling may still refine it. Do not invent a different job.
+
+If **`X.Y.Z` is absent** from that file: ask **what is this version for?** (one job, in product language) and **wait**.
 
 ## 2. `/grill-with-docs` (conversation only if you are on `main`)
 

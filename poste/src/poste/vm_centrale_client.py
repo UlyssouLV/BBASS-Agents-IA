@@ -48,6 +48,22 @@ class ConversationIntrouvableError(Exception):
     pass
 
 
+class PieceJointeIntrouvableError(Exception):
+    # 404 de la VM sur pieces-jointes* : piece_jointe_id inexistant,
+    # n'appartenant pas au compte du jeton, ou rattaché à une autre
+    # conversation (la VM ne distingue jamais les cas, voir
+    # vm_centrale.routers.conversations._recuperer_piece_jointe_du_compte).
+    pass
+
+
+class PieceJointeRefuseeError(Exception):
+    # 400 de la VM sur pieces-jointes* : type de fichier non supporté,
+    # fichier trop volumineux, ou pièce jointe déjà liée à un autre message.
+    # Le message distingue les cas, relayé tel quel (même principe que
+    # DernierAdministrateurError).
+    pass
+
+
 class DernierAdministrateurError(Exception):
     # 409 de la VM : la rétrogradation ou la suppression ferait passer le
     # nombre de comptes administrateur à zéro (garde-fou dernier
@@ -136,6 +152,19 @@ class ProfilTravail:
     date_derniere_maj: datetime | None
 
 
+@dataclass
+class PieceJointeResume:
+    id: int
+    nom_fichier: str
+    type_mime: str
+
+
+@dataclass
+class PieceJointeCreee:
+    piece_jointe: PieceJointeResume
+    echec_analyse: bool
+
+
 def _champs_compte_admin(corps: dict) -> dict:
     # Extraction partagée par lister_comptes/creer_compte/modifier_compte :
     # les trois construisent un CompteAdmin (ou un CompteCree, qui y ajoute
@@ -182,6 +211,36 @@ def _lever_si_conversation_introuvable(reponse: httpx.Response) -> None:
         raise ConversationIntrouvableError()
 
 
+# Doit rester identique à vm_centrale.routers.conversations._PIECE_JOINTE_INTROUVABLE :
+# seul moyen de distinguer, parmi les deux 404 possibles sur creer_conversation/
+# envoyer_message avec piece_jointe_id (conversation introuvable vs pièce jointe
+# introuvable), lequel des deux est survenu — la VM renvoie le même code pour les
+# deux (voir _recuperer_piece_jointe_du_compte).
+_PIECE_JOINTE_INTROUVABLE_DETAIL = "Pièce jointe introuvable"
+
+
+def _lever_si_erreur_piece_jointe(reponse: httpx.Response) -> None:
+    # Partagée par creer_conversation/envoyer_message (piece_jointe_id) : un
+    # 400 n'y est possible que pour une pièce jointe déjà liée à un autre
+    # message ; un 404 peut venir soit de la conversation, soit de la pièce
+    # jointe elle-même (voir _PIECE_JOINTE_INTROUVABLE_DETAIL ci-dessus).
+    if reponse.status_code == 400:
+        raise PieceJointeRefuseeError(reponse.json()["detail"])
+    if reponse.status_code == 404:
+        if reponse.json().get("detail") == _PIECE_JOINTE_INTROUVABLE_DETAIL:
+            raise PieceJointeIntrouvableError(_PIECE_JOINTE_INTROUVABLE_DETAIL)
+        raise ConversationIntrouvableError()
+
+
+def _lever_si_upload_piece_jointe_refuse(reponse: httpx.Response) -> None:
+    # Partagée par televerser_piece_jointe/televerser_piece_jointe_sans_conversation :
+    # type non supporté ou fichier trop volumineux (spec 1.1.2), jamais de
+    # confusion possible avec une conversation ici (pas de piece_jointe_id en
+    # entrée sur ces deux endpoints).
+    if reponse.status_code == 400:
+        raise PieceJointeRefuseeError(reponse.json()["detail"])
+
+
 def _vers_conversation(corps: dict) -> Conversation:
     return Conversation(
         id=corps["id"],
@@ -196,6 +255,13 @@ def _vers_message(corps: dict) -> Message:
         role=corps["role"],
         contenu=corps["contenu"],
         date_creation=datetime.fromisoformat(corps["date_creation"]),
+    )
+
+
+def _vers_piece_jointe_creee(corps: dict) -> PieceJointeCreee:
+    return PieceJointeCreee(
+        piece_jointe=PieceJointeResume(**corps["piece_jointe"]),
+        echec_analyse=corps["echec_analyse"],
     )
 
 
@@ -245,14 +311,23 @@ class VmCentraleClient:
         )
 
     def creer_conversation(
-        self, jeton: str, message: str, cle_idempotence: str | None = None
+        self,
+        jeton: str,
+        message: str,
+        cle_idempotence: str | None = None,
+        piece_jointe_id: int | None = None,
     ) -> ConversationCree:
         reponse = _http_client.post(
             f"{VM_CENTRALE_BASE_URL}/conversations",
-            json={"message": message, "cle_idempotence": cle_idempotence},
+            json={
+                "message": message,
+                "cle_idempotence": cle_idempotence,
+                "piece_jointe_id": piece_jointe_id,
+            },
             headers={"Authorization": f"Bearer {jeton}"},
         )
         _lever_si_jeton_invalide(reponse)
+        _lever_si_erreur_piece_jointe(reponse)
         reponse.raise_for_status()
         corps = reponse.json()
         return ConversationCree(
@@ -312,16 +387,53 @@ class VmCentraleClient:
         conversation_id: int,
         message: str,
         cle_idempotence: str | None = None,
+        piece_jointe_id: int | None = None,
     ) -> str:
         reponse = _http_client.post(
             f"{VM_CENTRALE_BASE_URL}/conversations/{conversation_id}/messages",
-            json={"message": message, "cle_idempotence": cle_idempotence},
+            json={
+                "message": message,
+                "cle_idempotence": cle_idempotence,
+                "piece_jointe_id": piece_jointe_id,
+            },
+            headers={"Authorization": f"Bearer {jeton}"},
+        )
+        _lever_si_jeton_invalide(reponse)
+        _lever_si_erreur_piece_jointe(reponse)
+        reponse.raise_for_status()
+        return reponse.json()["reponse"]
+
+    def televerser_piece_jointe(
+        self,
+        jeton: str,
+        conversation_id: int,
+        nom_fichier: str,
+        contenu: bytes,
+        type_mime: str,
+    ) -> PieceJointeCreee:
+        reponse = _http_client.post(
+            f"{VM_CENTRALE_BASE_URL}/conversations/{conversation_id}/pieces-jointes",
+            files={"fichier": (nom_fichier, contenu, type_mime)},
             headers={"Authorization": f"Bearer {jeton}"},
         )
         _lever_si_jeton_invalide(reponse)
         _lever_si_conversation_introuvable(reponse)
+        _lever_si_upload_piece_jointe_refuse(reponse)
         reponse.raise_for_status()
-        return reponse.json()["reponse"]
+        return _vers_piece_jointe_creee(reponse.json())
+
+    def televerser_piece_jointe_sans_conversation(
+        self, jeton: str, nom_fichier: str, contenu: bytes, type_mime: str
+    ) -> PieceJointeCreee:
+        reponse = _http_client.post(
+            f"{VM_CENTRALE_BASE_URL}/pieces-jointes",
+            files={"fichier": (nom_fichier, contenu, type_mime)},
+            headers={"Authorization": f"Bearer {jeton}"},
+        )
+        _lever_si_jeton_invalide(reponse)
+        _lever_si_upload_piece_jointe_refuse(reponse)
+        reponse.raise_for_status()
+        return _vers_piece_jointe_creee(reponse.json())
 
     def consulter_profil_travail(self, jeton: str, identifiant: str) -> ProfilTravail:
         # Le poste ne demande jamais que le profil du compte propriétaire du
