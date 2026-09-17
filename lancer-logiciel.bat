@@ -36,17 +36,27 @@ if errorlevel 1 (
 echo       PostgreSQL est demarre et pret ^(conteneur bbass-vm-centrale-postgres, port 5432^).
 echo.
 
-echo [5/7] Verification / creation du compte de test...
+echo [5/8] Verification / creation du compte de test...
 pushd "%~dp0vm-centrale"
 set PYTHONPATH=src
 .venv\Scripts\python.exe scripts\seed_compte_test.py
 popd
 
-echo [6/7] Ouverture des fenetres VM centrale et Poste...
+echo [6/8] Liberation des ports 8000 (VM centrale) et 8100 (Poste) si deja occupes...
+for /f "tokens=5" %%P in ('netstat -ano ^| findstr ":8000 " ^| findstr "LISTENING"') do (
+    echo       Port 8000 deja utilise par le PID %%P : arret de ce processus...
+    taskkill /F /PID %%P >nul 2>&1
+)
+for /f "tokens=5" %%P in ('netstat -ano ^| findstr ":8100 " ^| findstr "LISTENING"') do (
+    echo       Port 8100 deja utilise par le PID %%P : arret de ce processus...
+    taskkill /F /PID %%P >nul 2>&1
+)
+
+echo [7/8] Ouverture des fenetres VM centrale et Poste...
 start "VM centrale" cmd /k "cd /d "%~dp0vm-centrale" && set PYTHONPATH=src && .venv\Scripts\python.exe -m vm_centrale.main"
 start "Poste" cmd /k "cd /d "%~dp0poste" && set PYTHONPATH=src && .venv\Scripts\python.exe -m poste.main"
 
-echo [7/7] Attente du demarrage du poste puis ouverture du navigateur...
+echo [8/8] Attente du demarrage du poste puis ouverture du navigateur...
 timeout /t 4 /nobreak >nul
 start "" "http://127.0.0.1:8100"
 

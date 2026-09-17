@@ -21,6 +21,15 @@ Un peu de **style** et surtout le **minimum d’UX** : aujourd’hui l’écran 
 - Plugin Claude **`frontend-design`** (`frontend-design@claude-plugins-official`) : à tester / décider si on s’en sert pour cette version.
 - Frameworks front existants : lesquels seraient adaptés à un HTML/JS déjà servi par le backend local, sans expérience préalable de framework. Possible aussi de rester en HTML/CSS/JS « nu » + composants minimaux (modales, layout).
 
+## Ensuite : 1.2.1 — Style personnalisé du poste (ajustements CSS)
+
+Le socle React/TypeScript/Vite/shadcn-ui/Tailwind étant posé en 1.2.0, petite version de **style uniquement** : une identité visuelle plus personnalisée à l'usage du cabinet, sur les écrans et composants déjà en place. Pas de changement de structure — ni nouvel écran, ni nouveau composant, ni nouvelle dépendance — seulement des ajustements CSS (couleurs, typographie, espacements) sur les briques shadcn-ui/Tailwind déjà posées en 1.2.0.
+
+**Recherche.**
+
+- Plugin **`frontend-design`** pour une direction esthétique un peu plus travaillée que le « simple au début » retenu en 1.2.0 (charte visuelle du cabinet si elle existe, sinon une direction cohérente et sobre).
+- Rester dans les tokens/variables déjà en place (`index.css`, thème Tailwind/shadcn-ui) plutôt que d'introduire une nouvelle librairie de style.
+
 ## Ensuite : 1.3.0 — Premier Agent (pôle Administration), axé Moduléo
 
 Premier **Agent** métier. Pôle **Administration**. Premier périmètre logiciel : **Moduléo** (utilisé par tout le cabinet), pas tout le métier d’un coup.

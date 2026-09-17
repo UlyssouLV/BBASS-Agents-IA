@@ -28,8 +28,8 @@ flowchart LR
   L14["Lundi 14<br/>socle chat"] --> M15["Mardi 15<br/>V1.1.0 comptes"]
   M15 --> Me16["Mercredi 16<br/>V1.1.1 persistance"]
   Me16 --> J17["Jeudi 17<br/>V1.1.2 pièces jointes"]
-  J17 --> V113["V1.1.3<br/>consommation"]
-  V113 --> V120["V1.2.0<br/>interface poste"]
+  J17 --> J17b["Jeudi 17<br/>V1.1.3 consommation"]
+  J17b --> V120["V1.2.0<br/>interface poste"]
   V120 --> V18["Vendredi 18<br/>visé V1.3.0"]
 ```
 
