@@ -50,7 +50,7 @@ export function OngletConsommation() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h3 className="mb-2 text-sm font-semibold">Total</h3>
+        <h2 className="mb-2 text-sm font-semibold">Total</h2>
         <table className="w-full text-sm">
           <tbody>
             <tr className="border-b border-border">
@@ -66,7 +66,7 @@ export function OngletConsommation() {
       </div>
 
       <div>
-        <h3 className="mb-2 text-sm font-semibold">Conversations</h3>
+        <h2 className="mb-2 text-sm font-semibold">Conversations</h2>
         {conversations.length === 0 ? (
           <p className="text-sm text-muted-foreground">Aucune conversation avec de la consommation enregistrée.</p>
         ) : (

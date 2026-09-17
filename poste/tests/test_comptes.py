@@ -752,7 +752,7 @@ def test_changement_de_statut_admin_avec_vm_centrale_injoignable_retourne_une_er
 def _supprimer(client, identifiant: str = "n.durand", cle_admin_vm: str = "cle-admin-de-test"):
     # httpx.Client.delete() n'accepte pas de corps JSON : request() est requis
     # pour envoyer cle_admin_vm, comme le fera fetch(..., {method: "DELETE"})
-    # côté navigateur (voir app.js).
+    # côté navigateur (voir poste/frontend/src/hooks/useComptes.ts).
     return client.request(
         "DELETE", f"/comptes/{identifiant}", json={"cle_admin_vm": cle_admin_vm}
     )
