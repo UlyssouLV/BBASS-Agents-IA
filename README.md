@@ -49,7 +49,7 @@ flowchart LR
 
 ### Reste à implémenter
 
-- **V1.2.0** — interface poste (modales, écran comptes, minimum de style ; framework ou HTML/CSS/JS à choisir).
+- **V1.2.0** — interface poste (React/TypeScript/Vite, shadcn/ui, modales, écran comptes, minimum de style).
 - **V1.3.0** — premier agent, pôle Administration, Moduléo (API, serveur de test, lecture seule, plan d’automatisme sans écriture ni exécution).
 
 ### Attendu pour la fin de semaine (V1.3.0)
