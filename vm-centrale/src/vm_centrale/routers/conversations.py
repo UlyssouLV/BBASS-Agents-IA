@@ -261,18 +261,19 @@ def _recuperer_piece_jointe_du_compte(
     return piece_jointe
 
 
-_CARACTERE_NON_AUTORISE_DANS_NOM_FICHIER = re.compile(r"[^A-Za-z0-9._-]")
+_CARACTERES_DANGEREUX_DANS_NOM_FICHIER = re.compile(r"[\\/\x00-\x1f\x7f]")
 
 
 def _nom_fichier_sur_disque(nom_fichier: str | None) -> str:
     # Le nom de fichier vient du client (en-tête multipart, jamais de
-    # confiance) : sans ça, un nom du type "../../../etc/cron.d/x" écrirait
-    # hors de PIECES_JOINTES_DIR (Path Traversal, CWE-22). Liste blanche
-    # stricte (lettres, chiffres, point, tiret, underscore) plutôt qu'un
-    # simple basename : "/" et "\" disparaissent quelle que soit leur
-    # position, aucun séparateur de répertoire ne peut survivre.
-    nom_filtre = _CARACTERE_NON_AUTORISE_DANS_NOM_FICHIER.sub("_", nom_fichier or "")
-    return nom_filtre if nom_filtre and nom_filtre not in (".", "..") else "fichier"
+    # confiance). Seuls deux types de caractères sont réellement dangereux
+    # ici et sont retirés : "/" et "\" (permettraient de sortir de
+    # PIECES_JOINTES_DIR, Path Traversal CWE-22 — "../../../etc/cron.d/x")
+    # et les caractères de contrôle dont l'octet nul (troncature de chaîne
+    # côté OS, injection dans les logs). Tout le reste — accents, espaces,
+    # parenthèses, etc. — reste lisible tel quel sur le disque.
+    nom_filtre = _CARACTERES_DANGEREUX_DANS_NOM_FICHIER.sub("_", nom_fichier or "")
+    return nom_filtre or "fichier"
 
 
 def _chemin_piece_jointe_sur_disque(chemin_relatif: str) -> Path:
