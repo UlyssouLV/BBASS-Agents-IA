@@ -4,7 +4,7 @@ Logiciel d'agents IA pour le cabinet de géomètres-experts BBASS. L'objectif es
 
 ## État actuel
 
-**V1.1.2** disponible : backend local **poste** (interface HTML/CSS/JS) et API **VM centrale** (comptes administrateurs PostgreSQL, relais Mistral, conversations persistées avec historique borné, résumé glissant et profil de travail, pièces jointes PDF/Word/Excel/image avec extraction et rappel via outil hors fenêtre). Les agents métiers ne sont pas encore construits.
+**V1.1.3** disponible : backend local **poste** (interface HTML/CSS/JS) et API **VM centrale** (comptes administrateurs PostgreSQL, relais Mistral, conversations persistées avec historique borné, résumé glissant et profil de travail, pièces jointes PDF/Word/Excel/image avec extraction et rappel via outil hors fenêtre, suivi de la consommation Mistral — tokens/pages et coût figé au tarif du jour, par conversation côté collaborateur et agrégé par compte côté administrateur). Les agents métiers ne sont pas encore construits.
 
 ## Ce qu'on construit
 
@@ -26,11 +26,11 @@ Point visé vendredi 18 septembre : **V1.3.0**.
 ```mermaid
 flowchart LR
   L14["Lundi 14<br/>socle chat"] --> M15["Mardi 15<br/>V1.1.0 comptes"]
-  M15 --> V111["V1.1.1<br/>persistance"]
-  V111 --> V112["V1.1.2<br/>pièces jointes"]
-  V112 --> V113["V1.1.3<br/>consommation"]
+  M15 --> Me16["Mercredi 16<br/>V1.1.1 persistance"]
+  Me16 --> J17["Jeudi 17<br/>V1.1.2 pièces jointes"]
+  J17 --> V113["V1.1.3<br/>consommation"]
   V113 --> V120["V1.2.0<br/>interface poste"]
-  V120 --> V130["V1.3.0<br/>agent Moduléo"]
+  V120 --> V18["Vendredi 18<br/>visé V1.3.0"]
 ```
 
 ```mermaid
@@ -45,11 +45,10 @@ flowchart LR
 - **Lundi 14** — environnement (éditeur, Git), dépôt GitHub, glossaire, spécifications, ADR ; première interface de chat ; API Mistral via la VM avec des comptes de test.
 - **Mardi 15** — socle chat (Pay as you go Mistral) ; **V1.1.0** (comptes administrateurs, collaborateurs, pôles, mots de passe, révocation de session) et tests utilisateurs ; échange Topo sans suite immédiate.
 - **Mercredi 16** — **V1.1.1** (persistance des conversations côté VM centrale : PostgreSQL, plusieurs fils par compte, historique multi-tours borné, résumé glissant, profil de travail) et écrans poste correspondants (conversations, profil de travail en lecture seule).
-- **Jeudi 17** — **V1.1.2** (pièces jointes : upload PDF/Word/Excel/image, extraction OCR/locale/vision, contenu injecté dans le chat, mention courte dans le résumé glissant, rappel via outil hors fenêtre) et zone de dépôt minimale côté poste.
+- **Jeudi 17** — **V1.1.2** (pièces jointes : upload PDF/Word/Excel/image, extraction OCR/locale/vision, contenu injecté dans le chat, mention courte dans le résumé glissant, rappel via outil hors fenêtre) et zone de dépôt minimale côté poste ; **V1.1.3** (suivi de la consommation : une ligne par appel Mistral réel — chat, titrage, résumé+profil, OCR, vision —, tokens ou pages, coût figé au tarif du jour ; fenêtre Consommation côté collaborateur, onglet Consommations côté administrateur).
 
 ### Reste à implémenter
 
-- **V1.1.3** — suivi de la consommation : tokens (entrée / sortie / total) par compte et par session, dates, modèle, coût ; API tarifs Mistral si elle existe.
 - **V1.2.0** — interface poste (modales, écran comptes, minimum de style ; framework ou HTML/CSS/JS à choisir).
 - **V1.3.0** — premier agent, pôle Administration, Moduléo (API, serveur de test, lecture seule, plan d’automatisme sans écriture ni exécution).
 

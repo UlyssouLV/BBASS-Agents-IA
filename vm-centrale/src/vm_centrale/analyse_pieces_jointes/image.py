@@ -1,7 +1,8 @@
 import base64
 import json
 
-from vm_centrale.analyse_pieces_jointes.resultat import ResultatAnalyse
+from vm_centrale.analyse_pieces_jointes.resultat import InfoConsommationAnalyse, ResultatAnalyse
+from vm_centrale.config import MODELE_CHAT
 from vm_centrale.mistral_client import MistralClient
 
 # Seul format sans alternative locale (spec 1.1.2, ADR-0009) : le fichier est
@@ -51,8 +52,12 @@ def analyser(fichier: bytes, type_mime: str, client: MistralClient) -> ResultatA
             ],
         }
     ]
-    contenu_json = client.chat(messages, response_format=_SCHEMA_ANALYSE_IMAGE)
-    donnees = json.loads(contenu_json)
+    reponse = client.chat(messages, response_format=_SCHEMA_ANALYSE_IMAGE)
+    donnees = json.loads(reponse.contenu)
     return ResultatAnalyse(
-        contenu_extrait=donnees["contenu_extrait"], echec_analyse=donnees["echec_analyse"]
+        contenu_extrait=donnees["contenu_extrait"],
+        echec_analyse=donnees["echec_analyse"],
+        consommation=InfoConsommationAnalyse(
+            type_appel="vision", modele=MODELE_CHAT, usage=reponse.usage
+        ),
     )

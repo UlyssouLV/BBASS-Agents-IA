@@ -9,7 +9,14 @@ from sqlalchemy.pool import StaticPool
 
 from vm_centrale.database import Base, get_db
 from vm_centrale.main import app
-from vm_centrale.mistral_client import AppelOutil, AppelOutilDemande, get_mistral_client
+from vm_centrale.mistral_client import (
+    AppelOutil,
+    AppelOutilDemande,
+    ReponseChat,
+    ReponseOcr,
+    Usage,
+    get_mistral_client,
+)
 from vm_centrale.models import Compte, ComptePole
 from vm_centrale.security import hash_password
 from vm_centrale.jetons import JetonStore, get_jeton_store
@@ -39,6 +46,15 @@ def _sans_init_db_reel(monkeypatch):
     # mémoire (fixture `db_session`) et ne doivent dépendre d'aucun service
     # externe.
     monkeypatch.setattr("vm_centrale.main.init_db", lambda: None)
+
+
+# Usage/pages_processed factices (spec 1.1.3) : ce double ne sert encore
+# qu'à vérifier que le contrat MistralClient.chat()/.ocr() (ReponseChat/
+# ReponseOcr) est bien celui consommé par les appelants — aucun test ne
+# vérifie encore ces valeurs (ticket #53, la persistance Consommation
+# viendra avec le ticket suivant).
+_USAGE_FACTICE = Usage(tokens_entree=10, tokens_sortie=5, tokens_total=15)
+_PAGES_PROCESSED_FACTICE = 1
 
 
 class ClientMistralFactice:
@@ -90,12 +106,12 @@ class ClientMistralFactice:
         )
         self._exception = None
 
-    def ocr(self, document: bytes, type_mime: str) -> str:
+    def ocr(self, document: bytes, type_mime: str) -> ReponseOcr:
         with self._verrou:
             self.appels_ocr.append((document, type_mime))
             if self._exception_ocr is not None:
                 raise self._exception_ocr
-            return self._reponse_ocr
+            return ReponseOcr(contenu=self._reponse_ocr, pages_processed=_PAGES_PROCESSED_FACTICE)
 
     def repondre(self, *reponses: str, resume_et_profil: str | None = None) -> None:
         # `reponses` : file pour les appels sans response_format (réponse de
@@ -121,7 +137,7 @@ class ClientMistralFactice:
         # normale, configurée via repondre() comme d'habitude.
         self._appel_outil_a_renvoyer = AppelOutil(id=tool_call_id, nom=nom_outil, arguments=arguments)
 
-    def chat(self, messages, response_format=None, tools=None) -> str:
+    def chat(self, messages, response_format=None, tools=None) -> ReponseChat:
         with self._verrou:
             self.messages_recus.append(messages)
             self.response_formats_recus.append(response_format)
@@ -138,7 +154,7 @@ class ClientMistralFactice:
                 assert self._reponse_structuree is not None, (
                     "Aucune réponse structurée configurée : passer resume_et_profil= à repondre()"
                 )
-                return self._reponse_structuree
+                return ReponseChat(contenu=self._reponse_structuree, usage=_USAGE_FACTICE)
 
             if tools and self._appel_outil_a_renvoyer is not None:
                 appel = self._appel_outil_a_renvoyer
@@ -153,12 +169,12 @@ class ClientMistralFactice:
                         }
                     ],
                 }
-                raise AppelOutilDemande([appel], message_assistant)
+                raise AppelOutilDemande([appel], message_assistant, _USAGE_FACTICE)
 
             assert self._reponses, "Aucune réponse configurée : appeler repondre() d'abord"
             if len(self._reponses) > 1:
-                return self._reponses.pop(0)
-            return self._reponses[0]
+                return ReponseChat(contenu=self._reponses.pop(0), usage=_USAGE_FACTICE)
+            return ReponseChat(contenu=self._reponses[0], usage=_USAGE_FACTICE)
 
 
 @pytest.fixture()

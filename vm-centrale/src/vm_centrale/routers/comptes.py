@@ -7,14 +7,17 @@ from vm_centrale.autorisation import (
     get_compte_admin,
     get_identifiant_compte_du_jeton,
 )
+from vm_centrale.consommation import TYPES_CHAT, accumuler, detail_vide
 from vm_centrale.database import get_db
 from vm_centrale.jetons import JetonStore, get_jeton_store
-from vm_centrale.models import Compte, ComptePole, ProfilTravail
+from vm_centrale.models import Compte, ComptePole, Consommation, ProfilTravail
 from vm_centrale.schemas import (
+    CompteConsommationResponse,
     CompteCreeRequest,
     CompteCreeResponse,
     CompteModifieRequest,
     CompteResponse,
+    DetailConsommationCategorie,
     MotDePasseReinitialiseResponse,
     ProfilTravailResponse,
     StatutAdminRequest,
@@ -57,6 +60,55 @@ def lister_comptes(
         .all()
     )
     return [_vers_reponse(compte) for compte in comptes]
+
+
+@router.get("/consommation", response_model=list[CompteConsommationResponse])
+def lister_consommation_comptes(
+    db: Session = Depends(get_db),
+    _admin: Compte = Depends(get_compte_admin),
+) -> list[CompteConsommationResponse]:
+    # Même régime que GET /comptes ci-dessus (jeton est_admin=true, pas de clé
+    # d'administration VM) : lecture seule (spec 1.1.3).
+    lignes = db.query(Consommation).all()
+
+    # Détail agrégé par compte, jamais par conversation (confidentialité des
+    # conversations, spec 1.1.3) — accumulé en mémoire, même style que
+    # routers/consommation.py.
+    par_compte: dict[str, dict[str, DetailConsommationCategorie]] = {}
+    for ligne in lignes:
+        categorie = "chat" if ligne.type_appel in TYPES_CHAT else "piece_jointe"
+        details = par_compte.setdefault(
+            ligne.identifiant_compte, {"chat": detail_vide(), "piece_jointe": detail_vide()}
+        )
+        details[categorie] = accumuler(details[categorie], ligne)
+
+    if not par_compte:
+        return []
+
+    # Jointure sur Compte : un compte supprimé n'a plus de ligne à joindre ici
+    # et disparaît donc naturellement de la liste, sans que ses anciennes
+    # lignes Consommation ci-dessus n'aient été touchées (spec 1.1.3).
+    comptes = (
+        db.query(Compte.identifiant, Compte.prenom, Compte.nom)
+        .filter(Compte.identifiant.in_(par_compte.keys()))
+        .all()
+    )
+
+    resultats = [
+        CompteConsommationResponse(
+            identifiant=identifiant,
+            prenom=prenom,
+            nom=nom,
+            cout_usd=par_compte[identifiant]["chat"].cout_usd
+            + par_compte[identifiant]["piece_jointe"].cout_usd,
+            chat=par_compte[identifiant]["chat"],
+            piece_jointe=par_compte[identifiant]["piece_jointe"],
+        )
+        for identifiant, prenom, nom in comptes
+    ]
+    resultats.sort(key=lambda compte: compte.cout_usd, reverse=True)
+
+    return resultats
 
 
 @router.post("", response_model=CompteCreeResponse, status_code=201)

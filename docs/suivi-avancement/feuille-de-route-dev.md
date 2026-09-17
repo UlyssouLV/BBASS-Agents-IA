@@ -10,20 +10,9 @@ Ce n’est **pas** une spec (ça vient après « Ouvre la version »).
 - **1.1.0** — Comptes administrateurs, multi-pôles, mot de passe généré / changement forcé, révocation, affichage pôle/agence dans le chat.
 - **1.1.1** — Conversations persistées sur la VM (PostgreSQL) : plusieurs fils, reprise après rechargement / autre poste, historique borné (3 derniers messages + résumé glissant), profil de travail lecture seule ; pas de stockage Mistral Conversations.
 - **1.1.2** — Pièces jointes : upload PDF/Word/Excel/image sur un message (une par message), extraction (OCR Mistral, locale pour Word/Excel, vision Mistral pour l'image), contenu injecté dans le chat, mention courte dans le résumé glissant, rappel via un outil si la pièce jointe sort de la fenêtre ; jamais la Files API Mistral.
+- **1.1.3** — Consommation : une ligne `Consommation` par appel Mistral réel (chat, titrage, résumé+profil, OCR, vision), tokens ou pages selon le type, coût figé au tarif du jour de l'appel (pas d'API de tarification Mistral, tarifs en dur dans le code). Fenêtre Consommation côté collaborateur (total + classement des conversations par coût) ; onglet Consommations côté administrateur (comptes classés par coût, jamais de détail par conversation).
 
-## Prochaine : 1.1.3 — Consommation (tokens, modèles, coûts)
-
-S’appuie sur des **sessions de chat** datées (1.1.1).
-
-**Objectif.** Garder en **base** la consommation : **totale** par compte **et par session**, avec les **dates**. Identifier clairement les **tokens** (entrée / sortie / total) **et le modèle** utilisé à chaque appel, pour en déduire **combien ça a coûté**. Rappel côté collaborateur que l’usage a un prix ; vue agrégée possible pour un compte administrateur.
-
-**Recherche.**
-
-- Enregistrer ce que Mistral renvoie déjà (`usage` sur les complétions) **avec** le nom du modèle réellement appelé (celui décidé par la VM).
-- Agrégats : par compte, par session, par jour ; historique d’appels.
-- **Tarification dynamique** : existe-t-il une **API Mistral** qui donne les prix par modèle (pour calculer le coût sans tarifs figés dans le code) ? Sinon : source officielle, mise à jour manuelle, ou approximation.
-
-## Ensuite : 1.2.0 — Mise à jour de l’interface (poste)
+## Prochaine : 1.2.0 — Mise à jour de l’interface (poste)
 
 Un peu de **style** et surtout le **minimum d’UX** : aujourd’hui l’écran comptes (compte administrateur) est encombré, pas de **modales**, tout s’empile. On vise une interface **simple** au début, pas forcément très stylisée.
 

@@ -13,10 +13,16 @@ from sqlalchemy.orm import Session
 from vm_centrale.analyse_pieces_jointes import TYPES_SUPPORTES, analyser
 from vm_centrale.autorisation import get_identifiant_compte_du_jeton
 from vm_centrale.concurrence import cache_idempotence, verrous_comptes
-from vm_centrale.config import PIECES_JOINTES_DIR
+from vm_centrale.config import MODELE_CHAT, PIECES_JOINTES_DIR
+from vm_centrale.consommation import enregistrer_consommation
 from vm_centrale.database import get_db
-from vm_centrale.mistral_client import AppelOutilDemande, MistralClient, get_mistral_client
-from vm_centrale.models import Compte, Conversation, Message, PieceJointe, ProfilTravail
+from vm_centrale.mistral_client import (
+    AppelOutilDemande,
+    MistralClient,
+    ReponseChat,
+    get_mistral_client,
+)
+from vm_centrale.models import Compte, Consommation, Conversation, Message, PieceJointe, ProfilTravail
 from vm_centrale.schemas import (
     ConversationCreeRequest,
     ConversationCreeResponse,
@@ -392,14 +398,22 @@ def creer_conversation(
         # rollback (annule aussi la conversation flushée ci-dessus) — aucune
         # conversation fantôme n'est persistée.
         try:
-            reponse = client.chat(message_pour_mistral)
-            titre = client.chat(_prompt_titrage(requete.message, reponse))
+            reponse_chat = client.chat(message_pour_mistral)
+            reponse = reponse_chat.contenu
+            reponse_titrage = client.chat(_prompt_titrage(requete.message, reponse))
+            titre = reponse_titrage.contenu
         except Exception as erreur:
             db.rollback()
             logger.error("Échec de l'appel au relais Mistral : %s", erreur)
             raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
 
         conversation.titre = titre
+        enregistrer_consommation(
+            db, identifiant_compte, conversation.id, "chat", MODELE_CHAT, usage=reponse_chat.usage
+        )
+        enregistrer_consommation(
+            db, identifiant_compte, conversation.id, "titrage", MODELE_CHAT, usage=reponse_titrage.usage
+        )
 
         message_utilisateur = Message(
             conversation_id=conversation.id,
@@ -503,6 +517,15 @@ def supprimer_conversation(
 ) -> None:
     conversation = _recuperer_conversation_du_compte(db, conversation_id, identifiant_compte)
 
+    # Consommation n'a pas de cascade ORM déclarée sur Conversation (spec
+    # 1.1.3) : la ligne survit à la conversation qui l'a produite, seul le
+    # rattachement disparaît — jamais de suppression en cascade comme pour
+    # les messages/pièces jointes ci-dessous. Même transaction que le reste
+    # de la suppression.
+    db.query(Consommation).filter(Consommation.conversation_id == conversation.id).update(
+        {Consommation.conversation_id: None}
+    )
+
     # Pièces jointes (base + fichier disque) supprimées avant les messages
     # (spec 1.1.2) : PieceJointe.message_id référence Message, donc l'ordre
     # inverse violerait l'intégrité référentielle. missing_ok=True car un
@@ -582,6 +605,16 @@ def _creer_piece_jointe(
 
     piece_jointe.contenu_extrait = resultat.contenu_extrait
     piece_jointe.echec_analyse = resultat.echec_analyse
+    if resultat.consommation is not None:
+        enregistrer_consommation(
+            db,
+            identifiant_compte,
+            conversation_id,
+            resultat.consommation.type_appel,
+            resultat.consommation.modele,
+            usage=resultat.consommation.usage,
+            pages_traitees=resultat.consommation.pages_traitees,
+        )
     db.commit()
     db.refresh(piece_jointe)
 
@@ -629,7 +662,7 @@ def _appeler_reponse_chat(
     client: MistralClient,
     messages_pour_mistral: list[dict[str, str]],
     tools: list[dict] | None = None,
-) -> str:
+) -> ReponseChat:
     return client.chat(messages_pour_mistral, tools=tools)
 
 
@@ -651,7 +684,7 @@ def _traiter_appel_outil(
     demande: AppelOutilDemande,
     db: Session,
     conversation_id: int,
-) -> str:
+) -> ReponseChat:
     # Un seul outil déclaré pour cette version (spec 1.1.2) : seul le premier
     # appel demandé est traité.
     appel = demande.appels[0]
@@ -675,28 +708,41 @@ def _traiter_appel_outil(
 
 
 def _resoudre_reponse_chat(
-    obtenir_reponse: Callable[[], str],
+    obtenir_reponse: Callable[[], ReponseChat],
     client: MistralClient,
     messages_pour_mistral: list[dict[str, str]],
     db: Session,
     conversation_id: int,
-) -> str:
+    identifiant_compte: str,
+) -> ReponseChat:
     # Centralise la gestion de AppelOutilDemande (et son propre échec
     # éventuel) pour les deux façons d'obtenir la réponse de chat principale
     # ci-dessous (directe, ou via un ThreadPoolExecutor) : `obtenir_reponse`
     # est soit `futur_reponse.result`, soit un appel direct à
     # _appeler_reponse_chat.
     try:
-        return obtenir_reponse()
+        reponse = obtenir_reponse()
     except AppelOutilDemande as demande:
+        # L'appel qui a décidé d'invoquer l'outil a déjà consommé des tokens
+        # (spec V1.1.3), même si sa réponse n'est pas la réponse finale de ce
+        # tour : une ligne "chat" à part entière, en plus de celle du second
+        # appel ci-dessous.
+        enregistrer_consommation(
+            db, identifiant_compte, conversation_id, "chat", MODELE_CHAT, usage=demande.usage
+        )
         try:
-            return _traiter_appel_outil(client, messages_pour_mistral, demande, db, conversation_id)
+            reponse = _traiter_appel_outil(client, messages_pour_mistral, demande, db, conversation_id)
         except Exception as erreur:
             logger.error("Échec de l'appel au relais Mistral : %s", erreur)
             raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
     except Exception as erreur:
         logger.error("Échec de l'appel au relais Mistral : %s", erreur)
         raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
+
+    enregistrer_consommation(
+        db, identifiant_compte, conversation_id, "chat", MODELE_CHAT, usage=reponse.usage
+    )
+    return reponse
 
 
 def _appeler_resume_et_profil(
@@ -706,7 +752,7 @@ def _appeler_resume_et_profil(
     compte: Compte | None,
     messages_sortants: list[Message],
     pieces_jointes_sortantes: dict[int, PieceJointe],
-) -> str:
+) -> ReponseChat:
     return client.chat(
         _prompt_resume_et_profil(
             resume_contexte, profil_actuel, compte, messages_sortants, pieces_jointes_sortantes
@@ -816,17 +862,30 @@ def envoyer_message(
                     messages_sortants,
                     pieces_jointes_sortantes,
                 )
-                reponse = _resoudre_reponse_chat(
-                    futur_reponse.result, client, messages_pour_mistral, db, conversation.id
+                reponse_chat = _resoudre_reponse_chat(
+                    futur_reponse.result,
+                    client,
+                    messages_pour_mistral,
+                    db,
+                    conversation.id,
+                    identifiant_compte,
                 )
                 try:
-                    contenu_json = futur_resume.result()
+                    reponse_resume = futur_resume.result()
                 except Exception as erreur:
                     logger.error("Échec de l'appel au relais Mistral : %s", erreur)
                     raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
 
+            enregistrer_consommation(
+                db,
+                identifiant_compte,
+                conversation.id,
+                "resume_et_profil",
+                MODELE_CHAT,
+                usage=reponse_resume.usage,
+            )
             try:
-                donnees = json.loads(contenu_json)
+                donnees = json.loads(reponse_resume.contenu)
                 resume_maj = donnees["resume_contexte"]
                 profil_travail_delta = donnees.get("profil_travail_delta")
             except (json.JSONDecodeError, KeyError, TypeError) as erreur:
@@ -837,13 +896,16 @@ def envoyer_message(
                 logger.error("Réponse résumé+profil de Mistral invalide : %s", erreur)
                 raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
         else:
-            reponse = _resoudre_reponse_chat(
+            reponse_chat = _resoudre_reponse_chat(
                 lambda: _appeler_reponse_chat(client, messages_pour_mistral, tools),
                 client,
                 messages_pour_mistral,
                 db,
                 conversation.id,
+                identifiant_compte,
             )
+
+        reponse = reponse_chat.contenu
 
         maintenant = datetime.now(timezone.utc)
         if resume_maj is not None:

@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal
 from urllib.parse import quote
 
 import httpx
@@ -165,6 +166,40 @@ class PieceJointeCreee:
     echec_analyse: bool
 
 
+@dataclass
+class DetailConsommationCategorie:
+    tokens_total: int
+    pages_traitees: int
+    cout_usd: Decimal
+    nombre_requetes: int
+
+
+@dataclass
+class ConversationConsommation:
+    id: int
+    titre: str
+    cout_usd: Decimal
+    chat: DetailConsommationCategorie
+    piece_jointe: DetailConsommationCategorie
+
+
+@dataclass
+class Consommation:
+    chat: DetailConsommationCategorie
+    piece_jointe: DetailConsommationCategorie
+    conversations: list[ConversationConsommation]
+
+
+@dataclass
+class CompteConsommation:
+    identifiant: str
+    prenom: str
+    nom: str
+    cout_usd: Decimal
+    chat: DetailConsommationCategorie
+    piece_jointe: DetailConsommationCategorie
+
+
 def _champs_compte_admin(corps: dict) -> dict:
     # Extraction partagée par lister_comptes/creer_compte/modifier_compte :
     # les trois construisent un CompteAdmin (ou un CompteCree, qui y ajoute
@@ -273,6 +308,44 @@ def _vers_profil_travail(corps: dict) -> ProfilTravail:
             if corps["date_derniere_maj"] is not None
             else None
         ),
+    )
+
+
+def _vers_detail_consommation(corps: dict) -> DetailConsommationCategorie:
+    return DetailConsommationCategorie(
+        tokens_total=corps["tokens_total"],
+        pages_traitees=corps["pages_traitees"],
+        cout_usd=Decimal(corps["cout_usd"]),
+        nombre_requetes=corps["nombre_requetes"],
+    )
+
+
+def _vers_conversation_consommation(corps: dict) -> ConversationConsommation:
+    return ConversationConsommation(
+        id=corps["id"],
+        titre=corps["titre"],
+        cout_usd=Decimal(corps["cout_usd"]),
+        chat=_vers_detail_consommation(corps["chat"]),
+        piece_jointe=_vers_detail_consommation(corps["piece_jointe"]),
+    )
+
+
+def _vers_consommation(corps: dict) -> Consommation:
+    return Consommation(
+        chat=_vers_detail_consommation(corps["chat"]),
+        piece_jointe=_vers_detail_consommation(corps["piece_jointe"]),
+        conversations=[_vers_conversation_consommation(c) for c in corps["conversations"]],
+    )
+
+
+def _vers_compte_consommation(corps: dict) -> CompteConsommation:
+    return CompteConsommation(
+        identifiant=corps["identifiant"],
+        prenom=corps["prenom"],
+        nom=corps["nom"],
+        cout_usd=Decimal(corps["cout_usd"]),
+        chat=_vers_detail_consommation(corps["chat"]),
+        piece_jointe=_vers_detail_consommation(corps["piece_jointe"]),
     )
 
 
@@ -448,6 +521,19 @@ class VmCentraleClient:
         reponse.raise_for_status()
         return _vers_profil_travail(reponse.json())
 
+    def consulter_consommation(self, jeton: str) -> Consommation:
+        # Toujours celle du compte propriétaire du jeton (identifiant extrait
+        # côté VM à partir du jeton, voir vm_centrale.routers.consommation) :
+        # pas de paramètre identifiant ici, contrairement à
+        # consulter_profil_travail.
+        reponse = _http_client.get(
+            f"{VM_CENTRALE_BASE_URL}/consommation",
+            headers={"Authorization": f"Bearer {jeton}"},
+        )
+        _lever_si_jeton_invalide(reponse)
+        reponse.raise_for_status()
+        return _vers_consommation(reponse.json())
+
     def changer_mot_de_passe(self, jeton: str, nouveau_mot_de_passe: str) -> None:
         reponse = _http_client.post(
             f"{VM_CENTRALE_BASE_URL}/auth/mot-de-passe",
@@ -484,6 +570,18 @@ class VmCentraleClient:
         _lever_si_jeton_ou_droits_refuses(reponse)
         reponse.raise_for_status()
         return [CompteAdmin(**_champs_compte_admin(compte)) for compte in reponse.json()]
+
+    def lister_consommation_comptes(self, jeton: str) -> list[CompteConsommation]:
+        # Même régime que lister_comptes ci-dessus (jeton est_admin=true) :
+        # jamais de détail par conversation individuelle, voir
+        # vm_centrale.routers.comptes.lister_consommation_comptes.
+        reponse = _http_client.get(
+            f"{VM_CENTRALE_BASE_URL}/comptes/consommation",
+            headers={"Authorization": f"Bearer {jeton}"},
+        )
+        _lever_si_jeton_ou_droits_refuses(reponse)
+        reponse.raise_for_status()
+        return [_vers_compte_consommation(compte) for compte in reponse.json()]
 
     def creer_compte(
         self,

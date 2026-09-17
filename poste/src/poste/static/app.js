@@ -36,11 +36,21 @@ const conversationTitre = document.getElementById("conversation-titre");
 let appelConversationEnCours = false;
 
 const ongletBoutonChat = document.getElementById("onglet-bouton-chat");
+const ongletBoutonConsommation = document.getElementById("onglet-bouton-consommation");
 const ongletBoutonProfilTravail = document.getElementById("onglet-bouton-profil-travail");
 const ongletBoutonComptes = document.getElementById("onglet-bouton-comptes");
+const ongletBoutonConsommations = document.getElementById("onglet-bouton-consommations");
 const ongletChat = document.getElementById("onglet-chat");
+const ongletConsommation = document.getElementById("onglet-consommation");
 const ongletProfilTravail = document.getElementById("onglet-profil-travail");
 const ongletComptes = document.getElementById("onglet-comptes");
+const ongletConsommations = document.getElementById("onglet-consommations");
+const consommationErreur = document.getElementById("consommation-erreur");
+const consommationDonnees = document.getElementById("consommation-donnees");
+const consommationChatDetail = document.getElementById("consommation-chat-detail");
+const consommationPieceJointeDetail = document.getElementById("consommation-piece-jointe-detail");
+const consommationConversationsVide = document.getElementById("consommation-conversations-vide");
+const corpsConsommationConversations = document.getElementById("corps-consommation-conversations");
 const profilTravailErreur = document.getElementById("profil-travail-erreur");
 const profilTravailVide = document.getElementById("profil-travail-vide");
 const profilTravailDonnees = document.getElementById("profil-travail-donnees");
@@ -48,6 +58,8 @@ const profilTravailContenu = document.getElementById("profil-travail-contenu");
 const profilTravailDate = document.getElementById("profil-travail-date");
 const comptesErreur = document.getElementById("comptes-erreur");
 const corpsTableauComptes = document.getElementById("corps-tableau-comptes");
+const consommationsErreur = document.getElementById("consommations-erreur");
+const corpsTableauConsommations = document.getElementById("corps-tableau-consommations");
 const formulaireCreationCompte = document.getElementById("formulaire-creation-compte");
 const creationErreur = document.getElementById("creation-erreur");
 const compteCree = document.getElementById("compte-cree");
@@ -90,8 +102,10 @@ let conversationOuverteId = null;
 
 function cacherTousLesOnglets() {
   ongletChat.hidden = true;
+  ongletConsommation.hidden = true;
   ongletProfilTravail.hidden = true;
   ongletComptes.hidden = true;
+  ongletConsommations.hidden = true;
 }
 
 async function afficherOngletChat() {
@@ -99,6 +113,74 @@ async function afficherOngletChat() {
   ongletChat.hidden = false;
   afficherNouvelleConversation();
   await chargerConversations();
+}
+
+async function afficherOngletConsommation() {
+  cacherTousLesOnglets();
+  ongletConsommation.hidden = false;
+  await chargerConsommation();
+}
+
+function formaterDetailConsommation(detail) {
+  const parties = [`${detail.nombre_requetes} requête(s)`];
+  if (detail.tokens_total) {
+    parties.push(`${detail.tokens_total} tokens`);
+  }
+  if (detail.pages_traitees) {
+    parties.push(`${detail.pages_traitees} page(s)`);
+  }
+  parties.push(`${detail.cout_usd} $`);
+  return parties.join(" · ");
+}
+
+async function chargerConsommation() {
+  consommationErreur.hidden = true;
+  consommationDonnees.hidden = true;
+
+  let reponse;
+  try {
+    reponse = await fetch("/consommation");
+  } catch {
+    consommationErreur.textContent =
+      "Impossible de joindre le service de consommation. Réessayez plus tard.";
+    consommationErreur.hidden = false;
+    return;
+  }
+
+  if (reponse.status === 401) {
+    afficherEcranConnexion();
+    return;
+  }
+
+  if (!reponse.ok) {
+    const detail = await reponse.json().catch(() => null);
+    consommationErreur.textContent =
+      detail && detail.detail ? detail.detail : "Le chargement de la consommation a échoué. Réessayez plus tard.";
+    consommationErreur.hidden = false;
+    return;
+  }
+
+  const consommation = await reponse.json();
+  consommationChatDetail.textContent = formaterDetailConsommation(consommation.chat);
+  consommationPieceJointeDetail.textContent = formaterDetailConsommation(consommation.piece_jointe);
+
+  corpsConsommationConversations.replaceChildren();
+  consommationConversationsVide.hidden = consommation.conversations.length !== 0;
+  for (const conversation of consommation.conversations) {
+    const ligne = document.createElement("tr");
+    const celluleTitre = document.createElement("td");
+    celluleTitre.textContent = conversation.titre;
+    const celluleCout = document.createElement("td");
+    celluleCout.textContent = `${conversation.cout_usd} $`;
+    const celluleChat = document.createElement("td");
+    celluleChat.textContent = formaterDetailConsommation(conversation.chat);
+    const cellulePieceJointe = document.createElement("td");
+    cellulePieceJointe.textContent = formaterDetailConsommation(conversation.piece_jointe);
+    ligne.append(celluleTitre, celluleCout, celluleChat, cellulePieceJointe);
+    corpsConsommationConversations.append(ligne);
+  }
+
+  consommationDonnees.hidden = false;
 }
 
 async function afficherOngletProfilTravail() {
@@ -111,6 +193,12 @@ async function afficherOngletComptes() {
   cacherTousLesOnglets();
   ongletComptes.hidden = false;
   await chargerComptes();
+}
+
+async function afficherOngletConsommations() {
+  cacherTousLesOnglets();
+  ongletConsommations.hidden = false;
+  await chargerConsommationsComptes();
 }
 
 async function chargerProfilTravail() {
@@ -177,6 +265,7 @@ function afficherEcranCompte(compte) {
   // docs/specs/v1.1-gestion-comptes-admin.md) : est_admin n'est jamais mis
   // en cache au-delà de cette vérification côté poste non plus.
   ongletBoutonComptes.hidden = !compte.est_admin;
+  ongletBoutonConsommations.hidden = !compte.est_admin;
   afficherOngletChat();
   ecranConnexion.hidden = true;
   ecranChangementMotDePasse.hidden = true;
@@ -198,6 +287,7 @@ function afficherEcranConnexion() {
   messages.replaceChildren();
   chatErreur.hidden = true;
   ongletBoutonComptes.hidden = true;
+  ongletBoutonConsommations.hidden = true;
   conversationOuverteId = null;
 }
 
@@ -703,8 +793,10 @@ async function supprimerConversation(id) {
 }
 
 ongletBoutonChat.addEventListener("click", afficherOngletChat);
+ongletBoutonConsommation.addEventListener("click", afficherOngletConsommation);
 ongletBoutonProfilTravail.addEventListener("click", afficherOngletProfilTravail);
 ongletBoutonComptes.addEventListener("click", afficherOngletComptes);
+ongletBoutonConsommations.addEventListener("click", afficherOngletConsommations);
 
 function ligneCompte(compte) {
   const ligne = document.createElement("tr");
@@ -905,6 +997,51 @@ async function chargerComptes() {
   const comptes = await reponse.json();
   comptesActuels = comptes;
   corpsTableauComptes.replaceChildren(...comptes.map(ligneCompte));
+}
+
+function ligneConsommationCompte(compte) {
+  const ligne = document.createElement("tr");
+  for (const valeur of [compte.identifiant, compte.prenom, compte.nom, `${compte.cout_usd} $`]) {
+    const cellule = document.createElement("td");
+    cellule.textContent = valeur;
+    ligne.append(cellule);
+  }
+  const celluleChat = document.createElement("td");
+  celluleChat.textContent = formaterDetailConsommation(compte.chat);
+  const cellulePieceJointe = document.createElement("td");
+  cellulePieceJointe.textContent = formaterDetailConsommation(compte.piece_jointe);
+  ligne.append(celluleChat, cellulePieceJointe);
+  return ligne;
+}
+
+async function chargerConsommationsComptes() {
+  consommationsErreur.hidden = true;
+
+  let reponse;
+  try {
+    reponse = await fetch("/comptes/consommation");
+  } catch {
+    consommationsErreur.textContent =
+      "Impossible de joindre le service de consommation. Réessayez plus tard.";
+    consommationsErreur.hidden = false;
+    return;
+  }
+
+  if (reponse.status === 401) {
+    afficherEcranConnexion();
+    return;
+  }
+
+  if (!reponse.ok) {
+    const detail = await reponse.json().catch(() => null);
+    consommationsErreur.textContent =
+      detail && detail.detail ? detail.detail : "Le chargement des consommations a échoué. Réessayez plus tard.";
+    consommationsErreur.hidden = false;
+    return;
+  }
+
+  const comptes = await reponse.json();
+  corpsTableauConsommations.replaceChildren(...comptes.map(ligneConsommationCompte));
 }
 
 formulaireCreationCompte.addEventListener("submit", async (evenement) => {

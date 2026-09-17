@@ -1,4 +1,5 @@
 import os
+from decimal import Decimal
 
 from dotenv import load_dotenv
 
@@ -21,6 +22,38 @@ MISTRAL_HTTP_TIMEOUT = float(os.environ.get("MISTRAL_HTTP_TIMEOUT", "30"))
 # completions vs. OCR), pas un simple changement de paramètre.
 MODELE_CHAT = "mistral-small-latest"
 MODELE_OCR = "mistral-ocr-latest"
+
+# Tarifs par modèle (spec V1.1.3), en dur et datés par commentaire (Mistral
+# n'expose aucune API de tarification programmable — voir
+# docs/suivi-avancement/recherche-v1.1.3-usage-tarification-mistral.md).
+# Relevés le 2026-09-17 sur mistral.ai/pricing/api (à revérifier avant
+# intégration, correspondance alias MODELE_CHAT/MODELE_OCR avec les noms
+# commerciaux non confirmée par une citation primaire verbatim) : Mistral
+# Small ≈ 0,15 $/M tokens entrée, 0,60 $/M tokens sortie ; OCR ≈ 4 $/1000
+# pages.
+_PRIX_USD_PAR_TOKEN_ENTREE = {MODELE_CHAT: Decimal("0.15") / Decimal(1_000_000)}
+_PRIX_USD_PAR_TOKEN_SORTIE = {MODELE_CHAT: Decimal("0.60") / Decimal(1_000_000)}
+_PRIX_USD_PAR_PAGE = {MODELE_OCR: Decimal(4) / Decimal(1000)}
+
+# Seul "ocr" est facturé à la page (pages_traitees, pas de tokens) ; tout le
+# reste (chat/titrage/resume_et_profil/vision) est facturé au token (spec
+# V1.1.3) — une ligne Consommation ne porte jamais les deux jeux de champs.
+_TYPES_APPEL_PAGE_BASED = frozenset({"ocr"})
+
+
+def calculer_cout(
+    type_appel: str,
+    modele: str,
+    tokens_entree: int | None,
+    tokens_sortie: int | None,
+    pages_traitees: int | None,
+) -> Decimal:
+    if type_appel in _TYPES_APPEL_PAGE_BASED:
+        return _PRIX_USD_PAR_PAGE[modele] * Decimal(pages_traitees or 0)
+    return (
+        _PRIX_USD_PAR_TOKEN_ENTREE[modele] * Decimal(tokens_entree or 0)
+        + _PRIX_USD_PAR_TOKEN_SORTIE[modele] * Decimal(tokens_sortie or 0)
+    )
 
 
 def get_mistral_api_key() -> str:

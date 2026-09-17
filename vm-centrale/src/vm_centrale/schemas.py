@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -163,3 +164,39 @@ class PieceJointeCreeeResponse(BaseModel):
 class ProfilTravailResponse(BaseModel):
     contenu: str
     date_derniere_maj: datetime | None
+
+
+class DetailConsommationCategorie(BaseModel):
+    # tokens_total et pages_traitees toujours présents (0 si non applicable) :
+    # Pièce jointe mélange des lignes "ocr" (page-based) et "vision"
+    # (token-based), Chat n'est jamais page-based (spec 1.1.3).
+    tokens_total: int
+    pages_traitees: int
+    cout_usd: Decimal
+    nombre_requetes: int
+
+
+class ConversationConsommationResponse(BaseModel):
+    id: int
+    titre: str
+    cout_usd: Decimal
+    chat: DetailConsommationCategorie
+    piece_jointe: DetailConsommationCategorie
+
+
+class ConsommationResponse(BaseModel):
+    chat: DetailConsommationCategorie
+    piece_jointe: DetailConsommationCategorie
+    # Triée par cout_usd décroissant ; ne contient que les conversations
+    # encore existantes ayant au moins une ligne Consommation rattachée
+    # (spec 1.1.3).
+    conversations: list[ConversationConsommationResponse]
+
+
+class CompteConsommationResponse(BaseModel):
+    identifiant: str
+    prenom: str
+    nom: str
+    cout_usd: Decimal
+    chat: DetailConsommationCategorie
+    piece_jointe: DetailConsommationCategorie

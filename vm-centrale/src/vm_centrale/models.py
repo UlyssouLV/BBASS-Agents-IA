@@ -1,6 +1,7 @@
 from datetime import datetime
+from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from vm_centrale.database import Base
@@ -98,6 +99,36 @@ class PieceJointe(Base):
     chemin_fichier: Mapped[str] = mapped_column(String)
     contenu_extrait: Mapped[str | None] = mapped_column(String, nullable=True)
     echec_analyse: Mapped[bool] = mapped_column(Boolean, default=False)
+    date_creation: Mapped[datetime] = mapped_column(DateTime)
+
+
+class Consommation(Base):
+    __tablename__ = "consommations"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    # Pas de ForeignKey vers comptes.identifiant : même convention que
+    # Conversation/Jeton/ProfilTravail ci-dessus.
+    identifiant_compte: Mapped[str] = mapped_column(String, index=True)
+    # Nullable : mis explicitement à NULL (jamais de cascade) à la
+    # suppression de la conversation qui l'a produite (spec 1.1.3) — la
+    # ligne de consommation survit à ce qui l'a produite, seul le
+    # rattachement disparaît.
+    conversation_id: Mapped[int | None] = mapped_column(
+        ForeignKey("conversations.id"), nullable=True, index=True
+    )
+    # "chat" / "titrage" / "resume_et_profil" / "ocr" / "vision" (spec 1.1.3).
+    type_appel: Mapped[str] = mapped_column(String)
+    # La constante MODELE_CHAT/MODELE_OCR effectivement utilisée pour cet appel.
+    modele: Mapped[str] = mapped_column(String)
+    # Renseignés pour tout sauf "ocr" (facturé à la page, pas au token).
+    tokens_entree: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    tokens_sortie: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    tokens_total: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Renseigné seulement pour "ocr".
+    pages_traitees: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Figé au tarif du jour de l'appel (spec 1.1.3) : jamais recalculé à la
+    # lecture, même si les constantes de tarif de config.py changent ensuite.
+    cout_usd: Mapped[Decimal] = mapped_column(Numeric)
     date_creation: Mapped[datetime] = mapped_column(DateTime)
 
 

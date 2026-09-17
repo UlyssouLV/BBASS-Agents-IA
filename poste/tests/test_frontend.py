@@ -61,6 +61,18 @@ def test_front_end_expose_un_onglet_profil_de_travail_sans_action_de_modificatio
     assert "afficherOngletProfilTravail" in js
 
 
+def test_front_end_expose_un_onglet_consommation_sans_action_de_modification(client):
+    # Issue #58 : lecture seule, comme l'onglet Profil de travail — un total
+    # global et un classement des conversations par coût, jamais d'action.
+    html = client.get("/").text
+    js = client.get("/static/app.js").text
+
+    assert 'id="onglet-bouton-consommation"' in html
+    assert 'id="onglet-consommation" hidden' in html
+    assert '"/consommation"' in js
+    assert "afficherOngletConsommation" in js
+
+
 def test_front_end_bloque_un_second_envoi_tant_que_mistral_n_a_pas_repondu(client):
     js = client.get("/static/app.js").text
 
@@ -113,6 +125,20 @@ def test_front_end_signale_un_echec_danalyse_sans_bloquer_lenvoi(client):
     assert "echec_analyse" in js
     assert "pieceJointeMessageStatut" in js
     assert "pieceJointeNouvelleConversationStatut" in js
+
+
+def test_front_end_expose_un_onglet_consommations_administrateur_separe_de_l_onglet_comptes(client):
+    # Issue #59 : onglet séparé de l'onglet Comptes, masqué par défaut comme
+    # lui (voir test_liste_avec_session_admin_retourne_les_comptes côté
+    # backend pour l'API consommée), jamais de détail par conversation.
+    html = client.get("/").text
+    js = client.get("/static/app.js").text
+
+    assert 'id="onglet-bouton-consommations" hidden' in html
+    assert 'id="onglet-consommations" hidden' in html
+    assert "ongletBoutonConsommations.hidden = !compte.est_admin" in js
+    assert '"/comptes/consommation"' in js
+    assert "afficherOngletConsommations" in js
 
 
 def test_front_end_naffiche_pas_la_reponse_dans_la_mauvaise_conversation(client):

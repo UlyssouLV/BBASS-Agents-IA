@@ -2,9 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from poste.schemas import (
     CompteAdminResponse,
+    CompteConsommationResponse,
     CompteCreationRequest,
     CompteCreeResponse,
     CompteModificationRequest,
+    DetailConsommationCategorieResponse,
     MotDePasseReinitialiseResponse,
     StatutAdminRequest,
     SuppressionCompteRequest,
@@ -15,6 +17,7 @@ from poste.vm_centrale_client import (
     CleAdminInvalideError,
     CompteInexistantError,
     DernierAdministrateurError,
+    DetailConsommationCategorie,
     IdentifiantDejaUtiliseError,
     JetonInvalideError,
     VmCentraleClient,
@@ -95,6 +98,39 @@ def lister_comptes(
             poles=compte.poles,
             est_admin=compte.est_admin,
             doit_changer_mot_de_passe=compte.doit_changer_mot_de_passe,
+        )
+        for compte in comptes
+    ]
+
+
+def _vers_detail_consommation_reponse(detail: DetailConsommationCategorie) -> DetailConsommationCategorieResponse:
+    return DetailConsommationCategorieResponse(
+        tokens_total=detail.tokens_total,
+        pages_traitees=detail.pages_traitees,
+        cout_usd=detail.cout_usd,
+        nombre_requetes=detail.nombre_requetes,
+    )
+
+
+@router.get("/comptes/consommation", response_model=list[CompteConsommationResponse])
+def lister_consommation_comptes(
+    client: VmCentraleClient = Depends(get_vm_centrale_client),
+    session: SessionStore = Depends(get_session_store),
+) -> list[CompteConsommationResponse]:
+    jeton = _jeton_de_session(session)
+    try:
+        comptes = client.lister_consommation_comptes(jeton)
+    except Exception as erreur:
+        raise _erreur_vm_vers_http(session, erreur) from erreur
+
+    return [
+        CompteConsommationResponse(
+            identifiant=compte.identifiant,
+            prenom=compte.prenom,
+            nom=compte.nom,
+            cout_usd=compte.cout_usd,
+            chat=_vers_detail_consommation_reponse(compte.chat),
+            piece_jointe=_vers_detail_consommation_reponse(compte.piece_jointe),
         )
         for compte in comptes
     ]
