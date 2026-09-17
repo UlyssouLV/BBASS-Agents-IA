@@ -1,9 +1,10 @@
 import json
 import logging
+import os
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
@@ -49,6 +50,7 @@ _FICHIER_TROP_VOLUMINEUX = "Fichier trop volumineux (max 20 Mo)"
 _PIECE_JOINTE_INTROUVABLE = "Pièce jointe introuvable"
 _PIECE_JOINTE_DEJA_LIEE = "Pièce jointe déjà liée à un message"
 _PIECE_JOINTE_OUTIL_INTROUVABLE = "Pièce jointe introuvable."
+_CHEMIN_PIECE_JOINTE_INVALIDE = "Nom de fichier invalide"
 
 _OUTIL_CONTENU_PIECE_JOINTE = "obtenir_contenu_piece_jointe"
 
@@ -262,9 +264,21 @@ def _nom_fichier_sur_disque(nom_fichier: str | None) -> str:
     # Le nom de fichier vient du client (en-tête multipart, jamais de
     # confiance) : sans ça, un nom du type "../../../etc/cron.d/x" ou
     # "..\\..\\x" (Path Traversal, CWE-22) écrirait hors de
-    # PIECES_JOINTES_DIR. Normalise les antislashs puis ne garde que le
-    # dernier segment (équivalent d'un basename indépendant de l'OS).
-    return PurePosixPath((nom_fichier or "").replace("\\", "/")).name or "fichier"
+    # PIECES_JOINTES_DIR. Normalise les antislashs (basename ne coupe que sur
+    # "/" côté POSIX) puis ne garde que le dernier segment.
+    return os.path.basename((nom_fichier or "").replace("\\", "/")) or "fichier"
+
+
+def _chemin_piece_jointe_sur_disque(chemin_relatif: str) -> Path:
+    # Défense en profondeur en plus de _nom_fichier_sur_disque ci-dessus :
+    # vérifie, au moment de toucher le disque, que le chemin résolu reste
+    # bien sous PIECES_JOINTES_DIR avant toute écriture/suppression/déplacement
+    # (CWE-22, Path Traversal).
+    racine = Path(PIECES_JOINTES_DIR).resolve()
+    chemin_absolu = (racine / chemin_relatif).resolve()
+    if chemin_absolu != racine and racine not in chemin_absolu.parents:
+        raise HTTPException(status_code=400, detail=_CHEMIN_PIECE_JOINTE_INVALIDE)
+    return chemin_absolu
 
 
 def _lier_piece_jointe_a_la_conversation(piece_jointe: PieceJointe, conversation: Conversation) -> None:
@@ -279,9 +293,9 @@ def _lier_piece_jointe_a_la_conversation(piece_jointe: PieceJointe, conversation
         f"{conversation.identifiant_compte}/{conversation.id}/"
         f"{piece_jointe.id}-{_nom_fichier_sur_disque(piece_jointe.nom_fichier)}"
     )
-    chemin_absolu = Path(PIECES_JOINTES_DIR) / chemin_relatif
+    chemin_absolu = _chemin_piece_jointe_sur_disque(chemin_relatif)
     chemin_absolu.parent.mkdir(parents=True, exist_ok=True)
-    Path(PIECES_JOINTES_DIR, piece_jointe.chemin_fichier).replace(chemin_absolu)
+    _chemin_piece_jointe_sur_disque(piece_jointe.chemin_fichier).replace(chemin_absolu)
 
     piece_jointe.chemin_fichier = chemin_relatif
     piece_jointe.conversation_id = conversation.id
@@ -516,7 +530,7 @@ def _creer_piece_jointe(
         f"{identifiant_compte}/{segment_conversation}/"
         f"{piece_jointe.id}-{_nom_fichier_sur_disque(fichier.filename)}"
     )
-    chemin_absolu = Path(PIECES_JOINTES_DIR) / chemin_relatif
+    chemin_absolu = _chemin_piece_jointe_sur_disque(chemin_relatif)
     chemin_absolu.parent.mkdir(parents=True, exist_ok=True)
     chemin_absolu.write_bytes(contenu)
     piece_jointe.chemin_fichier = chemin_relatif
