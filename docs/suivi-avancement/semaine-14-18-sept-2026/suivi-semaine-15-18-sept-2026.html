@@ -319,7 +319,7 @@
             <div class="toc-row">
               <a href="#travail-realise">Travail réalisé</a>
               <span class="toc-dots" aria-hidden="true"></span>
-              <span class="toc-ref">14–16 sept.</span>
+              <span class="toc-ref">14–17 sept.</span>
             </div>
           </li>
           <li>
@@ -346,6 +346,7 @@
               <li><a href="#version-1-0-0">V1.0.0 — Socle</a></li>
               <li><a href="#version-1-1-0">V1.1.0 — Gestion des comptes</a></li>
               <li><a href="#version-1-1-1">V1.1.1 — Persistance des conversations</a></li>
+              <li><a href="#version-1-1-2">V1.1.2 — Pièces jointes</a></li>
             </ol>
           </li>
         </ol>
@@ -385,12 +386,20 @@
       </ul>
     </div>
 
+    <div class="jour">
+      <h3>Jeudi 17 septembre</h3>
+      <ul>
+        <li>Implémentation puis livraison de la <strong>V1.1.2</strong> : une pièce jointe par message (PDF, Word, Excel, image) ; fichier original sur disque côté VM ; extraction (OCR Mistral, locale Word/Excel, vision pour l’image) ; contenu injecté dans le chat ; mention courte dans le résumé glissant ; rappel via un outil si la pièce jointe sort de la fenêtre des trois derniers messages. Jamais de Files API Mistral.</li>
+        <li>Zone de dépôt minimale côté poste (non stylisée).</li>
+        <li>Tests fonctionnels sur Mistral (PDF Cerfa DT, carte IGN, vue aérienne) : le pipeline d’extraction tient ; le chat mélange encore des documents et invente des liens entre pièces jointes. Comptes rendus dans le dossier de suivi de la semaine.</li>
+      </ul>
+    </div>
+
     </section>
 
     <section class="bloc" id="reste-a-implementer">
     <h2>Reste à implémenter</h2>
     <ul>
-      <li><strong>V1.1.2</strong> — pièces jointes : une par message ; PDF (OCR Mistral), Word et Excel (extraction sur la VM), image (analyse visuelle Mistral). Fichier original sur disque côté VM ; jamais d’upload durable chez Mistral (pas de Files API). En cours de spec / tickets.</li>
       <li><strong>V1.1.3</strong> — suivi de la consommation : tokens (entrée / sortie / total) par compte et par session, dates, modèle, coût ; API tarifs Mistral si elle existe.</li>
       <li><strong>V1.2.0</strong> — interface poste (modales, écran comptes, minimum de style ; framework ou HTML/CSS/JS à choisir).</li>
       <li><strong>V1.3.0</strong> — premier agent, pôle Administration, Moduléo (API, serveur de test, lecture seule, plan d’automatisme sans écriture ni exécution).</li>
@@ -412,7 +421,7 @@
         <li>Identifiant et mot de passe ; session conservée (identifiants Windows) jusqu’à déconnexion ou révocation.</li>
         <li>Chat vers Mistral ; affichage prénom, nom, identifiant, agence et pôle(s).</li>
         <li>Mémoire d’un message à l’autre (livré en V1.1.1) ; plusieurs conversations par compte, persistées sur la VM : reprise après rechargement, relance du poste, autre machine du même compte. Titre auto, renommage, suppression. Historique borné (3 derniers messages + résumé). Profil de travail consultable, sans modifier l’identité du compte. Conversations privées (y compris vis-à-vis d’un compte administrateur).</li>
-        <li>Pièces jointes (V1.1.2, pas encore livrée) : un document par message (PDF, Word, Excel ou image), stocké côté VM ; le fichier n’est pas conservé chez Mistral. OCR pour les PDF, extraction locale pour Word/Excel, analyse visuelle pour les images.</li>
+        <li>Pièces jointes (V1.1.2, livrée jeudi 17) : un document par message (PDF, Word, Excel ou image), stocké côté VM ; le fichier n’est pas conservé chez Mistral. OCR pour les PDF, extraction locale pour Word/Excel, analyse visuelle pour les images. Le chat n’a le contenu complet que le tour de l’envoi, puis une mention courte + un outil de rappel.</li>
         <li>Suivi de la consommation : tokens (entrée, sortie, total) par compte et par session, dates, modèle, estimation du coût.</li>
         <li>Interface poste : minimum d’UX (modales, écran comptes).</li>
       </ul>
@@ -465,6 +474,18 @@
         <p>En V1.1.0, chaque message partait vers Mistral sans mémoire : le modèle ne voyait pas les messages précédents, même dans le même échange, sans recharger la page. Cette version enregistre les conversations sur la machine centrale à Castries (PostgreSQL) : le fil se poursuit d’un message à l’autre, un collaborateur peut avoir plusieurs fils, les retrouver le lendemain, et les reprendre depuis un autre poste avec le même compte. Le titre est proposé automatiquement à partir du premier échange ; on peut le renommer ou supprimer un fil. Un administrateur ne lit pas les conversations des autres.</p>
         <p>Pour maîtriser le coût (Mistral facture au token), on n’envoie plus tout l’historique à chaque tour : seulement les trois derniers messages, plus un résumé de ce qui est plus ancien. Un profil de travail, consultable en lecture seule, retient des habitudes de méthode — jamais le prénom, le nom, le pôle ou l’agence, qui restent sur le compte. Rien n’est stocké dans l’offre « Conversations » de Mistral : tout reste au cabinet.</p>
         <p>Le logiciel se lance par un script (Windows ou macOS) qui démarre Postgres en local pour le développement. La vraie VM à Castries n’est pas encore créée ; le schéma est déjà celui de la production.</p>
+        </div>
+      </div>
+
+      <div class="version" id="version-1-1-2">
+        <div class="version-head">
+          <h3>V1.1.2 — Pièces jointes</h3>
+          <span class="deploye">Déployé le 17/09/2026 à 10:47</span>
+        </div>
+        <div class="version-body">
+        <p>En V1.1.1, la table des pièces jointes existait déjà en base mais n’était ni peuplée ni lue : un collaborateur ne pouvait pas faire analyser un PDF, un Word, un Excel ou une image sans en recopier le contenu dans le chat. Cette version ajoute une zone de dépôt minimale (une pièce jointe par message) : le fichier original va sur disque côté VM, le texte extrait reste en base. PDF : OCR Mistral (appel ponctuel, jamais la Files API). Word et Excel : extraction locale sur la VM. Image : analyse visuelle Mistral, avec une explication textuelle si rien n’est exploitable.</p>
+        <p>À l’envoi du message, le contenu extrait est injecté pour cet appel de chat. Une fois le message sorti de la fenêtre des trois derniers, le résumé glissant n’en garde qu’une mention courte ; l’IA peut redemander le texte complet via un outil, sans ré-analyser le fichier. Seul le compte propriétaire voit ses pièces jointes (y compris vis-à-vis d’un administrateur). Supprimer une conversation efface aussi les fichiers sur disque.</p>
+        <p>Les essais fonctionnels du 17 septembre montrent que l’extraction tient, mais que le modèle de chat mélange encore des documents, refuse parfois une image pourtant extraite, et invente un lien entre pièces jointes sans preuve. Ces limites d’analyse (plusieurs PJ par message, traitement par pôle, fiabilité) sont reportées à la 1.4.0, une fois un Agent métier en place.</p>
         </div>
       </div>
     </section>

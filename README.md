@@ -26,9 +26,10 @@ Point visé vendredi 18 septembre : **V1.3.0**.
 ```mermaid
 flowchart LR
   L14["Lundi 14<br/>socle chat"] --> M15["Mardi 15<br/>V1.1.0 comptes"]
-  M15 --> V111["V1.1.1<br/>persistance"]
-  V111 --> V112["V1.1.2<br/>pièces jointes"]
-  V112 --> V113["V1.1.3<br/>consommation"]
+  M15 --> Me16["Mercredi 16<br/>V1.1.1 persistance"]
+  Me16 --> J17["Jeudi 17<br/>V1.1.2 pièces jointes"]
+  J17 --> V18["Vendredi 18<br/>visé V1.3.0"]
+  V18 --> V113["V1.1.3<br/>consommation"]
   V113 --> V120["V1.2.0<br/>interface poste"]
   V120 --> V130["V1.3.0<br/>agent Moduléo"]
 ```
