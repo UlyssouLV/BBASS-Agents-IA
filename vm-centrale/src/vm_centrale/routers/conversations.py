@@ -529,11 +529,21 @@ def _creer_piece_jointe(
     # temporaire, déplacé au chemin canonique lors du rattachement — voir
     # _lier_piece_jointe_a_la_conversation.
     segment_conversation = str(conversation_id) if conversation_id is not None else "_sans_conversation"
-    chemin_relatif = (
-        f"{identifiant_compte}/{segment_conversation}/"
-        f"{piece_jointe.id}-{_nom_fichier_sur_disque(fichier.filename)}"
-    )
-    chemin_absolu = _chemin_piece_jointe_sur_disque(chemin_relatif)
+    nom_fichier_disque = os.path.basename((fichier.filename or "").replace("\\", "/")) or "fichier"
+    chemin_relatif = f"{identifiant_compte}/{segment_conversation}/{piece_jointe.id}-{nom_fichier_disque}"
+
+    # Vérification faite ici, juste avant l'écriture (plutôt que via
+    # _chemin_piece_jointe_sur_disque comme pour le rattachement plus haut) :
+    # l'analyse de sécurité de SonarCloud ne suit pas la validation à travers
+    # une fonction séparée jusqu'au site d'écriture (CWE-22, PR #51).
+    racine_pieces_jointes = os.path.abspath(str(PIECES_JOINTES_DIR))
+    chemin_absolu_str = os.path.abspath(os.path.join(racine_pieces_jointes, chemin_relatif))
+    if chemin_absolu_str != racine_pieces_jointes and not chemin_absolu_str.startswith(
+        racine_pieces_jointes + os.sep
+    ):
+        raise HTTPException(status_code=400, detail=_CHEMIN_PIECE_JOINTE_INVALIDE)
+
+    chemin_absolu = Path(chemin_absolu_str)
     chemin_absolu.parent.mkdir(parents=True, exist_ok=True)
     chemin_absolu.write_bytes(contenu)
     piece_jointe.chemin_fichier = chemin_relatif
