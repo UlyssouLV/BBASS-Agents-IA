@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
@@ -260,15 +261,18 @@ def _recuperer_piece_jointe_du_compte(
     return piece_jointe
 
 
+_CARACTERE_NON_AUTORISE_DANS_NOM_FICHIER = re.compile(r"[^A-Za-z0-9._-]")
+
+
 def _nom_fichier_sur_disque(nom_fichier: str | None) -> str:
     # Le nom de fichier vient du client (en-tête multipart, jamais de
-    # confiance) : sans ça, un nom du type "../../../etc/cron.d/x" ou
-    # "..\\..\\x" (Path Traversal, CWE-22) écrirait hors de
-    # PIECES_JOINTES_DIR. Normalise les antislashs (basename ne coupe que sur
-    # "/" côté POSIX) puis ne garde que le dernier segment.
-    nom_normalise = (nom_fichier or "").replace("\\", "/")
-    nom_sans_repertoire = os.path.basename(nom_normalise)
-    return nom_sans_repertoire or "fichier"
+    # confiance) : sans ça, un nom du type "../../../etc/cron.d/x" écrirait
+    # hors de PIECES_JOINTES_DIR (Path Traversal, CWE-22). Liste blanche
+    # stricte (lettres, chiffres, point, tiret, underscore) plutôt qu'un
+    # simple basename : "/" et "\" disparaissent quelle que soit leur
+    # position, aucun séparateur de répertoire ne peut survivre.
+    nom_filtre = _CARACTERE_NON_AUTORISE_DANS_NOM_FICHIER.sub("_", nom_fichier or "")
+    return nom_filtre if nom_filtre and nom_filtre not in (".", "..") else "fichier"
 
 
 def _chemin_piece_jointe_sur_disque(chemin_relatif: str) -> Path:
@@ -529,21 +533,11 @@ def _creer_piece_jointe(
     # temporaire, déplacé au chemin canonique lors du rattachement — voir
     # _lier_piece_jointe_a_la_conversation.
     segment_conversation = str(conversation_id) if conversation_id is not None else "_sans_conversation"
-    nom_fichier_disque = os.path.basename((fichier.filename or "").replace("\\", "/")) or "fichier"
-    chemin_relatif = f"{identifiant_compte}/{segment_conversation}/{piece_jointe.id}-{nom_fichier_disque}"
-
-    # Vérification faite ici, juste avant l'écriture (plutôt que via
-    # _chemin_piece_jointe_sur_disque comme pour le rattachement plus haut) :
-    # l'analyse de sécurité de SonarCloud ne suit pas la validation à travers
-    # une fonction séparée jusqu'au site d'écriture (CWE-22, PR #51).
-    racine_pieces_jointes = os.path.abspath(str(PIECES_JOINTES_DIR))
-    chemin_absolu_str = os.path.abspath(os.path.join(racine_pieces_jointes, chemin_relatif))
-    if chemin_absolu_str != racine_pieces_jointes and not chemin_absolu_str.startswith(
-        racine_pieces_jointes + os.sep
-    ):
-        raise HTTPException(status_code=400, detail=_CHEMIN_PIECE_JOINTE_INVALIDE)
-
-    chemin_absolu = Path(chemin_absolu_str)
+    chemin_relatif = (
+        f"{identifiant_compte}/{segment_conversation}/"
+        f"{piece_jointe.id}-{_nom_fichier_sur_disque(fichier.filename)}"
+    )
+    chemin_absolu = _chemin_piece_jointe_sur_disque(chemin_relatif)
     chemin_absolu.parent.mkdir(parents=True, exist_ok=True)
     chemin_absolu.write_bytes(contenu)
     piece_jointe.chemin_fichier = chemin_relatif
