@@ -100,29 +100,15 @@ export function BarreLaterale({
     conversationsQuery.error,
     "Le chargement des conversations a échoué. Réessayez plus tard."
   );
-  const aucuneConversation =
-    !conversationsQuery.isLoading && (conversationsQuery.data?.length ?? 0) === 0;
 
   return (
     <Sidebar>
       <SidebarHeader className="gap-8">
-        {aucuneConversation ? (
-          <img src={logoBbass} alt="BBASS Géomètre-Expert" className="h-auto w-full object-contain" />
-        ) : (
-          <button
-            type="button"
-            className="w-full p-0 text-left"
-            onClick={() => onSelectionnerConversation(null)}
-          >
-            <img src={logoBbass} alt="BBASS Géomètre-Expert" className="h-auto w-full object-contain" />
-          </button>
-        )}
-        {aucuneConversation && (
-          <Button type="button" size="sm" className="w-full" onClick={() => onSelectionnerConversation(null)}>
-            <SquarePen aria-hidden="true" />
-            Nouvelle conversation
-          </Button>
-        )}
+        <img src={logoBbass} alt="BBASS Géomètre-Expert" className="h-auto w-full object-contain" />
+        <Button type="button" size="sm" className="w-full" onClick={() => onSelectionnerConversation(null)}>
+          <SquarePen aria-hidden="true" />
+          Nouvelle conversation
+        </Button>
       </SidebarHeader>
 
       <SidebarContent className="pt-8">
