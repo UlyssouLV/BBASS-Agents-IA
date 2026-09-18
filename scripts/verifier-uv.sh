@@ -18,7 +18,7 @@ ensure_uv() {
     fi
 
     echo "      uv n'est pas installe : installation (script officiel Astral)..."
-    if ! curl -LsSf https://astral.sh/uv/install.sh | sh; then
+    if ! curl --proto '=https' --tlsv1.2 -LsSf https://astral.sh/uv/install.sh | sh; then
         echo "[ERREUR] Echec de l'installation de uv." >&2
         echo "         Installe-le a la main (voir README.md, section Prerequis), puis relance ce script." >&2
         return 1

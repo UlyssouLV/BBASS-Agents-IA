@@ -189,7 +189,7 @@ export function BarreLaterale({
               >
                 {renommageId === conversation.id ? (
                   <input
-                    autoFocus
+                    ref={(element) => element?.focus()}
                     value={titreEnCours}
                     onChange={(evenement) => setTitreEnCours(evenement.target.value)}
                     onBlur={() => {
@@ -247,8 +247,9 @@ export function BarreLaterale({
                     align="end"
                     onCloseAutoFocus={(evenement) => {
                       // Empêche Radix de rendre le focus au bouton « … » à
-                      // la fermeture : sinon il entre en compétition avec
-                      // l'autoFocus de l'input inline ouvert par Renommer.
+                      // la fermeture : sinon il entre en compétition avec le
+                      // focus programmatique de l'input inline ouvert par
+                      // Renommer (voir le ref de cet input, plus haut).
                       evenement.preventDefault();
                     }}
                   >
