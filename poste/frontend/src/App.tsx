@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
 import { useSession } from "@/hooks/useSession";
 import { EcranChangementMotDePasse } from "@/screens/EcranChangementMotDePasse";
@@ -5,7 +6,8 @@ import { EcranCompte } from "@/screens/EcranCompte";
 import { EcranConnexion } from "@/screens/EcranConnexion";
 
 export function App() {
-  const { compte, chargementInitial, connexion, changerMotDePasse, deconnexion } = useSession();
+  const { compte, chargementInitial, erreurInitiale, reessayerChargementInitial, connexion, changerMotDePasse, deconnexion } =
+    useSession();
 
   return (
     <>
@@ -20,6 +22,22 @@ export function App() {
   function _ecran() {
     if (chargementInitial) {
       return null;
+    }
+
+    // Un 401 sur /compte vide déjà le cache (chargerCompteConnecte, voir
+    // useSession.ts) : compte === null y arrive normalement. Une erreur ici
+    // veut dire que /compte n'a pas pu être contacté du tout — ne pas le
+    // confondre avec un compte déconnecté sous peine de masquer une panne
+    // réseau/serveur derrière un simple écran de connexion.
+    if (!compte && erreurInitiale) {
+      return (
+        <main className="mx-auto mt-24 w-full max-w-sm text-center">
+          <p role="alert" className="mb-4 text-sm text-destructive">
+            Impossible de vérifier la session en cours. Vérifiez la connexion au serveur puis réessayez.
+          </p>
+          <Button onClick={() => reessayerChargementInitial()}>Réessayer</Button>
+        </main>
+      );
     }
 
     if (!compte) {

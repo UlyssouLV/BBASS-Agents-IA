@@ -9,20 +9,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python",
-            "args": [".claude/hooks/gate-code-review.py"],
-            "statusMessage": "Vérifie que /code-review est bien demandé"
-          }
-        ]
-      }
-    ],
-    "SubagentStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python",
-            "args": [".claude/hooks/gate-code-review.py"],
+            "command": "py",
+            "args": ["-3", ".claude/hooks/gate-code-review.py"],
             "statusMessage": "Vérifie que /code-review est bien demandé"
           }
         ]

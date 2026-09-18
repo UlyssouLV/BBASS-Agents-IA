@@ -116,6 +116,12 @@ export function useSession() {
   return {
     compte: compteQuery.data ?? null,
     chargementInitial: compteQuery.isLoading,
+    // Distinct d'un 401 (compte === null, chargerCompteConnecte l'avale déjà
+    // ci-dessus) : une erreur ici veut dire que /compte n'a pas pu être
+    // contacté du tout (réseau, backend indisponible), pas que le compte est
+    // déconnecté — App.tsx doit pouvoir le distinguer de l'écran de connexion.
+    erreurInitiale: compteQuery.error,
+    reessayerChargementInitial: compteQuery.refetch,
     connexion,
     changerMotDePasse,
     deconnexion,

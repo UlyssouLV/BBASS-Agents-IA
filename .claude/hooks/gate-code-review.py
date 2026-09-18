@@ -28,25 +28,36 @@ def _charge() -> dict:
         return {}
 
 
-def _dump(valeur: object) -> str:
-    return json.dumps(valeur, ensure_ascii=False).lower()
+def _est_identifiant_code_review(valeur: object) -> bool:
+    # Comparaison sur l'identifiant de skill/agent lui-même (ex. "code-review",
+    # "mattpocock-skills:code-review"), jamais sur un texte libre arbitraire :
+    # un prompt ou un chemin de fichier qui contient juste la sous-chaîne
+    # "code-review" (ex. docs/code-review-notes.md) ne doit pas déclencher le
+    # blocage sur un tool call sans rapport.
+    minuscule = str(valeur or "").strip().strip("/").lower()
+    if not minuscule:
+        return False
+    if minuscule in {"code-review", "code_review"}:
+        return True
+    return minuscule.endswith(":code-review") or minuscule.endswith(":code_review")
 
 
 def _est_code_review(payload: dict) -> bool:
     outil = str(payload.get("tool_name") or payload.get("tool") or "")
+    # SubagentStart n'a pas toujours de tool_name (outil == "") : ne pas
+    # l'exclure ici, seulement les tool calls clairement étrangers au trio
+    # Skill/Agent/Task déjà filtré par le matcher PreToolUse.
+    if outil and outil not in {"Skill", "Agent", "Task"}:
+        return False
     entree = payload.get("tool_input") or payload.get("input") or {}
-    texte = " ".join(
-        [
-            outil,
-            str(payload.get("hook_event_name") or ""),
-            str(payload.get("agent_type") or ""),
-            str(payload.get("subagent_type") or ""),
-            str(payload.get("skill") or ""),
-            _dump(entree),
-            str(payload.get("description") or ""),
-        ]
-    ).lower()
-    return "code-review" in texte or "code_review" in texte
+    candidats = [
+        entree.get("skill"),
+        entree.get("subagent_type"),
+        payload.get("skill"),
+        payload.get("subagent_type"),
+        payload.get("agent_type"),
+    ]
+    return any(_est_identifiant_code_review(candidat) for candidat in candidats)
 
 
 def _dernier_message_utilisateur(chemin: str) -> str:

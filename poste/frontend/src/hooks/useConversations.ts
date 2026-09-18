@@ -82,6 +82,26 @@ async function _envoyerPieceJointe(url: string, fichier: File): Promise<Resultat
   };
 }
 
+// Le fichier reste sélectionné dans l'input tant que la création de la
+// conversation / l'envoi du message n'a pas réussi (voir OngletChat.tsx,
+// vidé uniquement dans onSuccess) : un nouvel essai avec le même objet File
+// doit réutiliser la pièce jointe déjà téléversée plutôt que d'en créer une
+// seconde orpheline côté serveur si seul l'appel suivant avait échoué.
+const _piecesEnCache = new WeakMap<File, Promise<ResultatPieceJointe & { id: number }>>();
+
+function _envoyerPieceJointeAvecCache(url: string, fichier: File): Promise<ResultatPieceJointe & { id: number }> {
+  const enCache = _piecesEnCache.get(fichier);
+  if (enCache) {
+    return enCache;
+  }
+  const promesse = _envoyerPieceJointe(url, fichier).catch((erreur) => {
+    _piecesEnCache.delete(fichier);
+    throw erreur;
+  });
+  _piecesEnCache.set(fichier, promesse);
+  return promesse;
+}
+
 async function chargerConversations(): Promise<Conversation[]> {
   return appelApi<Conversation[]>(
     "/conversations",
@@ -111,7 +131,7 @@ async function creerConversation({
   fichier,
   cleIdempotence,
 }: CreerConversationVariables): Promise<ConversationCreee> {
-  const piece = fichier ? await _envoyerPieceJointe("/pieces-jointes", fichier) : null;
+  const piece = fichier ? await _envoyerPieceJointeAvecCache("/pieces-jointes", fichier) : null;
 
   const cree = await appelApi<{ conversation: { id: number; titre: string }; reponse: string }>(
     "/conversations",
@@ -145,7 +165,7 @@ async function envoyerMessage({
   cleIdempotence,
 }: EnvoyerMessageVariables): Promise<MessageEnvoye> {
   const piece = fichier
-    ? await _envoyerPieceJointe(`/conversations/${conversationId}/pieces-jointes`, fichier)
+    ? await _envoyerPieceJointeAvecCache(`/conversations/${conversationId}/pieces-jointes`, fichier)
     : null;
 
   const envoi = await appelApi<{ reponse: string }>(

@@ -72,12 +72,12 @@ export function OngletChat() {
 
   function gererEnvoiNouvelleConversation(evenement: FormEvent<HTMLFormElement>) {
     evenement.preventDefault();
-    creerConversationMutation.reset();
 
     const message = champNouveauMessage;
     if (!message.trim() || creerConversationMutation.isPending) {
       return;
     }
+    creerConversationMutation.reset();
 
     creerConversationMutation.mutate(
       {
@@ -99,12 +99,12 @@ export function OngletChat() {
 
   function gererEnvoiMessage(evenement: FormEvent<HTMLFormElement>) {
     evenement.preventDefault();
-    envoyerMessageMutation.reset();
 
     const message = champMessage;
     if (!message.trim() || conversationOuverteId === null || envoyerMessageMutation.isPending) {
       return;
     }
+    envoyerMessageMutation.reset();
 
     envoyerMessageMutation.mutate(
       {
@@ -150,6 +150,7 @@ export function OngletChat() {
             {erreurConversations}
           </p>
         )}
+        {conversationsQuery.isLoading && <p className="mb-2 text-sm text-muted-foreground">Chargement…</p>}
         <ul className="mb-3 flex flex-col gap-1">
           {conversationsQuery.data?.map((conversation) => (
             <li key={conversation.id} className="flex items-center gap-1">
