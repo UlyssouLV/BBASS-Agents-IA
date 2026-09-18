@@ -539,17 +539,17 @@ def keyring_factice(monkeypatch):
     return stockage
 
 
-@pytest.fixture()
+@pytest.fixture
 def vm_centrale_client_factice():
     return VmCentraleClientFactice()
 
 
-@pytest.fixture()
+@pytest.fixture
 def session_store():
     return SessionStore()
 
 
-@pytest.fixture()
+@pytest.fixture
 def client(vm_centrale_client_factice, session_store):
     app.dependency_overrides[get_vm_centrale_client] = lambda: vm_centrale_client_factice
     app.dependency_overrides[get_session_store] = lambda: session_store

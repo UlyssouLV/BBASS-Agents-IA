@@ -36,6 +36,21 @@ _VM_CENTRALE_INDISPONIBLE = "Le service de gestion des comptes de la VM centrale
 _CLE_ADMIN_INVALIDE = "Clé d'administration manquante ou invalide"
 _DERNIER_ADMINISTRATEUR = "Impossible de retirer le dernier compte administrateur restant"
 
+# Base commune à toutes les routes ci-dessous : _erreur_vm_vers_http traduit
+# n'importe quelle exception VmCentraleClient de la même façon, quel que soit
+# l'appelant (401/403/502 donc toujours atteignables). Chaque route étend ce
+# socle avec les codes propres à son opération (404, 409, ou un 403 combiné
+# quand elle exige aussi la Clé d'administration VM).
+_RESPONSES_BASE = {
+    401: {"description": _AUCUNE_SESSION},
+    403: {"description": _ACCES_ADMIN_REQUIS},
+    502: {"description": _VM_CENTRALE_INDISPONIBLE},
+}
+_RESPONSES_AVEC_CLE_ADMIN = {
+    **_RESPONSES_BASE,
+    403: {"description": f"{_ACCES_ADMIN_REQUIS} / {_CLE_ADMIN_INVALIDE}"},
+}
+
 
 def _jeton_de_session(session: SessionStore) -> str:
     jeton = session.jeton
@@ -77,7 +92,7 @@ def _erreur_vm_vers_http(session: SessionStore, erreur: Exception) -> HTTPExcept
     return HTTPException(status_code=502, detail=_VM_CENTRALE_INDISPONIBLE)
 
 
-@router.get("/comptes", response_model=list[CompteAdminResponse])
+@router.get("/comptes", responses=_RESPONSES_BASE)
 def lister_comptes(
     client: VmCentraleClient = Depends(get_vm_centrale_client),
     session: SessionStore = Depends(get_session_store),
@@ -112,7 +127,7 @@ def _vers_detail_consommation_reponse(detail: DetailConsommationCategorie) -> De
     )
 
 
-@router.get("/comptes/consommation", response_model=list[CompteConsommationResponse])
+@router.get("/comptes/consommation", responses=_RESPONSES_BASE)
 def lister_consommation_comptes(
     client: VmCentraleClient = Depends(get_vm_centrale_client),
     session: SessionStore = Depends(get_session_store),
@@ -136,7 +151,11 @@ def lister_consommation_comptes(
     ]
 
 
-@router.post("/comptes", response_model=CompteCreeResponse, status_code=201)
+@router.post(
+    "/comptes",
+    status_code=201,
+    responses={**_RESPONSES_BASE, 409: {"description": _IDENTIFIANT_DEJA_UTILISE}},
+)
 def creer_compte(
     requete: CompteCreationRequest,
     client: VmCentraleClient = Depends(get_vm_centrale_client),
@@ -169,7 +188,10 @@ def creer_compte(
     )
 
 
-@router.patch("/comptes/{identifiant}", response_model=CompteAdminResponse)
+@router.patch(
+    "/comptes/{identifiant}",
+    responses={**_RESPONSES_BASE, 404: {"description": _COMPTE_INTROUVABLE}},
+)
 def modifier_compte(
     identifiant: str,
     requete: CompteModificationRequest,
@@ -204,7 +226,7 @@ def modifier_compte(
 
 @router.post(
     "/comptes/{identifiant}/reinitialiser-mot-de-passe",
-    response_model=MotDePasseReinitialiseResponse,
+    responses={**_RESPONSES_BASE, 404: {"description": _COMPTE_INTROUVABLE}},
 )
 def reinitialiser_mot_de_passe(
     identifiant: str,
@@ -220,7 +242,11 @@ def reinitialiser_mot_de_passe(
     return MotDePasseReinitialiseResponse(mot_de_passe=mot_de_passe)
 
 
-@router.post("/comptes/{identifiant}/deconnexion-forcee", status_code=204)
+@router.post(
+    "/comptes/{identifiant}/deconnexion-forcee",
+    status_code=204,
+    responses={**_RESPONSES_BASE, 404: {"description": _COMPTE_INTROUVABLE}},
+)
 def deconnexion_forcee(
     identifiant: str,
     client: VmCentraleClient = Depends(get_vm_centrale_client),
@@ -233,7 +259,15 @@ def deconnexion_forcee(
         raise _erreur_vm_vers_http(session, erreur) from erreur
 
 
-@router.delete("/comptes/{identifiant}", status_code=204)
+@router.delete(
+    "/comptes/{identifiant}",
+    status_code=204,
+    responses={
+        **_RESPONSES_AVEC_CLE_ADMIN,
+        404: {"description": _COMPTE_INTROUVABLE},
+        409: {"description": _DERNIER_ADMINISTRATEUR},
+    },
+)
 def supprimer_compte(
     identifiant: str,
     requete: SuppressionCompteRequest,
@@ -247,7 +281,14 @@ def supprimer_compte(
         raise _erreur_vm_vers_http(session, erreur) from erreur
 
 
-@router.patch("/comptes/{identifiant}/est-admin", response_model=CompteAdminResponse)
+@router.patch(
+    "/comptes/{identifiant}/est-admin",
+    responses={
+        **_RESPONSES_AVEC_CLE_ADMIN,
+        404: {"description": _COMPTE_INTROUVABLE},
+        409: {"description": _DERNIER_ADMINISTRATEUR},
+    },
+)
 def modifier_statut_admin(
     identifiant: str,
     requete: StatutAdminRequest,

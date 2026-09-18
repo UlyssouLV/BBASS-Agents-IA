@@ -1,3 +1,5 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from poste.schemas import ConsommationResponse, ConversationConsommationResponse, DetailConsommationCategorieResponse
@@ -36,10 +38,16 @@ def _vers_conversation_reponse(conversation: ConversationConsommation) -> Conver
     )
 
 
-@router.get("/consommation", response_model=ConsommationResponse)
+@router.get(
+    "/consommation",
+    responses={
+        401: {"description": _AUCUNE_SESSION},
+        502: {"description": _VM_CENTRALE_INDISPONIBLE},
+    },
+)
 def consulter_consommation(
-    client: VmCentraleClient = Depends(get_vm_centrale_client),
-    session: SessionStore = Depends(get_session_store),
+    client: Annotated[VmCentraleClient, Depends(get_vm_centrale_client)],
+    session: Annotated[SessionStore, Depends(get_session_store)],
 ) -> ConsommationResponse:
     jeton = session.jeton
     if jeton is None:

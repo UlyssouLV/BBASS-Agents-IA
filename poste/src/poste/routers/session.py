@@ -15,7 +15,14 @@ _PERSISTANCE_DEGRADEE = (
 )
 
 
-@router.post("/connexion", response_model=ConnexionResponse, response_model_exclude_none=True)
+@router.post(
+    "/connexion",
+    response_model_exclude_none=True,
+    responses={
+        401: {"description": _ECHEC_CONNEXION},
+        502: {"description": _VM_CENTRALE_INDISPONIBLE},
+    },
+)
 def connexion(
     requete: ConnexionRequest,
     client: VmCentraleClient = Depends(get_vm_centrale_client),
@@ -71,7 +78,13 @@ def deconnexion(
             pass
 
 
-@router.post("/mot-de-passe", response_model=CompteResponse)
+@router.post(
+    "/mot-de-passe",
+    responses={
+        401: {"description": _AUCUNE_SESSION},
+        502: {"description": _VM_CENTRALE_INDISPONIBLE},
+    },
+)
 def changer_mot_de_passe(
     requete: ChangerMotDePasseRequest,
     client: VmCentraleClient = Depends(get_vm_centrale_client),
@@ -115,7 +128,10 @@ def changer_mot_de_passe(
     )
 
 
-@router.get("/compte", response_model=CompteResponse)
+@router.get(
+    "/compte",
+    responses={401: {"description": _AUCUNE_SESSION}},
+)
 def compte_connecte(session: SessionStore = Depends(get_session_store)) -> CompteResponse:
     identifiant = session.identifiant
     if identifiant is None:
