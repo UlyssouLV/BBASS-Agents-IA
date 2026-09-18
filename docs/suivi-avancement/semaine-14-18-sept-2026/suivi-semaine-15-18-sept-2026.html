@@ -319,14 +319,14 @@
             <div class="toc-row">
               <a href="#travail-realise">Travail réalisé</a>
               <span class="toc-dots" aria-hidden="true"></span>
-              <span class="toc-ref">14–17 sept.</span>
+              <span class="toc-ref">14–18 sept.</span>
             </div>
           </li>
           <li>
             <div class="toc-row">
               <a href="#reste-a-implementer">Reste à implémenter</a>
               <span class="toc-dots" aria-hidden="true"></span>
-              <span class="toc-ref">V1.2.0 à V1.3.0</span>
+              <span class="toc-ref">V1.2.1 à V1.3.0</span>
             </div>
           </li>
           <li>
@@ -348,6 +348,7 @@
               <li><a href="#version-1-1-1">V1.1.1 — Persistance des conversations</a></li>
               <li><a href="#version-1-1-2">V1.1.2 — Pièces jointes</a></li>
               <li><a href="#version-1-1-3">V1.1.3 — Consommation</a></li>
+              <li><a href="#version-1-2-0">V1.2.0 — Interface poste</a></li>
             </ol>
           </li>
         </ol>
@@ -397,12 +398,20 @@
       </ul>
     </div>
 
+    <div class="jour">
+      <h3>Vendredi 18 septembre</h3>
+      <ul>
+        <li>Livraison de la <strong>V1.2.0</strong> : interface du poste réécrite en React/TypeScript/Vite (shadcn/ui, Tailwind, TanStack Query). L’écran comptes (compte administrateur) passe d’un empilement de formulaires à un tableau et une modale par action (création, modification, statut administrateur, suppression — clé d’administration VM inchangée). Le build est committé dans git : un poste collaborateur n’installe pas Node.js (double-clic sur le lanceur comme avant).</li>
+        <li>Revue de code SonarCloud : <code>main</code> était en note de sécurité E. Passage en revue des alertes (dont un signalement de parcours de fichier sur les pièces jointes, déjà contré dans le code, marqué faux positif) et nettoyage des « code smells ».</li>
+      </ul>
+    </div>
+
     </section>
 
     <section class="bloc" id="reste-a-implementer">
     <h2>Reste à implémenter</h2>
     <ul>
-      <li><strong>V1.2.0</strong> — interface poste (modales, écran comptes, minimum de style ; framework ou HTML/CSS/JS à choisir).</li>
+      <li><strong>V1.2.1</strong> — style personnalisé du poste : ajustements CSS uniquement (couleurs, typographie, espacements) sur les briques déjà posées en V1.2.0, sans nouvel écran ni nouvelle dépendance.</li>
       <li><strong>V1.3.0</strong> — premier agent, pôle Administration, Moduléo (API, serveur de test, lecture seule, plan d’automatisme sans écriture ni exécution).</li>
     </ul>
     </section>
@@ -410,7 +419,7 @@
     <section class="bloc" id="attendu-fin-de-semaine">
     <h2>Attendu pour la fin de semaine</h2>
     <div class="recap">
-      <p><strong>Point vendredi 18 septembre — version attendue : V1.3.0</strong></p>
+      <p><strong>Point vendredi 18 septembre — visé : V1.3.0 · livré : V1.2.0</strong></p>
       <h3>Architecture</h3>
       <ul>
         <li>Logiciel sur le poste (interface web locale) ; VM à Castries, réseau interne seulement.</li>
@@ -424,7 +433,7 @@
         <li>Mémoire d’un message à l’autre (livré en V1.1.1) ; plusieurs conversations par compte, persistées sur la VM : reprise après rechargement, relance du poste, autre machine du même compte. Titre auto, renommage, suppression. Historique borné (3 derniers messages + résumé). Profil de travail consultable, sans modifier l’identité du compte. Conversations privées (y compris vis-à-vis d’un compte administrateur).</li>
         <li>Pièces jointes (V1.1.2, livrée jeudi 17) : un document par message (PDF, Word, Excel ou image), stocké côté VM ; le fichier n’est pas conservé chez Mistral. OCR pour les PDF, extraction locale pour Word/Excel, analyse visuelle pour les images. Le chat n’a le contenu complet que le tour de l’envoi, puis une mention courte + un outil de rappel.</li>
         <li>Suivi de la consommation (V1.1.3, livrée jeudi 17) : une ligne par appel Mistral réel (chat, titrage, résumé+profil, OCR, vision), tokens ou pages, coût figé au tarif du jour. Fenêtre Consommation pour le collaborateur ; onglet Consommations pour un compte administrateur (agrégat par compte, jamais par conversation).</li>
-        <li>Interface poste : minimum d’UX (modales, écran comptes).</li>
+        <li>Interface poste (V1.2.0, livrée vendredi 18) : React/TypeScript/Vite, shadcn/ui ; écran comptes en tableau + modales. Chat, consommation et profil de travail : même comportement qu’en 1.1.3, présentation migrée. Pas de Node.js sur un poste collaborateur.</li>
       </ul>
       <h3>Comptes administrateurs</h3>
       <ul>
@@ -498,7 +507,18 @@
         <div class="version-body">
         <p>Jusqu’ici, chaque appel Mistral coûtait de l’argent sans laisser de trace consultable au cabinet : impossible de savoir ce qu’un compte ou une conversation avait consommé. Cette version enregistre une ligne à chaque appel réel (chat, titrage, résumé+profil, OCR, vision) : tokens ou pages selon le type, modèle, coût déjà calculé avec le tarif du jour. Il n’existe pas d’API Mistral de tarification par appel ; les prix sont donc en dur dans le code, datés. Un tarif changé plus tard ne réécrit pas l’historique.</p>
         <p>Un collaborateur ouvre une fenêtre Consommation : total (Chat vs Pièce jointe) et classement de ses conversations encore présentes, par coût. Un compte administrateur a un onglet Consommations séparé de Comptes : les comptes classés par coût, sans jamais voir le détail par conversation d’un autre. Supprimer une conversation retire le fil du classement, mais conserve les lignes de consommation (le total global ne recule pas).</p>
-        <p>Les écrans restent minimaux ; le style et les modales sont le sujet de la 1.2.0.</p>
+        <p>Les écrans restaient minimaux ; le style de fond et les modales sont livrés en 1.2.0.</p>
+        </div>
+      </div>
+
+      <div class="version" id="version-1-2-0">
+        <div class="version-head">
+          <h3>V1.2.0 — Interface poste</h3>
+          <span class="deploye">Déployé le 18/09/2026 à 09:08</span>
+        </div>
+        <div class="version-body">
+        <p>Jusqu’ici, l’interface du poste tenait dans une unique page HTML et un unique script JavaScript (plus de 1 200 lignes). L’écran comptes d’un compte administrateur empilait tableau, formulaires de création et de modification, révélations de mot de passe et confirmations (clé d’administration VM) en permanence. Cette version réécrit tout le front en React/TypeScript, buildé par Vite, avec des composants shadcn/ui (modales, table, formulaires) et Tailwind. Les appels à la VM centrale passent par TanStack Query ; le contrat HTTP ne change pas.</p>
+        <p>Le tableau des comptes est la vue par défaut ; créer, modifier, promouvoir/rétrograder ou supprimer s’ouvre dans une modale dédiée. La clé d’administration VM reste exigée pour la suppression et le changement de statut. Chat, consommation et profil de travail se comportent comme en 1.1.3. Le dossier compilé est committé dans git : un poste n’a pas Node.js, seulement le lanceur habituel.</p>
         </div>
       </div>
     </section>

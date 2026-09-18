@@ -6,12 +6,8 @@ rem uv resout la version de Python via son propre .python-version (3.11).
 setlocal
 set "PKG_DIR=%~1"
 
-uv --version >nul 2>nul
-if errorlevel 1 (
-    echo [ERREUR] "uv" est requis mais n'a pas ete trouve sur le PATH.
-    echo          Installe-le ^(voir README.md, section Prerequis^), puis relance ce script.
-    exit /b 1
-)
+call "%~dp0verifier-uv.bat"
+if errorlevel 1 exit /b 1
 
 if not exist "%PKG_DIR%\pyproject.toml" (
     echo [ERREUR] "%PKG_DIR%" ne contient pas de pyproject.toml.

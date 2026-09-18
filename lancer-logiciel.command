@@ -39,11 +39,17 @@ if ! scripts/preparer-package.sh "$ROOT_DIR/poste"; then
 fi
 
 echo "[4/7] Verification / demarrage de PostgreSQL (Docker)..."
+if ! scripts/verifier-docker.sh; then
+    echo
+    read -n 1 -s -r -p "Appuie sur une touche pour fermer..."
+    echo
+    exit 1
+fi
 echo "      (premier lancement : telechargement de l'image postgres, peut prendre quelques minutes)"
 if ! docker compose up -d --wait; then
     echo
     echo "[ERREUR] Docker n'a pas pu demarrer PostgreSQL."
-    echo "         Verifie que Docker Desktop est bien ouvert et demarre, puis relance ce script."
+    echo "         Verifie que Docker Desktop est bien pret, puis relance ce script."
     read -n 1 -s -r -p "Appuie sur une touche pour fermer..."
     echo
     exit 1
