@@ -191,6 +191,10 @@
       color: #44403c;
       margin: 0;
     }
+    .meta a {
+      color: #1e3a5f;
+      text-decoration: underline;
+    }
     p { margin: 0 0 6pt; }
     .lead {
       font-size: 10pt;
@@ -230,6 +234,41 @@
       margin-top: 0;
       padding-top: 0;
       border-top: none;
+    }
+    #reste-a-implementer {
+      page-break-before: always;
+      break-before: page;
+    }
+    #attendu-fin-de-semaine {
+      page-break-before: avoid;
+      break-before: avoid;
+    }
+    .agenda {
+      page-break-before: always;
+      break-before: page;
+      border-top: none;
+      margin-top: 0;
+      padding-top: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 250mm;
+    }
+    .agenda h2 {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+    }
+    .agenda img {
+      display: block;
+      margin: 0 auto;
+      max-width: 170mm;
+      max-height: 250mm;
+      width: auto;
+      height: auto;
     }
     .versions .version {
       margin-top: 12pt;
@@ -307,9 +346,9 @@
       <div class="couverture-identite">
         <img class="logo" src="../logo-bbass.png" alt="BBASS géomètre-expert" />
         <p class="kicker">Alternance Agents IA · 2026–2027</p>
-        <h1>Suivi d’avancement (brouillon)</h1>
-        <p class="meta">Semaine du 14 au 18 septembre 2026 · Ulysse Long<br />
-        Dépôt : github.com/UlyssouLV/BBASS-Agents-IA</p>
+        <h1>Bilan de semaine - Alternance Ulysse LONG</h1>
+        <p class="meta">Semaine du 14 au 18 septembre 2026<br />
+        Dépôt : <a href="https://github.com/UlyssouLV/BBASS-Agents-IA">github.com/UlyssouLV/BBASS-Agents-IA</a></p>
         <div class="semaine">14–18 sept. 2026</div>
       </div>
       <nav class="toc" aria-label="Table des matières">
@@ -326,12 +365,12 @@
             <div class="toc-row">
               <a href="#reste-a-implementer">Reste à implémenter</a>
               <span class="toc-dots" aria-hidden="true"></span>
-              <span class="toc-ref">V1.2.1 à V1.3.0</span>
+              <span class="toc-ref">V1.3.0 — reporté</span>
             </div>
           </li>
           <li>
             <div class="toc-row">
-              <a href="#attendu-fin-de-semaine">Attendu pour la fin de semaine</a>
+              <a href="#attendu-fin-de-semaine">Livré pour le 18/09/2026</a>
               <span class="toc-dots" aria-hidden="true"></span>
               <span class="toc-ref">vendredi 18 sept.</span>
             </div>
@@ -349,7 +388,15 @@
               <li><a href="#version-1-1-2">V1.1.2 — Pièces jointes</a></li>
               <li><a href="#version-1-1-3">V1.1.3 — Consommation</a></li>
               <li><a href="#version-1-2-0">V1.2.0 — Interface poste</a></li>
+              <li><a href="#version-1-2-1">V1.2.1 — Identité visuelle et disposition</a></li>
             </ol>
+          </li>
+          <li>
+            <div class="toc-row">
+              <a href="#agenda-quotidien">Emploi du temps quotidien</a>
+              <span class="toc-dots" aria-hidden="true"></span>
+              <span class="toc-ref">semaine</span>
+            </div>
           </li>
         </ol>
       </nav>
@@ -403,6 +450,8 @@
       <ul>
         <li>Livraison de la <strong>V1.2.0</strong> : interface du poste réécrite en React/TypeScript/Vite (shadcn/ui, Tailwind, TanStack Query). L’écran comptes (compte administrateur) passe d’un empilement de formulaires à un tableau et une modale par action (création, modification, statut administrateur, suppression — clé d’administration VM inchangée). Le build est committé dans git : un poste collaborateur n’installe pas Node.js (double-clic sur le lanceur comme avant).</li>
         <li>Revue de code SonarCloud : <code>main</code> était en note de sécurité E. Passage en revue des alertes (dont un signalement de parcours de fichier sur les pièces jointes, déjà contré dans le code, marqué faux positif) et nettoyage des « code smells ».</li>
+        <li>Ouverture puis livraison de la <strong>V1.2.1</strong> : identité visuelle du poste aux couleurs du cabinet BBASS Géomètre-Expert (palette anthracite/rouge de marque, police Manrope auto-hébergée, logo, favicon) et disposition façon ChatGPT (sidebar avec conversations et puce compte, page Profil dédiée, Panel d’administration dédié avec de vrais tableaux et étiquettes shadcn/ui). Périmètre initialement prévu comme « ajustements CSS uniquement », élargi en cours de grilling (décision explicite du cabinet) à cette refonte de disposition. Aucun changement côté VM centrale ni du contrat API ; suite pytest existante restée verte sans modification.</li>
+        <li>La V1.2.1 n’était pas prévue cette semaine : elle a pris la place initialement réservée à la V1.3.0. Faute de temps restant vendredi, l’ouverture de la <strong>V1.3.0</strong> (premier agent, pôle Administration, Moduléo) est <strong>reportée à la semaine prochaine</strong>.</li>
       </ul>
     </div>
 
@@ -411,13 +460,12 @@
     <section class="bloc" id="reste-a-implementer">
     <h2>Reste à implémenter</h2>
     <ul>
-      <li><strong>V1.2.1</strong> — style personnalisé du poste : ajustements CSS uniquement (couleurs, typographie, espacements) sur les briques déjà posées en V1.2.0, sans nouvel écran ni nouvelle dépendance.</li>
-      <li><strong>V1.3.0</strong> — premier agent, pôle Administration, Moduléo (API, serveur de test, lecture seule, plan d’automatisme sans écriture ni exécution).</li>
+      <li><strong>V1.3.0</strong> — premier agent, pôle Administration, Moduléo (API, serveur de test, lecture seule, plan d’automatisme sans écriture ni exécution). <strong>Reporté à la semaine prochaine</strong> : la V1.2.1 (identité visuelle et disposition), non prévue au départ, a pris la place de son ouverture cette semaine, par manque de temps.</li>
     </ul>
     </section>
 
     <section class="bloc" id="attendu-fin-de-semaine">
-    <h2>Attendu pour la fin de semaine</h2>
+    <h2>Livré pour le 18/09/2026</h2>
     <div class="recap">
       <p><strong>Point vendredi 18 septembre — visé : V1.3.0 · livré : V1.2.0</strong></p>
       <h3>Architecture</h3>
@@ -434,6 +482,7 @@
         <li>Pièces jointes (V1.1.2, livrée jeudi 17) : un document par message (PDF, Word, Excel ou image), stocké côté VM ; le fichier n’est pas conservé chez Mistral. OCR pour les PDF, extraction locale pour Word/Excel, analyse visuelle pour les images. Le chat n’a le contenu complet que le tour de l’envoi, puis une mention courte + un outil de rappel.</li>
         <li>Suivi de la consommation (V1.1.3, livrée jeudi 17) : une ligne par appel Mistral réel (chat, titrage, résumé+profil, OCR, vision), tokens ou pages, coût figé au tarif du jour. Fenêtre Consommation pour le collaborateur ; onglet Consommations pour un compte administrateur (agrégat par compte, jamais par conversation).</li>
         <li>Interface poste (V1.2.0, livrée vendredi 18) : React/TypeScript/Vite, shadcn/ui ; écran comptes en tableau + modales. Chat, consommation et profil de travail : même comportement qu’en 1.1.3, présentation migrée. Pas de Node.js sur un poste collaborateur.</li>
+        <li>Identité visuelle et disposition (V1.2.1, livrée vendredi 18) : couleurs et police du cabinet, logo, favicon ; sidebar avec conversations et puce compte en remplacement des onglets à plat ; page Profil dédiée (consommation, profil de travail, déconnexion) et Panel d’administration dédié (comptes, consommations en tableaux/étiquettes) pour un compte administrateur. Aucun changement de comportement ni du contrat API.</li>
       </ul>
       <h3>Comptes administrateurs</h3>
       <ul>
@@ -441,10 +490,6 @@
         <li>Depuis le poste : liste, création, modification (identité, email, agence, un ou plusieurs des six pôles).</li>
         <li>Mot de passe aléatoire à la création ou à la réinitialisation ; obligation de le changer avant le chat.</li>
         <li>Déconnexion forcée. Promotion, rétrogradation et suppression définitive : clé d’administration VM en plus ; impossible de supprimer ou rétrograder le dernier administrateur.</li>
-      </ul>
-      <h3>Premier agent</h3>
-      <ul>
-        <li>Pôle Administration, logiciel Moduléo, serveur de test : version minimale pour montrer que ça marche.</li>
       </ul>
     </div>
     </section>
@@ -517,10 +562,28 @@
           <span class="deploye">Déployé le 18/09/2026 à 09:08</span>
         </div>
         <div class="version-body">
-        <p>Jusqu’ici, l’interface du poste tenait dans une unique page HTML et un unique script JavaScript (plus de 1 200 lignes). L’écran comptes d’un compte administrateur empilait tableau, formulaires de création et de modification, révélations de mot de passe et confirmations (clé d’administration VM) en permanence. Cette version réécrit tout le front en React/TypeScript, buildé par Vite, avec des composants shadcn/ui (modales, table, formulaires) et Tailwind. Les appels à la VM centrale passent par TanStack Query ; le contrat HTTP ne change pas.</p>
-        <p>Le tableau des comptes est la vue par défaut ; créer, modifier, promouvoir/rétrograder ou supprimer s’ouvre dans une modale dédiée. La clé d’administration VM reste exigée pour la suppression et le changement de statut. Chat, consommation et profil de travail se comportent comme en 1.1.3. Le dossier compilé est committé dans git : un poste n’a pas Node.js, seulement le lanceur habituel.</p>
+        <p>Jusqu’ici, l’interface du poste tenait dans un seul fichier, devenu difficile à faire évoluer sans tout casser (plus de 1 200 lignes). L’écran comptes d’un compte administrateur empilait en permanence le tableau, les formulaires de création et de modification, les révélations de mot de passe et les confirmations (clé d’administration de la machine centrale). Cette version réécrit entièrement l’interface du poste avec des outils plus robustes et plus faciles à faire évoluer sans risquer de régression, sans rien changer à la façon dont le poste communique avec la machine centrale.</p>
+        <p>Le tableau des comptes est désormais la vue par défaut ; créer, modifier, promouvoir/rétrograder ou supprimer un compte s’ouvre dans une fenêtre dédiée plutôt que de s’afficher en permanence. La clé d’administration de la machine centrale reste exigée pour la suppression et le changement de statut. Le chat, la consommation et le profil de travail se comportent comme en V1.1.3, seule la présentation change. Le logiciel s’installe et se lance toujours de la même façon qu’avant, par un simple double-clic sur le lanceur.</p>
         </div>
       </div>
+
+      <div class="version" id="version-1-2-1">
+        <div class="version-head">
+          <h3>V1.2.1 — Identité visuelle et disposition</h3>
+          <span class="deploye">Déployé le 18/09/2026 à 16:43</span>
+        </div>
+        <div class="version-body">
+        <p>L’interface du poste, posée en V1.2.0, restait sans identité visuelle : tout en gris, sans aucun lien avec le cabinet BBASS Géomètre-Expert, et organisée en cinq onglets à plat dans un seul écran, sans distinction entre discuter avec l’IA et gérer son compte.</p>
+        <p>Les couleurs reprennent celles du logo du cabinet (anthracite pour les actions principales, rouge de marque réservé à quelques accents, distinct du rouge déjà utilisé pour les actions de suppression) ; la police du cabinet est intégrée directement dans le logiciel, pour qu’il reste utilisable même sans connexion internet ; le logo apparaît sur l’écran de connexion et dans le menu de gauche ; l’icône de l’onglet du navigateur reprend le symbole « B » du logo. Pas de mode sombre dans cette version.</p>
+        <p>La navigation façon ChatGPT remplace les cinq onglets à plat : un menu latéral permanent affiche la liste des conversations et permet d’en démarrer une nouvelle ; en bas, l’identité du collaborateur connecté (initiales, prénom, nom, pôle, agence). La consommation et le profil de travail sont sur un écran Profil dédié, avec le bouton pour se déconnecter. Pour un compte administrateur, un bouton Panel d’administration ouvre un écran dédié reprenant la gestion des comptes et des consommations, présentée avec de vrais tableaux et des étiquettes plutôt que de simples listes — les fonctionnalités restent les mêmes, seule la présentation change.</p>
+        <p>L’écran de discussion est façon ChatGPT : on envoie un message en appuyant sur Entrée, et une pièce jointe se dépose directement dans le champ de saisie. Dans le menu de gauche, on peut renommer une conversation sur place, ouvrir un menu d’actions par conversation, et confirmer avant de supprimer. Le titre d’une nouvelle conversation et la réponse de l’IA s’écrivent progressivement ; la barre de défilement est discrète. L’écran Profil affiche un graphique de répartition de la consommation.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="bloc agenda" id="agenda-quotidien">
+      <h2>Emploi du temps quotidien</h2>
+      <img src="agenda-quotidien-tableau.png" alt="Emploi du temps quotidien — semaine du 14 au 18 septembre 2026" />
     </section>
   </div>
 </body>
