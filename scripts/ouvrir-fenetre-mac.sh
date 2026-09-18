@@ -16,4 +16,5 @@ ouvrir_fenetre_mac() {
     } > "$tmp"
     chmod +x "$tmp"
     open "$tmp"
+    return 0
 }
