@@ -3,14 +3,7 @@ import { useRef, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  useConversationQuery,
-  useConversationsQuery,
-  useCreerConversationMutation,
-  useEnvoyerMessageMutation,
-  useRenommerConversationMutation,
-  useSupprimerConversationMutation,
-} from "@/hooks/useConversations";
+import { useConversationQuery, useCreerConversationMutation, useEnvoyerMessageMutation } from "@/hooks/useConversations";
 import { messageErreur } from "@/lib/api";
 
 // Mêmes extensions/types qu'app.js (formulaireNouvelleConversation /
@@ -18,50 +11,29 @@ import { messageErreur } from "@/lib/api";
 // (spec 1.1.2).
 const TYPES_PIECE_JOINTE_ACCEPTES = ".pdf,.docx,.xlsx,image/jpeg,image/png,image/webp,image/gif";
 
-// Réécriture React de la section #onglet-chat d'app.js : liste des
-// conversations à gauche, nouvelle conversation ou conversation ouverte à
-// droite — même comportement qu'aujourd'hui (voir docs/specs/
-// v1.2.0-interface-poste.md), porté sur les hooks TanStack Query de
+interface OngletChatProps {
+  conversationOuverteId: number | null;
+  onConversationCreee: (id: number) => void;
+}
+
+// Réécriture React de la section #onglet-chat d'app.js : ne porte plus que
+// la conversation ouverte (nouvelle conversation ou fil existant) — la
+// liste des conversations et sa création sont montées dans la sidebar
+// permanente de l'écran Compte depuis le ticket #74 (voir
+// BarreLaterale.tsx et docs/specs/v1.2.1-identite-visuelle-disposition.md),
+// `conversationOuverteId` devenant un état partagé porté par EcranCompte.
+// Même comportement qu'auparavant, porté sur les hooks TanStack Query de
 // useConversations.ts (un hook mutation par action, invalidation du cache
 // après chaque mutation plutôt qu'un état local dupliqué).
-export function OngletChat() {
-  const [conversationOuverteId, setConversationOuverteId] = useState<number | null>(null);
+export function OngletChat({ conversationOuverteId, onConversationCreee }: Readonly<OngletChatProps>) {
   const [champNouveauMessage, setChampNouveauMessage] = useState("");
   const [champMessage, setChampMessage] = useState("");
   const refFichierNouvelleConversation = useRef<HTMLInputElement>(null);
   const refFichierMessage = useRef<HTMLInputElement>(null);
 
-  const conversationsQuery = useConversationsQuery();
   const conversationQuery = useConversationQuery(conversationOuverteId);
   const creerConversationMutation = useCreerConversationMutation();
   const envoyerMessageMutation = useEnvoyerMessageMutation();
-  const renommerConversationMutation = useRenommerConversationMutation();
-  const supprimerConversationMutation = useSupprimerConversationMutation();
-
-  function afficherNouvelleConversation() {
-    setConversationOuverteId(null);
-  }
-
-  function renommerConversation(id: number, titreActuel: string) {
-    const nouveauTitre = window.prompt("Nouveau titre de la conversation :", titreActuel);
-    if (!nouveauTitre?.trim() || nouveauTitre === titreActuel) {
-      return;
-    }
-    renommerConversationMutation.mutate({ id, titre: nouveauTitre });
-  }
-
-  function supprimerConversation(id: number) {
-    if (!window.confirm("Supprimer définitivement cette conversation ?")) {
-      return;
-    }
-    supprimerConversationMutation.mutate(id, {
-      onSuccess: () => {
-        if (conversationOuverteId === id) {
-          setConversationOuverteId(null);
-        }
-      },
-    });
-  }
 
   function gererEnvoiNouvelleConversation(evenement: FormEvent<HTMLFormElement>) {
     evenement.preventDefault();
@@ -84,7 +56,7 @@ export function OngletChat() {
           if (refFichierNouvelleConversation.current) {
             refFichierNouvelleConversation.current.value = "";
           }
-          setConversationOuverteId(donnees.conversation.id);
+          onConversationCreee(donnees.conversation.id);
         },
       }
     );
@@ -117,10 +89,6 @@ export function OngletChat() {
     );
   }
 
-  const erreurConversations = messageErreur(
-    conversationsQuery.error,
-    "Le chargement des conversations a échoué. Réessayez plus tard."
-  );
   const erreurConversationOuverte = messageErreur(
     conversationQuery.error,
     "L'ouverture de la conversation a échoué. Réessayez plus tard."
@@ -135,49 +103,8 @@ export function OngletChat() {
   );
 
   return (
-    <div className="flex gap-6">
-      <div className="w-56 shrink-0">
-        <h2 className="mb-2 text-sm font-semibold">Conversations</h2>
-        {erreurConversations && (
-          <p role="alert" className="mb-2 text-sm text-destructive">
-            {erreurConversations}
-          </p>
-        )}
-        {conversationsQuery.isLoading && <output className="mb-2 block text-sm text-muted-foreground">Chargement…</output>}
-        <ul className="mb-3 flex flex-col gap-1">
-          {conversationsQuery.data?.map((conversation) => (
-            <li key={conversation.id} className="flex items-center gap-1">
-              <button
-                type="button"
-                className="flex-1 truncate text-left text-sm hover:underline"
-                onClick={() => setConversationOuverteId(conversation.id)}
-              >
-                {conversation.titre}
-              </button>
-              <button
-                type="button"
-                className="text-xs text-muted-foreground hover:underline"
-                onClick={() => renommerConversation(conversation.id, conversation.titre)}
-              >
-                Renommer
-              </button>
-              <button
-                type="button"
-                className="text-xs text-destructive hover:underline"
-                onClick={() => supprimerConversation(conversation.id)}
-              >
-                Supprimer
-              </button>
-            </li>
-          ))}
-        </ul>
-        <Button type="button" variant="outline" size="sm" onClick={afficherNouvelleConversation}>
-          Nouvelle conversation
-        </Button>
-      </div>
-
-      <div className="min-w-0 flex-1">
-        {conversationOuverteId === null ? (
+    <div className="min-w-0 flex-1">
+      {conversationOuverteId === null ? (
           <div>
             <h2 className="mb-2 text-sm font-semibold">Nouvelle conversation</h2>
             <form onSubmit={gererEnvoiNouvelleConversation} className="flex flex-col gap-3">
@@ -285,7 +212,6 @@ export function OngletChat() {
             </form>
           </div>
         )}
-      </div>
     </div>
   );
 }

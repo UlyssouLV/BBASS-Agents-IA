@@ -1,8 +1,7 @@
 import { useState } from "react";
 import type { UseMutationResult } from "@tanstack/react-query";
 
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BarreLaterale } from "@/components/BarreLaterale";
 import type { Compte } from "@/hooks/useSession";
 import { OngletChat } from "@/onglets/OngletChat";
 import { PagePanelAdministration } from "@/screens/PagePanelAdministration";
@@ -13,11 +12,16 @@ interface EcranCompteProps {
   deconnexion: UseMutationResult<void, Error, void>;
 }
 
+// Disposition façon ChatGPT (issue #74) : la sidebar (BarreLaterale) devient
+// la structure permanente de l'écran Compte pour la conversation en cours,
+// remplaçant l'ancienne navigation par onglets à plat et l'en-tête qui
+// portait l'identité du compte et les boutons Profil/Panel
+// d'administration (voir docs/specs/v1.2.1-identite-visuelle-disposition.md).
+// Ces deux pages restent plein écran, sans sidebar, atteignables uniquement
+// depuis la puce compte.
 export function EcranCompte({ compte, deconnexion }: Readonly<EcranCompteProps>) {
-  const [onglet, setOnglet] = useState("chat");
   const [vue, setVue] = useState<"chat" | "profil" | "panel-administration">("chat");
-
-  const poleAgence = [compte.poles.join(", "), compte.agence].filter(Boolean).join(" — ");
+  const [conversationOuverteId, setConversationOuverteId] = useState<number | null>(null);
 
   if (vue === "profil") {
     return <PageProfil deconnexion={deconnexion} onRetour={() => setVue("chat")} />;
@@ -28,41 +32,24 @@ export function EcranCompte({ compte, deconnexion }: Readonly<EcranCompteProps>)
   }
 
   return (
-    <main className="mx-auto mt-8 w-full max-w-4xl px-4">
-      <header className="mb-4 flex items-center justify-between gap-4">
-        <span className="text-sm">
-          Connecté en tant que{" "}
-          <strong className="font-medium">
-            {compte.prenom} {compte.nom} ({compte.identifiant})
-          </strong>{" "}
-          ({poleAgence})
-        </span>
-        <div className="flex items-center gap-2">
-          {compte.est_admin && (
-            <Button variant="outline" onClick={() => setVue("panel-administration")}>
-              Panel d'administration
-            </Button>
-          )}
-          <Button variant="outline" onClick={() => setVue("profil")}>
-            Profil
-          </Button>
-        </div>
-      </header>
+    <div className="flex">
+      <BarreLaterale
+        compte={compte}
+        conversationOuverteId={conversationOuverteId}
+        onSelectionnerConversation={setConversationOuverteId}
+        onOuvrirProfil={() => setVue("profil")}
+        onOuvrirPanelAdministration={() => setVue("panel-administration")}
+      />
 
-      {compte.avertissement && (
-        <p role="alert" className="mb-4 text-sm text-destructive">
-          {compte.avertissement}
-        </p>
-      )}
+      <main className="min-w-0 flex-1 overflow-y-auto px-6 py-8">
+        {compte.avertissement && (
+          <p role="alert" className="mb-4 text-sm text-destructive">
+            {compte.avertissement}
+          </p>
+        )}
 
-      <Tabs value={onglet} onValueChange={setOnglet}>
-        <TabsList>
-          <TabsTrigger value="chat">Discussion</TabsTrigger>
-        </TabsList>
-        <TabsContent value="chat">
-          <OngletChat />
-        </TabsContent>
-      </Tabs>
-    </main>
+        <OngletChat conversationOuverteId={conversationOuverteId} onConversationCreee={setConversationOuverteId} />
+      </main>
+    </div>
   );
 }
