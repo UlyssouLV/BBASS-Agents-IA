@@ -12,15 +12,9 @@ Ce n’est **pas** une spec (ça vient après « Ouvre la version »).
 - **1.1.2** — Pièces jointes : upload PDF/Word/Excel/image sur un message (une par message), extraction (OCR Mistral, locale pour Word/Excel, vision Mistral pour l'image), contenu injecté dans le chat, mention courte dans le résumé glissant, rappel via un outil si la pièce jointe sort de la fenêtre ; jamais la Files API Mistral.
 - **1.1.3** — Consommation : une ligne `Consommation` par appel Mistral réel (chat, titrage, résumé+profil, OCR, vision), tokens ou pages selon le type, coût figé au tarif du jour de l'appel (pas d'API de tarification Mistral, tarifs en dur dans le code). Fenêtre Consommation côté collaborateur (total + classement des conversations par coût) ; onglet Consommations côté administrateur (comptes classés par coût, jamais de détail par conversation).
 - **1.2.0** — Interface poste réécrite en React/TypeScript/Vite (shadcn/ui, Tailwind, TanStack Query), build committé dans git (jamais de Node.js requis sur un poste, [ADR-0010](../adr/0010-front-poste-react-typescript-vite.md)) ; écran comptes (compte administrateur) passé de blocs empilés à une table avec une modale par action.
+- **1.2.1** — Identité visuelle du poste calquée sur le logo BBASS Géomètre-Expert (couleurs, police Manrope auto-hébergée, logo, favicon) et disposition façon ChatGPT (sidebar avec conversations et puce compte, page Profil dédiée, Panel d'administration dédié avec tableaux/étiquettes shadcn-ui) ; aucun changement côté VM centrale ni du contrat API.
 
-## Prochaine : 1.2.1 — Identité visuelle et disposition (poste)
-
-Le socle React/TypeScript/Vite/shadcn-ui/Tailwind étant posé en 1.2.0, cette version devait au départ n'être qu'un **style uniquement** (ajustements CSS, sans changement de structure). Le grilling a fait apparaître un vrai besoin de refonte de la disposition ; décision explicite du cabinet : élargir 1.2.1 plutôt que d'ouvrir une version séparée. Spec complète : [issue #70](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/70), [docs/specs/v1.2.1-identite-visuelle-disposition.md](../specs/v1.2.1-identite-visuelle-disposition.md).
-
-- **Identité visuelle** : palette calquée sur le logo BBASS Géomètre-Expert (anthracite dominant, rouge de marque en accent ponctuel, distinct du rouge `destructive`), police Manrope auto-hébergée (pas de CDN), logo + favicon intégrés. Pas de dark mode.
-- **Disposition façon ChatGPT** : sidebar (conversations + puce compte) en remplacement des onglets à plat ; page Profil dédiée (Consommation, Profil de travail, déconnexion) ; page Panel d'administration dédiée (Comptes, Consommations, tableaux/étiquettes shadcn-ui) pour un compte administrateur. Nouveaux composants shadcn-ui (`Sidebar`, `Table`, `Badge`, `Avatar`), pas de nouvelle dépendance externe, pas de nouvel ADR, aucun changement côté VM centrale/contrat API.
-
-## Ensuite : 1.3.0 — Premier Agent (pôle Administration), axé Moduléo
+## Prochaine : 1.3.0 — Premier Agent (pôle Administration), axé Moduléo
 
 Premier **Agent** métier. Pôle **Administration**. Premier périmètre logiciel : **Moduléo** (utilisé par tout le cabinet), pas tout le métier d’un coup.
 

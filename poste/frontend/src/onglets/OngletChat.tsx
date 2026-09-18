@@ -186,7 +186,7 @@ function ChampMessageAvecPieceJointe({
 }
 
 // Issue #84 : le message du collaborateur ne doit pas apparaître d'un bloc
-// en haut à droite du fil ; il glisse depuis la zone de saisie (juste en
+// en haut à droite de la conversation ; il glisse depuis la zone de saisie (juste en
 // dessous) vers sa place définitive. requestAnimationFrame plutôt qu'un
 // montage direct en position finale : le navigateur doit peindre l'état
 // initial (translaté, transparent) avant que la transition CSS vers l'état
@@ -220,7 +220,7 @@ const _INTERVALLE_ANIMATION_FRAPPE_MS = 20;
 // soit la longueur du texte déjà reçu (pas de streaming HTTP, voir issue).
 const _NB_ETAPES_ANIMATION_FRAPPE = 60;
 
-// Écrit `texte` progressivement, comme si l'assistant tapait sa réponse.
+// Écrit `texte` progressivement, comme si l'Agent tapait sa réponse.
 function TexteAnimeReponse({ texte, onTermine }: Readonly<{ texte: string; onTermine: () => void }>) {
   const [longueurAffichee, setLongueurAffichee] = useState(0);
   const animationTermineeRef = useRef(false);
@@ -245,7 +245,7 @@ function TexteAnimeReponse({ texte, onTermine }: Readonly<{ texte: string; onTer
 }
 
 // Réécriture React de la section #onglet-chat d'app.js : ne porte plus que
-// la conversation ouverte (nouvelle conversation ou fil existant) — la
+// la conversation ouverte (nouvelle conversation ou conversation existante) — la
 // liste des conversations et sa création sont montées dans la sidebar
 // permanente de l'écran Compte depuis le ticket #74 (voir
 // BarreLaterale.tsx et docs/specs/v1.2.1-identite-visuelle-disposition.md),
@@ -254,8 +254,8 @@ function TexteAnimeReponse({ texte, onTermine }: Readonly<{ texte: string; onTer
 // les mutations TanStack Query restent inchangées.
 //
 // Issue #84 : le premier envoi et les envois suivants ne doivent plus
-// attendre la réponse d'un bloc. `envoiEnCours` porte l'état visuel du fil
-// pendant qu'une réponse est en vol, indépendamment de l'accroche ou de la
+// attendre la réponse d'un bloc. `envoiEnCours` porte l'état visuel de la
+// conversation pendant qu'une réponse est en vol, indépendamment de l'accroche ou de la
 // conversation ouverte :
 // - "attente" : la VM n'a pas encore répondu (indicateur « Réflexion… »).
 // - "frappe"  : la réponse est connue et s'écrit progressivement (voir
@@ -266,7 +266,7 @@ function TexteAnimeReponse({ texte, onTermine }: Readonly<{ texte: string; onTer
 //   message pendant que la requête de fond est encore en vol.
 // `messagesAvantEnvoiRef` fige la liste affichée avant cet envoi (vide pour
 // une toute nouvelle conversation) : tant qu'`envoiEnCours` n'est pas nul,
-// le fil se construit à partir de ce figé + des bulles optimistes plutôt
+// la conversation se construit à partir de ce figé + des bulles optimistes plutôt
 // que des données live, qui peuvent se mettre à jour avant la fin de
 // l'animation.
 type PhaseEnvoi = "attente" | "frappe" | "termine";
@@ -291,7 +291,7 @@ export function OngletChat({ conversationOuverteId, onConversationCreee }: Reado
 
   // Une fois la frappe terminée, rebascule sur les données live dès qu'elles
   // contiennent bien ce tour (message + réponse), sans attendre davantage :
-  // évite qu'un fil déjà à jour reste figé sur l'état optimiste.
+  // évite qu'une conversation déjà à jour reste figée sur l'état optimiste.
   useEffect(() => {
     if (envoiEnCours?.phase !== "termine") {
       return;

@@ -38,7 +38,13 @@ export function EcranCompte({ compte, deconnexion }: Readonly<EcranCompteProps>)
     return <PageProfil deconnexion={deconnexion} onRetour={() => setVue("chat")} />;
   }
 
-  if (vue === "panel-administration") {
+  // Le bouton qui positionne cette vue n'est déjà rendu que pour un compte
+  // administrateur (voir BarreLaterale.tsx), mais on revérifie ici
+  // `compte.est_admin` pour que le rendu de la page reste conforme à «
+  // accessible uniquement si compte.est_admin » (docs/specs/v1.2.1-
+  // identite-visuelle-disposition.md) même si `vue` venait à être positionné
+  // autrement à l'avenir.
+  if (vue === "panel-administration" && compte.est_admin) {
     return <PagePanelAdministration onRetour={() => setVue("chat")} />;
   }
 
