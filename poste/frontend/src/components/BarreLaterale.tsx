@@ -5,6 +5,14 @@ import logoBbass from "@/assets/logo-bbass.png";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -100,6 +108,12 @@ export function BarreLaterale({
   // visible tant que son menu est ouvert, même si la souris quitte la ligne.
   const [menuOuvertId, setMenuOuvertId] = useState<number | null>(null);
 
+  // Confirmation de suppression (issue #87) : remplace window.confirm, qui
+  // n'affiche rien dans ce contexte (même défaut que window.prompt, déjà
+  // contourné pour le renommage inline — voir #81). conversationASupprimerId
+  // pilote l'ouverture d'un Dialog shadcn/ui ; null signifie fermé.
+  const [conversationASupprimerId, setConversationASupprimerId] = useState<number | null>(null);
+
   const poleAgence = [compte.poles.join(", "), compte.agence].filter(Boolean).join(" — ");
 
   function commencerRenommage(conversation: { id: number; titre: string }) {
@@ -122,9 +136,6 @@ export function BarreLaterale({
   }
 
   function supprimerConversation(id: number) {
-    if (!window.confirm("Supprimer définitivement cette conversation ?")) {
-      return;
-    }
     supprimerConversationMutation.mutate(id, {
       onSuccess: () => {
         if (conversationOuverteId === id) {
@@ -132,6 +143,13 @@ export function BarreLaterale({
         }
       },
     });
+  }
+
+  function confirmerSuppression() {
+    if (conversationASupprimerId !== null) {
+      supprimerConversation(conversationASupprimerId);
+    }
+    setConversationASupprimerId(null);
   }
 
   const erreurConversations = messageErreur(
@@ -239,7 +257,7 @@ export function BarreLaterale({
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       variant="destructive"
-                      onSelect={() => supprimerConversation(conversation.id)}
+                      onSelect={() => setConversationASupprimerId(conversation.id)}
                     >
                       Supprimer
                     </DropdownMenuItem>
@@ -272,6 +290,32 @@ export function BarreLaterale({
           </Button>
         )}
       </SidebarFooter>
+
+      <Dialog
+        open={conversationASupprimerId !== null}
+        onOpenChange={(ouvert) => {
+          if (!ouvert) {
+            setConversationASupprimerId(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Supprimer cette conversation ?</DialogTitle>
+            <DialogDescription>
+              Cette action est définitive et supprimera l'ensemble des messages de la conversation.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setConversationASupprimerId(null)}>
+              Annuler
+            </Button>
+            <Button type="button" variant="destructive" onClick={confirmerSuppression}>
+              Supprimer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Sidebar>
   );
 }
