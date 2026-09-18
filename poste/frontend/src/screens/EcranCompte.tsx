@@ -22,6 +22,17 @@ interface EcranCompteProps {
 export function EcranCompte({ compte, deconnexion }: Readonly<EcranCompteProps>) {
   const [vue, setVue] = useState<"chat" | "profil" | "panel-administration">("chat");
   const [conversationOuverteId, setConversationOuverteId] = useState<number | null>(null);
+  // Issue #83 : id de la conversation qui vient d'être créée, tant que son
+  // titre n'a pas fini de s'écrire dans la sidebar (voir
+  // BarreLaterale.tsx — TitreAnimeConversation). Distinct de
+  // conversationOuverteId, qui reste positionné après la fin de
+  // l'animation (l'utilisateur continue de discuter dans ce fil).
+  const [conversationRecenteId, setConversationRecenteId] = useState<number | null>(null);
+
+  function gererConversationCreee(id: number) {
+    setConversationOuverteId(id);
+    setConversationRecenteId(id);
+  }
 
   if (vue === "profil") {
     return <PageProfil deconnexion={deconnexion} onRetour={() => setVue("chat")} />;
@@ -39,6 +50,8 @@ export function EcranCompte({ compte, deconnexion }: Readonly<EcranCompteProps>)
         onSelectionnerConversation={setConversationOuverteId}
         onOuvrirProfil={() => setVue("profil")}
         onOuvrirPanelAdministration={() => setVue("panel-administration")}
+        conversationRecenteId={conversationRecenteId}
+        onAnimationTitreTerminee={() => setConversationRecenteId(null)}
       />
 
       <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-6 py-8">
@@ -48,7 +61,7 @@ export function EcranCompte({ compte, deconnexion }: Readonly<EcranCompteProps>)
           </p>
         )}
 
-        <OngletChat conversationOuverteId={conversationOuverteId} onConversationCreee={setConversationOuverteId} />
+        <OngletChat conversationOuverteId={conversationOuverteId} onConversationCreee={gererConversationCreee} />
       </main>
     </div>
   );

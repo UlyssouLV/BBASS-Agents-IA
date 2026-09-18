@@ -1,5 +1,5 @@
 import { Ellipsis, SquarePen } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import logoBbass from "@/assets/logo-bbass.png";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -26,10 +26,46 @@ interface BarreLateraleProps {
   onSelectionnerConversation: (id: number | null) => void;
   onOuvrirProfil: () => void;
   onOuvrirPanelAdministration: () => void;
+  conversationRecenteId: number | null;
+  onAnimationTitreTerminee: () => void;
 }
 
 function initiales(compte: Compte): string {
   return `${compte.prenom.charAt(0)}${compte.nom.charAt(0)}`.toUpperCase();
+}
+
+const _INTERVALLE_ANIMATION_TITRE_MS = 30;
+
+// Issue #83 : à la création d'une conversation, le titre renvoyé par l'API
+// (titre auto généré côté VM, inchangé — voir docs/specs/v1.2.1-identite-
+// visuelle-disposition.md) ne doit pas apparaître d'un bloc dans la
+// sidebar : il s'écrit progressivement, caractère par caractère, une fois
+// connu. `onTermine` bascule le parent hors du mode « conversation
+// récente » une fois l'animation finie, pour qu'un renommage ultérieur
+// n'affiche plus jamais cette animation sur cette ligne.
+function TitreAnimeConversation({
+  titre,
+  onTermine,
+}: Readonly<{ titre: string; onTermine: () => void }>) {
+  const [longueurAffichee, setLongueurAffichee] = useState(0);
+  const animationTermineeRef = useRef(false);
+
+  useEffect(() => {
+    if (longueurAffichee >= titre.length) {
+      if (!animationTermineeRef.current) {
+        animationTermineeRef.current = true;
+        onTermine();
+      }
+      return;
+    }
+    const delai = window.setTimeout(
+      () => setLongueurAffichee((longueur) => longueur + 1),
+      _INTERVALLE_ANIMATION_TITRE_MS
+    );
+    return () => window.clearTimeout(delai);
+  }, [longueurAffichee, titre, onTermine]);
+
+  return <>{titre.slice(0, longueurAffichee)}</>;
 }
 
 // Structure permanente de l'écran Compte façon ChatGPT (issue #74) : reprend
@@ -44,6 +80,8 @@ export function BarreLaterale({
   onSelectionnerConversation,
   onOuvrirProfil,
   onOuvrirPanelAdministration,
+  conversationRecenteId,
+  onAnimationTitreTerminee,
 }: Readonly<BarreLateraleProps>) {
   const conversationsQuery = useConversationsQuery();
   const renommerConversationMutation = useRenommerConversationMutation();
@@ -163,7 +201,11 @@ export function BarreLaterale({
                     }
                     onClick={() => onSelectionnerConversation(conversation.id)}
                   >
-                    {conversation.titre}
+                    {conversation.id === conversationRecenteId ? (
+                      <TitreAnimeConversation titre={conversation.titre} onTermine={onAnimationTitreTerminee} />
+                    ) : (
+                      conversation.titre
+                    )}
                   </button>
                 )}
                 <DropdownMenu onOpenChange={(ouvert) => setMenuOuvertId(ouvert ? conversation.id : null)}>
