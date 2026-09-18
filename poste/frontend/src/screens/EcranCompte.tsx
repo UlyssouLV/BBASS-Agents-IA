@@ -32,7 +32,7 @@ export function EcranCompte({ compte, deconnexion }: Readonly<EcranCompteProps>)
   }
 
   return (
-    <div className="flex">
+    <div className="flex h-screen">
       <BarreLaterale
         compte={compte}
         conversationOuverteId={conversationOuverteId}
@@ -41,7 +41,7 @@ export function EcranCompte({ compte, deconnexion }: Readonly<EcranCompteProps>)
         onOuvrirPanelAdministration={() => setVue("panel-administration")}
       />
 
-      <main className="min-w-0 flex-1 overflow-y-auto px-6 py-8">
+      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-6 py-8">
         {compte.avertissement && (
           <p role="alert" className="mb-4 text-sm text-destructive">
             {compte.avertissement}

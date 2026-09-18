@@ -3,6 +3,7 @@ import { useRef, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useConversationQuery, useCreerConversationMutation, useEnvoyerMessageMutation } from "@/hooks/useConversations";
 import { messageErreur } from "@/lib/api";
 
@@ -16,15 +17,45 @@ interface OngletChatProps {
   onConversationCreee: (id: number) => void;
 }
 
+function ChampSaisieMessage({
+  id,
+  label,
+  valeur,
+  onChange,
+  disabled,
+}: Readonly<{
+  id: string;
+  label: string;
+  valeur: string;
+  onChange: (valeur: string) => void;
+  disabled: boolean;
+}>) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label htmlFor={id} className="sr-only">
+        {label}
+      </Label>
+      <Textarea
+        id={id}
+        autoComplete="off"
+        required
+        rows={3}
+        value={valeur}
+        onChange={(evenement) => onChange(evenement.target.value)}
+        disabled={disabled}
+      />
+    </div>
+  );
+}
+
 // Réécriture React de la section #onglet-chat d'app.js : ne porte plus que
 // la conversation ouverte (nouvelle conversation ou fil existant) — la
 // liste des conversations et sa création sont montées dans la sidebar
 // permanente de l'écran Compte depuis le ticket #74 (voir
 // BarreLaterale.tsx et docs/specs/v1.2.1-identite-visuelle-disposition.md),
 // `conversationOuverteId` devenant un état partagé porté par EcranCompte.
-// Même comportement qu'auparavant, porté sur les hooks TanStack Query de
-// useConversations.ts (un hook mutation par action, invalidation du cache
-// après chaque mutation plutôt qu'un état local dupliqué).
+// Issue #76 : écran de composition centré (accroche + textarea partagé) ;
+// les mutations TanStack Query restent inchangées.
 export function OngletChat({ conversationOuverteId, onConversationCreee }: Readonly<OngletChatProps>) {
   const [champNouveauMessage, setChampNouveauMessage] = useState("");
   const [champMessage, setChampMessage] = useState("");
@@ -103,24 +134,19 @@ export function OngletChat({ conversationOuverteId, onConversationCreee }: Reado
   );
 
   return (
-    <div className="min-w-0 flex-1">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       {conversationOuverteId === null ? (
-          <div>
-            <h2 className="mb-2 text-sm font-semibold">Nouvelle conversation</h2>
+        <div className="flex flex-1 flex-col items-center justify-center">
+          <div className="w-full max-w-2xl">
+            <h2 className="mb-6 text-center text-2xl font-semibold tracking-tight">Comment puis-je vous aider ?</h2>
             <form onSubmit={gererEnvoiNouvelleConversation} className="flex flex-col gap-3">
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="nouveau-message-conversation" className="sr-only">
-                  Premier message
-                </Label>
-                <Input
-                  id="nouveau-message-conversation"
-                  autoComplete="off"
-                  required
-                  value={champNouveauMessage}
-                  onChange={(evenement) => setChampNouveauMessage(evenement.target.value)}
-                  disabled={creerConversationMutation.isPending}
-                />
-              </div>
+              <ChampSaisieMessage
+                id="nouveau-message-conversation"
+                label="Premier message"
+                valeur={champNouveauMessage}
+                onChange={setChampNouveauMessage}
+                disabled={creerConversationMutation.isPending}
+              />
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="piece-jointe-nouvelle-conversation">Pièce jointe (optionnel)</Label>
                 <Input
@@ -146,72 +172,67 @@ export function OngletChat({ conversationOuverteId, onConversationCreee }: Reado
               )}
             </form>
           </div>
-        ) : (
-          <div>
-            <h2 className="mb-2 text-sm font-semibold">
-              {conversationQuery.data?.titre ?? (conversationQuery.isLoading ? "Chargement…" : "")}
-            </h2>
-            {erreurConversationOuverte && (
-              <p role="alert" className="mb-2 text-sm text-destructive">
-                {erreurConversationOuverte}
+        </div>
+      ) : (
+        <div className="flex min-h-0 flex-1 flex-col">
+          <h2 className="mb-2 text-sm font-semibold">
+            {conversationQuery.data?.titre ?? (conversationQuery.isLoading ? "Chargement…" : "")}
+          </h2>
+          {erreurConversationOuverte && (
+            <p role="alert" className="mb-2 text-sm text-destructive">
+              {erreurConversationOuverte}
+            </p>
+          )}
+          <div role="log" className="mb-3 flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
+            {conversationQuery.data?.messages.map((message) => (
+              <p
+                key={message.id}
+                className={
+                  message.role === "user"
+                    ? "self-end rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground"
+                    : "self-start rounded-md bg-muted px-3 py-1.5 text-sm"
+                }
+              >
+                {message.contenu}
+              </p>
+            ))}
+          </div>
+          {envoyerMessageMutation.isPending && <output className="block">Envoi en cours…</output>}
+
+          <form onSubmit={gererEnvoiMessage} className="flex flex-col gap-3">
+            <ChampSaisieMessage
+              id="message"
+              label="Message"
+              valeur={champMessage}
+              onChange={setChampMessage}
+              disabled={envoyerMessageMutation.isPending}
+            />
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="piece-jointe-message">Pièce jointe (optionnel)</Label>
+              <Input
+                id="piece-jointe-message"
+                type="file"
+                accept={TYPES_PIECE_JOINTE_ACCEPTES}
+                ref={refFichierMessage}
+                disabled={envoyerMessageMutation.isPending}
+              />
+            </div>
+            <Button type="submit" disabled={envoyerMessageMutation.isPending} className="self-start">
+              Envoyer
+            </Button>
+            {envoyerMessageMutation.data?.pieceJointeEchecAnalyse && (
+              <output className="text-sm text-muted-foreground">
+                L'IA n'a pas pu analyser la pièce jointe « {envoyerMessageMutation.data.pieceJointeNomFichier} ».
+              </output>
+            )}
+            {erreurEnvoiMessage && (
+              <p role="alert" className="text-sm text-destructive">
+                {erreurEnvoiMessage}
               </p>
             )}
-            <div role="log" className="mb-3 flex flex-col gap-2">
-              {conversationQuery.data?.messages.map((message) => (
-                <p
-                  key={message.id}
-                  className={
-                    message.role === "user"
-                      ? "self-end rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground"
-                      : "self-start rounded-md bg-muted px-3 py-1.5 text-sm"
-                  }
-                >
-                  {message.contenu}
-                </p>
-              ))}
-            </div>
-            {envoyerMessageMutation.isPending && <output className="block">Envoi en cours…</output>}
-
-            <form onSubmit={gererEnvoiMessage} className="flex flex-col gap-3">
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="message" className="sr-only">
-                  Message
-                </Label>
-                <Input
-                  id="message"
-                  autoComplete="off"
-                  required
-                  value={champMessage}
-                  onChange={(evenement) => setChampMessage(evenement.target.value)}
-                  disabled={envoyerMessageMutation.isPending}
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="piece-jointe-message">Pièce jointe (optionnel)</Label>
-                <Input
-                  id="piece-jointe-message"
-                  type="file"
-                  accept={TYPES_PIECE_JOINTE_ACCEPTES}
-                  ref={refFichierMessage}
-                  disabled={envoyerMessageMutation.isPending}
-                />
-              </div>
-              <Button type="submit" disabled={envoyerMessageMutation.isPending} className="self-start">
-                Envoyer
-              </Button>
-              {envoyerMessageMutation.data?.pieceJointeEchecAnalyse && (
-                <output className="text-sm text-muted-foreground">
-                  L'IA n'a pas pu analyser la pièce jointe « {envoyerMessageMutation.data.pieceJointeNomFichier} ».
-                </output>
-              )}
-              {erreurEnvoiMessage && (
-                <p role="alert" className="text-sm text-destructive">
-                  {erreurEnvoiMessage}
-                </p>
-              )}
-            </form>
-          </div>
-        )}
+          </form>
+        </div>
+      )}
     </div>
   );
 }
