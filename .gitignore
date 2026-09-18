@@ -6,3 +6,5 @@ __pycache__/
 *.db
 .env
 vm-centrale/pieces_jointes/
+.claude/prochaine-etape.md
+.claude/scheduled_tasks.lock

@@ -14,6 +14,17 @@
             "statusMessage": "Vérifie que /code-review est bien demandé"
           }
         ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "py",
+            "args": ["-3", ".claude/hooks/gate-poste-sans-mistral.py"],
+            "statusMessage": "Le poste n'appelle pas Mistral"
+          }
+        ]
       }
     ]
   }

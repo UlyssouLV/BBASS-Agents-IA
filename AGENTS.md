@@ -2,6 +2,8 @@
 
 ## Agent skills
 
+Skills in this repo are **workflows** (what to do: tickets, `gh`, git, tests). They are not bound to a model (Sonnet, Grok, …) and not written for one harness’s tools. Canonical copies live in **`.claude/skills/`** (name is historical). Cursor and Claude Code both load that folder here. Put a skill under `.cursor/skills/` only when it cannot run outside Cursor (e.g. spawn a terminal). A plugin such as Matt Pocock `/implement` is Claude Code runtime, not a second copy of a repo skill.
+
 ### Issue tracker
 
 Issues live as GitHub issues in this repo (`UlyssouLV/BBASS-Agents-IA`), managed via the `gh` CLI. See `docs/agents/issue-tracker.md`.
@@ -16,7 +18,7 @@ Matt Pocock `/implement` for TDD. **Next action** (the plugin’s closing step, 
 
 ### Ouvre the version
 
-When the user says **« Ouvre la version »** (must include **`X.Y.Z`**): skill `ouvrir-la-version`. Purpose from **`docs/suivi-avancement/feuille-de-route-dev.md`** when that version is already listed (otherwise ask) → `/grill-with-docs` → `/to-spec` (parent issue; **no spec files on `main`**) → **branch from `main` → immediate init commit+push** (uncommitted leftover on `main` goes on that branch, **never** a commit on `main` ; `docs/specs` + doc updates) → `/to-tickets` (propose, **yes**, then create with **native** blocked-by **and parent blocked by every child**, then drop `ready-for-agent` on the parent) → PR → propose `/clear` and `/implement` the first unblocked **child**.
+When the user says **« Ouvre la version »** (must include **`X.Y.Z`**): skill `ouvrir-la-version`. Purpose from **`docs/suivi-avancement/feuille-de-route-dev.md`** when that version is already listed (otherwise ask) → `/grill-with-docs` → `/to-spec` (parent issue; **no spec files on `main`**) → **branch from `main` → immediate init commit+push** (uncommitted leftover on `main` goes on that branch, **never** a commit on `main` ; `docs/specs` + doc updates) → `/to-tickets` (**inverted-ticket** pass: GitHub `blocked_by` only when skipping the blocker **breaks** a concrete import/model/test/route; comfort order is not an edge; parent still blocked by every child) → PR → propose `/clear` and `/implement` the first unblocked **child**.
 
 ### Finalise the version
 

@@ -19,6 +19,7 @@ When the ticket code is in:
 
 - Run the full pytest suite for each package you touched (`vm-centrale` and/or `poste`), with that package’s venv.
 - If **any** test fails: stop. No commit, no push, no close. Report the failures.
+- Run `py -3 .claude/hooks/gate-poste-sans-mistral.py --scan`. If it fails: stop. No commit. The poste must not gain a Mistral URL, `MISTRAL_API_KEY`, or Mistral client.
 
 ## 2. Tests green → commit, push, close, drop `ready-for-agent`
 
@@ -48,16 +49,32 @@ Find the parent (`## Parent` / `Part of #n` on the issue you just finished). Lis
 
 A remaining ticket is **unblocked** when GitHub reports no open blockers (`issue_dependencies_summary.blocked_by` is 0), or every issue in a fallback **Blocked by** body line is Closed.
 
-**If at least one unblocked child remains:**
+Write `.claude/prochaine-etape.md` (gitignored; overwrite). That file is the only memory that survives `/clear`.
 
-- Propose the **next** unblocked child (lowest issue number among unblocked `ready-for-agent`).
-- Ask the user to `/clear` then `/implement #<next>`. Wait. Do not start the next implement in this same compacted window.
+**If at least one unblocked child remains** (lowest Open `ready-for-agent` issue number among unblocked children):
+
+```
+commande: /implement #<next>
+issue: <next>
+parent: <parent>
+branche: <current branch>
+sha: <HEAD>
+```
+
+Then tell the user, in French: open a **new chat** (or `/clear`), then type **only** `/prochaine-etape`. Wait. Do not start the next `/implement` in this same compacted window. Do not ask them to remember `#<next>`.
 
 **If no remaining children** (all PR children are Closed):
 
-- Stop after telling the user, in French, exactly this handoff (adapt only the parent/PR numbers if useful):
+```
+commande: Finalise la version
+parent: <parent>
+branche: <current branch>
+sha: <HEAD>
+```
 
-  Tous les tickets ont été implémentés. Veuillez faire des tests pour valider que tout est fonctionnel ; lorsque ce sera bon, lancez le skill **Finalise la version** (`finaliser-la-version`).
+Then tell the user, in French, exactly this handoff (adapt only the parent/PR numbers if useful):
+
+  Tous les tickets ont été implémentés. Veuillez faire des tests pour valider que tout est fonctionnel ; lorsque ce sera bon, lancez le skill **Finalise la version** (`finaliser-la-version`). Après `/clear`, `/prochaine-etape` rappelle cette consigne.
 
 - Do not merge, tag, or start the next version.
 

@@ -37,6 +37,14 @@ Matt’s next step is **`/to-spec`**. Synthesize the full spec (problem, solutio
 
 Still **do not** commit that spec onto `main`.
 
+## 3b. Inventory of invariants (wait)
+
+From **this** spec and the ADRs it cites, list phrases with « jamais », « uniquement », or « ne doit pas ». For each line: *already locked by a test or hook* **or** *prompt-only*.
+
+Done when every such phrase from **this** spec is in that list (zero rows is valid: say so).
+
+**Wait.** The human picks **zero or one** invariant for a new deterministic gate (confidentiality / account integrity). Do **not** write hooks or CI in this skill unless they named that invariant this turn. UX-only versions often pick zero.
+
 ## 4. Branch, then **immediate** init commit + push
 
 `git fetch origin`. From `origin/main`, create and checkout `vX.Y.Z-<slug>`. If that name exists, stop and ask.
@@ -50,18 +58,27 @@ First commit = **initialisation de la version**. `git push -u origin HEAD`. **`m
 
 Never `.env` / `*.db` / `.venv`.
 
-## 5. `/to-tickets` — propose, **then** create
+## 5. `/to-tickets` — propose, invert, **then** create
 
-You are not wrong: next is **`/to-tickets`**. Follow its quiz: numbered tickets, **Blocked by**, what each delivers, **vertical** slices if possible.
+You are not wrong: next is **`/to-tickets`**. Follow its quiz: numbered tickets, what each delivers, **vertical** slices if possible.
 
-Show the **implementation order**: tickets with no open blockers first (lowest number among that set).
+Then the **inverted-ticket** pass, **before** any `gh issue create`. For every proposed child→child edge, an agent with **only** the blocked ticket’s body implements it **before** the blocker. Write one line:
 
-**Wait for an explicit yes** on that list. Then `gh issue create` each child (`Part of #<parent>`, `ready-for-agent`). Also set **GitHub native** blocked-by (see `docs/agents/issue-tracker.md`: POST `issues/<n>/dependencies/blocked_by` with JSON integer `issue_id` = the blocker’s **database id**):
+- **real dependency:** what **breaks** (missing import, missing model, test that cannot be written, missing route) — or
+- **comfort order:** why it feels nicer; **drop the GitHub edge**.
 
-- **Between children**, as the quiz said (ticket B blocked by ticket A).
+Parent **blocked by every child** is a merge gate, not a code dependency: do not put it in this list.
+
+Show (1) tickets with **only real** edges, (2) the implementation order (no open real blocker first; lowest number among that set), (3) dropped comfort edges.
+
+Done when every proposed child→child edge is in (2) or (3), and every line in (2) names a concrete break.
+
+**Wait for an explicit yes.** Then `gh issue create` each child (`Part of #<parent>`, `ready-for-agent`). Each real edge appears in the child body as `Blocked by: #n — sans #n : <what breaks>`. Also set **GitHub native** blocked-by (see `docs/agents/issue-tracker.md`: POST `issues/<n>/dependencies/blocked_by` with JSON integer `issue_id` = the blocker’s **database id`):
+
+- **Between children**, only the **real** edges from the yes’d list.
 - **Parent blocked by every child**: POST `issues/<parent>/dependencies/blocked_by` once per child. The parent spec stays **Blocked** until every child is **Closed**. Then `gh issue edit <parent> --remove-label "ready-for-agent"`. The parent is never an `/implement` ticket.
 
-A body `Blocked by: #n` line is only a fallback. Closing a blocker must update the GitHub Blocking / Blocked by UI. Do not create tickets before that yes. Do not `/implement`.
+A body `Blocked by: #n` line without **sans #n** is only a fallback for native API failure. Closing a blocker must update the GitHub Blocking / Blocked by UI. Do not create tickets before that yes. Do not `/implement`.
 
 ## 6. Pull request
 
@@ -76,7 +93,17 @@ Draft is OK until the user wants it ready.
 
 ## 7. Hand off to implement
 
-Propose: **`/clear`**, then **`/implement #<first>`** where `#first` is the first unblocked **child** (not the parent). Wait. Do not start `/implement` in this same window after a long grill.
+Write `.claude/prochaine-etape.md` (gitignored; overwrite):
+
+```
+commande: /implement #<first>
+issue: <first>
+parent: <parent>
+branche: <feature branch>
+sha: <HEAD>
+```
+
+`#first` is the first unblocked **child** (not the parent). Then tell the user, in French: **`/clear`** (or a new chat), then **only** `/prochaine-etape`. Wait. Do not start `/implement` in this same window after a long grill.
 
 ## Not this skill
 
