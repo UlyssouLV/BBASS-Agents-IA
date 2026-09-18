@@ -1,17 +1,15 @@
 ---
 name: encadrer-implement
 description: >-
-  After /implement, when tests pass or fail, when about to /code-review or
-  spawn Standards/Spec subagents, when closing a finished child ticket, or
-  when choosing the next child issue on a PR. Wraps Matt Pocock /implement
-  for this repo: tests, then commit+push+close the issue and remove
-  ready-for-agent, then next ticket or ask the user to test then
-  « Finalise la version ».
+  Green pytest after a child GitHub ticket, or the implement plugin's closing
+  step: commit, push, close the child, drop ready-for-agent, then the next
+  unblocked child or ask the user to test then Finalise la version. Load this
+  as soon as /implement tests pass.
 ---
 
 # Wrap `/implement` (Matt Pocock)
 
-Use the plugin **`/implement`** for TDD and the ticket body. **This skill owns the end of the run.** If the plugin says to `/code-review` after one child issue, **skip it**.
+Use the plugin **`/implement`** for TDD and the ticket body. **This skill owns the end of the run.** The plugin’s last line is a review step; in this repo that last line is **this skill, from Tests onward**.
 
 Closing a finished **child** ticket is required: GitHub **Blocked by** / **Blocking** only unblocks dependents when the blocker is **Closed**.
 
@@ -52,13 +50,11 @@ A remaining ticket is **unblocked** when GitHub reports no open blockers (`issue
 
 **If at least one unblocked child remains:**
 
-- Do **not** run `/code-review`.
 - Propose the **next** unblocked child (lowest issue number among unblocked `ready-for-agent`).
 - Ask the user to `/clear` then `/implement #<next>`. Wait. Do not start the next implement in this same compacted window.
 
 **If no remaining children** (all PR children are Closed):
 
-- Do **not** run `/code-review`.
 - Stop after telling the user, in French, exactly this handoff (adapt only the parent/PR numbers if useful):
 
   Tous les tickets ont été implémentés. Veuillez faire des tests pour valider que tout est fonctionnel ; lorsque ce sera bon, lancez le skill **Finalise la version** (`finaliser-la-version`).
@@ -70,3 +66,4 @@ A remaining ticket is **unblocked** when GitHub reports no open blockers (`issue
 - Opening or merging the PR, GitHub Release, deleting the branch: skill `finaliser-la-version` (« Finalise la version »).
 - Re-implementing Closed children.
 - `needs-triage` work (e.g. #6) that is not a child of this PR.
+- A two-axis review vs `main`: only if the human typed `/code-review` this turn.

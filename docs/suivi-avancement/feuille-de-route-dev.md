@@ -11,15 +11,16 @@ Ce n’est **pas** une spec (ça vient après « Ouvre la version »).
 - **1.1.1** — Conversations persistées sur la VM (PostgreSQL) : plusieurs fils, reprise après rechargement / autre poste, historique borné (3 derniers messages + résumé glissant), profil de travail lecture seule ; pas de stockage Mistral Conversations.
 - **1.1.2** — Pièces jointes : upload PDF/Word/Excel/image sur un message (une par message), extraction (OCR Mistral, locale pour Word/Excel, vision Mistral pour l'image), contenu injecté dans le chat, mention courte dans le résumé glissant, rappel via un outil si la pièce jointe sort de la fenêtre ; jamais la Files API Mistral.
 - **1.1.3** — Consommation : une ligne `Consommation` par appel Mistral réel (chat, titrage, résumé+profil, OCR, vision), tokens ou pages selon le type, coût figé au tarif du jour de l'appel (pas d'API de tarification Mistral, tarifs en dur dans le code). Fenêtre Consommation côté collaborateur (total + classement des conversations par coût) ; onglet Consommations côté administrateur (comptes classés par coût, jamais de détail par conversation).
+- **1.2.0** — Interface poste réécrite en React/TypeScript/Vite (shadcn/ui, Tailwind, TanStack Query), build committé dans git (jamais de Node.js requis sur un poste, [ADR-0010](../adr/0010-front-poste-react-typescript-vite.md)) ; écran comptes (compte administrateur) passé de blocs empilés à une table avec une modale par action.
 
-## Prochaine : 1.2.0 — Mise à jour de l’interface (poste)
+## Prochaine : 1.2.1 — Style personnalisé du poste (ajustements CSS)
 
-Un peu de **style** et surtout le **minimum d’UX** : aujourd’hui l’écran comptes (compte administrateur) est encombré, pas de **modales**, tout s’empile. On vise une interface **simple** au début, pas forcément très stylisée.
+Le socle React/TypeScript/Vite/shadcn-ui/Tailwind étant posé en 1.2.0, petite version de **style uniquement** : une identité visuelle plus personnalisée à l'usage du cabinet, sur les écrans et composants déjà en place. Pas de changement de structure — ni nouvel écran, ni nouveau composant, ni nouvelle dépendance — seulement des ajustements CSS (couleurs, typographie, espacements) sur les briques shadcn-ui/Tailwind déjà posées en 1.2.0.
 
-**Recherche (le grilling tranchera).**
+**Recherche.**
 
-- Plugin Claude **`frontend-design`** (`frontend-design@claude-plugins-official`) : à tester / décider si on s’en sert pour cette version.
-- Frameworks front existants : lesquels seraient adaptés à un HTML/JS déjà servi par le backend local, sans expérience préalable de framework. Possible aussi de rester en HTML/CSS/JS « nu » + composants minimaux (modales, layout).
+- Plugin **`frontend-design`** pour une direction esthétique un peu plus travaillée que le « simple au début » retenu en 1.2.0 (charte visuelle du cabinet si elle existe, sinon une direction cohérente et sobre).
+- Rester dans les tokens/variables déjà en place (`index.css`, thème Tailwind/shadcn-ui) plutôt que d'introduire une nouvelle librairie de style.
 
 ## Ensuite : 1.3.0 — Premier Agent (pôle Administration), axé Moduléo
 
@@ -48,6 +49,15 @@ S’appuie sur la [1.1.2](../specs/v1.1.2-pieces-jointes.md) (pipeline d’extra
 
 ## Plus tard (pas encore numéroté)
 
+### Agent IA de continuation du développement, validation par compte administrateur
+
+Constat (grilling 1.2.0) : à terme, plus aucune personne qualifiée ne sera sur place pour faire évoluer le logiciel elle-même. L'évolution du code (nouvelles versions, corrections, nouveaux Agents métier) serait alors portée par un agent IA dédié à la continuation du développement, avec un compte administrateur qui ne fait que **valider** (approuver/refuser) les changements proposés, sans avoir à coder ni à relire le code en détail.
+
+Implications déjà identifiées à creuser plus tard :
+- Cette contrainte pèse sur les choix techniques pris dès 1.2.0 (ex. TypeScript plutôt que JS nu, pour donner un filet de sécurité à la compilation en l'absence de relecture humaine technique).
+- Reste à définir : à quoi ressemble concrètement le flux de validation (où/comment un compte administrateur voit et approuve un changement), le périmètre de ce que l'agent peut faire seul vs ce qui nécessite une validation, et les garde-fous (rollback, tests obligatoires avant validation, etc.).
+- Tests front (grilling 1.2.0) : pas de tests dédiés côté UI React en 1.2.0 (on reste sur les tests pytest HTTP-boundary existants + validation visuelle par l'admin). À une version pas encore numérotée : ajouter un filet de sécurité automatisé côté UI (ex. Playwright) puisque seul un agent IA maintient ce code sans relecture humaine technique — pertinent surtout quand le volume d'écrans aura grossi (1.3.0, 1.4.0 et au-delà).
+
 ### Lanceur poste (exécutable, pywebview)
 
 Un exécutable qui ouvre une fenêtre (pages web du backend local). Fermer la fenêtre ne tuerait pas le process : accès encore possible dans le navigateur (`localhost` du poste).
@@ -59,3 +69,5 @@ Recherche : empaquetage Windows, icône / démarrage du backend, barre d’état
 Déployer pour avoir des retours. Automatiser depuis GitHub Actions / un hébergeur type Netlify.
 
 Contraintes déjà vues : pas de VM centrale physique pour un CD du relais ; Netlify (Internet) vs poste local + LAN ; Actions pour pytest seulement ; pilote sur une machine en attendant.
+
+Ajout (grilling 1.2.0) : depuis 1.2.0, le front `poste` passe par un build Vite/React — en attendant cette CI, le dossier compilé (`dist/`) est committé directement dans git (comme `static/` aujourd'hui), aucune étape de build sur le poste. Quand cette CI/CD sera mise en place, elle devra aussi prendre en charge le build du front (au lieu du commit direct du `dist/` compilé).

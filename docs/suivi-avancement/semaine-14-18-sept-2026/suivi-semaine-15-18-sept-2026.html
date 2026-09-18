@@ -326,7 +326,7 @@
             <div class="toc-row">
               <a href="#reste-a-implementer">Reste à implémenter</a>
               <span class="toc-dots" aria-hidden="true"></span>
-              <span class="toc-ref">V1.1.2 à V1.3.0</span>
+              <span class="toc-ref">V1.2.0 à V1.3.0</span>
             </div>
           </li>
           <li>
@@ -347,6 +347,7 @@
               <li><a href="#version-1-1-0">V1.1.0 — Gestion des comptes</a></li>
               <li><a href="#version-1-1-1">V1.1.1 — Persistance des conversations</a></li>
               <li><a href="#version-1-1-2">V1.1.2 — Pièces jointes</a></li>
+              <li><a href="#version-1-1-3">V1.1.3 — Consommation</a></li>
             </ol>
           </li>
         </ol>
@@ -392,6 +393,7 @@
         <li>Implémentation puis livraison de la <strong>V1.1.2</strong> : une pièce jointe par message (PDF, Word, Excel, image) ; fichier original sur disque côté VM ; extraction (OCR Mistral, locale Word/Excel, vision pour l’image) ; contenu injecté dans le chat ; mention courte dans le résumé glissant ; rappel via un outil si la pièce jointe sort de la fenêtre des trois derniers messages. Jamais de Files API Mistral.</li>
         <li>Zone de dépôt minimale côté poste (non stylisée).</li>
         <li>Tests fonctionnels sur Mistral (PDF Cerfa DT, carte IGN, vue aérienne) : le pipeline d’extraction tient ; le chat mélange encore des documents et invente des liens entre pièces jointes. Comptes rendus dans le dossier de suivi de la semaine.</li>
+        <li>Livraison de la <strong>V1.1.3</strong> : une ligne de consommation par appel Mistral réel (chat, titrage, résumé+profil, OCR, vision) — tokens ou pages selon le type, coût figé au tarif du jour (pas d’API de tarification Mistral). Fenêtre Consommation côté collaborateur (total + classement des conversations par coût) ; onglet Consommations côté administrateur (comptes classés par coût, jamais de détail par conversation). La suppression d’une conversation conserve les lignes de consommation.</li>
       </ul>
     </div>
 
@@ -400,7 +402,6 @@
     <section class="bloc" id="reste-a-implementer">
     <h2>Reste à implémenter</h2>
     <ul>
-      <li><strong>V1.1.3</strong> — suivi de la consommation : tokens (entrée / sortie / total) par compte et par session, dates, modèle, coût ; API tarifs Mistral si elle existe.</li>
       <li><strong>V1.2.0</strong> — interface poste (modales, écran comptes, minimum de style ; framework ou HTML/CSS/JS à choisir).</li>
       <li><strong>V1.3.0</strong> — premier agent, pôle Administration, Moduléo (API, serveur de test, lecture seule, plan d’automatisme sans écriture ni exécution).</li>
     </ul>
@@ -422,7 +423,7 @@
         <li>Chat vers Mistral ; affichage prénom, nom, identifiant, agence et pôle(s).</li>
         <li>Mémoire d’un message à l’autre (livré en V1.1.1) ; plusieurs conversations par compte, persistées sur la VM : reprise après rechargement, relance du poste, autre machine du même compte. Titre auto, renommage, suppression. Historique borné (3 derniers messages + résumé). Profil de travail consultable, sans modifier l’identité du compte. Conversations privées (y compris vis-à-vis d’un compte administrateur).</li>
         <li>Pièces jointes (V1.1.2, livrée jeudi 17) : un document par message (PDF, Word, Excel ou image), stocké côté VM ; le fichier n’est pas conservé chez Mistral. OCR pour les PDF, extraction locale pour Word/Excel, analyse visuelle pour les images. Le chat n’a le contenu complet que le tour de l’envoi, puis une mention courte + un outil de rappel.</li>
-        <li>Suivi de la consommation : tokens (entrée, sortie, total) par compte et par session, dates, modèle, estimation du coût.</li>
+        <li>Suivi de la consommation (V1.1.3, livrée jeudi 17) : une ligne par appel Mistral réel (chat, titrage, résumé+profil, OCR, vision), tokens ou pages, coût figé au tarif du jour. Fenêtre Consommation pour le collaborateur ; onglet Consommations pour un compte administrateur (agrégat par compte, jamais par conversation).</li>
         <li>Interface poste : minimum d’UX (modales, écran comptes).</li>
       </ul>
       <h3>Comptes administrateurs</h3>
@@ -486,6 +487,18 @@
         <p>En V1.1.1, la table des pièces jointes existait déjà en base mais n’était ni peuplée ni lue : un collaborateur ne pouvait pas faire analyser un PDF, un Word, un Excel ou une image sans en recopier le contenu dans le chat. Cette version ajoute une zone de dépôt minimale (une pièce jointe par message) : le fichier original va sur disque côté VM, le texte extrait reste en base. PDF : OCR Mistral (appel ponctuel, jamais la Files API). Word et Excel : extraction locale sur la VM. Image : analyse visuelle Mistral, avec une explication textuelle si rien n’est exploitable.</p>
         <p>À l’envoi du message, le contenu extrait est injecté pour cet appel de chat. Une fois le message sorti de la fenêtre des trois derniers, le résumé glissant n’en garde qu’une mention courte ; l’IA peut redemander le texte complet via un outil, sans ré-analyser le fichier. Seul le compte propriétaire voit ses pièces jointes (y compris vis-à-vis d’un administrateur). Supprimer une conversation efface aussi les fichiers sur disque.</p>
         <p>Les essais fonctionnels du 17 septembre montrent que l’extraction tient, mais que le modèle de chat mélange encore des documents, refuse parfois une image pourtant extraite, et invente un lien entre pièces jointes sans preuve. Ces limites d’analyse (plusieurs PJ par message, traitement par pôle, fiabilité) sont reportées à la 1.4.0, une fois un Agent métier en place.</p>
+        </div>
+      </div>
+
+      <div class="version" id="version-1-1-3">
+        <div class="version-head">
+          <h3>V1.1.3 — Consommation</h3>
+          <span class="deploye">Déployé le 17/09/2026 à 15:26</span>
+        </div>
+        <div class="version-body">
+        <p>Jusqu’ici, chaque appel Mistral coûtait de l’argent sans laisser de trace consultable au cabinet : impossible de savoir ce qu’un compte ou une conversation avait consommé. Cette version enregistre une ligne à chaque appel réel (chat, titrage, résumé+profil, OCR, vision) : tokens ou pages selon le type, modèle, coût déjà calculé avec le tarif du jour. Il n’existe pas d’API Mistral de tarification par appel ; les prix sont donc en dur dans le code, datés. Un tarif changé plus tard ne réécrit pas l’historique.</p>
+        <p>Un collaborateur ouvre une fenêtre Consommation : total (Chat vs Pièce jointe) et classement de ses conversations encore présentes, par coût. Un compte administrateur a un onglet Consommations séparé de Comptes : les comptes classés par coût, sans jamais voir le détail par conversation d’un autre. Supprimer une conversation retire le fil du classement, mais conserve les lignes de consommation (le total global ne recule pas).</p>
+        <p>Les écrans restent minimaux ; le style et les modales sont le sujet de la 1.2.0.</p>
         </div>
       </div>
     </section>
