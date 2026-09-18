@@ -15,7 +15,7 @@ interface EcranCompteProps {
   deconnexion: UseMutationResult<void, Error, void>;
 }
 
-export function EcranCompte({ compte, deconnexion }: EcranCompteProps) {
+export function EcranCompte({ compte, deconnexion }: Readonly<EcranCompteProps>) {
   const [onglet, setOnglet] = useState("chat");
 
   const poleAgence = [compte.poles.join(", "), compte.agence].filter(Boolean).join(" — ");

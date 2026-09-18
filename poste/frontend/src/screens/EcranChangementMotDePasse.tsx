@@ -5,13 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { Compte } from "@/hooks/useSession";
-import { ErreurApi } from "@/lib/api";
+import { messageErreur } from "@/lib/api";
 
 interface EcranChangementMotDePasseProps {
   changerMotDePasse: UseMutationResult<Compte, Error, string>;
 }
 
-export function EcranChangementMotDePasse({ changerMotDePasse }: EcranChangementMotDePasseProps) {
+export function EcranChangementMotDePasse({ changerMotDePasse }: Readonly<EcranChangementMotDePasseProps>) {
   const [nouveauMotDePasse, setNouveauMotDePasse] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [erreurLocale, setErreurLocale] = useState<string | null>(null);
@@ -33,14 +33,8 @@ export function EcranChangementMotDePasse({ changerMotDePasse }: EcranChangement
     });
   }
 
-  const erreurMutation = changerMotDePasse.error;
-  const messageErreur =
-    erreurLocale ??
-    (erreurMutation
-      ? erreurMutation instanceof ErreurApi
-        ? erreurMutation.message
-        : "Le changement de mot de passe a échoué. Réessayez plus tard."
-      : null);
+  const messageErreurChangement =
+    erreurLocale ?? messageErreur(changerMotDePasse.error, "Le changement de mot de passe a échoué. Réessayez plus tard.");
 
   return (
     <main className="mx-auto mt-24 w-full max-w-sm">
@@ -76,9 +70,9 @@ export function EcranChangementMotDePasse({ changerMotDePasse }: EcranChangement
         <Button type="submit" disabled={changerMotDePasse.isPending}>
           Changer le mot de passe
         </Button>
-        {messageErreur && (
+        {messageErreurChangement && (
           <p role="alert" className="text-sm text-destructive">
-            {messageErreur}
+            {messageErreurChangement}
           </p>
         )}
       </form>

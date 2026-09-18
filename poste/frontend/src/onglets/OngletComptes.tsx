@@ -92,7 +92,7 @@ export function OngletComptes() {
         </Button>
       </div>
 
-      {comptesQuery.isLoading && <p role="status">Chargement…</p>}
+      {comptesQuery.isLoading && <output>Chargement…</output>}
       {erreurComptes && (
         <p role="alert" className="mb-2 text-sm text-destructive">
           {erreurComptes}
@@ -240,7 +240,7 @@ function ChampsIdentite({
   setAgence,
   poles,
   setPoles,
-}: ChampsIdentiteProps) {
+}: Readonly<ChampsIdentiteProps>) {
   function basculerPole(pole: string, coche: boolean) {
     setPoles((actuels) => (coche ? [...actuels, pole] : actuels.filter((valeur) => valeur !== pole)));
   }
@@ -291,7 +291,7 @@ interface FormulaireCreationCompteProps {
   onCree: (compte: { identifiant: string; mot_de_passe: string }) => void;
 }
 
-function FormulaireCreationCompte({ onFermer, onCree }: FormulaireCreationCompteProps) {
+function FormulaireCreationCompte({ onFermer, onCree }: Readonly<FormulaireCreationCompteProps>) {
   const mutation = useCreerCompteMutation();
   const [identifiant, setIdentifiant] = useState("");
   const [prenom, setPrenom] = useState("");
@@ -370,7 +370,11 @@ interface FormulaireModificationCompteProps {
   onModifie: (compte: CompteAdmin) => void;
 }
 
-function FormulaireModificationCompte({ compte, onFermer, onModifie }: FormulaireModificationCompteProps) {
+function FormulaireModificationCompte({
+  compte,
+  onFermer,
+  onModifie,
+}: Readonly<FormulaireModificationCompteProps>) {
   const mutation = useModifierCompteMutation();
   const [prenom, setPrenom] = useState(compte.prenom);
   const [nom, setNom] = useState(compte.nom);
@@ -439,7 +443,7 @@ interface FormulaireStatutAdminProps {
   onConfirme: (compte: CompteAdmin) => void;
 }
 
-function FormulaireStatutAdmin({ compte, onFermer, onConfirme }: FormulaireStatutAdminProps) {
+function FormulaireStatutAdmin({ compte, onFermer, onConfirme }: Readonly<FormulaireStatutAdminProps>) {
   const mutation = useModifierStatutAdminMutation();
   const [cleAdminVm, setCleAdminVm] = useState("");
   const nouveauStatut = !compte.est_admin;
@@ -498,7 +502,11 @@ interface FormulaireSuppressionCompteProps {
   onSupprime: (identifiant: string) => void;
 }
 
-function FormulaireSuppressionCompte({ compte, onFermer, onSupprime }: FormulaireSuppressionCompteProps) {
+function FormulaireSuppressionCompte({
+  compte,
+  onFermer,
+  onSupprime,
+}: Readonly<FormulaireSuppressionCompteProps>) {
   const mutation = useSupprimerCompteMutation();
   const [cleAdminVm, setCleAdminVm] = useState("");
 

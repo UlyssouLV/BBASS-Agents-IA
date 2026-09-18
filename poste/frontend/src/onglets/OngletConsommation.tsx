@@ -25,7 +25,7 @@ export function OngletConsommation() {
   const consommationQuery = useConsommationQuery();
 
   if (consommationQuery.isLoading) {
-    return <p role="status">Chargement…</p>;
+    return <output>Chargement…</output>;
   }
 
   if (consommationQuery.error) {
@@ -54,11 +54,15 @@ export function OngletConsommation() {
         <table className="w-full text-sm">
           <tbody>
             <tr className="border-b border-border">
-              <td className="py-1.5 pr-4 font-medium">Chat</td>
+              <th scope="row" className="py-1.5 pr-4 text-left font-medium">
+                Chat
+              </th>
               <td className="py-1.5">{formaterDetail(consommation.chat)}</td>
             </tr>
             <tr>
-              <td className="py-1.5 pr-4 font-medium">Pièce jointe</td>
+              <th scope="row" className="py-1.5 pr-4 text-left font-medium">
+                Pièce jointe
+              </th>
               <td className="py-1.5">{formaterDetail(consommation.piece_jointe)}</td>
             </tr>
           </tbody>

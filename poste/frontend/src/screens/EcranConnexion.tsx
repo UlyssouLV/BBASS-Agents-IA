@@ -5,13 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { Compte } from "@/hooks/useSession";
-import { ErreurApi } from "@/lib/api";
+import { messageErreur } from "@/lib/api";
 
 interface EcranConnexionProps {
   connexion: UseMutationResult<Compte, Error, { identifiant: string; motDePasse: string }>;
 }
 
-export function EcranConnexion({ connexion }: EcranConnexionProps) {
+export function EcranConnexion({ connexion }: Readonly<EcranConnexionProps>) {
   const [identifiant, setIdentifiant] = useState("");
   const [motDePasse, setMotDePasse] = useState("");
 
@@ -20,12 +20,7 @@ export function EcranConnexion({ connexion }: EcranConnexionProps) {
     connexion.mutate({ identifiant, motDePasse });
   }
 
-  const erreur = connexion.error;
-  const messageErreur = erreur
-    ? erreur instanceof ErreurApi
-      ? erreur.message
-      : "La connexion a échoué. Réessayez plus tard."
-    : null;
+  const messageErreurConnexion = messageErreur(connexion.error, "La connexion a échoué. Réessayez plus tard.");
 
   return (
     <main className="mx-auto mt-24 w-full max-w-sm">
@@ -57,9 +52,9 @@ export function EcranConnexion({ connexion }: EcranConnexionProps) {
         <Button type="submit" disabled={connexion.isPending}>
           Se connecter
         </Button>
-        {messageErreur && (
+        {messageErreurConnexion && (
           <p role="alert" className="text-sm text-destructive">
-            {messageErreur}
+            {messageErreurConnexion}
           </p>
         )}
       </form>

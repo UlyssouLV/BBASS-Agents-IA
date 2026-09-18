@@ -24,7 +24,7 @@ export function OngletConsommations() {
   const consommationComptesQuery = useComptesConsommationQuery();
 
   if (consommationComptesQuery.isLoading) {
-    return <p role="status">Chargement…</p>;
+    return <output>Chargement…</output>;
   }
 
   if (consommationComptesQuery.error) {

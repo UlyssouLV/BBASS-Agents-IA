@@ -11,19 +11,12 @@ import {
   useRenommerConversationMutation,
   useSupprimerConversationMutation,
 } from "@/hooks/useConversations";
-import { ErreurApi } from "@/lib/api";
+import { messageErreur } from "@/lib/api";
 
 // Mêmes extensions/types qu'app.js (formulaireNouvelleConversation /
 // formulaireChat) : la VM centrale n'accepte pas d'autres pièces jointes
 // (spec 1.1.2).
 const TYPES_PIECE_JOINTE_ACCEPTES = ".pdf,.docx,.xlsx,image/jpeg,image/png,image/webp,image/gif";
-
-function messageErreur(erreur: unknown, messageParDefaut: string): string | null {
-  if (!erreur) {
-    return null;
-  }
-  return erreur instanceof ErreurApi ? erreur.message : messageParDefaut;
-}
 
 // Réécriture React de la section #onglet-chat d'app.js : liste des
 // conversations à gauche, nouvelle conversation ou conversation ouverte à
@@ -51,7 +44,7 @@ export function OngletChat() {
 
   function renommerConversation(id: number, titreActuel: string) {
     const nouveauTitre = window.prompt("Nouveau titre de la conversation :", titreActuel);
-    if (!nouveauTitre || !nouveauTitre.trim() || nouveauTitre === titreActuel) {
+    if (!nouveauTitre?.trim() || nouveauTitre === titreActuel) {
       return;
     }
     renommerConversationMutation.mutate({ id, titre: nouveauTitre });
@@ -150,7 +143,7 @@ export function OngletChat() {
             {erreurConversations}
           </p>
         )}
-        {conversationsQuery.isLoading && <p className="mb-2 text-sm text-muted-foreground">Chargement…</p>}
+        {conversationsQuery.isLoading && <output className="mb-2 block text-sm text-muted-foreground">Chargement…</output>}
         <ul className="mb-3 flex flex-col gap-1">
           {conversationsQuery.data?.map((conversation) => (
             <li key={conversation.id} className="flex items-center gap-1">
@@ -215,9 +208,9 @@ export function OngletChat() {
                 Envoyer
               </Button>
               {creerConversationMutation.data?.pieceJointeEchecAnalyse && (
-                <p role="status" className="text-sm text-muted-foreground">
+                <output className="text-sm text-muted-foreground">
                   L'IA n'a pas pu analyser la pièce jointe « {creerConversationMutation.data.pieceJointeNomFichier} ».
-                </p>
+                </output>
               )}
               {erreurNouvelleConversation && (
                 <p role="alert" className="text-sm text-destructive">
@@ -250,7 +243,7 @@ export function OngletChat() {
                 </p>
               ))}
             </div>
-            {envoyerMessageMutation.isPending && <p role="status">Envoi en cours…</p>}
+            {envoyerMessageMutation.isPending && <output className="block">Envoi en cours…</output>}
 
             <form onSubmit={gererEnvoiMessage} className="flex flex-col gap-3">
               <div className="flex flex-col gap-1.5">
@@ -280,9 +273,9 @@ export function OngletChat() {
                 Envoyer
               </Button>
               {envoyerMessageMutation.data?.pieceJointeEchecAnalyse && (
-                <p role="status" className="text-sm text-muted-foreground">
+                <output className="text-sm text-muted-foreground">
                   L'IA n'a pas pu analyser la pièce jointe « {envoyerMessageMutation.data.pieceJointeNomFichier} ».
-                </p>
+                </output>
               )}
               {erreurEnvoiMessage && (
                 <p role="alert" className="text-sm text-destructive">

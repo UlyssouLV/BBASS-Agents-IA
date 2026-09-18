@@ -17,6 +17,13 @@ async function extraireMessageErreur(reponse: Response, messageParDefaut: string
   return detail && typeof detail.detail === "string" ? detail.detail : messageParDefaut;
 }
 
+export function messageErreur(erreur: unknown, messageParDefaut: string): string | null {
+  if (!erreur) {
+    return null;
+  }
+  return erreur instanceof ErreurApi ? erreur.message : messageParDefaut;
+}
+
 export async function appelApi<T>(
   chemin: string,
   options: RequestInit | undefined,

@@ -8,7 +8,7 @@ export function OngletProfilTravail() {
   const profilTravailQuery = useProfilTravailQuery();
 
   if (profilTravailQuery.isLoading) {
-    return <p role="status">Chargement…</p>;
+    return <output>Chargement…</output>;
   }
 
   if (profilTravailQuery.error) {
