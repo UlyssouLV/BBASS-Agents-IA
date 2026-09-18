@@ -1,5 +1,13 @@
+import { Ellipsis } from "lucide-react";
+
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader } from "@/components/ui/sidebar";
 import {
   useConversationsQuery,
@@ -96,20 +104,32 @@ export function BarreLaterale({
               >
                 {conversation.titre}
               </button>
-              <button
-                type="button"
-                className="text-xs text-muted-foreground hover:underline"
-                onClick={() => renommerConversation(conversation.id, conversation.titre)}
-              >
-                Renommer
-              </button>
-              <button
-                type="button"
-                className="text-xs text-destructive hover:underline"
-                onClick={() => supprimerConversation(conversation.id)}
-              >
-                Supprimer
-              </button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="size-7 shrink-0"
+                    aria-label="Actions de la conversation"
+                  >
+                    <Ellipsis aria-hidden="true" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onSelect={() => renommerConversation(conversation.id, conversation.titre)}
+                  >
+                    Renommer
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onSelect={() => supprimerConversation(conversation.id)}
+                  >
+                    Supprimer
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </li>
           ))}
         </ul>
