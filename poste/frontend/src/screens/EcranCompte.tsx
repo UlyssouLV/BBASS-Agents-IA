@@ -5,8 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Compte } from "@/hooks/useSession";
 import { OngletChat } from "@/onglets/OngletChat";
-import { OngletComptes } from "@/onglets/OngletComptes";
-import { OngletConsommations } from "@/onglets/OngletConsommations";
+import { PagePanelAdministration } from "@/screens/PagePanelAdministration";
 import { PageProfil } from "@/screens/PageProfil";
 
 interface EcranCompteProps {
@@ -16,12 +15,16 @@ interface EcranCompteProps {
 
 export function EcranCompte({ compte, deconnexion }: Readonly<EcranCompteProps>) {
   const [onglet, setOnglet] = useState("chat");
-  const [vue, setVue] = useState<"chat" | "profil">("chat");
+  const [vue, setVue] = useState<"chat" | "profil" | "panel-administration">("chat");
 
   const poleAgence = [compte.poles.join(", "), compte.agence].filter(Boolean).join(" — ");
 
   if (vue === "profil") {
     return <PageProfil deconnexion={deconnexion} onRetour={() => setVue("chat")} />;
+  }
+
+  if (vue === "panel-administration") {
+    return <PagePanelAdministration onRetour={() => setVue("chat")} />;
   }
 
   return (
@@ -34,9 +37,16 @@ export function EcranCompte({ compte, deconnexion }: Readonly<EcranCompteProps>)
           </strong>{" "}
           ({poleAgence})
         </span>
-        <Button variant="outline" onClick={() => setVue("profil")}>
-          Profil
-        </Button>
+        <div className="flex items-center gap-2">
+          {compte.est_admin && (
+            <Button variant="outline" onClick={() => setVue("panel-administration")}>
+              Panel d'administration
+            </Button>
+          )}
+          <Button variant="outline" onClick={() => setVue("profil")}>
+            Profil
+          </Button>
+        </div>
       </header>
 
       {compte.avertissement && (
@@ -48,22 +58,10 @@ export function EcranCompte({ compte, deconnexion }: Readonly<EcranCompteProps>)
       <Tabs value={onglet} onValueChange={setOnglet}>
         <TabsList>
           <TabsTrigger value="chat">Discussion</TabsTrigger>
-          {compte.est_admin && <TabsTrigger value="comptes">Comptes</TabsTrigger>}
-          {compte.est_admin && <TabsTrigger value="consommations">Consommations</TabsTrigger>}
         </TabsList>
         <TabsContent value="chat">
           <OngletChat />
         </TabsContent>
-        {compte.est_admin && (
-          <TabsContent value="comptes">
-            <OngletComptes />
-          </TabsContent>
-        )}
-        {compte.est_admin && (
-          <TabsContent value="consommations">
-            <OngletConsommations />
-          </TabsContent>
-        )}
       </Tabs>
     </main>
   );

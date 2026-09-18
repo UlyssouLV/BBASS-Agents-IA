@@ -1,3 +1,4 @@
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useComptesConsommationQuery, type CompteConsommation } from "@/hooks/useComptes";
 import type { DetailConsommationCategorie } from "@/hooks/useConsommation";
 import { ErreurApi } from "@/lib/api";
@@ -47,28 +48,28 @@ export function OngletConsommations() {
       {comptes.length === 0 ? (
         <p className="text-sm text-muted-foreground">Aucune consommation enregistrée.</p>
       ) : (
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border text-left">
-              <th className="py-1.5 pr-4 font-medium">Compte</th>
-              <th className="py-1.5 pr-4 font-medium">Coût total</th>
-              <th className="py-1.5 pr-4 font-medium">Chat</th>
-              <th className="py-1.5 font-medium">Pièce jointe</th>
-            </tr>
-          </thead>
-          <tbody>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Compte</TableHead>
+              <TableHead>Coût total</TableHead>
+              <TableHead>Chat</TableHead>
+              <TableHead>Pièce jointe</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {comptes.map((compte) => (
-              <tr key={compte.identifiant} className="border-b border-border last:border-0">
-                <td className="py-1.5 pr-4">
+              <TableRow key={compte.identifiant}>
+                <TableCell>
                   {compte.prenom} {compte.nom} ({compte.identifiant})
-                </td>
-                <td className="py-1.5 pr-4">{compte.cout_usd} $</td>
-                <td className="py-1.5 pr-4">{formaterDetail(compte.chat)}</td>
-                <td className="py-1.5">{formaterDetail(compte.piece_jointe)}</td>
-              </tr>
+                </TableCell>
+                <TableCell>{compte.cout_usd} $</TableCell>
+                <TableCell>{formaterDetail(compte.chat)}</TableCell>
+                <TableCell>{formaterDetail(compte.piece_jointe)}</TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       )}
     </div>
   );
