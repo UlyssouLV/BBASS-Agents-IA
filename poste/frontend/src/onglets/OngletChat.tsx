@@ -1,10 +1,25 @@
-import { useRef, useState, type DragEvent, type FormEvent } from "react";
-import { File, FileImage, FileSpreadsheet, FileText, FileType, Paperclip, X, type LucideIcon } from "lucide-react";
+import { useEffect, useRef, useState, type DragEvent, type FormEvent } from "react";
+import {
+  File,
+  FileImage,
+  FileSpreadsheet,
+  FileText,
+  FileType,
+  Loader2,
+  Paperclip,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useConversationQuery, useCreerConversationMutation, useEnvoyerMessageMutation } from "@/hooks/useConversations";
+import {
+  useConversationQuery,
+  useCreerConversationMutation,
+  useEnvoyerMessageMutation,
+  type Message,
+} from "@/hooks/useConversations";
 import { messageErreur } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -170,6 +185,65 @@ function ChampMessageAvecPieceJointe({
   );
 }
 
+// Issue #84 : le message du collaborateur ne doit pas apparaître d'un bloc
+// en haut à droite du fil ; il glisse depuis la zone de saisie (juste en
+// dessous) vers sa place définitive. requestAnimationFrame plutôt qu'un
+// montage direct en position finale : le navigateur doit peindre l'état
+// initial (translaté, transparent) avant que la transition CSS vers l'état
+// final ne parte, sinon les deux états se confondent en un seul rendu.
+function BulleMessageEnvoye({ texte }: Readonly<{ texte: string }>) {
+  const [arrivee, setArrivee] = useState(false);
+
+  useEffect(() => {
+    const id = window.requestAnimationFrame(() => setArrivee(true));
+    return () => window.cancelAnimationFrame(id);
+  }, []);
+
+  return (
+    <p
+      className={cn(
+        "self-end rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground transition-all duration-300 ease-out",
+        arrivee ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
+      )}
+    >
+      {texte}
+    </p>
+  );
+}
+
+const _INTERVALLE_ANIMATION_FRAPPE_MS = 20;
+// Nombre d'étapes cible pour parcourir tout le texte : un pas fixe (comme
+// TitreAnimeConversation dans BarreLaterale.tsx) prendrait plusieurs
+// secondes sur une réponse longue (contrainte 1.2.1 : « rythme soutenu, pas
+// trop lent »). Le nombre de caractères révélés par étape est donc calculé
+// pour que l'animation dure toujours environ le même temps, quelle que
+// soit la longueur du texte déjà reçu (pas de streaming HTTP, voir issue).
+const _NB_ETAPES_ANIMATION_FRAPPE = 60;
+
+// Écrit `texte` progressivement, comme si l'assistant tapait sa réponse.
+function TexteAnimeReponse({ texte, onTermine }: Readonly<{ texte: string; onTermine: () => void }>) {
+  const [longueurAffichee, setLongueurAffichee] = useState(0);
+  const animationTermineeRef = useRef(false);
+  const caracteresParEtape = Math.max(1, Math.ceil(texte.length / _NB_ETAPES_ANIMATION_FRAPPE));
+
+  useEffect(() => {
+    if (longueurAffichee >= texte.length) {
+      if (!animationTermineeRef.current) {
+        animationTermineeRef.current = true;
+        onTermine();
+      }
+      return;
+    }
+    const delai = window.setTimeout(
+      () => setLongueurAffichee((longueur) => Math.min(texte.length, longueur + caracteresParEtape)),
+      _INTERVALLE_ANIMATION_FRAPPE_MS
+    );
+    return () => window.clearTimeout(delai);
+  }, [longueurAffichee, texte, caracteresParEtape, onTermine]);
+
+  return <>{texte.slice(0, longueurAffichee)}</>;
+}
+
 // Réécriture React de la section #onglet-chat d'app.js : ne porte plus que
 // la conversation ouverte (nouvelle conversation ou fil existant) — la
 // liste des conversations et sa création sont montées dans la sidebar
@@ -178,36 +252,85 @@ function ChampMessageAvecPieceJointe({
 // `conversationOuverteId` devenant un état partagé porté par EcranCompte.
 // Issue #76 : écran de composition centré (accroche + textarea partagé) ;
 // les mutations TanStack Query restent inchangées.
+//
+// Issue #84 : le premier envoi et les envois suivants ne doivent plus
+// attendre la réponse d'un bloc. `envoiEnCours` porte l'état visuel du fil
+// pendant qu'une réponse est en vol, indépendamment de l'accroche ou de la
+// conversation ouverte :
+// - "attente" : la VM n'a pas encore répondu (indicateur « Réflexion… »).
+// - "frappe"  : la réponse est connue et s'écrit progressivement (voir
+//   TexteAnimeReponse ci-dessus).
+// - "termine" : la frappe est finie ; on attend que `conversationQuery`
+//   (invalidée par la mutation) rattrape le nouveau tour avant de rebasculer
+//   sur ses données, pour ne jamais faire disparaître puis réapparaître le
+//   message pendant que la requête de fond est encore en vol.
+// `messagesAvantEnvoiRef` fige la liste affichée avant cet envoi (vide pour
+// une toute nouvelle conversation) : tant qu'`envoiEnCours` n'est pas nul,
+// le fil se construit à partir de ce figé + des bulles optimistes plutôt
+// que des données live, qui peuvent se mettre à jour avant la fin de
+// l'animation.
+type PhaseEnvoi = "attente" | "frappe" | "termine";
+
+interface EnvoiEnCours {
+  message: string;
+  phase: PhaseEnvoi;
+  reponse: string;
+}
+
 export function OngletChat({ conversationOuverteId, onConversationCreee }: Readonly<OngletChatProps>) {
   const [champNouveauMessage, setChampNouveauMessage] = useState("");
   const [champMessage, setChampMessage] = useState("");
   const [fichierNouvelleConversation, setFichierNouvelleConversation] = useState<File | null>(null);
   const [fichierMessage, setFichierMessage] = useState<File | null>(null);
+  const [envoiEnCours, setEnvoiEnCours] = useState<EnvoiEnCours | null>(null);
+  const messagesAvantEnvoiRef = useRef<Message[]>([]);
 
   const conversationQuery = useConversationQuery(conversationOuverteId);
   const creerConversationMutation = useCreerConversationMutation();
   const envoyerMessageMutation = useEnvoyerMessageMutation();
 
+  // Une fois la frappe terminée, rebascule sur les données live dès qu'elles
+  // contiennent bien ce tour (message + réponse), sans attendre davantage :
+  // évite qu'un fil déjà à jour reste figé sur l'état optimiste.
+  useEffect(() => {
+    if (envoiEnCours?.phase !== "termine") {
+      return;
+    }
+    const messages = conversationQuery.data?.messages;
+    if (messages && messages.length >= messagesAvantEnvoiRef.current.length + 2) {
+      setEnvoiEnCours(null);
+    }
+  }, [envoiEnCours, conversationQuery.data]);
+
   function gererEnvoiNouvelleConversation(evenement: FormEvent<HTMLFormElement>) {
     evenement.preventDefault();
 
     const message = champNouveauMessage;
+    const fichier = fichierNouvelleConversation;
     if (!message.trim() || creerConversationMutation.isPending) {
       return;
     }
     creerConversationMutation.reset();
 
+    messagesAvantEnvoiRef.current = [];
+    setEnvoiEnCours({ message, phase: "attente", reponse: "" });
+    setChampNouveauMessage("");
+
     creerConversationMutation.mutate(
       {
         message,
-        fichier: fichierNouvelleConversation,
+        fichier,
         cleIdempotence: crypto.randomUUID(),
       },
       {
         onSuccess: (donnees) => {
-          setChampNouveauMessage("");
           setFichierNouvelleConversation(null);
+          setEnvoiEnCours({ message, phase: "frappe", reponse: donnees.reponse });
           onConversationCreee(donnees.conversation.id);
+        },
+        onError: () => {
+          setEnvoiEnCours(null);
+          setChampNouveauMessage(message);
         },
       }
     );
@@ -217,26 +340,42 @@ export function OngletChat({ conversationOuverteId, onConversationCreee }: Reado
     evenement.preventDefault();
 
     const message = champMessage;
+    const fichier = fichierMessage;
     if (!message.trim() || conversationOuverteId === null || envoyerMessageMutation.isPending) {
       return;
     }
     envoyerMessageMutation.reset();
 
+    messagesAvantEnvoiRef.current = conversationQuery.data?.messages ?? [];
+    setEnvoiEnCours({ message, phase: "attente", reponse: "" });
+    setChampMessage("");
+
     envoyerMessageMutation.mutate(
       {
         conversationId: conversationOuverteId,
         message,
-        fichier: fichierMessage,
+        fichier,
         cleIdempotence: crypto.randomUUID(),
       },
       {
-        onSuccess: () => {
-          setChampMessage("");
+        onSuccess: (donnees) => {
           setFichierMessage(null);
+          setEnvoiEnCours({ message, phase: "frappe", reponse: donnees.reponse });
+        },
+        onError: () => {
+          setEnvoiEnCours(null);
+          setChampMessage(message);
         },
       }
     );
   }
+
+  // Issue #84 : l'accroche ne s'affiche que si rien n'a encore été envoyé —
+  // dès la soumission du premier message, on bascule sur le fil (avec les
+  // bulles optimistes ci-dessous) sans attendre la réponse de la VM.
+  const brouillonActif = conversationOuverteId === null && envoiEnCours === null;
+  const messagesAffiches: Message[] =
+    envoiEnCours !== null ? messagesAvantEnvoiRef.current : conversationQuery.data?.messages ?? [];
 
   const erreurConversationOuverte = messageErreur(
     conversationQuery.error,
@@ -253,7 +392,7 @@ export function OngletChat({ conversationOuverteId, onConversationCreee }: Reado
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      {conversationOuverteId === null ? (
+      {brouillonActif ? (
         <div className="flex flex-1 flex-col items-center justify-center">
           <div className="w-full max-w-2xl">
             <h2 className="mb-6 text-center text-2xl font-semibold tracking-tight">Comment puis-je vous aider ?</h2>
@@ -291,20 +430,39 @@ export function OngletChat({ conversationOuverteId, onConversationCreee }: Reado
             </p>
           )}
           <div role="log" className="mb-3 flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
-            {conversationQuery.data?.messages.map((message) => (
+            {messagesAffiches.map((message) => (
               <p
                 key={message.id}
                 className={
                   message.role === "user"
                     ? "self-end rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground"
-                    : "self-start rounded-md bg-muted px-3 py-1.5 text-sm"
+                    : "max-w-[70%] self-start rounded-md bg-muted px-3 py-1.5 text-sm"
                 }
               >
                 {message.contenu}
               </p>
             ))}
+            {envoiEnCours && (
+              <>
+                <BulleMessageEnvoye texte={envoiEnCours.message} />
+                {envoiEnCours.phase === "attente" ? (
+                  <output className="flex max-w-[70%] items-center gap-2 self-start rounded-md bg-muted px-3 py-1.5 text-sm text-muted-foreground">
+                    <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+                    Réflexion…
+                  </output>
+                ) : (
+                  <p className="max-w-[70%] self-start rounded-md bg-muted px-3 py-1.5 text-sm">
+                    <TexteAnimeReponse
+                      texte={envoiEnCours.reponse}
+                      onTermine={() =>
+                        setEnvoiEnCours((precedent) => (precedent ? { ...precedent, phase: "termine" } : precedent))
+                      }
+                    />
+                  </p>
+                )}
+              </>
+            )}
           </div>
-          {envoyerMessageMutation.isPending && <output className="block">Envoi en cours…</output>}
 
           <form onSubmit={gererEnvoiMessage} className="flex flex-col gap-3">
             <ChampMessageAvecPieceJointe
@@ -314,7 +472,7 @@ export function OngletChat({ conversationOuverteId, onConversationCreee }: Reado
               onChange={setChampMessage}
               fichier={fichierMessage}
               onFichierChange={setFichierMessage}
-              disabled={envoyerMessageMutation.isPending}
+              disabled={envoiEnCours !== null}
             />
             {envoyerMessageMutation.data?.pieceJointeEchecAnalyse && (
               <output className="text-sm text-muted-foreground">
