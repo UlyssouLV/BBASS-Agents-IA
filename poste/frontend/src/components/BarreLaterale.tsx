@@ -1,5 +1,6 @@
-import { Ellipsis } from "lucide-react";
+import { Ellipsis, SquarePen } from "lucide-react";
 
+import logoBbass from "@/assets/logo-bbass.png";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -73,16 +74,32 @@ export function BarreLaterale({
     conversationsQuery.error,
     "Le chargement des conversations a échoué. Réessayez plus tard."
   );
+  const aucuneConversation =
+    !conversationsQuery.isLoading && (conversationsQuery.data?.length ?? 0) === 0;
 
   return (
     <Sidebar>
-      <SidebarHeader>
-        <Button type="button" variant="outline" size="sm" onClick={() => onSelectionnerConversation(null)}>
-          Nouvelle conversation
-        </Button>
+      <SidebarHeader className="gap-8">
+        {aucuneConversation ? (
+          <img src={logoBbass} alt="BBASS Géomètre-Expert" className="h-auto w-full object-contain" />
+        ) : (
+          <button
+            type="button"
+            className="w-full p-0 text-left"
+            onClick={() => onSelectionnerConversation(null)}
+          >
+            <img src={logoBbass} alt="BBASS Géomètre-Expert" className="h-auto w-full object-contain" />
+          </button>
+        )}
+        {aucuneConversation && (
+          <Button type="button" size="sm" className="w-full" onClick={() => onSelectionnerConversation(null)}>
+            <SquarePen aria-hidden="true" />
+            Nouvelle conversation
+          </Button>
+        )}
       </SidebarHeader>
 
-      <SidebarContent>
+      <SidebarContent className="pt-8">
         <h2 className="mb-2 text-sm font-semibold">Conversations</h2>
         {erreurConversations && (
           <p role="alert" className="mb-2 text-sm text-destructive">
