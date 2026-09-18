@@ -1,6 +1,15 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "Manrope";
+  src: url("./assets/fonts/manrope-variable.woff2") format("woff2-variations"), url("./assets/fonts/manrope-variable.woff2") format("woff2");
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+}
+
 @theme inline {
+  --font-sans: "Manrope", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -26,24 +35,29 @@
 :root {
   --radius: 0.5rem;
   --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  --foreground: oklch(0.18 0.012 315);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
+  --card-foreground: oklch(0.18 0.012 315);
+  /* Anthracite du logo BBASS : couleur dominante (boutons, texte fort). */
+  --primary: oklch(0.27 0.02 315);
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
+  --secondary: oklch(0.96 0.006 315);
+  --secondary-foreground: oklch(0.27 0.02 315);
+  --muted: oklch(0.96 0.006 315);
+  --muted-foreground: oklch(0.5 0.01 315);
+  /* Rouge de marque du logo BBASS : accents ponctuels (liens, éléments de marque),
+     volontairement plus clair et plus saturé que --destructive pour ne jamais
+     confondre une action normale et une action dangereuse. */
+  --accent: oklch(0.55 0.18 26);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.4 0.13 23);
   --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --border: oklch(0.9 0.006 315);
+  --input: oklch(0.9 0.006 315);
+  --ring: oklch(0.55 0.18 26);
 }
 
 body {
   @apply bg-background text-foreground;
+  font-family: var(--font-sans);
 }
