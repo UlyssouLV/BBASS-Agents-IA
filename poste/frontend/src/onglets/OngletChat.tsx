@@ -113,6 +113,16 @@ function ChampMessageAvecPieceJointe({
           rows={3}
           value={valeur}
           onChange={(evenement) => onChange(evenement.target.value)}
+          onKeyDown={(evenement) => {
+            // Issue #78 : Entrée seule soumet le formulaire (comme le
+            // bouton « Envoyer » retiré ci-dessous), Maj+Entrée insère un
+            // retour à la ligne (comportement par défaut du textarea, donc
+            // pas de preventDefault dans ce cas).
+            if (evenement.key === "Enter" && !evenement.shiftKey) {
+              evenement.preventDefault();
+              evenement.currentTarget.form?.requestSubmit();
+            }
+          }}
           disabled={disabled}
           className="pr-12"
         />
@@ -257,9 +267,6 @@ export function OngletChat({ conversationOuverteId, onConversationCreee }: Reado
                 onFichierChange={setFichierNouvelleConversation}
                 disabled={creerConversationMutation.isPending}
               />
-              <Button type="submit" disabled={creerConversationMutation.isPending} className="self-start">
-                Envoyer
-              </Button>
               {creerConversationMutation.data?.pieceJointeEchecAnalyse && (
                 <output className="text-sm text-muted-foreground">
                   L'IA n'a pas pu analyser la pièce jointe « {creerConversationMutation.data.pieceJointeNomFichier} ».
@@ -309,9 +316,6 @@ export function OngletChat({ conversationOuverteId, onConversationCreee }: Reado
               onFichierChange={setFichierMessage}
               disabled={envoyerMessageMutation.isPending}
             />
-            <Button type="submit" disabled={envoyerMessageMutation.isPending} className="self-start">
-              Envoyer
-            </Button>
             {envoyerMessageMutation.data?.pieceJointeEchecAnalyse && (
               <output className="text-sm text-muted-foreground">
                 L'IA n'a pas pu analyser la pièce jointe « {envoyerMessageMutation.data.pieceJointeNomFichier} ».
