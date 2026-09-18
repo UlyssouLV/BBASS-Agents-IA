@@ -310,7 +310,7 @@ def test_supprimer_sans_jeton_est_refuse(client):
     assert reponse.status_code == 401
 
 
-@pytest.fixture()
+@pytest.fixture
 def _repertoire_pieces_jointes(tmp_path, monkeypatch):
     # Isole les tests du répertoire par défaut (VM_CENTRALE_PIECES_JOINTES_DIR,
     # ./pieces_jointes), même convention que test_pieces_jointes.py.

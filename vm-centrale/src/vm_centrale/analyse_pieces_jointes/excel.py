@@ -6,11 +6,12 @@ from vm_centrale.analyse_pieces_jointes.resultat import ResultatAnalyse
 from vm_centrale.mistral_client import MistralClient
 
 
-def analyser(fichier: bytes, type_mime: str, client: MistralClient) -> ResultatAnalyse:
+def analyser(fichier: bytes, _type_mime: str, _client: MistralClient) -> ResultatAnalyse:
     # Extraction locale (openpyxl), même logique que word.py : un tableur est
     # une donnée déjà structurée, restituée en texte/tableau, jamais transmis
-    # à Mistral (spec 1.1.2). `type_mime`/`client` non utilisés ici, gardés
-    # pour la signature uniforme des sous-modules.
+    # à Mistral (spec 1.1.2). `_type_mime`/`_client` non utilisés ici, gardés
+    # (préfixés `_`) pour la signature uniforme des sous-modules appelés de
+    # façon polymorphe par analyse_pieces_jointes.analyser (voir __init__.py).
     classeur = load_workbook(BytesIO(fichier), data_only=True, read_only=True)
     lignes = []
     for feuille in classeur.worksheets:

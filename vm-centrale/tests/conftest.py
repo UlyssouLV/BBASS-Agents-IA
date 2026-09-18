@@ -34,7 +34,6 @@ def _concurrence_reinitialisee():
 
     cache_idempotence._entrees.clear()
     verrous_comptes._verrous.clear()
-    yield
 
 
 @pytest.fixture(autouse=True)
@@ -177,7 +176,7 @@ class ClientMistralFactice:
             return ReponseChat(contenu=self._reponses[0], usage=_USAGE_FACTICE)
 
 
-@pytest.fixture()
+@pytest.fixture
 def db_session():
     engine = create_engine(
         "sqlite://",
@@ -195,17 +194,17 @@ def db_session():
         Base.metadata.drop_all(bind=engine)
 
 
-@pytest.fixture()
+@pytest.fixture
 def mistral_client_factice():
     return ClientMistralFactice()
 
 
-@pytest.fixture()
+@pytest.fixture
 def jeton_store(db_session):
     return JetonStore(db_session)
 
 
-@pytest.fixture()
+@pytest.fixture
 def client(db_session, mistral_client_factice, jeton_store):
     def override_get_db():
         yield db_session
@@ -218,12 +217,12 @@ def client(db_session, mistral_client_factice, jeton_store):
     app.dependency_overrides.clear()
 
 
-@pytest.fixture()
+@pytest.fixture
 def jeton_valide(jeton_store):
     return jeton_store.emettre("j.dupont")
 
 
-@pytest.fixture()
+@pytest.fixture
 def seed_compte(db_session):
     def _seed(
         identifiant: str,

@@ -1,3 +1,5 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
@@ -10,10 +12,10 @@ from vm_centrale.schemas import ConsommationResponse, ConversationConsommationRe
 router = APIRouter()
 
 
-@router.get("/consommation", response_model=ConsommationResponse)
+@router.get("/consommation")
 def consulter_consommation(
-    identifiant_compte: str = Depends(get_identifiant_compte_du_jeton),
-    db: Session = Depends(get_db),
+    identifiant_compte: Annotated[str, Depends(get_identifiant_compte_du_jeton)],
+    db: Annotated[Session, Depends(get_db)],
 ) -> ConsommationResponse:
     lignes = (
         db.query(Consommation).filter(Consommation.identifiant_compte == identifiant_compte).all()
@@ -46,7 +48,7 @@ def consulter_consommation(
             .filter(Conversation.id.in_(par_conversation.keys()))
             .all()
         )
-        titres = {conversation_id: titre for conversation_id, titre in lignes_titres}
+        titres = dict(lignes_titres)
         for conversation_id, details in par_conversation.items():
             titre = titres.get(conversation_id)
             if titre is None:

@@ -6,6 +6,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from vm_centrale.database import Base
 
+_FK_CONVERSATIONS_ID = "conversations.id"
+
 
 class Compte(Base):
     __tablename__ = "comptes"
@@ -63,7 +65,7 @@ class Message(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     conversation_id: Mapped[int] = mapped_column(
-        ForeignKey("conversations.id"), index=True
+        ForeignKey(_FK_CONVERSATIONS_ID), index=True
     )
     role: Mapped[str] = mapped_column(String)
     contenu: Mapped[str] = mapped_column(String)
@@ -86,7 +88,7 @@ class PieceJointe(Base):
     # Renseigné au rattachement (création de la conversation, ou envoi d'un
     # message) si elle ne l'était pas déjà.
     conversation_id: Mapped[int | None] = mapped_column(
-        ForeignKey("conversations.id"), nullable=True, index=True
+        ForeignKey(_FK_CONVERSATIONS_ID), nullable=True, index=True
     )
     # Nullable : renseigné seulement une fois la pièce jointe liée à un
     # message envoyé (référencement dans l'envoi d'un message — spec 1.1.2).
@@ -114,7 +116,7 @@ class Consommation(Base):
     # ligne de consommation survit à ce qui l'a produite, seul le
     # rattachement disparaît.
     conversation_id: Mapped[int | None] = mapped_column(
-        ForeignKey("conversations.id"), nullable=True, index=True
+        ForeignKey(_FK_CONVERSATIONS_ID), nullable=True, index=True
     )
     # "chat" / "titrage" / "resume_et_profil" / "ocr" / "vision" (spec 1.1.3).
     type_appel: Mapped[str] = mapped_column(String)

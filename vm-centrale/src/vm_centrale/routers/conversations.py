@@ -51,6 +51,7 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 _ECHEC_RELAIS = "Le relais Mistral est indisponible"
+_MSG_ECHEC_RELAIS_LOG = "Échec de l'appel au relais Mistral"
 _CONVERSATION_INTROUVABLE = "Conversation introuvable"
 _TYPE_NON_SUPPORTE = "Type de fichier non supporté"
 _FICHIER_TROP_VOLUMINEUX = "Fichier trop volumineux (max 20 Mo)"
@@ -349,7 +350,14 @@ def _vers_resume(conversation: Conversation) -> ConversationResponse:
     )
 
 
-@router.post("/conversations", response_model=ConversationCreeResponse)
+@router.post(
+    "/conversations",
+    responses={
+        404: {"description": _PIECE_JOINTE_INTROUVABLE},
+        400: {"description": _PIECE_JOINTE_DEJA_LIEE},
+        502: {"description": _ECHEC_RELAIS},
+    },
+)
 def creer_conversation(
     requete: ConversationCreeRequest,
     identifiant_compte: str = Depends(get_identifiant_compte_du_jeton),
@@ -404,7 +412,7 @@ def creer_conversation(
             titre = reponse_titrage.contenu
         except Exception as erreur:
             db.rollback()
-            logger.error("Échec de l'appel au relais Mistral : %s", erreur)
+            logger.exception(_MSG_ECHEC_RELAIS_LOG)
             raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
 
         conversation.titre = titre
@@ -448,7 +456,7 @@ def creer_conversation(
         return resultat
 
 
-@router.get("/conversations", response_model=list[ConversationResponse])
+@router.get("/conversations")
 def lister_conversations(
     identifiant_compte: str = Depends(get_identifiant_compte_du_jeton),
     db: Session = Depends(get_db),
@@ -462,7 +470,10 @@ def lister_conversations(
     return [_vers_resume(conversation) for conversation in conversations]
 
 
-@router.get("/conversations/{conversation_id}", response_model=ConversationDetailResponse)
+@router.get(
+    "/conversations/{conversation_id}",
+    responses={404: {"description": _CONVERSATION_INTROUVABLE}},
+)
 def consulter_conversation(
     conversation_id: int,
     identifiant_compte: str = Depends(get_identifiant_compte_du_jeton),
@@ -493,7 +504,10 @@ def consulter_conversation(
     )
 
 
-@router.patch("/conversations/{conversation_id}", response_model=ConversationResponse)
+@router.patch(
+    "/conversations/{conversation_id}",
+    responses={404: {"description": _CONVERSATION_INTROUVABLE}},
+)
 def renommer_conversation(
     conversation_id: int,
     requete: ConversationRenommeeRequest,
@@ -509,7 +523,11 @@ def renommer_conversation(
     return _vers_resume(conversation)
 
 
-@router.delete("/conversations/{conversation_id}", status_code=204)
+@router.delete(
+    "/conversations/{conversation_id}",
+    status_code=204,
+    responses={404: {"description": _CONVERSATION_INTROUVABLE}},
+)
 def supprimer_conversation(
     conversation_id: int,
     identifiant_compte: str = Depends(get_identifiant_compte_du_jeton),
@@ -600,7 +618,7 @@ def _creer_piece_jointe(
         # survivre à un échec de l'appel Mistral.
         db.rollback()
         chemin_absolu.unlink(missing_ok=True)
-        logger.error("Échec de l'appel au relais Mistral (OCR) : %s", erreur)
+        logger.exception("Échec de l'appel au relais Mistral (OCR)")
         raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
 
     piece_jointe.contenu_extrait = resultat.contenu_extrait
@@ -630,8 +648,12 @@ def _creer_piece_jointe(
 
 @router.post(
     "/conversations/{conversation_id}/pieces-jointes",
-    response_model=PieceJointeCreeeResponse,
     status_code=201,
+    responses={
+        404: {"description": _CONVERSATION_INTROUVABLE},
+        400: {"description": f"{_TYPE_NON_SUPPORTE} / {_FICHIER_TROP_VOLUMINEUX}"},
+        502: {"description": _ECHEC_RELAIS},
+    },
 )
 def televerser_piece_jointe(
     conversation_id: int,
@@ -644,7 +666,14 @@ def televerser_piece_jointe(
     return _creer_piece_jointe(db, client, identifiant_compte, conversation.id, fichier)
 
 
-@router.post("/pieces-jointes", response_model=PieceJointeCreeeResponse, status_code=201)
+@router.post(
+    "/pieces-jointes",
+    status_code=201,
+    responses={
+        400: {"description": f"{_TYPE_NON_SUPPORTE} / {_FICHIER_TROP_VOLUMINEUX}"},
+        502: {"description": _ECHEC_RELAIS},
+    },
+)
 def televerser_piece_jointe_sans_conversation(
     fichier: UploadFile = File(...),
     identifiant_compte: str = Depends(get_identifiant_compte_du_jeton),
@@ -733,10 +762,10 @@ def _resoudre_reponse_chat(
         try:
             reponse = _traiter_appel_outil(client, messages_pour_mistral, demande, db, conversation_id)
         except Exception as erreur:
-            logger.error("Échec de l'appel au relais Mistral : %s", erreur)
+            logger.exception(_MSG_ECHEC_RELAIS_LOG)
             raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
     except Exception as erreur:
-        logger.error("Échec de l'appel au relais Mistral : %s", erreur)
+        logger.exception(_MSG_ECHEC_RELAIS_LOG)
         raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
 
     enregistrer_consommation(
@@ -761,8 +790,91 @@ def _appeler_resume_et_profil(
     )
 
 
+def _generer_reponse_et_resume(
+    client: MistralClient,
+    messages_pour_mistral: list[dict[str, str]],
+    tools: list[dict] | None,
+    db: Session,
+    conversation: Conversation,
+    identifiant_compte: str,
+    messages_sortants: list[Message],
+    profil_actuel: str,
+    compte: Compte | None,
+    pieces_jointes_sortantes: dict[int, PieceJointe],
+) -> tuple[ReponseChat, str | None, str | None]:
+    # Comme pour la création (cf. creer_conversation) : les appels Mistral
+    # sont faits avant toute écriture, pour ne jamais persister un message
+    # utilisateur sans sa réponse en cas d'échec. Contrairement à
+    # creer_conversation (où le titrage a besoin de la réponse de chat), les
+    # deux appels ici sont indépendants l'un de l'autre : lancés en parallèle
+    # plutôt qu'en séquence pour ne pas doubler la latence de ce tour — mais
+    # seulement s'il y a effectivement un résumé à mettre à jour.
+    if not messages_sortants:
+        reponse_chat = _resoudre_reponse_chat(
+            lambda: _appeler_reponse_chat(client, messages_pour_mistral, tools),
+            client,
+            messages_pour_mistral,
+            db,
+            conversation.id,
+            identifiant_compte,
+        )
+        return reponse_chat, None, None
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futur_reponse = executor.submit(_appeler_reponse_chat, client, messages_pour_mistral, tools)
+        futur_resume = executor.submit(
+            _appeler_resume_et_profil,
+            client,
+            conversation.resume_contexte,
+            profil_actuel,
+            compte,
+            messages_sortants,
+            pieces_jointes_sortantes,
+        )
+        reponse_chat = _resoudre_reponse_chat(
+            futur_reponse.result,
+            client,
+            messages_pour_mistral,
+            db,
+            conversation.id,
+            identifiant_compte,
+        )
+        try:
+            reponse_resume = futur_resume.result()
+        except Exception as erreur:
+            logger.exception(_MSG_ECHEC_RELAIS_LOG)
+            raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
+
+    enregistrer_consommation(
+        db,
+        identifiant_compte,
+        conversation.id,
+        "resume_et_profil",
+        MODELE_CHAT,
+        usage=reponse_resume.usage,
+    )
+    try:
+        donnees = json.loads(reponse_resume.contenu)
+        resume_maj = donnees["resume_contexte"]
+        profil_travail_delta = donnees.get("profil_travail_delta")
+    except (json.JSONDecodeError, KeyError, TypeError) as erreur:
+        # Distinct du bloc ci-dessus : une réponse reçue mais mal formée n'est
+        # pas une panne du relais Mistral, ne doit jamais être journalisée
+        # comme telle (les deux étaient auparavant confondues dans un seul
+        # except Exception large).
+        logger.exception("Réponse résumé+profil de Mistral invalide")
+        raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
+
+    return reponse_chat, resume_maj, profil_travail_delta
+
+
 @router.post(
-    "/conversations/{conversation_id}/messages", response_model=MessageEnvoyeResponse
+    "/conversations/{conversation_id}/messages",
+    responses={
+        404: {"description": _CONVERSATION_INTROUVABLE},
+        400: {"description": _PIECE_JOINTE_INTROUVABLE},
+        502: {"description": _ECHEC_RELAIS},
+    },
 )
 def envoyer_message(
     conversation_id: int,
@@ -838,72 +950,18 @@ def envoyer_message(
 
         compte = db.query(Compte).filter(Compte.identifiant == identifiant_compte).first()
 
-        resume_maj: str | None = None
-        profil_travail_delta: str | None = None
-
-        # Comme pour la création (cf. creer_conversation) : les appels Mistral
-        # sont faits avant toute écriture, pour ne jamais persister un message
-        # utilisateur sans sa réponse en cas d'échec. Contrairement à
-        # creer_conversation (où le titrage a besoin de la réponse de chat),
-        # les deux appels ici sont indépendants l'un de l'autre : lancés en
-        # parallèle plutôt qu'en séquence pour ne pas doubler la latence de
-        # ce tour.
-        if messages_sortants:
-            with ThreadPoolExecutor(max_workers=2) as executor:
-                futur_reponse = executor.submit(
-                    _appeler_reponse_chat, client, messages_pour_mistral, tools
-                )
-                futur_resume = executor.submit(
-                    _appeler_resume_et_profil,
-                    client,
-                    conversation.resume_contexte,
-                    profil_actuel,
-                    compte,
-                    messages_sortants,
-                    pieces_jointes_sortantes,
-                )
-                reponse_chat = _resoudre_reponse_chat(
-                    futur_reponse.result,
-                    client,
-                    messages_pour_mistral,
-                    db,
-                    conversation.id,
-                    identifiant_compte,
-                )
-                try:
-                    reponse_resume = futur_resume.result()
-                except Exception as erreur:
-                    logger.error("Échec de l'appel au relais Mistral : %s", erreur)
-                    raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
-
-            enregistrer_consommation(
-                db,
-                identifiant_compte,
-                conversation.id,
-                "resume_et_profil",
-                MODELE_CHAT,
-                usage=reponse_resume.usage,
-            )
-            try:
-                donnees = json.loads(reponse_resume.contenu)
-                resume_maj = donnees["resume_contexte"]
-                profil_travail_delta = donnees.get("profil_travail_delta")
-            except (json.JSONDecodeError, KeyError, TypeError) as erreur:
-                # Distinct du bloc ci-dessus : une réponse reçue mais mal
-                # formée n'est pas une panne du relais Mistral, ne doit jamais
-                # être journalisée comme telle (les deux étaient auparavant
-                # confondues dans un seul except Exception large).
-                logger.error("Réponse résumé+profil de Mistral invalide : %s", erreur)
-                raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
-        else:
-            reponse_chat = _resoudre_reponse_chat(
-                lambda: _appeler_reponse_chat(client, messages_pour_mistral, tools),
-                client,
-                messages_pour_mistral,
-                db,
-                conversation.id,
-                identifiant_compte,
-            )
+        reponse_chat, resume_maj, profil_travail_delta = _generer_reponse_et_resume(
+            client,
+            messages_pour_mistral,
+            tools,
+            db,
+            conversation,
+            identifiant_compte,
+            messages_sortants,
+            profil_actuel,
+            compte,
+            pieces_jointes_sortantes,
+        )
 
         reponse = reponse_chat.contenu
 
