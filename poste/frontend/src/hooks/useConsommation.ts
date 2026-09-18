@@ -49,11 +49,11 @@ export function useConsommationQuery() {
     queryFn: async () => {
       try {
         return await chargerConsommation();
-      } catch (erreur) {
-        if (erreur instanceof ErreurApi && erreur.status === 401) {
+      } catch (error_) {
+        if (error_ instanceof ErreurApi && error_.status === 401) {
           marquerSessionExpiree(queryClient);
         }
-        throw erreur;
+        throw error_;
       }
     },
   });

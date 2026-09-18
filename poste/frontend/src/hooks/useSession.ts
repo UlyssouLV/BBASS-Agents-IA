@@ -34,11 +34,11 @@ async function chargerCompteConnecte(): Promise<Compte | null> {
       "Impossible de joindre le service de connexion. Réessayez plus tard.",
       "Impossible de récupérer le compte connecté."
     );
-  } catch (erreur) {
-    if (erreur instanceof ErreurApi && erreur.status === 401) {
+  } catch (error_) {
+    if (error_ instanceof ErreurApi && error_.status === 401) {
       return null;
     }
-    throw erreur;
+    throw error_;
   }
 }
 

@@ -60,7 +60,24 @@ def _erreur_vm_vers_http(session: SessionStore, erreur: Exception) -> HTTPExcept
     return HTTPException(status_code=502, detail=_VM_CENTRALE_INDISPONIBLE)
 
 
-@router.post("/conversations", response_model=ConversationCreeResponse)
+# Base commune à toutes les routes ci-dessous : _jeton_de_session et
+# _erreur_vm_vers_http sont partagées par tous les appelants (401/502 donc
+# toujours atteignables). Chaque route étend ce socle avec les codes propres
+# à son opération (404 conversation, 404/400 pièce jointe).
+_RESPONSES_BASE = {
+    401: {"description": _AUCUNE_SESSION},
+    502: {"description": _VM_CENTRALE_INDISPONIBLE},
+}
+_RESPONSES_PIECE_JOINTE = {
+    404: {"description": _PIECE_JOINTE_INTROUVABLE},
+    400: {"description": _PIECE_JOINTE_REFUSEE},
+}
+
+
+@router.post(
+    "/conversations",
+    responses={**_RESPONSES_BASE, **_RESPONSES_PIECE_JOINTE},
+)
 def creer_conversation(
     requete: ConversationCreationRequest,
     client: VmCentraleClient = Depends(get_vm_centrale_client),
@@ -80,7 +97,7 @@ def creer_conversation(
     )
 
 
-@router.get("/conversations", response_model=list[ConversationResponse])
+@router.get("/conversations", responses=_RESPONSES_BASE)
 def lister_conversations(
     client: VmCentraleClient = Depends(get_vm_centrale_client),
     session: SessionStore = Depends(get_session_store),
@@ -101,7 +118,10 @@ def lister_conversations(
     ]
 
 
-@router.get("/conversations/{conversation_id}", response_model=ConversationDetailResponse)
+@router.get(
+    "/conversations/{conversation_id}",
+    responses={**_RESPONSES_BASE, 404: {"description": _CONVERSATION_INTROUVABLE}},
+)
 def consulter_conversation(
     conversation_id: int,
     client: VmCentraleClient = Depends(get_vm_centrale_client),
@@ -130,7 +150,10 @@ def consulter_conversation(
     )
 
 
-@router.patch("/conversations/{conversation_id}", response_model=ConversationResponse)
+@router.patch(
+    "/conversations/{conversation_id}",
+    responses={**_RESPONSES_BASE, 404: {"description": _CONVERSATION_INTROUVABLE}},
+)
 def renommer_conversation(
     conversation_id: int,
     requete: ConversationRenommeeRequest,
@@ -150,7 +173,11 @@ def renommer_conversation(
     )
 
 
-@router.delete("/conversations/{conversation_id}", status_code=204)
+@router.delete(
+    "/conversations/{conversation_id}",
+    status_code=204,
+    responses={**_RESPONSES_BASE, 404: {"description": _CONVERSATION_INTROUVABLE}},
+)
 def supprimer_conversation(
     conversation_id: int,
     client: VmCentraleClient = Depends(get_vm_centrale_client),
@@ -163,7 +190,14 @@ def supprimer_conversation(
         raise _erreur_vm_vers_http(session, erreur) from erreur
 
 
-@router.post("/conversations/{conversation_id}/messages", response_model=MessageEnvoyeResponse)
+@router.post(
+    "/conversations/{conversation_id}/messages",
+    responses={
+        **_RESPONSES_BASE,
+        **_RESPONSES_PIECE_JOINTE,
+        404: {"description": f"{_CONVERSATION_INTROUVABLE} / {_PIECE_JOINTE_INTROUVABLE}"},
+    },
+)
 def envoyer_message(
     conversation_id: int,
     requete: MessageEnvoyeRequest,
@@ -204,8 +238,12 @@ def _nom_et_type_du_fichier(fichier: UploadFile) -> tuple[str, str]:
 
 @router.post(
     "/conversations/{conversation_id}/pieces-jointes",
-    response_model=PieceJointeCreeeResponse,
     status_code=201,
+    responses={
+        **_RESPONSES_BASE,
+        404: {"description": _CONVERSATION_INTROUVABLE},
+        400: {"description": _PIECE_JOINTE_REFUSEE},
+    },
 )
 def televerser_piece_jointe(
     conversation_id: int,
@@ -225,7 +263,11 @@ def televerser_piece_jointe(
     return _piece_jointe_creee_response(cree)
 
 
-@router.post("/pieces-jointes", response_model=PieceJointeCreeeResponse, status_code=201)
+@router.post(
+    "/pieces-jointes",
+    status_code=201,
+    responses={**_RESPONSES_BASE, 400: {"description": _PIECE_JOINTE_REFUSEE}},
+)
 def televerser_piece_jointe_sans_conversation(
     fichier: UploadFile = File(...),
     client: VmCentraleClient = Depends(get_vm_centrale_client),

@@ -29,7 +29,10 @@ _HASH_BIDON = hash_password("mot-de-passe-bidon-pour-le-timing")
 _bearer_scheme = HTTPBearer(auto_error=False)
 
 
-@router.post("/auth", response_model=AuthResponse)
+@router.post(
+    "/auth",
+    responses={401: {"description": _ECHEC_AUTHENTIFICATION}},
+)
 def authentifier(
     requete: AuthRequest,
     db: Session = Depends(get_db),
@@ -60,7 +63,10 @@ def _identifiant_depuis_le_jeton(
     return jetons.identifiant_pour(credentials.credentials) if credentials is not None else None
 
 
-@router.get("/auth/verifier", response_model=VerifierResponse)
+@router.get(
+    "/auth/verifier",
+    responses={401: {"description": _JETON_INVALIDE}},
+)
 def verifier(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
     db: Session = Depends(get_db),
@@ -83,7 +89,14 @@ def verifier(
     )
 
 
-@router.post("/auth/mot-de-passe", status_code=204)
+@router.post(
+    "/auth/mot-de-passe",
+    status_code=204,
+    responses={
+        401: {"description": _JETON_INVALIDE},
+        403: {"description": _CHANGEMENT_NON_AUTORISE},
+    },
+)
 def changer_mot_de_passe(
     requete: ChangerMotDePasseRequest,
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),

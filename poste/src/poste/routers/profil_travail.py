@@ -1,3 +1,5 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from poste.schemas import ProfilTravailResponse
@@ -10,10 +12,16 @@ _AUCUNE_SESSION = "Aucune session active"
 _VM_CENTRALE_INDISPONIBLE = "Le service de profil de travail de la VM centrale est indisponible"
 
 
-@router.get("/profil-travail", response_model=ProfilTravailResponse)
+@router.get(
+    "/profil-travail",
+    responses={
+        401: {"description": _AUCUNE_SESSION},
+        502: {"description": _VM_CENTRALE_INDISPONIBLE},
+    },
+)
 def consulter_profil_travail(
-    client: VmCentraleClient = Depends(get_vm_centrale_client),
-    session: SessionStore = Depends(get_session_store),
+    client: Annotated[VmCentraleClient, Depends(get_vm_centrale_client)],
+    session: Annotated[SessionStore, Depends(get_session_store)],
 ) -> ProfilTravailResponse:
     identifiant = session.identifiant
     jeton = session.jeton

@@ -48,7 +48,7 @@ def _vers_reponse(compte: Compte) -> CompteResponse:
     )
 
 
-@router.get("", response_model=list[CompteResponse])
+@router.get("")
 def lister_comptes(
     db: Session = Depends(get_db),
     _admin: Compte = Depends(get_compte_admin),
@@ -62,7 +62,7 @@ def lister_comptes(
     return [_vers_reponse(compte) for compte in comptes]
 
 
-@router.get("/consommation", response_model=list[CompteConsommationResponse])
+@router.get("/consommation")
 def lister_consommation_comptes(
     db: Session = Depends(get_db),
     _admin: Compte = Depends(get_compte_admin),
@@ -111,7 +111,11 @@ def lister_consommation_comptes(
     return resultats
 
 
-@router.post("", response_model=CompteCreeResponse, status_code=201)
+@router.post(
+    "",
+    status_code=201,
+    responses={409: {"description": _IDENTIFIANT_DEJA_UTILISE}},
+)
 def creer_compte(
     requete: CompteCreeRequest,
     db: Session = Depends(get_db),
@@ -149,7 +153,10 @@ def creer_compte(
     return CompteCreeResponse(**_vers_reponse(compte).model_dump(), mot_de_passe=mot_de_passe)
 
 
-@router.patch("/{identifiant}", response_model=CompteResponse)
+@router.patch(
+    "/{identifiant}",
+    responses={404: {"description": _COMPTE_INTROUVABLE}},
+)
 def modifier_compte(
     identifiant: str,
     requete: CompteModifieRequest,
@@ -178,7 +185,7 @@ def modifier_compte(
 
 @router.post(
     "/{identifiant}/reinitialiser-mot-de-passe",
-    response_model=MotDePasseReinitialiseResponse,
+    responses={404: {"description": _COMPTE_INTROUVABLE}},
 )
 def reinitialiser_mot_de_passe(
     identifiant: str,
@@ -200,7 +207,11 @@ def reinitialiser_mot_de_passe(
     return MotDePasseReinitialiseResponse(mot_de_passe=mot_de_passe)
 
 
-@router.post("/{identifiant}/deconnexion-forcee", status_code=204)
+@router.post(
+    "/{identifiant}/deconnexion-forcee",
+    status_code=204,
+    responses={404: {"description": _COMPTE_INTROUVABLE}},
+)
 def deconnexion_forcee(
     identifiant: str,
     db: Session = Depends(get_db),
@@ -216,7 +227,14 @@ def deconnexion_forcee(
     jetons.revoquer_tous(identifiant)
 
 
-@router.delete("/{identifiant}", status_code=204)
+@router.delete(
+    "/{identifiant}",
+    status_code=204,
+    responses={
+        404: {"description": _COMPTE_INTROUVABLE},
+        409: {"description": _DERNIER_ADMINISTRATEUR_SUPPRESSION},
+    },
+)
 def supprimer_compte(
     identifiant: str,
     db: Session = Depends(get_db),
@@ -243,7 +261,13 @@ def supprimer_compte(
     db.commit()
 
 
-@router.patch("/{identifiant}/est-admin", response_model=CompteResponse)
+@router.patch(
+    "/{identifiant}/est-admin",
+    responses={
+        404: {"description": _COMPTE_INTROUVABLE},
+        409: {"description": _DERNIER_ADMINISTRATEUR},
+    },
+)
 def modifier_statut_admin(
     identifiant: str,
     requete: StatutAdminRequest,
@@ -275,7 +299,10 @@ def modifier_statut_admin(
     return _vers_reponse(compte)
 
 
-@router.get("/{identifiant}/profil-travail", response_model=ProfilTravailResponse)
+@router.get(
+    "/{identifiant}/profil-travail",
+    responses={403: {"description": _ACCES_PROFIL_TRAVAIL_REFUSE}},
+)
 def consulter_profil_travail(
     identifiant: str,
     identifiant_du_jeton: str = Depends(get_identifiant_compte_du_jeton),

@@ -1,37 +1,36 @@
 #!/usr/bin/env bash
 # Prepare un package Python (venv + dependances + .env) avant de le lancer.
 # Usage : scripts/preparer-package.sh "chemin/vers/le/package"
-# Necessite que PYTHON_CMD ait deja ete determine et exporte (scripts/verifier-python.sh).
+# Le package doit contenir un uv.lock (source de verite des versions installees) ;
+# uv resout la version de Python via son propre .python-version (3.11).
 set -u
 PKG_DIR="$1"
 
-if [ -z "${PYTHON_CMD:-}" ]; then
-    echo "[ERREUR interne] PYTHON_CMD n'est pas defini (verifier-python.sh doit etre appele avant)." >&2
+if ! command -v uv >/dev/null 2>&1; then
+    echo "[ERREUR] \"uv\" est requis mais n'a pas ete trouve sur le PATH." >&2
+    echo "         Installe-le (voir README.md, section Prerequis), puis relance ce script." >&2
     exit 1
 fi
 
-if [ ! -f "$PKG_DIR/pyproject.toml" ]; then
+if [[ ! -f "$PKG_DIR/pyproject.toml" ]]; then
     echo "[ERREUR] \"$PKG_DIR\" ne contient pas de pyproject.toml." >&2
     exit 1
 fi
 
-if [ ! -f "$PKG_DIR/.venv/bin/python" ]; then
-    echo "      Creation de l'environnement virtuel \"$PKG_DIR/.venv\"..."
-    if ! "$PYTHON_CMD" -m venv "$PKG_DIR/.venv"; then
-        echo "[ERREUR] Impossible de creer l'environnement virtuel dans \"$PKG_DIR\"." >&2
-        exit 1
-    fi
+if [[ ! -f "$PKG_DIR/uv.lock" ]]; then
+    echo "[ERREUR] \"$PKG_DIR\" ne contient pas de uv.lock." >&2
+    exit 1
 fi
 
-if [ ! -f "$PKG_DIR/.env" ] && [ -f "$PKG_DIR/.env.example" ]; then
+if [[ ! -f "$PKG_DIR/.env" && -f "$PKG_DIR/.env.example" ]]; then
     echo "      Creation de \"$PKG_DIR/.env\" a partir de .env.example..."
     cp "$PKG_DIR/.env.example" "$PKG_DIR/.env"
 fi
 
-echo "      Installation des dependances (pip install -e) dans \"$PKG_DIR/.venv\"..."
-if ! "$PKG_DIR/.venv/bin/python" -m pip install -e "$PKG_DIR"; then
+echo "      Installation des dependances (uv sync, versions figees par uv.lock) dans \"$PKG_DIR/.venv\"..."
+if ! uv sync --directory "$PKG_DIR" --extra test --python 3.11 --locked; then
     echo "[ERREUR] Echec de l'installation des dependances pour \"$PKG_DIR\"." >&2
-    echo "         Verifie ta connexion internet et le message pip ci-dessus, puis relance ce script." >&2
+    echo "         Verifie ta connexion internet et le message uv ci-dessus, puis relance ce script." >&2
     exit 1
 fi
 
