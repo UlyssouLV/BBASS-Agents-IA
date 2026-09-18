@@ -71,9 +71,9 @@ export function useComptesConsommationQuery() {
     queryFn: async () => {
       try {
         return await _chargerConsommationComptes();
-      } catch (erreur) {
-        _surErreurSession(queryClient, erreur);
-        throw erreur;
+      } catch (error_) {
+        _surErreurSession(queryClient, error_);
+        throw error_;
       }
     },
   });
@@ -189,9 +189,9 @@ export function useComptesQuery() {
     queryFn: async () => {
       try {
         return await _chargerComptes();
-      } catch (erreur) {
-        _surErreurSession(queryClient, erreur);
-        throw erreur;
+      } catch (error_) {
+        _surErreurSession(queryClient, error_);
+        throw error_;
       }
     },
   });

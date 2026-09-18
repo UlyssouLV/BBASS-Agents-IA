@@ -94,9 +94,9 @@ function _envoyerPieceJointeAvecCache(url: string, fichier: File): Promise<Resul
   if (enCache) {
     return enCache;
   }
-  const promesse = _envoyerPieceJointe(url, fichier).catch((erreur) => {
+  const promesse = _envoyerPieceJointe(url, fichier).catch((error_) => {
     _piecesEnCache.delete(fichier);
-    throw erreur;
+    throw error_;
   });
   _piecesEnCache.set(fichier, promesse);
   return promesse;
@@ -232,9 +232,9 @@ export function useConversationsQuery() {
     queryFn: async () => {
       try {
         return await chargerConversations();
-      } catch (erreur) {
-        surErreurSession(queryClient, erreur);
-        throw erreur;
+      } catch (error_) {
+        surErreurSession(queryClient, error_);
+        throw error_;
       }
     },
   });
@@ -247,9 +247,9 @@ export function useConversationQuery(id: number | null) {
     queryFn: async () => {
       try {
         return await chargerConversation(id as number);
-      } catch (erreur) {
-        surErreurSession(queryClient, erreur);
-        throw erreur;
+      } catch (error_) {
+        surErreurSession(queryClient, error_);
+        throw error_;
       }
     },
     enabled: id !== null,
