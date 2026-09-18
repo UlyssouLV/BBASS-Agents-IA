@@ -17,6 +17,69 @@ function formaterDetail(detail: DetailConsommationCategorie): string {
   return parties.join(" · ");
 }
 
+// Camembert de répartition du coût total entre chat et pièce jointe (issue
+// #88), en complément du tableau « Total » qui garde les valeurs exactes.
+// Deux parts seulement : pas de bibliothèque de graphiques, un cercle dont le
+// trait (rayon 25, épaisseur 50) remplit le disque, avec pathLength=100 pour
+// exprimer les tirets directement en pourcentage.
+function CamembertRepartitionCout({ coutChat, coutPieceJointe }: Readonly<{ coutChat: number; coutPieceJointe: number }>) {
+  const total = coutChat + coutPieceJointe;
+
+  if (!Number.isFinite(total) || total <= 0) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Aucune consommation enregistrée pour l'instant : pas de répartition à afficher.
+      </p>
+    );
+  }
+
+  // Le complément à 100 plutôt qu'un second arrondi : les deux parts font
+  // toujours un camembert entier, affichage et tracé sur le même chiffre.
+  const pourcentageChat = Math.round((coutChat / total) * 100);
+  const parts = [
+    { libelle: "Chat", pourcentage: pourcentageChat, debut: 0, trait: "stroke-primary", pastille: "bg-primary" },
+    {
+      libelle: "Pièce jointe",
+      pourcentage: 100 - pourcentageChat,
+      debut: pourcentageChat,
+      trait: "stroke-accent",
+      pastille: "bg-accent",
+    },
+  ];
+  const description = parts.map((part) => `${part.libelle} ${part.pourcentage} %`).join(", ");
+
+  return (
+    <div className="flex items-center gap-6">
+      <svg viewBox="0 0 100 100" role="img" aria-label={`Répartition du coût total : ${description}`} className="size-32 -rotate-90">
+        {parts.map((part) => (
+          <circle
+            key={part.libelle}
+            cx="50"
+            cy="50"
+            r="25"
+            fill="none"
+            strokeWidth="50"
+            pathLength={100}
+            strokeDasharray={`${part.pourcentage} 100`}
+            strokeDashoffset={-part.debut}
+            className={part.trait}
+          />
+        ))}
+      </svg>
+      <ul className="flex flex-col gap-2 text-sm">
+        {parts.map((part) => (
+          <li key={part.libelle} className="flex items-center gap-2">
+            <span aria-hidden="true" className={`size-3 shrink-0 rounded-full ${part.pastille}`} />
+            <span>
+              {part.libelle} — {part.pourcentage} %
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 // Réécriture React de la section #onglet-consommation d'app.js : total
 // global (chat vs pièce jointe) puis classement des conversations par coût
 // décroissant, lecture seule (voir docs/specs/v1.2.0-interface-poste.md et
@@ -67,6 +130,12 @@ export function OngletConsommation() {
             </tr>
           </tbody>
         </table>
+
+        <h3 className="mt-4 mb-2 text-sm font-medium">Répartition du coût</h3>
+        <CamembertRepartitionCout
+          coutChat={Number(consommation.chat.cout_usd)}
+          coutPieceJointe={Number(consommation.piece_jointe.cout_usd)}
+        />
       </div>
 
       <div>
