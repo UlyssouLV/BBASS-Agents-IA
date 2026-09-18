@@ -64,12 +64,15 @@ flowchart LR
 - **Python 3.11** (série figée : pas 3.12 / 3.13 / 3.14).
   - Windows : dernier installeur officiel [Python 3.11.9](https://www.python.org/downloads/release/python-3119/) — prendre *Windows installer (64-bit)*. Cocher **Add python.exe to PATH**. Les correctifs 3.11.x plus récents n'ont plus d'installeur (source only).
   - macOS : `brew install python@3.11` (Homebrew), ou l'installeur officiel [Python 3.11.9](https://www.python.org/downloads/release/python-3119/) (*macOS 64-bit universal2 installer*).
+- **[uv](https://docs.astral.sh/uv/)**, pour installer les dépendances Python de `vm-centrale` et `poste` à partir de leur `uv.lock` (versions exactes, reproductibles — [ADR-0011](docs/adr/0011-gestion-dependances-python-avec-uv.md)).
+  - Windows (PowerShell) : `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`.
+  - macOS : `brew install uv`, ou `curl -LsSf https://astral.sh/uv/install.sh | sh`.
 - **Docker Desktop** pour le PostgreSQL local de la VM centrale ([ADR-0008](docs/adr/0008-postgresql-vm-centrale.md)).
 - Une clé API Mistral (console [La Plateforme](https://console.mistral.ai)) pour un vrai chat
 
 ## Démarrer
 
-Après avoir installé les prérequis ci-dessus (Python 3.11, Docker Desktop lancé), le parcours officiel est : cloner le dépôt, puis double-cliquer sur l'un des deux scripts à la racine correspondant à ton OS — aucune autre commande à taper.
+Après avoir installé les prérequis ci-dessus (Python 3.11, uv, Docker Desktop lancé), le parcours officiel est : cloner le dépôt, puis double-cliquer sur l'un des deux scripts à la racine correspondant à ton OS — aucune autre commande à taper.
 
 **Windows** (`.bat`) :
 
@@ -83,7 +86,7 @@ Après avoir installé les prérequis ci-dessus (Python 3.11, Docker Desktop lan
 
   Premier lancement : si un clic droit → *Ouvrir* est nécessaire (Gatekeeper, seulement si le dépôt a été téléchargé en `.zip` plutôt que cloné avec `git clone`), ou si le double-clic ne fait rien, exécute une fois dans un Terminal (à la racine du dépôt) `chmod +x lancer-vm.command lancer-logiciel.command` puis retente le double-clic.
 
-Les deux jeux de scripts sont autonomes : au besoin, ils créent les environnements virtuels (`vm-centrale/.venv`, et `poste/.venv` pour `lancer-logiciel.*`), installent les dépendances (`pip install -e .`) et créent les fichiers `.env` manquants à partir des `.env.example` correspondants (racine, `vm-centrale/`, `poste/`). Rien de manuel à faire au premier clone, ni après un `git pull` qui modifie un `pyproject.toml`. La logique commune aux deux scripts d'une même plateforme vit dans `scripts/` (`*.bat` pour Windows, `*.sh` pour macOS) afin d'éviter deux copies divergentes.
+Les deux jeux de scripts sont autonomes : au besoin, ils créent les environnements virtuels (`vm-centrale/.venv`, et `poste/.venv` pour `lancer-logiciel.*`), installent les dépendances (`uv sync`, versions figées par `uv.lock`) et créent les fichiers `.env` manquants à partir des `.env.example` correspondants (racine, `vm-centrale/`, `poste/`). Rien de manuel à faire au premier clone, ni après un `git pull` qui modifie un `pyproject.toml`/`uv.lock`. La logique commune aux deux scripts d'une même plateforme vit dans `scripts/` (`*.bat` pour Windows, `*.sh` pour macOS) afin d'éviter deux copies divergentes.
 
 Pour un vrai chat (pas seulement le compte de test), colle ta clé API Mistral dans `MISTRAL_API_KEY` du fichier `vm-centrale/.env` — jamais dans Git.
 
