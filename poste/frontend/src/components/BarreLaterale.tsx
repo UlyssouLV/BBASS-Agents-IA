@@ -1,4 +1,5 @@
 import { Ellipsis, SquarePen } from "lucide-react";
+import { useRef, useState } from "react";
 
 import logoBbass from "@/assets/logo-bbass.png";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -17,6 +18,7 @@ import {
 } from "@/hooks/useConversations";
 import type { Compte } from "@/hooks/useSession";
 import { messageErreur } from "@/lib/api";
+import { cn } from "@/lib/utils";
 
 interface BarreLateraleProps {
   compte: Compte;
@@ -47,14 +49,38 @@ export function BarreLaterale({
   const renommerConversationMutation = useRenommerConversationMutation();
   const supprimerConversationMutation = useSupprimerConversationMutation();
 
+  // Renommage inline (remplace window.prompt, qui n'affiche pas de champ
+  // utilisable) : le titre de la ligne devient un input tant que
+  // renommageId correspond à cette conversation. fermetureManuelleRef évite
+  // qu'onBlur ne rejoue la validation déjà faite par Entrée, et qu'il n'en
+  // déclenche une après Escape (qui ne doit jamais enregistrer).
+  const [renommageId, setRenommageId] = useState<number | null>(null);
+  const [titreEnCours, setTitreEnCours] = useState("");
+  const fermetureManuelleRef = useRef(false);
+
+  // Bouton « … » masqué par défaut (voir group-hover ci-dessous) : reste
+  // visible tant que son menu est ouvert, même si la souris quitte la ligne.
+  const [menuOuvertId, setMenuOuvertId] = useState<number | null>(null);
+
   const poleAgence = [compte.poles.join(", "), compte.agence].filter(Boolean).join(" — ");
 
-  function renommerConversation(id: number, titreActuel: string) {
-    const nouveauTitre = window.prompt("Nouveau titre de la conversation :", titreActuel);
-    if (!nouveauTitre?.trim() || nouveauTitre === titreActuel) {
+  function commencerRenommage(conversation: { id: number; titre: string }) {
+    setRenommageId(conversation.id);
+    setTitreEnCours(conversation.titre);
+  }
+
+  function validerRenommage(id: number, titreActuel: string) {
+    const nouveauTitre = titreEnCours.trim();
+    setRenommageId(null);
+    if (!nouveauTitre || nouveauTitre === titreActuel) {
       return;
     }
     renommerConversationMutation.mutate({ id, titre: nouveauTitre });
+  }
+
+  function annulerRenommage() {
+    fermetureManuelleRef.current = true;
+    setRenommageId(null);
   }
 
   function supprimerConversation(id: number) {
@@ -108,47 +134,92 @@ export function BarreLaterale({
         )}
         {conversationsQuery.isLoading && <output className="mb-2 block text-sm text-muted-foreground">Chargement…</output>}
         <ul className="flex flex-col gap-1">
-          {conversationsQuery.data?.map((conversation) => (
-            <li key={conversation.id} className="flex items-center gap-1">
-              <button
-                type="button"
-                className={
-                  conversation.id === conversationOuverteId
-                    ? "flex-1 truncate rounded-sm bg-secondary px-1.5 py-1 text-left text-sm text-secondary-foreground"
-                    : "flex-1 truncate rounded-sm px-1.5 py-1 text-left text-sm hover:bg-secondary/50"
-                }
-                onClick={() => onSelectionnerConversation(conversation.id)}
+          {conversationsQuery.data?.map((conversation) => {
+            const estOuverte = conversation.id === conversationOuverteId;
+            const menuOuvert = menuOuvertId === conversation.id;
+            return (
+              <li
+                key={conversation.id}
+                className={cn(
+                  "group flex items-center gap-1 rounded-sm",
+                  estOuverte && "bg-secondary text-secondary-foreground"
+                )}
               >
-                {conversation.titre}
-              </button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
+                {renommageId === conversation.id ? (
+                  <input
+                    autoFocus
+                    value={titreEnCours}
+                    onChange={(evenement) => setTitreEnCours(evenement.target.value)}
+                    onBlur={() => {
+                      if (fermetureManuelleRef.current) {
+                        fermetureManuelleRef.current = false;
+                        return;
+                      }
+                      validerRenommage(conversation.id, conversation.titre);
+                    }}
+                    onKeyDown={(evenement) => {
+                      if (evenement.key === "Enter") {
+                        fermetureManuelleRef.current = true;
+                        validerRenommage(conversation.id, conversation.titre);
+                      } else if (evenement.key === "Escape") {
+                        annulerRenommage();
+                      }
+                    }}
+                    className="flex-1 truncate rounded-sm bg-background px-1.5 py-1 text-left text-sm text-foreground outline-none ring-1 ring-ring"
+                  />
+                ) : (
+                  <button
                     type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="size-7 shrink-0"
-                    aria-label="Actions de la conversation"
+                    className={
+                      estOuverte
+                        ? "flex-1 truncate rounded-sm px-1.5 py-1 text-left text-sm"
+                        : "flex-1 truncate rounded-sm px-1.5 py-1 text-left text-sm hover:bg-secondary/50"
+                    }
+                    onClick={() => onSelectionnerConversation(conversation.id)}
                   >
-                    <Ellipsis aria-hidden="true" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem
-                    onSelect={() => renommerConversation(conversation.id, conversation.titre)}
+                    {conversation.titre}
+                  </button>
+                )}
+                <DropdownMenu onOpenChange={(ouvert) => setMenuOuvertId(ouvert ? conversation.id : null)}>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className={cn(
+                        "size-7 shrink-0",
+                        menuOuvert
+                          ? "opacity-100"
+                          : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+                      )}
+                      aria-label="Actions de la conversation"
+                    >
+                      <Ellipsis aria-hidden="true" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="end"
+                    onCloseAutoFocus={(evenement) => {
+                      // Empêche Radix de rendre le focus au bouton « … » à
+                      // la fermeture : sinon il entre en compétition avec
+                      // l'autoFocus de l'input inline ouvert par Renommer.
+                      evenement.preventDefault();
+                    }}
                   >
-                    Renommer
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    variant="destructive"
-                    onSelect={() => supprimerConversation(conversation.id)}
-                  >
-                    Supprimer
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </li>
-          ))}
+                    <DropdownMenuItem onSelect={() => commencerRenommage(conversation)}>
+                      Renommer
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onSelect={() => supprimerConversation(conversation.id)}
+                    >
+                      Supprimer
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </li>
+            );
+          })}
         </ul>
       </SidebarContent>
 
