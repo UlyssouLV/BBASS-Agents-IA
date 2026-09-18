@@ -1,11 +1,13 @@
 import { useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
 import { toast } from "sonner";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   useComptesQuery,
   useCreerCompteMutation,
@@ -100,30 +102,44 @@ export function OngletComptes() {
       )}
 
       {comptesQuery.data && (
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border text-left">
-              <th className="py-1.5 pr-4 font-medium">Identifiant</th>
-              <th className="py-1.5 pr-4 font-medium">Prénom</th>
-              <th className="py-1.5 pr-4 font-medium">Nom</th>
-              <th className="py-1.5 pr-4 font-medium">Agence</th>
-              <th className="py-1.5 pr-4 font-medium">Pôles</th>
-              <th className="py-1.5 pr-4 font-medium">Email</th>
-              <th className="py-1.5 font-medium">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Identifiant</TableHead>
+              <TableHead>Prénom</TableHead>
+              <TableHead>Nom</TableHead>
+              <TableHead>Agence</TableHead>
+              <TableHead>Pôles</TableHead>
+              <TableHead>Statut</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>
                 <span className="sr-only">Actions</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {comptesQuery.data.map((compte) => (
-              <tr key={compte.identifiant} className="border-b border-border last:border-0">
-                <td className="py-1.5 pr-4">{compte.identifiant}</td>
-                <td className="py-1.5 pr-4">{compte.prenom}</td>
-                <td className="py-1.5 pr-4">{compte.nom}</td>
-                <td className="py-1.5 pr-4">{compte.agence}</td>
-                <td className="py-1.5 pr-4">{compte.poles.join(", ")}</td>
-                <td className="py-1.5 pr-4">{compte.email ?? ""}</td>
-                <td className="py-1.5">
+              <TableRow key={compte.identifiant}>
+                <TableCell>{compte.identifiant}</TableCell>
+                <TableCell>{compte.prenom}</TableCell>
+                <TableCell>{compte.nom}</TableCell>
+                <TableCell>{compte.agence}</TableCell>
+                <TableCell>
+                  <div className="flex flex-wrap gap-1">
+                    {compte.poles.map((pole) => (
+                      <Badge key={pole} variant="outline">
+                        {pole}
+                      </Badge>
+                    ))}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <Badge variant={compte.est_admin ? "default" : "secondary"}>
+                    {compte.est_admin ? "Administrateur" : "Standard"}
+                  </Badge>
+                </TableCell>
+                <TableCell>{compte.email ?? ""}</TableCell>
+                <TableCell>
                   <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
                     <button
                       type="button"
@@ -163,11 +179,11 @@ export function OngletComptes() {
                       Supprimer
                     </button>
                   </div>
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       )}
 
       <Dialog open={action !== null} onOpenChange={(ouvert) => !ouvert && fermerDialog()}>

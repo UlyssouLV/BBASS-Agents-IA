@@ -12,17 +12,9 @@ Ce n’est **pas** une spec (ça vient après « Ouvre la version »).
 - **1.1.2** — Pièces jointes : upload PDF/Word/Excel/image sur un message (une par message), extraction (OCR Mistral, locale pour Word/Excel, vision Mistral pour l'image), contenu injecté dans le chat, mention courte dans le résumé glissant, rappel via un outil si la pièce jointe sort de la fenêtre ; jamais la Files API Mistral.
 - **1.1.3** — Consommation : une ligne `Consommation` par appel Mistral réel (chat, titrage, résumé+profil, OCR, vision), tokens ou pages selon le type, coût figé au tarif du jour de l'appel (pas d'API de tarification Mistral, tarifs en dur dans le code). Fenêtre Consommation côté collaborateur (total + classement des conversations par coût) ; onglet Consommations côté administrateur (comptes classés par coût, jamais de détail par conversation).
 - **1.2.0** — Interface poste réécrite en React/TypeScript/Vite (shadcn/ui, Tailwind, TanStack Query), build committé dans git (jamais de Node.js requis sur un poste, [ADR-0010](../adr/0010-front-poste-react-typescript-vite.md)) ; écran comptes (compte administrateur) passé de blocs empilés à une table avec une modale par action.
+- **1.2.1** — Identité visuelle du poste calquée sur le logo BBASS Géomètre-Expert (couleurs, police Manrope auto-hébergée, logo, favicon) et disposition façon ChatGPT (sidebar avec conversations et puce compte, page Profil dédiée, Panel d'administration dédié avec tableaux/étiquettes shadcn-ui) ; aucun changement côté VM centrale ni du contrat API.
 
-## Prochaine : 1.2.1 — Style personnalisé du poste (ajustements CSS)
-
-Le socle React/TypeScript/Vite/shadcn-ui/Tailwind étant posé en 1.2.0, petite version de **style uniquement** : une identité visuelle plus personnalisée à l'usage du cabinet, sur les écrans et composants déjà en place. Pas de changement de structure — ni nouvel écran, ni nouveau composant, ni nouvelle dépendance — seulement des ajustements CSS (couleurs, typographie, espacements) sur les briques shadcn-ui/Tailwind déjà posées en 1.2.0.
-
-**Recherche.**
-
-- Plugin **`frontend-design`** pour une direction esthétique un peu plus travaillée que le « simple au début » retenu en 1.2.0 (charte visuelle du cabinet si elle existe, sinon une direction cohérente et sobre).
-- Rester dans les tokens/variables déjà en place (`index.css`, thème Tailwind/shadcn-ui) plutôt que d'introduire une nouvelle librairie de style.
-
-## Ensuite : 1.3.0 — Premier Agent (pôle Administration), axé Moduléo
+## Prochaine : 1.3.0 — Premier Agent (pôle Administration), axé Moduléo
 
 Premier **Agent** métier. Pôle **Administration**. Premier périmètre logiciel : **Moduléo** (utilisé par tout le cabinet), pas tout le métier d’un coup.
 

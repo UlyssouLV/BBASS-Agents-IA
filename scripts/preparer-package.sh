@@ -6,9 +6,10 @@
 set -u
 PKG_DIR="$1"
 
-if ! command -v uv >/dev/null 2>&1; then
-    echo "[ERREUR] \"uv\" est requis mais n'a pas ete trouve sur le PATH." >&2
-    echo "         Installe-le (voir README.md, section Prerequis), puis relance ce script." >&2
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=verifier-uv.sh
+. "$SCRIPT_DIR/verifier-uv.sh"
+if ! ensure_uv; then
     exit 1
 fi
 
