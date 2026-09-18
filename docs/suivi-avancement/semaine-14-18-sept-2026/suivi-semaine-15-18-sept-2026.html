@@ -326,7 +326,7 @@
             <div class="toc-row">
               <a href="#reste-a-implementer">Reste à implémenter</a>
               <span class="toc-dots" aria-hidden="true"></span>
-              <span class="toc-ref">V1.2.1 à V1.3.0</span>
+              <span class="toc-ref">V1.3.0 — reporté</span>
             </div>
           </li>
           <li>
@@ -349,6 +349,7 @@
               <li><a href="#version-1-1-2">V1.1.2 — Pièces jointes</a></li>
               <li><a href="#version-1-1-3">V1.1.3 — Consommation</a></li>
               <li><a href="#version-1-2-0">V1.2.0 — Interface poste</a></li>
+              <li><a href="#version-1-2-1">V1.2.1 — Identité visuelle et disposition</a></li>
             </ol>
           </li>
         </ol>
@@ -403,6 +404,8 @@
       <ul>
         <li>Livraison de la <strong>V1.2.0</strong> : interface du poste réécrite en React/TypeScript/Vite (shadcn/ui, Tailwind, TanStack Query). L’écran comptes (compte administrateur) passe d’un empilement de formulaires à un tableau et une modale par action (création, modification, statut administrateur, suppression — clé d’administration VM inchangée). Le build est committé dans git : un poste collaborateur n’installe pas Node.js (double-clic sur le lanceur comme avant).</li>
         <li>Revue de code SonarCloud : <code>main</code> était en note de sécurité E. Passage en revue des alertes (dont un signalement de parcours de fichier sur les pièces jointes, déjà contré dans le code, marqué faux positif) et nettoyage des « code smells ».</li>
+        <li>Ouverture puis livraison de la <strong>V1.2.1</strong> : identité visuelle du poste aux couleurs du cabinet BBASS Géomètre-Expert (palette anthracite/rouge de marque, police Manrope auto-hébergée, logo, favicon) et disposition façon ChatGPT (sidebar avec conversations et puce compte, page Profil dédiée, Panel d’administration dédié avec de vrais tableaux et étiquettes shadcn/ui). Périmètre initialement prévu comme « ajustements CSS uniquement », élargi en cours de grilling (décision explicite du cabinet) à cette refonte de disposition. Aucun changement côté VM centrale ni du contrat API ; suite pytest existante restée verte sans modification.</li>
+        <li>La V1.2.1 n’était pas prévue cette semaine : elle a pris la place initialement réservée à la V1.3.0. Faute de temps restant vendredi, l’ouverture de la <strong>V1.3.0</strong> (premier agent, pôle Administration, Moduléo) est <strong>reportée à la semaine prochaine</strong>.</li>
       </ul>
     </div>
 
@@ -411,15 +414,14 @@
     <section class="bloc" id="reste-a-implementer">
     <h2>Reste à implémenter</h2>
     <ul>
-      <li><strong>V1.2.1</strong> — style personnalisé du poste : ajustements CSS uniquement (couleurs, typographie, espacements) sur les briques déjà posées en V1.2.0, sans nouvel écran ni nouvelle dépendance.</li>
-      <li><strong>V1.3.0</strong> — premier agent, pôle Administration, Moduléo (API, serveur de test, lecture seule, plan d’automatisme sans écriture ni exécution).</li>
+      <li><strong>V1.3.0</strong> — premier agent, pôle Administration, Moduléo (API, serveur de test, lecture seule, plan d’automatisme sans écriture ni exécution). <strong>Reporté à la semaine prochaine</strong> : la V1.2.1 (identité visuelle et disposition), non prévue au départ, a pris la place de son ouverture cette semaine, par manque de temps.</li>
     </ul>
     </section>
 
     <section class="bloc" id="attendu-fin-de-semaine">
     <h2>Attendu pour la fin de semaine</h2>
     <div class="recap">
-      <p><strong>Point vendredi 18 septembre — visé : V1.3.0 · livré : V1.2.0</strong></p>
+      <p><strong>Point vendredi 18 septembre — visé : V1.3.0 · livré : V1.2.0, V1.2.1 · V1.3.0 reportée à la semaine prochaine (manque de temps, V1.2.1 non prévue)</strong></p>
       <h3>Architecture</h3>
       <ul>
         <li>Logiciel sur le poste (interface web locale) ; VM à Castries, réseau interne seulement.</li>
@@ -434,6 +436,7 @@
         <li>Pièces jointes (V1.1.2, livrée jeudi 17) : un document par message (PDF, Word, Excel ou image), stocké côté VM ; le fichier n’est pas conservé chez Mistral. OCR pour les PDF, extraction locale pour Word/Excel, analyse visuelle pour les images. Le chat n’a le contenu complet que le tour de l’envoi, puis une mention courte + un outil de rappel.</li>
         <li>Suivi de la consommation (V1.1.3, livrée jeudi 17) : une ligne par appel Mistral réel (chat, titrage, résumé+profil, OCR, vision), tokens ou pages, coût figé au tarif du jour. Fenêtre Consommation pour le collaborateur ; onglet Consommations pour un compte administrateur (agrégat par compte, jamais par conversation).</li>
         <li>Interface poste (V1.2.0, livrée vendredi 18) : React/TypeScript/Vite, shadcn/ui ; écran comptes en tableau + modales. Chat, consommation et profil de travail : même comportement qu’en 1.1.3, présentation migrée. Pas de Node.js sur un poste collaborateur.</li>
+        <li>Identité visuelle et disposition (V1.2.1, livrée vendredi 18) : couleurs et police du cabinet, logo, favicon ; sidebar avec conversations et puce compte en remplacement des onglets à plat ; page Profil dédiée (consommation, profil de travail, déconnexion) et Panel d’administration dédié (comptes, consommations en tableaux/étiquettes) pour un compte administrateur. Aucun changement de comportement ni du contrat API.</li>
       </ul>
       <h3>Comptes administrateurs</h3>
       <ul>
@@ -444,7 +447,7 @@
       </ul>
       <h3>Premier agent</h3>
       <ul>
-        <li>Pôle Administration, logiciel Moduléo, serveur de test : version minimale pour montrer que ça marche.</li>
+        <li>Pôle Administration, logiciel Moduléo, serveur de test : version minimale pour montrer que ça marche. <strong>Reporté à la semaine prochaine</strong> : la V1.2.1, non prévue au départ, a pris la place de son ouverture cette semaine, par manque de temps.</li>
       </ul>
     </div>
     </section>
@@ -519,6 +522,19 @@
         <div class="version-body">
         <p>Jusqu’ici, l’interface du poste tenait dans une unique page HTML et un unique script JavaScript (plus de 1 200 lignes). L’écran comptes d’un compte administrateur empilait tableau, formulaires de création et de modification, révélations de mot de passe et confirmations (clé d’administration VM) en permanence. Cette version réécrit tout le front en React/TypeScript, buildé par Vite, avec des composants shadcn/ui (modales, table, formulaires) et Tailwind. Les appels à la VM centrale passent par TanStack Query ; le contrat HTTP ne change pas.</p>
         <p>Le tableau des comptes est la vue par défaut ; créer, modifier, promouvoir/rétrograder ou supprimer s’ouvre dans une modale dédiée. La clé d’administration VM reste exigée pour la suppression et le changement de statut. Chat, consommation et profil de travail se comportent comme en 1.1.3. Le dossier compilé est committé dans git : un poste n’a pas Node.js, seulement le lanceur habituel.</p>
+        </div>
+      </div>
+
+      <div class="version" id="version-1-2-1">
+        <div class="version-head">
+          <h3>V1.2.1 — Identité visuelle et disposition</h3>
+          <span class="deploye">Déployé le 18/09/2026 à 16:43</span>
+        </div>
+        <div class="version-body">
+        <p>Le socle React/TypeScript/Vite/shadcn-ui posé en V1.2.0 restait entièrement gris : aucun lien visuel avec le cabinet BBASS Géomètre-Expert, et une navigation encore à plat (cinq onglets dans un seul écran), sans hiérarchie entre discuter avec l’IA et gérer son compte. Cette version devait au départ n’être qu’un ajustement de style (couleurs, typographie) ; le grilling a fait apparaître un vrai besoin de refonte de la disposition, et le cabinet a explicitement choisi d’élargir la V1.2.1 plutôt que d’ouvrir une version séparée — au prix d’un report de l’ouverture de la V1.3.0 à la semaine suivante.</p>
+        <p>Palette calquée sur le logo du cabinet (anthracite dominant pour les actions principales, rouge de marque réservé à des accents ponctuels, distinct du rouge « destructive » déjà en place) ; police Manrope téléchargée et committée dans le repo (jamais de CDN, l’appli reste utilisable sans connexion internet) ; logo intégré à l’écran de connexion et à la sidebar ; favicon dérivé du symbole « B » seul. Pas de mode sombre dans cette version.</p>
+        <p>La navigation façon ChatGPT remplace les cinq onglets à plat : une sidebar permanente porte la liste des conversations, la création d’une nouvelle conversation, et en bas la puce compte (initiales, prénom/nom, pôle/agence). Consommation et profil de travail migrent vers une page Profil plein écran, avec le bouton de déconnexion. Pour un compte administrateur, un bouton Panel d’administration ouvre une page dédiée reprenant Comptes et Consommations, restylés avec de vrais tableaux et étiquettes (shadcn/ui) au lieu de listes brutes — mêmes fonctionnalités qu’avant, uniquement la présentation change. Navigation par état React interne, toujours sans routeur.</p>
+        <p>Au fil des retours fonctionnels successifs pendant l’implémentation, le périmètre s’est encore étoffé : écran de composition façon ChatGPT (envoi par Entrée, pièce jointe glissée-déposée dans le champ de saisie), renommage inline d’une conversation, menu « … » par conversation, confirmation avant suppression, animations d’écriture (titre, réponse), barre de défilement plus discrète, et un camembert de répartition de la consommation sur la page Profil. Aucun changement côté VM centrale ni du contrat API ; la suite pytest existante reste verte, sans modification.</p>
         </div>
       </div>
     </section>
