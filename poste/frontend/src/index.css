@@ -55,9 +55,42 @@
   --border: oklch(0.9 0.006 315);
   --input: oklch(0.9 0.006 315);
   --ring: oklch(0.55 0.18 26);
+  /* Issue #85 : barre de défilement plus fine et discrète (fil de chat,
+     sidebar) que le rendu natif, aux couleurs du poste — anthracite du
+     logo (--primary), semi-transparent au repos pour rester discret,
+     plus opaque au survol pour rester repérable pendant le glisser. */
+  --scrollbar-thumb: oklch(0.27 0.02 315 / 35%);
+  --scrollbar-thumb-hover: oklch(0.27 0.02 315 / 55%);
 }
 
 body {
   @apply bg-background text-foreground;
   font-family: var(--font-sans);
+}
+
+/* Issue #85 : rendu standard (Firefox, Chromium récent) — piste
+   transparente, curseur fin plutôt que le double bouton natif. */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+/* Issue #85 : équivalent WebKit/Chromium pour les navigateurs qui
+   n'appliquent pas encore scrollbar-color (Electron/Chromium plus anciens). */
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb);
+  border-radius: 9999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scrollbar-thumb-hover);
 }
