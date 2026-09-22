@@ -24,8 +24,8 @@ Always project-scoped. Never `~/.cursor/skills/` or `~/.claude/skills/`.
 
 ## 2. Write `agents/skills/<bucket>/<name>/SKILL.md`
 
-- **`meta/`** — capabilities of the coding agents themselves (this skill).
-- **`process/`** — recipes of the version cycle (`ouvrir-la-version`, `encadrer-implement`, `finaliser-la-version`).
+- **`meta/`** — primary capabilities of the coding agents (this skill; later: commit, etc.). They do not orchestrate other project skills.
+- **`process/`** — composed recipes that call other skills (e.g. the version cycle: `ouvrir-la-version`, `encadrer-implement`, `finaliser-la-version`).
 - If the bucket is unclear, ask. Do not invent it.
 - Folder name = frontmatter `name`: lowercase, hyphens, max 64 characters.
 - `description`: third person, **what** + **when**. Triggers live here, not restated as a list in the body.
