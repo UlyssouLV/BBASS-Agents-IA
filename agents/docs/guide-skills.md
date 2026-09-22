@@ -50,6 +50,30 @@ Propose un **titre** de commit (français, le pourquoi). Ne commit pas. Avec `/d
 
 ## Process
 
+### Commit
+
+**Commande :** `/c`
+
+**Options :** `/a` — tout le working tree, pas seulement l’index. `/p` — push après le commit. `/p /f` — `--force-with-lease` après confirmation **oui** au message suivant.
+
+**Corps :** inutile ; le skill relit le diff via `/mc /d` (bloc 3 = message).
+
+Commit sur la branche courante (HEAD ↔ working tree). Défaut = fichiers déjà stagés. Refuse `main` / `master`. Secrets exclus. Équivalent process : skill `commit`.
+
+**Exemple :**
+
+```
+/c
+```
+
+```
+/c /a /p
+```
+
+```
+/c /p /f
+```
+
 ### Ouvrir la version
 
 **Commande :** `Ouvre la version`

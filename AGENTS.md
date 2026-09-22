@@ -26,4 +26,4 @@ HTTP-boundary tests only (observable responses). Do not praise or require tests 
 
 ## Git
 
-Commit and push only when the **current user message** explicitly asks, **except** skill `encadrer-implement` after green tests (that skill is the permission: commit, push, close the child, drop `ready-for-agent`). Never force-push. Never commit `.env`, `*.db`, `.venv`, or secrets.
+Commit and push only when the **current user message** explicitly asks, **except** skill `encadrer-implement` after green tests (that skill is the permission: commit, push, close the child, drop `ready-for-agent`) and skill `commit` (`/c`; `/c /p` pushes; `/c /p /f` is `--force-with-lease` only after **oui** on the next turn). Never force-push otherwise. Never commit `.env`, `*.db`, `.venv`, or secrets.

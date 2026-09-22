@@ -4,4 +4,4 @@ C’est depuis ce dossier qu’on génère les skills, hooks et le reste de l’
 
 Les conventions de process (tracker, labels, lecture du domaine) sont ici. Comment lancer les skills : [docs/guide-skills.md](docs/guide-skills.md).
 
-Skills : `agents/skills/meta/` (fonctions primaires des agents : créer un skill, commit, …) et `agents/skills/process/` (recettes qui s’appellent entre elles, ex. cycle de version). Nouveau skill : `creer-skill`, puis `python3 agents/scripts/dispatch.py` (copie à plat vers `.claude/skills/` et `.cursor/skills/`).
+Skills : `agents/skills/meta/` (fonctions primaires des agents : créer un skill, message de commit, …) et `agents/skills/process/` (recettes qui s’appellent entre elles, ex. cycle de version, `/c`). Nouveau skill : `creer-skill`, puis `python3 agents/scripts/dispatch.py` (copie à plat vers `.claude/skills/` et `.cursor/skills/`).
