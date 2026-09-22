@@ -41,5 +41,5 @@ Done when the command prints a PR URL. Reply with that URL.
 ## Not this skill
 
 - Create the branch: skill `ouvrir-branche` (`/ob`).
-- Squash-merge / release: skill `finaliser-la-version`.
+- Squash-merge / release: skill `finaliser-la-version` / `fusionner-pr` (`/mpr`) / `creer-release` (`/crel`).
 - Whole version cycle: skill `ouvrir-la-version`.

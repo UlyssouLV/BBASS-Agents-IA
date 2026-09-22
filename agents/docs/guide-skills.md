@@ -125,6 +125,38 @@ Fixes #12
 Fixes #13
 ```
 
+### Créer une release
+
+**Commande :** `/crel`
+
+**Options :** aucune.
+
+**Corps :** `vX.Y.Z` (ou `X.Y.Z`), éventuellement le purpose.
+
+Crée la GitHub Release **sur le SHA de la branche courante**, pas `main`. Titre `VX.Y.Z — …`. Notes : Pourquoi / Ce qu’on peut faire / Historique (PR + Fixes) / Hors périmètre (ADR sur le tag). Ne retaggue pas. Pas de merge. Équivalent : « crée une release ».
+
+**Exemple :**
+
+```
+/crel v1.3.0
+```
+
+### Fusionner le PR
+
+**Commande :** `/mpr`
+
+**Options :** aucune.
+
+**Corps :** inutile.
+
+Squash-merge du PR de la branche courante dans `main`, suppression de la branche. Ne déplace pas le tag de release. Équivalent : « fusionne le PR ».
+
+**Exemple :**
+
+```
+/mpr
+```
+
 ---
 
 
@@ -221,7 +253,7 @@ TDD du ticket (plugin `/implement`). La **fin** : **`/t`**, **`/c -p`**, **`/cci
 
 **Corps :** inutile.
 
-Release GitHub, squash-merge dans `main`, suppression de la branche. Tous les enfants du PR doivent être Closed. Skill `finaliser-la-version`.
+Enfants Closed + docs à jour (`/c -a -p` si besoin), puis **`/crel`**, puis **`/mpr`**. Skill `finaliser-la-version`.
 
 **Exemple :**
 
