@@ -46,6 +46,22 @@ Propose un **titre** de commit (français, le pourquoi). Ne commit pas. Avec `/d
 /mc /d
 ```
 
+### Lister les skills
+
+**Commande :** `/sl`
+
+**Options :** aucune.
+
+**Corps :** inutile ; le skill scanne `agents/skills/`, `.claude/skills/` et `.cursor/skills/`.
+
+Tableau : chaque skill, bucket `meta`/`process` s’il est sous `agents/`, présence Claude / Cursor. Liste les écarts (adaptateur seul, source sans copie). Équivalent : « récapitule les skills ».
+
+**Exemple :**
+
+```
+/sl
+```
+
 ---
 
 ## Process
