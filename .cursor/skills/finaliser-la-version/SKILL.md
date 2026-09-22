@@ -15,7 +15,7 @@ A version = one feature branch + one PR that ships a **set** of child issues (pa
 
 Do **not** `/implement` here. Do **not** `gh issue close` children here (they should already be Closed). Do **not** close the parent by hand — squash `Fixes` does that.
 
-Paths: load **`agents/roles.yml`**, use `roles.<name>.paths`. Missing role → skip; do not invent a path.
+Paths: **`agents/roles.yml`**.
 
 ## 0. Locate the PR
 

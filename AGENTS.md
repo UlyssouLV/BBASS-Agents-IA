@@ -18,7 +18,7 @@ Canonical labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-hu
 
 ## Domain
 
-Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. See `agents/domain.md`. File roles (roadmap, glossary, spec, tests, …): `agents/roles.yml`. `/code-review` **Standards**: start here (`AGENTS.md`).
+See `agents/domain.md`. File roles and path lookup: `agents/roles.yml`. `/code-review` **Standards**: start here (`AGENTS.md`).
 
 ## Tests
 

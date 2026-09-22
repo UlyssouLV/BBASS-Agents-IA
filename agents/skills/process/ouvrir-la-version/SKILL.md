@@ -12,7 +12,7 @@ Triggered by **« Ouvre la version »**. The user **must** give a semver **`X.Y.
 
 Do **not** `/implement` here. Do **not** merge. Do **not** `git commit` on **`main`**. Git branch / commit / PR go through the skills below, not inline.
 
-Paths: load **`agents/roles.yml`**, use `roles.<name>.paths`. Missing role → skip; do not invent a path.
+Paths: **`agents/roles.yml`**.
 
 ## 1. Purpose
 

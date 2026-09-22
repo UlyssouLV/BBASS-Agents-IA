@@ -31,7 +31,7 @@ Always project-scoped. Never `~/.cursor/skills/` or `~/.claude/skills/`.
 - If the bucket is unclear, ask. Do not invent it.
 - Folder name = frontmatter `name`: lowercase, hyphens, max 64 characters.
 - `description`: third person, **what** + **when**. Triggers live here, not restated as a list in the body.
-- Body: ordered steps, each with a done-when. Point at repo docs instead of pasting them.
+- Body: ordered steps, each with a done-when. Point at repo docs instead of pasting them. Repo paths: one line `Paths: **agents/roles.yml**.` — do not copy the lookup/stop rules; they live in that file.
 - Optional siblings in the same folder: `references/`, `scripts/`. Keep `SKILL.md` the recipe.
 
 Match this repo’s skills (`ouvrir-la-version`, `encadrer-implement`, `finaliser-la-version`): short, imperative, French trigger phrases when the human says them in French.

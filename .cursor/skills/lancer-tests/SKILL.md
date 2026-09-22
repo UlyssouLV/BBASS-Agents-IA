@@ -12,7 +12,7 @@ description: >-
 
 HTTP-boundary tests only (Tests convention in `AGENTS.md` via role **`agent-adapter`**). Do not add or praise tests of internal function calls.
 
-Paths: load **`agents/roles.yml`**, use `roles.<name>.paths`. Missing role → skip; do not invent a path.
+Paths: **`agents/roles.yml`**.
 
 ## 1. Which packages
 
