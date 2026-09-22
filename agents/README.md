@@ -3,3 +3,5 @@
 C’est depuis ce dossier qu’on génère les skills, hooks et le reste de l’outillage des agents de développement. Le résultat est ensuite dispatché de façon cohérente dans les méthodes de travail des différents modèles d’IA (Cursor, Claude Code).
 
 Les conventions de process (tracker, labels, lecture du domaine) sont ici.
+
+Skills : `agents/skills/meta/` (capacités des agents) et `agents/skills/process/` (cycle de version). Nouveau skill : `creer-skill`, puis `python3 agents/scripts/dispatch.py` (copie à plat vers `.claude/skills/` et `.cursor/skills/`).
