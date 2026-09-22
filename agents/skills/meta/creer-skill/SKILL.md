@@ -2,13 +2,15 @@
 name: creer-skill
 description: >-
   Author a project skill under agents/skills/meta/ or agents/skills/process/ then dispatch it to Claude Code
-  and Cursor. Use when the user wants to create, write, or add a skill, or says
-  « crée un skill ». Not for hooks, MCP, or editing AGENTS.md alone.
+  and Cursor. Use when the user wants to create, write, or add a skill, says
+  « crée un skill », or types `/cs`. Not for hooks, MCP, or editing AGENTS.md alone.
 ---
 
 # Create a project skill
 
 Write **one** `SKILL.md` under `agents/skills/meta/` or `agents/skills/process/`. Then copy it to the IDE adapters with the repo script. Do **not** write a skill directly into `.claude/skills/` or `.cursor/skills/`.
+
+`/cs` is the same trigger as « crée un skill ».
 
 ## 1. Gather
 
@@ -45,7 +47,20 @@ python3 agents/scripts/dispatch.py --check
 
 If `--check` fails: stop. Do not hand-edit `.claude/skills/` or `.cursor/skills/` to “fix” it; fix the source and dispatch again.
 
-Done when the new folder exists under `agents/skills/meta/` or `agents/skills/process/` **and** `--check` is green.
+## 4. Guide
+
+Add (or replace if that heading already exists) one section in `agents/docs/guide-skills.md`. Same shape as the peers already in the file:
+
+- French title (`### …`)
+- **Commande :**
+- **Options :**
+- **Corps :**
+- one line of what it does
+- **Exemple :** a fenced block of what the user would type
+
+Put it under `## Meta` or `## Process` to match the bucket. Do not rewrite the rest of the guide.
+
+Done when the new folder exists under `agents/skills/meta/` or `agents/skills/process/`, `--check` is green, **and** the guide has that section.
 
 ## Not this skill
 
