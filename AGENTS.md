@@ -1,39 +1,29 @@
 # AGENTS.md
 
-## Agent skills
+## Cycle
 
-### Issue tracker
+**« Ouvre la version »** → implement each child (close when tests are green) → **« Finalise la version »**. The **parent** spec closes via `Fixes` on the squash. Do **not** leave implemented children Open. Do **not** close the parent from `encadrer-implement`.
 
-Issues live as GitHub issues in this repo (`UlyssouLV/BBASS-Agents-IA`), managed via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+- **« Ouvre la version »** (must include **`X.Y.Z`**): skill `ouvrir-la-version`
+- Child-ticket TDD: `/implement`, then skill `encadrer-implement`
+- **« Finalise la version »**: skill `finaliser-la-version`
 
-### Triage labels
+See `agents/README.md`.
 
-Canonical labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`. No `awaiting-merge`.
+## Tracker
 
-### After `/implement`
+Issues live as GitHub issues in this repo (`UlyssouLV/BBASS-Agents-IA`), managed via the `gh` CLI. See `agents/issue-tracker.md`.
 
-Matt Pocock `/implement` for TDD. **Next action** (the plugin’s closing step, in this repo): skill `encadrer-implement` — tests → commit + push + **close the child** and **remove `ready-for-agent`** → next unblocked Open child (`/clear` + `/implement`) **or**, if every PR child is Closed, ask the user to **test functionally** then **« Finalise la version »**. A repo hook blocks `/code-review` unless the current user message asks for it.
+Canonical labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `agents/triage-labels.md`. No `awaiting-merge`.
 
-### Ouvre the version
+## Domain
 
-When the user says **« Ouvre la version »** (must include **`X.Y.Z`**): skill `ouvrir-la-version`. Purpose from **`docs/suivi-avancement/feuille-de-route-dev.md`** when that version is already listed (otherwise ask) → `/grill-with-docs` → `/to-spec` (parent issue; **no spec files on `main`**) → **branch from `main` → immediate init commit+push** (uncommitted leftover on `main` goes on that branch, **never** a commit on `main` ; `docs/specs` + doc updates) → `/to-tickets` (propose, **yes**, then create with **native** blocked-by **and parent blocked by every child**, then drop `ready-for-agent` on the parent) → PR → propose `/clear` and `/implement` the first unblocked **child**.
+Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. See `agents/domain.md`. `/code-review` **Standards**: start here (`AGENTS.md`).
 
-### Finalise the version
+## Tests
 
-When the user says **« Finalise la version »**: skill `finaliser-la-version`. Check every PR **child** is **Closed**, **docs** (`README.md`, `CONTEXT.md`, `CLAUDE.md`, `AGENTS.md`, `docs/` including **`docs/suivi-avancement/feuille-de-route-dev.md`**) match the version, **then** GitHub Release (semver tag on the **feature branch** SHA), **then** squash-merge into `main` and delete the feature branch.
+HTTP-boundary tests only (observable responses). Do not praise or require tests of internal function calls. Same convention as V1 and `docs/specs/`.
 
-### Domain docs
+## Git
 
-Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`. `/code-review` Standards: start at `CLAUDE.md`.
-
-## Git commits and pushes
-
-After a green `/implement` of a child ticket, skill `encadrer-implement` **does** commit, push, remove `ready-for-agent`, and close that child (no extra “say the word”). Still never force-push; never commit `.env`, `*.db`, `.venv`, or secrets.
-
-Do **not** commit or push for other reasons unless the **current user message** explicitly asks.
-
-## GitHub issues vs `main`
-
-Cycle: **« Ouvre la version »** (grill + spec, then branch + tickets + PR) → implement children (**close each child** when tests are green) → **« Finalise la version »** (docs gate, Release tag on the feature SHA, squash-merge to `main`, delete the branch). The **parent** spec closes via `Fixes` on the squash.
-
-Do **not** leave implemented children Open. Close them so dependents unblock. Do **not** close the parent from `encadrer-implement`.
+Commit and push only when the **current user message** explicitly asks, **except** skill `encadrer-implement` after green tests (that skill is the permission: commit, push, close the child, drop `ready-for-agent`). Never force-push. Never commit `.env`, `*.db`, `.venv`, or secrets.

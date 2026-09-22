@@ -2,7 +2,7 @@
 
 How the engineering skills should consume this repo's domain documentation when exploring the codebase.
 
-`/code-review` **Standards** starts at repo-root `CLAUDE.md`, which points here. Load this file, then `CONTEXT.md` and relevant `docs/adr/`, instead of reporting “no conventions”.
+`/code-review` **Standards** starts at repo-root `AGENTS.md`, which points here. Load this file, then `CONTEXT.md` and relevant `docs/adr/`, instead of reporting “no conventions”. Claude Code also has `.claude/CLAUDE.md` (adapter only: hook, `/implement` close); it is not the Standards entry.
 
 ## Before exploring, read these
 
