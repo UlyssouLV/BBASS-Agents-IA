@@ -4,14 +4,14 @@ description: >-
   Push the current branch and open a GitHub PR into main. Use when the
   user types `/opr` or says « ouvre une PR » / « ouvre une pull request »,
   or when another skill tells you to run ouvrir-pr with a title and body.
-  Do not merge. Do not force-push. Not `/ob`. Not « Finalise la version ».
+  `-draft` opens a draft PR. Do not merge. Do not force-push. Not `/ob`. Not « Finalise la version ».
 ---
 
 # Open a pull request
 
 `/opr` **is** permission to `git push` the **current** branch (`-u origin HEAD` if it has no upstream) and `gh pr create` into `main`. No force-push. Do not merge. Do not delete the branch. Do not `git commit` (skill `commit` / `/c`).
 
-Treat `/opr` as a whole token (slash + letters).
+`/` = this skill’s trigger. `-` = options. Treat `/opr` and `-draft` as whole tokens.
 
 ## 1. Guards
 
@@ -27,7 +27,7 @@ If they are missing:
 - **Title:** subject of `git log -1 --format='%s'`
 - **Body:** `## Summary` plus the commit subjects of `git log origin/main..HEAD --format='%s'` (or one line if that is empty)
 
-If the asker said **draft**, create a draft. Otherwise a ready PR.
+If **`-draft`** is present, create a draft. Otherwise a ready PR.
 
 Keep `Fixes #<n>` lines **verbatim** when the asker (or calling skill) gave them — one keyword per issue. Do not invent issue numbers.
 

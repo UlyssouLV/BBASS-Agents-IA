@@ -42,7 +42,7 @@ Then write on **this** branch only:
 - `docs/specs/` for this version (the `/to-spec` body)
 - `CONTEXT.md` / `AGENTS.md` / `.claude/CLAUDE.md` / `agents/` / `docs/adr/` only if this version actually changes them (new ADR; never rewrite old ADR history)
 
-Then run skill **`commit`** as if the user had typed **`/c /a /p`**. That commit **is** the initialisation de la version. `main` stays unchanged.
+Then run skill **`commit`** as if the user had typed **`/c -a -p`**. That commit **is** the initialisation de la version. `main` stays unchanged.
 
 ## 5. `/to-tickets` — propose, **then** create
 
@@ -59,7 +59,7 @@ A body `Blocked by: #n` line is only a fallback. Do not create tickets before th
 
 ## 6. Pull request
 
-Run skill **`ouvrir-pr`** as if the user had typed **`/opr draft`** with:
+Run skill **`ouvrir-pr`** as if the user had typed **`/opr -draft`** with:
 
 - Title: `VX.Y.Z — <purpose in one line>`
 - `## Summary` (what this version is)

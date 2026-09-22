@@ -41,6 +41,6 @@ Done when `git branch --show-current` is `<name>` and `main` has no new commit. 
 
 ## Not this skill
 
-- Commit / push: skill `commit` (`/c`, `/c /a /p`).
+- Commit / push: skill `commit` (`/c`, `/c -a -p`).
 - Open a PR: skill `ouvrir-pr` (`/opr`).
 - Whole version cycle: skill `ouvrir-la-version`.
