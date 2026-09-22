@@ -62,6 +62,45 @@ Tableau : chaque skill, bucket `meta`/`process` s’il est sous `agents/`, prés
 /sl
 ```
 
+### Ouvrir une branche
+
+**Commande :** `/ob`
+
+**Options :** aucune.
+
+**Corps :** le nom de la branche. S’il manque, le skill demande et attend.
+
+Crée et checkout la branche depuis `origin/main`, en emportant le working tree. Pas de commit, pas de push. Stop si le nom existe. Équivalent : « ouvre une branche ».
+
+**Exemple :**
+
+```
+/ob v1.3.0-carte
+```
+
+### Ouvrir une pull request
+
+**Commande :** `/opr`
+
+**Options :** `draft` dans le corps si tu veux un brouillon.
+
+**Corps :** titre + summary / `Fixes` si tu les as ; sinon titre = dernier commit.
+
+Push la branche courante (pas de force) et ouvre un PR vers `main`. Refuse `main`. Équivalent : « ouvre une PR ».
+
+**Exemple :**
+
+```
+/opr
+```
+
+```
+/opr draft
+VX.Y.Z — un job
+Fixes #12
+Fixes #13
+```
+
 ---
 
 ## Process
@@ -98,7 +137,7 @@ Commit sur la branche courante (HEAD ↔ working tree). Défaut = fichiers déj�
 
 **Corps :** seulement si la version n’est pas déjà dans `docs/suivi-avancement/feuille-de-route-dev.md` — à quoi elle sert (un job).
 
-Grill + spec + branche + tickets + PR, puis propose le premier `/implement`. Skill `ouvrir-la-version`.
+Grill + spec, puis **`/ob`**, écriture de la spec, **`/c /a /p`**, tickets, **`/opr draft`**, puis propose le premier `/implement`. Skill `ouvrir-la-version`.
 
 **Exemple :**
 
