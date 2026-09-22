@@ -1,0 +1,29 @@
+# Skills refer to roles. Paths live only here.
+# Missing role: skip; do not invent the file.
+# Lookup: roles.<name>.paths  (always a list)
+
+roles:
+  roadmap:
+    paths:
+      - docs/suivi-avancement/feuille-de-route-dev.md
+  glossary:
+    paths:
+      - CONTEXT.md
+  spec:
+    paths:
+      - docs/specs/
+  adr:
+    paths:
+      - docs/adr/
+  readme:
+    paths:
+      - README.md
+  agent-adapter:
+    paths:
+      - AGENTS.md
+      - .claude/CLAUDE.md
+      - agents/
+  test-roots:
+    paths:
+      - vm-centrale
+      - poste

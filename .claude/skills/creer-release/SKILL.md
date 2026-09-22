@@ -13,6 +13,8 @@ description: >-
 
 `/crel` **is** permission to `gh release create` **targeting the current branch SHA**. Do not merge. Do not delete the branch. Do not `git commit`. Do not force-push. Do not retag an existing `vX.Y.Z`.
 
+Paths: load **`agents/roles.yml`**, use `roles.<name>.paths`. Missing role → skip; do not invent a path.
+
 ## 1. Guards
 
 1. `git branch --show-current` is `main` or `master` → stop.
@@ -61,12 +63,14 @@ Tickets (`Fixes`) : #… #…
 
 ADRs de cette version (liens **sur ce tag**, pas `main`) :
 
-- https://github.com/<owner>/<repo>/blob/vX.Y.Z/docs/adr/NNNN-….md
+- https://github.com/<owner>/<repo>/blob/vX.Y.Z/<adr-path>
 
 Issues laissées de côté (ex. `#6`) : #…
 ```
 
-Fill from the PR body (`Fixes`, summary), parent spec, and `docs/adr/` added on this branch. If the caller already passed notes, **fit them into these headings** — do not replace the layout with a free-form blob.
+`<adr-path>` = files under role **`adr`** (`agents/roles.yml`). Missing role → omit the ADR list.
+
+Fill from the PR body (`Fixes`, summary), parent spec, and role **`adr`** files added on this branch. If the caller already passed notes, **fit them into these headings** — do not replace the layout with a free-form blob.
 
 Owner/repo from `git remote`. PR number from `gh pr view` for this branch.
 

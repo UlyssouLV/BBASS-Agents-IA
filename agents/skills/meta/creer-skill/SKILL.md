@@ -65,4 +65,4 @@ Done when the new folder exists under `agents/skills/meta/` or `agents/skills/pr
 ## Not this skill
 
 - Claude/Cursor **hooks** or MCP configs.
-- Rewriting `AGENTS.md` / `.claude/CLAUDE.md` unless the new skill needs a one-line pointer there.
+- Rewriting files in role **`agent-adapter`** (`agents/roles.yml`) unless the new skill needs a one-line pointer there.

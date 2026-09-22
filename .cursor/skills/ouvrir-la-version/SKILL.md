@@ -12,9 +12,11 @@ Triggered by **« Ouvre la version »**. The user **must** give a semver **`X.Y.
 
 Do **not** `/implement` here. Do **not** merge. Do **not** `git commit` on **`main`**. Git branch / commit / PR go through the skills below, not inline.
 
+Paths: load **`agents/roles.yml`**, use `roles.<name>.paths`. Missing role → skip; do not invent a path.
+
 ## 1. Purpose
 
-Read **`docs/suivi-avancement/feuille-de-route-dev.md`**. If that file already describes version **`X.Y.Z`** (heading « Prochaine : X.Y.Z », « Ensuite : X.Y.Z », or equivalent):
+Read role **`roadmap`**. If that file already describes version **`X.Y.Z`** (heading « Prochaine : X.Y.Z », « Ensuite : X.Y.Z », or equivalent):
 
 - That section **is** the purpose (one job, product language). State it back in one sentence, then go to step 2. Do **not** ask « what is this version for? ».
 - The file is a roadmap, not a spec: grilling may still refine it. Do not invent a different job.
@@ -25,7 +27,7 @@ If **`X.Y.Z` is absent** from that file: ask **what is this version for?** (one 
 
 Call **grill-with-docs**. Rounds until the tree is empty. **Wait** for shared-understanding confirmation.
 
-If the current branch is **`main`**: do **not** write `docs/specs`, `CONTEXT.md`, or ADRs to disk yet (that would dirty `main`). Keep decisions in the conversation.
+If the current branch is **`main`**: do **not** write roles **`spec`**, **`glossary`**, or **`adr`** to disk yet (that would dirty `main`). Keep decisions in the conversation.
 
 ## 3. `/to-spec` (content first)
 
@@ -39,8 +41,8 @@ Run skill **`ouvrir-branche`** as if the user had typed **`/ob vX.Y.Z-<slug>`**.
 
 Then write on **this** branch only:
 
-- `docs/specs/` for this version (the `/to-spec` body)
-- `CONTEXT.md` / `AGENTS.md` / `.claude/CLAUDE.md` / `agents/` / `docs/adr/` only if this version actually changes them (new ADR; never rewrite old ADR history)
+- role **`spec`** for this version (the `/to-spec` body)
+- roles **`glossary`**, **`agent-adapter`**, **`adr`** only if this version actually changes them (new ADR; never rewrite old ADR history)
 
 Then run skill **`commit`** as if the user had typed **`/c -a -p`**. That commit **is** the initialisation de la version. `main` stays unchanged.
 

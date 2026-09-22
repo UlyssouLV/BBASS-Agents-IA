@@ -15,6 +15,8 @@ A version = one feature branch + one PR that ships a **set** of child issues (pa
 
 Do **not** `/implement` here. Do **not** `gh issue close` children here (they should already be Closed). Do **not** close the parent by hand — squash `Fixes` does that.
 
+Paths: load **`agents/roles.yml`**, use `roles.<name>.paths`. Missing role → skip; do not invent a path.
+
 ## 0. Locate the PR
 
 Current branch must not be `main`. Resolve the open PR for this branch (`gh pr view`). If none, stop.
@@ -35,15 +37,14 @@ If the PR body’s `Fixes` line would not close the **parent** on squash, **edit
 
 ## 2. Docs must match this version (before tag and squash)
 
-Read, against the parent spec / ADRs / code that this PR actually ships:
+Read each role below (paths from `agents/roles.yml`), against the parent spec / ADRs / code that this PR actually ships:
 
-- `README.md` — « État actuel », lancement, comptes de test : no leftover previous-version branch names or « not built yet » for features this version delivered.
-- `CONTEXT.md` — glossary and ADR links match the model (new terms, reversed V1 decisions).
-- `.claude/CLAUDE.md` — Claude adapter still valid (hook, `/implement` close, Standards pointer to `AGENTS.md`).
-- `AGENTS.md` — skills named here exist under `agents/skills/` (synced to `.claude/skills/` and `.cursor/skills/`); implement / finalise cycle matches those skills.
-- `docs/` — spec for this version under `docs/specs/` ; new ADRs under `docs/adr/` if decisions changed.
-- `agents/` — process docs still match (tracker, labels, domain).
-- **`docs/suivi-avancement/feuille-de-route-dev.md`** — must match the version just shipped:
+- **`readme`** — « État actuel », lancement, comptes de test : no leftover previous-version branch names or « not built yet » for features this version delivered.
+- **`glossary`** — glossary and ADR links match the model (new terms, reversed V1 decisions).
+- **`agent-adapter`** — Claude adapter still valid (hook, `/implement` close, Standards pointer); skills named in `AGENTS.md` exist under `agents/skills/` (synced to the IDE adapters); implement / finalise cycle matches those skills; process docs still match (tracker, labels, domain).
+- **`spec`** — spec for this version exists there.
+- **`adr`** — new ADRs if decisions changed.
+- **`roadmap`** — must match the version just shipped:
   - Move this **`X.Y.Z`** into **Déjà livré** (one short product line: what you can do now). Drop it from « Prochaine » / « Ensuite ».
   - The **next** numbered version in that file becomes **Prochaine** (keep its objectif / recherche). Renumber « Ensuite » headings if needed.
   - Delete leftover claims that this version has **not** delivered. Do not invent new versions; only reshuffle what is already listed.
