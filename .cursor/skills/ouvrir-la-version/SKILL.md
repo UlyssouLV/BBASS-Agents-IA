@@ -16,7 +16,7 @@ Paths: **`agents/roles.yml`**.
 
 ## 1. Purpose
 
-Read role **`roadmap`**. If that file already describes version **`X.Y.Z`** (heading « Prochaine : X.Y.Z », « Ensuite : X.Y.Z », or equivalent):
+Read role **`roadmap`**. If that file already describes version **`X.Y.Z`**:
 
 - That section **is** the purpose (one job, product language). State it back in one sentence, then go to step 2. Do **not** ask « what is this version for? ».
 - The file is a roadmap, not a spec: grilling may still refine it. Do not invent a different job.

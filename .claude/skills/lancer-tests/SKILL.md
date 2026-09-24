@@ -1,7 +1,7 @@
 ---
 name: lancer-tests
 description: >-
-  Run the HTTP-boundary pytest suites under role test-roots (agents/roles.yml).
+  Run the pytest suites under role test-roots (agents/roles.yml).
   Use when the user types `/t` or says « lance les tests », or when another
   skill tells you to run lancer-tests. Do not commit. Do not close issues.
 ---
@@ -10,7 +10,7 @@ description: >-
 
 `/` = this skill’s trigger. No options.
 
-HTTP-boundary tests only (Tests convention in `AGENTS.md` via role **`agent-adapter`**). Do not add or praise tests of internal function calls.
+Follow the Tests convention in role **`agent-adapter`**. Do not invent a different test style.
 
 Paths: **`agents/roles.yml`**.
 

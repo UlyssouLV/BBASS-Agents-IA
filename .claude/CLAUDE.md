@@ -12,4 +12,4 @@ Un hook (`.claude/hooks/gate-code-review.py`) refuse le skill `/code-review` tan
 
 ## Out of this file
 
-Tracker, labels, cycle Ouvre / Implement / Finalise: `AGENTS.md` and `agents/`. Product spec for the Spec review axis: the originating issue plus `docs/specs/`.
+Tracker, labels, cycle Ouvre / Implement / Finalise: `AGENTS.md` and `agents/`. Product spec for the Spec review axis: the originating issue plus role **`spec`** (`agents/roles.yml`).

@@ -24,6 +24,13 @@ See `agents/domain.md`. File roles and path lookup: `agents/roles.yml`. `/code-r
 
 HTTP-boundary tests only (observable responses). Do not praise or require tests of internal function calls. Same convention as V1 and `docs/specs/`.
 
+## Docs
+
+« Finalise la version » extra checks (role **`agent-adapter`**):
+
+- **`readme`**: « État actuel », lancement, comptes de test — no leftover previous-version branch names or « not built yet » for features this version delivered.
+- **`roadmap`**: move **`X.Y.Z`** into **Déjà livré**; drop it from « Prochaine » / « Ensuite »; the next listed version becomes **Prochaine** (keep objectif / recherche).
+
 ## Git
 
 Commit and push only when the **current user message** explicitly asks, **except** skill `encadrer-implement` after green tests (that skill is the permission: commit, push, close the child, drop `ready-for-agent`), skill `commit` (`/c`; `/c -p` pushes; `/c -p -f` is `--force-with-lease` only after **oui** on the next turn), skill `ouvrir-pr` (`/opr`: push then `gh pr create` into `main`), skill `creer-release` (`/crel`: `gh release create` on the feature SHA), and skill `fusionner-pr` (`/mpr`: squash-merge into `main` and delete the branch). Never force-push otherwise. Never commit `.env`, `*.db`, `.venv`, or secrets.

@@ -65,7 +65,7 @@ ADRs de cette version (liens **sur ce tag**, pas `main`) :
 
 - https://github.com/<owner>/<repo>/blob/vX.Y.Z/<adr-path>
 
-Issues laissées de côté (ex. `#6`) : #…
+Issues laissées de côté (PR / spec hors périmètre) : #…
 ```
 
 `<adr-path>` = files under role **`adr`**.

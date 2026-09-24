@@ -25,7 +25,7 @@ Infer **`X.Y.Z`** from the branch `vX.Y.Z-<slug>` or the PR title `VX.Y.Z — �
 
 ## 1. Every related issue is published
 
-Related = listed in the PR body (`Fixes` / `Part of`) **and** children of the parent spec that are in scope for this PR. Ignore `wontfix` and issues explicitly out of the version (e.g. #6). See `agents/issue-tracker.md`.
+Related = listed in the PR body (`Fixes` / `Part of`) **and** children of the parent spec that are in scope for this PR. Ignore `wontfix` and issues the PR or parent spec mark as out of this version. See `agents/issue-tracker.md`.
 
 **Published** = each in-scope **child** is **Closed**.
 
@@ -39,15 +39,12 @@ If the PR body’s `Fixes` line would not close the **parent** on squash, **edit
 
 Read each role below (paths from `agents/roles.yml`), against the parent spec / ADRs / code that this PR actually ships:
 
-- **`readme`** — « État actuel », lancement, comptes de test : no leftover previous-version branch names or « not built yet » for features this version delivered.
-- **`glossary`** — glossary and ADR links match the model (new terms, reversed V1 decisions).
-- **`agent-adapter`** — Claude adapter still valid (hook, `/implement` close, Standards pointer); skills named in `AGENTS.md` exist under `agents/skills/` (synced to the IDE adapters); implement / finalise cycle matches those skills; process docs still match (tracker, labels, domain).
+- **`readme`** — matches what this version shipped. Extra README checks live in role **`agent-adapter`**; do not invent a layout.
+- **`glossary`** — glossary and ADR links match the model (new terms, reversed decisions).
+- **`agent-adapter`** — adapter still valid (hook, `/implement` close, Standards pointer); skills named there exist under `agents/skills/` (synced to the IDE adapters); implement / finalise cycle matches those skills; process docs still match (tracker, labels, domain).
 - **`spec`** — spec for this version exists there.
 - **`adr`** — new ADRs if decisions changed.
-- **`roadmap`** — must match the version just shipped:
-  - Move this **`X.Y.Z`** into **Déjà livré** (one short product line: what you can do now). Drop it from « Prochaine » / « Ensuite ».
-  - The **next** numbered version in that file becomes **Prochaine** (keep its objectif / recherche). Renumber « Ensuite » headings if needed.
-  - Delete leftover claims that this version has **not** delivered. Do not invent new versions; only reshuffle what is already listed.
+- **`roadmap`** — **`X.Y.Z`** is recorded as delivered; upcoming versions stay listed; drop claims this version has **not** delivered. Do not invent new versions; only reshuffle what is already listed.
 
 If anything is stale: **stop the release**. Update those files on the **feature branch**, then run skill **`commit`** as if the user had typed **`/c -a -p`**. Then re-read this section. Do **not** `/crel` or `/mpr` until this gate is green — the tag must include the docs.
 

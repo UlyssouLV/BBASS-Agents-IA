@@ -74,9 +74,9 @@ Tableau : chaque skill, bucket `meta`/`process` s’il est sous `agents/`, prés
 
 **Options :** aucune.
 
-**Corps :** inutile ; le skill choisit `vm-centrale` et/ou `poste` selon le diff.
+**Corps :** inutile ; le skill choisit les dossiers du rôle **`test-roots`** selon le diff.
 
-Pytest (frontière HTTP) dans le venv du paquet. Échec → stop. Équivalent : « lance les tests ».
+Pytest dans le venv de chaque paquet. Convention Tests : rôle **`agent-adapter`**. Échec → stop. Équivalent : « lance les tests ».
 
 **Exemple :**
 
@@ -215,7 +215,7 @@ Retire `ready-for-agent` et ferme l’issue. Refuse s’il n’y a pas `Part of`
 
 **Options :** semver obligatoire `X.Y.Z` (ex. `1.3.0`).
 
-**Corps :** seulement si la version n’est pas déjà dans `docs/suivi-avancement/feuille-de-route-dev.md` — à quoi elle sert (un job).
+**Corps :** seulement si la version n’est pas déjà dans le rôle **`roadmap`** — à quoi elle sert (un job).
 
 Grill + spec, puis **`/ob`**, écriture de la spec, **`/c -a -p`**, tickets, **`/opr -draft`**, puis propose le premier `/implement`. Skill `ouvrir-la-version`.
 
