@@ -23,7 +23,7 @@ See `agents/domain.md`. File roles and path lookup: `agents/roles.yml`. `/code-r
 
 ## Tests
 
-Pytest: `/t`. Quality gate: `/qg`. Both: `/vf` / « Vérifie la fiabilité du code ». Fix a red gate: `/cqg`.
+Tests: `/t`. Quality gate: `/qg`. Both: `/vf` / « Vérifie la fiabilité du code ». Fix a red gate: `/cqg`.
 
 ## Git
 

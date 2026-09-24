@@ -91,7 +91,7 @@ Tableau : chaque skill, bucket `meta`/`process` s’il est sous `agents/`, prés
 
 **Corps :** inutile ; le skill choisit les dossiers du rôle **`test-roots`** selon le diff.
 
-Pytest dans le venv de chaque paquet. Convention Tests : rôle **`agent-adapter`**. Échec → stop. Équivalent : « lance les tests ».
+Détecte le runner par racine (pytest + venv, sinon `npm test`). Inconnu → stop. Extra Tests : rôle **`agent-adapter`**. Échec → stop. Équivalent : « lance les tests ».
 
 **Exemple :**
 

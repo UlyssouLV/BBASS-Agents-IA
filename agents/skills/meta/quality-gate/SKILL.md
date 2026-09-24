@@ -53,5 +53,5 @@ Done when the gate for **this** SHA is `OK`, or as soon as it is not.
 ## Not this skill
 
 - Fix the gate: `corriger-quality-gate` (`/cqg`)
-- Pytest: `lancer-tests` (`/t`)
+- Tests: `lancer-tests` (`/t`)
 - Both: `verifier-la-fiabilite` (`/vf`)

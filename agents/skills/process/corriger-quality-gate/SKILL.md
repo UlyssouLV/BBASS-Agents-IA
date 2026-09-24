@@ -35,5 +35,5 @@ Done when `/qg` is green, or after one fix + one re-check that is still red.
 ## Not this skill
 
 - Read-only gate: `quality-gate` (`/qg`)
-- Pytest: `lancer-tests` (`/t`)
+- Tests: `lancer-tests` (`/t`)
 - Tests then gate: `verifier-la-fiabilite` (`/vf`)
