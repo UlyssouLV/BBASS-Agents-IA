@@ -21,6 +21,10 @@ Canonical labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-hu
 
 See `agents/domain.md`. File roles and path lookup: `agents/roles.yml`. `/code-review` **Standards**: start here (`AGENTS.md`).
 
+## Tests
+
+Pytest: `/t`. Quality gate: `/qg`. Both: `/vf` / « Vérifie la fiabilité du code ». Fix a red gate: `/cqg`.
+
 ## Git
 
 Commit and push only when the **current user message** explicitly asks, **except** skill `encadrer-implement` after green tests, skill `commit` (`/c`; `/c -p` pushes; `/c -p -f` after **oui**), skill `initialise-le-repo` (`/init`: `/c -a -p` on `main` is allowed, once), skill `ouvrir-pr` (`/opr`), skill `creer-release` (`/crel`), and skill `fusionner-pr` (`/mpr`). Never force-push otherwise. Never commit `.env`, `*.db`, `.venv`, or secrets.

@@ -40,5 +40,7 @@ Done when every selected suite exited 0, or as soon as one failed.
 
 ## Not this skill
 
+- Quality gate: `quality-gate` (`/qg`)
+- Tests then gate: `verifier-la-fiabilite` (`/vf`)
 - Close a child issue: `fermer-ticket-enfant` (`/cci`).
 - Commit: `commit` (`/c`).

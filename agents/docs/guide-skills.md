@@ -84,6 +84,22 @@ Pytest dans le venv de chaque paquet. Convention Tests : rôle **`agent-adapter`
 /t
 ```
 
+### Quality gate
+
+**Commande :** `/qg`
+
+**Options :** aucune.
+
+**Corps :** inutile ; le skill lit le Quality Gate Sonar du SHA `HEAD`.
+
+Lecture seule (`SONAR_HOST_URL`, `SONAR_TOKEN`, `SONAR_PROJECT_KEY` dans `.env`). Gate pas `OK` → stop. Ne corrige pas. Équivalent : « vérifie le quality gate ».
+
+**Exemple :**
+
+```
+/qg
+```
+
 ### Ouvrir une branche
 
 **Commande :** `/ob`
@@ -181,6 +197,42 @@ Crée le squelette (`docs/dev/`, specs, ADR, `CONTEXT.md`), dispatch les skills,
 
 ```
 Initialise le repo
+```
+
+### Vérifie la fiabilité du code
+
+**Commande :** `/vf` ou `Vérifie la fiabilité du code`
+
+**Options :** aucune.
+
+**Corps :** inutile.
+
+Lance **`/t`** puis **`/qg`**. Premier échec → stop. Ne corrige pas le gate. Skill `verifier-la-fiabilite`.
+
+**Exemple :**
+
+```
+/vf
+```
+
+```
+Vérifie la fiabilité du code
+```
+
+### Corriger le quality gate
+
+**Commande :** `/cqg` ou `Corriger le quality gate`
+
+**Options :** aucune.
+
+**Corps :** inutile.
+
+Lit **`/qg`**, corrige ce que le gate exige, relit **`/qg`** une fois. Pas de boucle. Skill `corriger-quality-gate`.
+
+**Exemple :**
+
+```
+/cqg
 ```
 
 ### Commit

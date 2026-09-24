@@ -75,5 +75,6 @@ Done when `README.md` exists, dispatch `--check` is green, and HEAD has that ini
 
 - Open a version → `ouvrir-la-version`
 - Tests → `lancer-tests` (`/t`)
-- Quality gate → later skill (`/qg`)
+- Quality gate → `quality-gate` (`/qg`)
+- Tests then gate → `verifier-la-fiabilite` (`/vf`)
 - « Finalise la version » → `finaliser-la-version`

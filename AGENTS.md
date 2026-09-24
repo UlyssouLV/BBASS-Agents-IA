@@ -23,7 +23,7 @@ See `agents/domain.md`. File roles and path lookup: `agents/roles.yml`. `/code-r
 
 ## Tests
 
-HTTP-boundary tests only (observable responses). Do not praise or require tests of internal function calls. Same convention as V1 and `docs/specs/`.
+HTTP-boundary tests only (observable responses). Do not praise or require tests of internal function calls. Same convention as V1 and `docs/specs/`. Pytest: `/t`. Quality gate: `/qg`. Both: `/vf` / « Vérifie la fiabilité du code ». Fix a red gate: `/cqg`.
 
 ## Docs
 
