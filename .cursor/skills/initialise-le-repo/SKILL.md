@@ -63,7 +63,24 @@ If missing, copy:
 
 Do not overwrite those two if they already exist.
 
-## 5. Commit
+## 5. SonarQube (o/n)
+
+Ask in French, then **wait**:
+
+> Utilisez-vous SonarQube pour ce projet ? **o/n**
+
+- **n** / **non** → skip this section. `/qg` will stop later until credentials exist.
+- **o** / **oui** → ask for **`SONAR_HOST_URL`**, **`SONAR_TOKEN`**, **`SONAR_PROJECT_KEY`**. **Wait.** Do not invent them. Do not echo the token back.
+
+Then, without printing secret values:
+
+1. Upsert those three keys in **`.env`** (create the file if needed). Never `git add` `.env`.
+2. If **`.env.example`** has no `SONAR_` keys, append empty placeholders (`SONAR_HOST_URL=`, `SONAR_TOKEN=`, `SONAR_PROJECT_KEY=`). That file may be committed.
+3. If `gh` can see a GitHub remote: `gh secret set` for the same three names (`printf '%s' "$value" | gh secret set NAME`). If `gh` fails (no remote, no admin): say so; **`.env` alone** is enough for `/qg` locally.
+
+`/qg`, `/vf`, and `/cqg` load `.env`. They do not read GitHub Actions secrets.
+
+## 6. Commit
 
 Run skill **`commit`** as if the user had typed **`/c -a -p`**. Still never `.env`, `*.db`, `.venv/`, secrets.
 

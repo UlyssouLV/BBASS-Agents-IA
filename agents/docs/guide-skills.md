@@ -187,7 +187,7 @@ Squash-merge du PR de la branche courante dans `main`, suppression de la branche
 
 **Corps :** inutile ; le skill grille à quoi sert le repo.
 
-Crée le squelette (`docs/dev/`, specs, ADR, `CONTEXT.md`), dispatch les skills, grill Matt, écrit README + modèles `AGENTS.md` / `CLAUDE.md`, commit `/c -a -p` (y compris sur `main`). Stop si un README existe déjà. Skill `initialise-le-repo`.
+Crée le squelette (`docs/dev/`, specs, ADR, `CONTEXT.md`), dispatch, grill, README + modèles, demande Sonar **o/n** (`.env` + `gh secret set` si oui), commit `/c -a -p` (y compris sur `main`). Stop si un README existe déjà. Skill `initialise-le-repo`.
 
 **Exemple :**
 
