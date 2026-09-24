@@ -1,0 +1,26 @@
+# AGENTS.md
+
+## Cycle
+
+**« Ouvre la version »** → implement each child (close when tests are green) → **« Finalise la version »**. The **parent** spec closes via `Fixes` on the squash. Do **not** leave implemented children Open. Do **not** close the parent from `encadrer-implement`.
+
+- **« Initialise le repo »** (`/init`): skill `initialise-le-repo` (already done in this repo)
+- **« Ouvre la version »** (must include **`X.Y.Z`**): skill `ouvrir-la-version`
+- Child-ticket TDD: `/implement`, then skill `encadrer-implement`
+- **« Finalise la version »**: skill `finaliser-la-version`
+
+See `agents/README.md`.
+
+## Tracker
+
+Issues live as GitHub issues in this repo, managed via the `gh` CLI. See `agents/issue-tracker.md`. Infer the repo from `git remote`.
+
+Canonical labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `agents/triage-labels.md`. No `awaiting-merge`.
+
+## Domain
+
+See `agents/domain.md`. File roles and path lookup: `agents/roles.yml`. `/code-review` **Standards**: start here (`AGENTS.md`).
+
+## Git
+
+Commit and push only when the **current user message** explicitly asks, **except** skill `encadrer-implement` after green tests, skill `commit` (`/c`; `/c -p` pushes; `/c -p -f` after **oui**), skill `initialise-le-repo` (`/init`: `/c -a -p` on `main` is allowed, once), skill `ouvrir-pr` (`/opr`), skill `creer-release` (`/crel`), and skill `fusionner-pr` (`/mpr`). Never force-push otherwise. Never commit `.env`, `*.db`, `.venv`, or secrets.

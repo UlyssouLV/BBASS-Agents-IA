@@ -5,7 +5,8 @@ description: >-
   `/mc -d` block 3. Use when the user types `/c`, or after this skill asked
   « Êtes-vous sûr » for a force-push and they reply oui or non. `-a` stages
   the whole working tree; `-p` pushes; `-p -f` force-with-lease only after
-  oui on the next turn. Not `/mc` (message only). Not on main.
+  oui on the next turn. Not `/mc` (message only). Not on main except
+  `/init` / « Initialise le repo ».
 ---
 
 # Commit the current branch
@@ -25,7 +26,7 @@ Do not commit again on this turn.
 
 ## 1. Guards
 
-1. `git branch --show-current` is `main` or `master` → stop. No commit, no push.
+1. `git branch --show-current` is `main` or `master` → stop, **except** when the current user message is **`/init`** or **« Initialise le repo »** (that skill is the only allowed commit on `main`). Still refuse force-push to `main` / `master`.
 2. `-f` without `-p` → stop. Say `-f` only exists as `/c -p -f`.
 3. Without `-a`: if the index is empty (`git diff --cached --quiet`) → stop. Say to stage files or pass `-a`.
 4. Always unstage secrets (`.env`, `*.db`, `.venv/`, credential files) before committing, even if the user had staged them.

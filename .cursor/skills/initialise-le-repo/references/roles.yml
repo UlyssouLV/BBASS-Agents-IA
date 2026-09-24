@@ -1,0 +1,30 @@
+# Skills refer to roles. Paths live only here.
+# Lookup: roles.<name>.paths  (always a list)
+#
+# Unresolved (key missing, or a listed path not on disk): **stop**.
+# Do not skip. Do not invent a path or file. Do not continue later steps.
+# Tell the user: to continue, run **Créer <name>** (creates the missing
+# file and, if needed, the key here). A listed directory that exists may
+# be empty.
+
+roles:
+  roadmap:
+    paths:
+      - docs/dev/feuille-de-route-dev.md
+  glossary:
+    paths:
+      - CONTEXT.md
+  spec:
+    paths:
+      - docs/specs/
+  adr:
+    paths:
+      - docs/adr/
+  readme:
+    paths:
+      - README.md
+  agent-adapter:
+    paths:
+      - AGENTS.md
+      - .claude/CLAUDE.md
+      - agents/

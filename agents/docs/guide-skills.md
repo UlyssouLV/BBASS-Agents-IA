@@ -163,7 +163,25 @@ Squash-merge du PR de la branche courante dans `main`, suppression de la branche
 
 ## Process
 
+### Initialise le repo
 
+**Commande :** `/init` ou `Initialise le repo`
+
+**Options :** aucune.
+
+**Corps :** inutile ; le skill grille à quoi sert le repo.
+
+Crée le squelette (`docs/dev/`, specs, ADR, `CONTEXT.md`), dispatch les skills, grill Matt, écrit README + modèles `AGENTS.md` / `CLAUDE.md`, commit `/c -a -p` (y compris sur `main`). Stop si un README existe déjà. Skill `initialise-le-repo`.
+
+**Exemple :**
+
+```
+/init
+```
+
+```
+Initialise le repo
+```
 
 ### Commit
 
@@ -173,7 +191,7 @@ Squash-merge du PR de la branche courante dans `main`, suppression de la branche
 
 **Corps :** inutile ; le skill relit le diff via `/mc -d` (bloc 3 = message).
 
-Commit sur la branche courante (HEAD ↔ working tree). Défaut = fichiers déjà stagés. Refuse `main` / `master`. Secrets exclus. Équivalent process : skill `commit`.
+Commit sur la branche courante (HEAD ↔ working tree). Défaut = fichiers déjà stagés. Refuse `main` / `master`, **sauf** `/init`. Secrets exclus. Équivalent process : skill `commit`.
 
 **Exemple :**
 

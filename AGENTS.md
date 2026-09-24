@@ -2,8 +2,9 @@
 
 ## Cycle
 
-**« Ouvre la version »** → implement each child (close when tests are green) → **« Finalise la version »**. The **parent** spec closes via `Fixes` on the squash. Do **not** leave implemented children Open. Do **not** close the parent from `encadrer-implement`.
+**« Ouvre la version »** → implement each child (close when tests are green) → **« Finalise la version »**. The **parent** spec closes via `Fixes` on the squash. Do **not** leave implemented children Open. Do **not** close the parent from `encadrer-implement`. New repo: **`/init`** / **« Initialise le repo »**.
 
+- **« Initialise le repo »** (`/init`): skill `initialise-le-repo`
 - **« Ouvre la version »** (must include **`X.Y.Z`**): skill `ouvrir-la-version`
 - Child-ticket TDD: `/implement`, then skill `encadrer-implement`
 - **« Finalise la version »**: skill `finaliser-la-version`
@@ -33,4 +34,4 @@ HTTP-boundary tests only (observable responses). Do not praise or require tests 
 
 ## Git
 
-Commit and push only when the **current user message** explicitly asks, **except** skill `encadrer-implement` after green tests (that skill is the permission: commit, push, close the child, drop `ready-for-agent`), skill `commit` (`/c`; `/c -p` pushes; `/c -p -f` is `--force-with-lease` only after **oui** on the next turn), skill `ouvrir-pr` (`/opr`: push then `gh pr create` into `main`), skill `creer-release` (`/crel`: `gh release create` on the feature SHA), and skill `fusionner-pr` (`/mpr`: squash-merge into `main` and delete the branch). Never force-push otherwise. Never commit `.env`, `*.db`, `.venv`, or secrets.
+Commit and push only when the **current user message** explicitly asks, **except** skill `encadrer-implement` after green tests (that skill is the permission: commit, push, close the child, drop `ready-for-agent`), skill `commit` (`/c`; `/c -p` pushes; `/c -p -f` is `--force-with-lease` only after **oui** on the next turn), skill `initialise-le-repo` (`/init`: `/c -a -p` on `main` is allowed, once), skill `ouvrir-pr` (`/opr`: push then `gh pr create` into `main`), skill `creer-release` (`/crel`: `gh release create` on the feature SHA), and skill `fusionner-pr` (`/mpr`: squash-merge into `main` and delete the branch). Never force-push otherwise. Never commit `.env`, `*.db`, `.venv`, or secrets.
