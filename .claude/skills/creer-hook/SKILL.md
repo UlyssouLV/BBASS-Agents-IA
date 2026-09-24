@@ -48,12 +48,20 @@ Do not echo secrets.
 
 ## 4. Guide
 
-Add (or replace) one section in `agents/docs/guide-skills.md` under **Meta**, same shape as the peers (`### …`, Commande, Options, Corps, one line, Exemple).
+Add (or replace if that heading already exists) one section in **`agents/docs/guide-hooks.md`**. Same shape as the peers already in that file:
 
-Done when `agents/hooks/<name>/` exists, **both** adapters are wired, and the guide has that section.
+- French title (`### <nom>`)
+- **Source :** `agents/hooks/<nom>/…`
+- **Claude :** event + matcher
+- **Cursor :** event + matcher
+- **Fait :** one line of what it blocks or allows
+
+Do not put the hook inventory in `guide-skills.md` (`/ch` stays there as the command). Do not rewrite the rest of the hooks guide.
+
+Done when `agents/hooks/<name>/` exists, **both** adapters are wired, **and** `guide-hooks.md` has that section.
 
 ## Not this skill
 
 - Project skills → `creer-skill` (`/cs`)
 - MCP configs
-- Moving `gate-code-review.py` (already wired for Claude)
+- Moving `gate-code-review.py` without `/ch` (inventory: `agents/docs/guide-hooks.md`)

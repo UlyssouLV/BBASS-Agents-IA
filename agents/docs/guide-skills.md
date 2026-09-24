@@ -36,7 +36,7 @@ Trigger : « explique l'échec des tests ». Meta.
 
 **Corps :** quand le hook doit tirer, ce qu’il bloque ou laisse passer.
 
-Grill si besoin, **décrit le hook et attend un oui**, puis écrit `agents/hooks/<nom>/` et câble Claude **et** Cursor. Équivalent : « crée un hook ».
+Grill si besoin, **décrit le hook et attend un oui**, puis écrit `agents/hooks/<nom>/`, câble Claude **et** Cursor, et ajoute l’entrée dans `agents/docs/guide-hooks.md`. Équivalent : « crée un hook ».
 
 **Exemple :**
 
