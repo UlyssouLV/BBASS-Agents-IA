@@ -18,7 +18,7 @@
 
 **Corps :** ce que le skill doit faire, quand il se déclenche, `meta` ou `process` si tu le sais déjà.
 
-Écrit un `SKILL.md` sous `agents/skills/`, le copie vers `.claude/skills/` et `.cursor/skills/`, et ajoute l’entrée dans `agents/docs/guide-skills.md`. Équivalent : « crée un skill ».
+Écrit un `SKILL.md` sous `agents/skills/` **après confirmation** (même sans grill), le copie vers `.claude/skills/` et `.cursor/skills/`, et ajoute l’entrée dans `agents/docs/guide-skills.md`. Équivalent : « crée un skill ».
 
 **Exemple :**
 
@@ -28,7 +28,22 @@ Un skill qui propose un message de lint après un pytest rouge.
 Trigger : « explique l'échec des tests ». Meta.
 ```
 
+### Créer un hook
 
+**Commande :** `/ch`
+
+**Options :** aucune.
+
+**Corps :** quand le hook doit tirer, ce qu’il bloque ou laisse passer.
+
+Grill si besoin, **décrit le hook et attend un oui**, puis écrit `agents/hooks/<nom>/` et câble Claude **et** Cursor. Équivalent : « crée un hook ».
+
+**Exemple :**
+
+```
+/ch
+Bloquer /code-review sauf si l’utilisateur l’a demandé, ou Finalise la version.
+```
 
 ### Message de commit
 

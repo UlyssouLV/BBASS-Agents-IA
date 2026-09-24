@@ -3,7 +3,7 @@ name: creer-skill
 description: >-
   Author a project skill under agents/skills/meta/ or agents/skills/process/ then dispatch it to Claude Code
   and Cursor. Use when the user wants to create, write, or add a skill, says
-  « crée un skill », or types `/cs`. Not for hooks, MCP, or editing AGENTS.md alone.
+  « crée un skill », or types `/cs`. Not `/ch`. Not MCP, or editing AGENTS.md alone.
 ---
 
 # Create a project skill
@@ -24,7 +24,18 @@ Peers: look at existing skills in `agents/skills/` and `.claude/skills/` for ton
 
 Always project-scoped. Never `~/.cursor/skills/` or `~/.claude/skills/`.
 
-## 2. Write `agents/skills/<bucket>/<name>/SKILL.md`
+## 2. Propose, then wait
+
+**Even if there was no grill**, describe in French **before any write**:
+
+- folder name and `meta` / `process`
+- trigger (`/` and/or phrase)
+- what the skill does, step by step
+- what it will **not** do
+
+**Wait** for an explicit **oui**. Anything else → do not write.
+
+## 3. Write `agents/skills/<bucket>/<name>/SKILL.md`
 
 - **`meta/`** — primary capabilities of the coding agents (this skill; `message-de-commit`; etc.). They do not orchestrate other project skills.
 - **`process/`** — composed recipes that call other skills (e.g. the version cycle; `commit`, which calls `message-de-commit`).
@@ -36,7 +47,7 @@ Always project-scoped. Never `~/.cursor/skills/` or `~/.claude/skills/`.
 
 Match this repo’s skills (`ouvrir-la-version`, `encadrer-implement`, `finaliser-la-version`): short, imperative, French trigger phrases when the human says them in French.
 
-## 3. Dispatch
+## 4. Dispatch
 
 From the repo root:
 
@@ -47,7 +58,7 @@ python3 agents/scripts/dispatch.py --check
 
 If `--check` fails: stop. Do not hand-edit `.claude/skills/` or `.cursor/skills/` to “fix” it; fix the source and dispatch again.
 
-## 4. Guide
+## 5. Guide
 
 Add (or replace if that heading already exists) one section in `agents/docs/guide-skills.md`. Same shape as the peers already in the file:
 
@@ -64,5 +75,6 @@ Done when the new folder exists under `agents/skills/meta/` or `agents/skills/pr
 
 ## Not this skill
 
-- Claude/Cursor **hooks** or MCP configs.
+- Claude/Cursor **hooks** → `creer-hook` (`/ch`)
+- MCP configs.
 - Rewriting files in role **`agent-adapter`** (`agents/roles.yml`) unless the new skill needs a one-line pointer there.
