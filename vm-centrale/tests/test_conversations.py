@@ -234,6 +234,123 @@ def test_detail_sans_jeton_est_refuse(client):
     assert reponse.status_code == 401
 
 
+# --- Pagination par curseur (issue #103) -------------------------------------
+
+
+def _envoyer_messages(client, mistral_client_factice, jeton, conversation_id, nombre):
+    # Chaque envoi ajoute 2 messages (user + assistant) à la conversation déjà
+    # créée par _creer_conversation (elle-même en compte déjà 2). Contenu
+    # distinct de celui du premier échange pour ne jamais prêter à confusion
+    # dans les assertions ci-dessous.
+    for i in range(nombre):
+        mistral_client_factice.repondre(
+            f"Réponse suite {i}", resume_et_profil=_reponse_resume_et_profil(f"Résumé {i}")
+        )
+        client.post(
+            f"/conversations/{conversation_id}/messages",
+            json={"message": f"Suite {i}"},
+            headers=_autorisation(jeton),
+        )
+
+
+def test_detail_fenetre_par_defaut_renvoie_les_plus_recents_et_signale_les_plus_anciens(
+    client, mistral_client_factice, jeton_valide
+):
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide, "Premier message")
+    _envoyer_messages(client, mistral_client_factice, jeton_valide, conversation_id, 2)
+    # 6 messages en tout : le premier échange, puis 2 échanges supplémentaires.
+
+    reponse = client.get(
+        f"/conversations/{conversation_id}?limite=2", headers=_autorisation(jeton_valide)
+    )
+
+    assert reponse.status_code == 200
+    corps = reponse.json()
+    # La fenêtre la plus récente (pas le premier échange de la conversation),
+    # dans l'ordre chronologique.
+    assert [m["contenu"] for m in corps["messages"]] == ["Suite 1", "Réponse suite 1"]
+    assert corps["a_des_messages_plus_anciens"] is True
+
+
+def test_detail_curseur_recupere_la_page_plus_ancienne_dans_lordre(
+    client, mistral_client_factice, jeton_valide
+):
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide, "Premier message")
+    _envoyer_messages(client, mistral_client_factice, jeton_valide, conversation_id, 2)
+
+    fenetre_recente = client.get(
+        f"/conversations/{conversation_id}?limite=2", headers=_autorisation(jeton_valide)
+    ).json()
+    id_plus_ancien_de_la_fenetre = fenetre_recente["messages"][0]["id"]
+
+    page_precedente = client.get(
+        f"/conversations/{conversation_id}?limite=2&avant_id={id_plus_ancien_de_la_fenetre}",
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert page_precedente.status_code == 200
+    corps = page_precedente.json()
+    assert [m["contenu"] for m in corps["messages"]] == ["Suite 0", "Réponse suite 0"]
+    assert corps["a_des_messages_plus_anciens"] is True
+
+
+def test_detail_arrive_au_premier_message_naffiche_plus_de_messages_plus_anciens(
+    client, mistral_client_factice, jeton_valide
+):
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide, "Premier message")
+    _envoyer_messages(client, mistral_client_factice, jeton_valide, conversation_id, 2)
+
+    fenetre_recente = client.get(
+        f"/conversations/{conversation_id}?limite=2", headers=_autorisation(jeton_valide)
+    ).json()
+    page_intermediaire = client.get(
+        f"/conversations/{conversation_id}?limite=2&avant_id={fenetre_recente['messages'][0]['id']}",
+        headers=_autorisation(jeton_valide),
+    ).json()
+
+    toute_la_conversation = client.get(
+        f"/conversations/{conversation_id}?limite=2&avant_id={page_intermediaire['messages'][0]['id']}",
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert toute_la_conversation.status_code == 200
+    corps = toute_la_conversation.json()
+    assert [m["contenu"] for m in corps["messages"]] == ["Premier message", "Réponse assistant"]
+    # Plus aucun message avant le tout premier : aucun chargement
+    # supplémentaire ne doit se déclencher côté front.
+    assert corps["a_des_messages_plus_anciens"] is False
+
+
+def test_detail_conversation_plus_courte_que_la_fenetre_ne_declenche_pas_de_pagination(
+    client, mistral_client_factice, jeton_valide
+):
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide, "Bonjour")
+
+    reponse = client.get(
+        f"/conversations/{conversation_id}?limite=20", headers=_autorisation(jeton_valide)
+    )
+
+    assert reponse.status_code == 200
+    corps = reponse.json()
+    assert len(corps["messages"]) == 2
+    assert corps["a_des_messages_plus_anciens"] is False
+
+
+def test_detail_conversation_plus_courte_que_la_fenetre_ne_declenche_pas_de_pagination(
+    client, mistral_client_factice, jeton_valide
+):
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide, "Bonjour")
+
+    reponse = client.get(
+        f"/conversations/{conversation_id}?limite=20", headers=_autorisation(jeton_valide)
+    )
+
+    assert reponse.status_code == 200
+    corps = reponse.json()
+    assert len(corps["messages"]) == 2
+    assert corps["a_des_messages_plus_anciens"] is False
+
+
 def test_renommer_change_le_titre(client, mistral_client_factice, jeton_valide):
     conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide)
 

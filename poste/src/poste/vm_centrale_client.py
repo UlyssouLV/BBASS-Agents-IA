@@ -145,6 +145,7 @@ class ConversationDetail:
     date_creation: datetime
     date_derniere_activite: datetime
     messages: list[Message]
+    a_des_messages_plus_anciens: bool
 
 
 @dataclass
@@ -417,9 +418,26 @@ class VmCentraleClient:
         reponse.raise_for_status()
         return [_vers_conversation(conversation) for conversation in reponse.json()]
 
-    def consulter_conversation(self, jeton: str, conversation_id: int) -> ConversationDetail:
+    def consulter_conversation(
+        self,
+        jeton: str,
+        conversation_id: int,
+        avant_id: int | None = None,
+        limite: int | None = None,
+    ) -> ConversationDetail:
+        # Transmis tels que reçus par poste, sans interprétation ni valeur
+        # par défaut propre (spec 1.2.3) : un paramètre absent ici n'est
+        # jamais envoyé à la VM, qui applique alors sa propre fenêtre par
+        # défaut (_TAILLE_FENETRE_PAGINATION_PAR_DEFAUT).
+        parametres: dict[str, int] = {}
+        if avant_id is not None:
+            parametres["avant_id"] = avant_id
+        if limite is not None:
+            parametres["limite"] = limite
+
         reponse = _http_client.get(
             f"{VM_CENTRALE_BASE_URL}/conversations/{conversation_id}",
+            params=parametres,
             headers={"Authorization": f"Bearer {jeton}"},
         )
         _lever_si_jeton_invalide(reponse)
@@ -432,6 +450,7 @@ class VmCentraleClient:
             date_creation=datetime.fromisoformat(corps["date_creation"]),
             date_derniere_activite=datetime.fromisoformat(corps["date_derniere_activite"]),
             messages=[_vers_message(message) for message in corps["messages"]],
+            a_des_messages_plus_anciens=corps["a_des_messages_plus_anciens"],
         )
 
     def renommer_conversation(self, jeton: str, conversation_id: int, titre: str) -> Conversation:

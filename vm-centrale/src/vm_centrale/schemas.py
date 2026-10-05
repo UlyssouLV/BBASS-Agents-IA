@@ -132,6 +132,11 @@ class ConversationDetailResponse(BaseModel):
     date_creation: datetime
     date_derniere_activite: datetime
     messages: list[MessageResponse]
+    # Pagination par curseur (issue #103) : indique s'il reste des messages
+    # plus anciens que `messages` à charger (un nouvel appel avec avant_id =
+    # id du plus ancien message ci-dessus). Jamais de pagination par numéro
+    # de page ni par décalage global, voir vm_centrale.routers.conversations.
+    a_des_messages_plus_anciens: bool
 
 
 class ConversationRenommeeRequest(BaseModel):

@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from vm_centrale.analyse_pieces_jointes import TYPES_SUPPORTES, analyser
@@ -38,6 +38,11 @@ from vm_centrale.schemas import (
 )
 
 _TAILLE_FENETRE_HISTORIQUE = 3
+# Taille de la fenêtre par défaut de GET /conversations/{id} (issue #103) :
+# un détail d'implémentation, pas une décision produit figée (spec
+# 1.2.3) — ajustable librement sans changer le contrat de pagination
+# (curseur avant_id + limite).
+_TAILLE_FENETRE_PAGINATION_PAR_DEFAUT = 20
 # Fixée en dur (comme la fenêtre de 3 messages ci-dessus), indépendante des
 # plafonds propres à Mistral (spec 1.1.2).
 _TAILLE_MAX_PIECE_JOINTE = 20 * 1024 * 1024
@@ -574,17 +579,29 @@ def lister_conversations(
 )
 def consulter_conversation(
     conversation_id: int,
+    # Curseur par identifiant de message (jamais un numéro de page ni un
+    # décalage global, spec 1.2.3) : sans lui, la fenêtre la plus récente de
+    # la conversation ; avec lui, les messages strictement plus anciens que
+    # ce message de référence.
+    avant_id: int | None = None,
+    limite: int = Query(default=_TAILLE_FENETRE_PAGINATION_PAR_DEFAUT, gt=0),
     identifiant_compte: str = Depends(get_identifiant_compte_du_jeton),
     db: Session = Depends(get_db),
 ) -> ConversationDetailResponse:
     conversation = _recuperer_conversation_du_compte(db, conversation_id, identifiant_compte)
 
-    messages = (
-        db.query(Message)
-        .filter(Message.conversation_id == conversation.id)
-        .order_by(Message.id)
-        .all()
-    )
+    requete_messages = db.query(Message).filter(Message.conversation_id == conversation.id)
+    if avant_id is not None:
+        requete_messages = requete_messages.filter(Message.id < avant_id)
+
+    # Un message de plus que la limite demandée, trié du plus récent au plus
+    # ancien : sa seule présence indique qu'il reste des messages plus
+    # anciens que cette fenêtre, sans nécessiter de second COUNT(*) (spec
+    # 1.2.3 — indication de présence, jamais un total ni un numéro de page).
+    messages_page_desc = requete_messages.order_by(Message.id.desc()).limit(limite + 1).all()
+    a_des_messages_plus_anciens = len(messages_page_desc) > limite
+    messages = list(reversed(messages_page_desc[:limite]))
+
     return ConversationDetailResponse(
         id=conversation.id,
         titre=conversation.titre,
@@ -599,6 +616,7 @@ def consulter_conversation(
             )
             for message in messages
         ],
+        a_des_messages_plus_anciens=a_des_messages_plus_anciens,
     )
 
 

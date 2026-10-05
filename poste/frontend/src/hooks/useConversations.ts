@@ -1,4 +1,4 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { appelApi, ErreurApi } from "@/lib/api";
 import { marquerSessionExpiree } from "@/hooks/useSession";
@@ -19,12 +19,18 @@ export interface Message {
   date_creation: string;
 }
 
-export interface ConversationDetail {
+// Une page de la pagination par curseur de GET /conversations/{id} (issue
+// #103) : `messages` y est toujours trié par ordre chronologique croissant,
+// `a_des_messages_plus_anciens` indique s'il reste un historique plus ancien
+// que cette page à charger (nouvel appel avec avant_id = id du premier
+// message de cette page).
+export interface ConversationDetailPage {
   id: number;
   titre: string;
   date_creation: string;
   date_derniere_activite: string;
   messages: Message[];
+  a_des_messages_plus_anciens: boolean;
 }
 
 interface PieceJointeResume {
@@ -119,9 +125,13 @@ async function chargerConversations(): Promise<Conversation[]> {
   );
 }
 
-async function chargerConversation(id: number): Promise<ConversationDetail> {
-  return appelApi<ConversationDetail>(
-    `/conversations/${id}`,
+async function chargerConversation(id: number, avantId?: number): Promise<ConversationDetailPage> {
+  // avant_id absent sur le premier appel : la VM applique alors sa propre
+  // fenêtre par défaut (spec 1.2.3) — jamais de valeur par défaut propre au
+  // front ni de limite imposée ici.
+  const parametres = avantId !== undefined ? `?avant_id=${avantId}` : "";
+  return appelApi<ConversationDetailPage>(
+    `/conversations/${id}${parametres}`,
     undefined,
     _MSG_ERREUR_RESEAU_CONVERSATIONS,
     "L'ouverture de la conversation a échoué. Réessayez plus tard."
@@ -249,25 +259,39 @@ export function useConversationsQuery() {
   });
 }
 
+// Issue #103 : useInfiniteQuery plutôt que useQuery — chaque « page » est une
+// fenêtre de GET /conversations/{id}, la première (pages[0]) étant toujours
+// la plus récente (titre/dates de la conversation lus sur elle) et chaque
+// fetchNextPage() en remontant une page plus ancienne (pageParam = id du
+// premier message de la dernière page chargée). getNextPageParam renvoie
+// undefined dès que cette dernière page n'a plus de message plus ancien
+// (a_des_messages_plus_anciens) : TanStack Query expose alors hasNextPage à
+// false, plus aucun fetchNextPage() ne se déclenche (voir OngletChat.tsx).
 export function useConversationQuery(id: number | null) {
   const queryClient = useQueryClient();
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: cleConversation(id ?? -1),
-    queryFn: async () => {
+    queryFn: async ({ pageParam }) => {
       try {
-        return await chargerConversation(id as number);
+        return await chargerConversation(id as number, pageParam);
       } catch (error_) {
         surErreurSession(queryClient, error_);
         throw error_;
       }
     },
+    initialPageParam: undefined as number | undefined,
+    getNextPageParam: (dernierePage) =>
+      dernierePage.a_des_messages_plus_anciens ? dernierePage.messages[0]?.id : undefined,
     enabled: id !== null,
-    // Issue #101 : rebasculer vers une conversation déjà visitée ne doit
-    // plus retomber sur un état vide / « Chargement… » pendant le
-    // rechargement, même si son cache a expiré (gcTime) entre deux visites —
-    // l'ancien contenu (celui de la conversation quittée) reste affiché
-    // jusqu'à l'arrivée du nouveau, au lieu de disparaître dès le changement
-    // de queryKey.
+    // Issue #101, étendu par la 1.2.3 : rebasculer vers une conversation
+    // déjà visitée ne doit plus retomber sur un état vide / « Chargement… »
+    // pendant le rechargement, même si son cache a expiré (gcTime) entre
+    // deux visites — l'ancien contenu (celui de la conversation quittée)
+    // reste affiché jusqu'à l'arrivée du nouveau, au lieu de disparaître dès
+    // le changement de queryKey. Vaut aussi pour une conversation dont
+    // plusieurs pages étaient déjà chargées : elles restent affichées, y
+    // compris pendant qu'une bascule recharge la première page de la
+    // nouvelle conversation.
     placeholderData: keepPreviousData,
   });
 }

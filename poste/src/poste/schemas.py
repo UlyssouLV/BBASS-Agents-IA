@@ -73,6 +73,9 @@ class ConversationDetailResponse(BaseModel):
     date_creation: datetime
     date_derniere_activite: datetime
     messages: list[MessageResponse]
+    # Relayé tel quel depuis vm_centrale.schemas.ConversationDetailResponse,
+    # voir poste.vm_centrale_client.ConversationDetail (issue #103).
+    a_des_messages_plus_anciens: bool
 
 
 class ConversationRenommeeRequest(BaseModel):

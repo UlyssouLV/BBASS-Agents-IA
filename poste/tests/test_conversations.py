@@ -130,6 +130,7 @@ def test_consulter_une_conversation_retourne_le_detail_et_les_messages(client, v
                 Message(id=1, role="user", contenu="Bonjour", date_creation=maintenant),
                 Message(id=2, role="assistant", contenu="Bonjour !", date_creation=maintenant),
             ],
+            a_des_messages_plus_anciens=False,
         )
     )
 
@@ -142,7 +143,34 @@ def test_consulter_une_conversation_retourne_le_detail_et_les_messages(client, v
         ("user", "Bonjour"),
         ("assistant", "Bonjour !"),
     ]
+    assert corps["a_des_messages_plus_anciens"] is False
     assert vm_centrale_client_factice._ids_detail_conversation == [1]
+    assert vm_centrale_client_factice._avant_ids_detail_conversation == [None]
+    assert vm_centrale_client_factice._limites_detail_conversation == [None]
+
+
+def test_consulter_une_conversation_relaie_les_parametres_de_pagination_a_la_vm(
+    client, vm_centrale_client_factice
+):
+    _connecter(client, vm_centrale_client_factice)
+    maintenant = datetime(2026, 9, 10, 12, 0, tzinfo=timezone.utc)
+    vm_centrale_client_factice.detail_conversation_retourne(
+        ConversationDetail(
+            id=1,
+            titre="Salutations",
+            date_creation=maintenant,
+            date_derniere_activite=maintenant,
+            messages=[],
+            a_des_messages_plus_anciens=True,
+        )
+    )
+
+    reponse = client.get("/conversations/1?avant_id=42&limite=5")
+
+    assert reponse.status_code == 200
+    assert reponse.json()["a_des_messages_plus_anciens"] is True
+    assert vm_centrale_client_factice._avant_ids_detail_conversation == [42]
+    assert vm_centrale_client_factice._limites_detail_conversation == [5]
 
 
 def test_consulter_une_conversation_introuvable_retourne_404(client, vm_centrale_client_factice):
