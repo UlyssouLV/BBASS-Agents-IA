@@ -4,7 +4,7 @@ Logiciel d'agents IA pour le cabinet de géomètres-experts BBASS. L'objectif es
 
 ## État actuel
 
-**V1.2.2** disponible : style de réponse de l'IA — prompt système de style sur l'appel de chat principal (vouvoiement, pas de remplissage réflexe, emojis rares, pas de relance systématique, Markdown borné autorisé), jamais sur le titrage ni le résumé + profil de travail ; rendu Markdown borné côté poste (gras, italique, listes) remplaçant l'affichage en texte brut. Hérite de l'identité visuelle du poste aux couleurs du cabinet BBASS (palette anthracite/rouge, police Manrope auto-hébergée, logo, favicon) et de la disposition façon ChatGPT (sidebar avec conversations et puce compte, page Profil dédiée, Panel d'administration dédié avec tableaux/étiquettes shadcn/ui). Backend local **poste** (interface React/TypeScript/Vite, shadcn/ui) et API **VM centrale** (comptes administrateurs PostgreSQL, relais Mistral, conversations persistées avec historique borné, résumé glissant et profil de travail, pièces jointes PDF/Word/Excel/image avec extraction et rappel via outil hors fenêtre, suivi de la consommation Mistral — tokens/pages et coût figé au tarif du jour, par conversation côté collaborateur et agrégé par compte côté administrateur). Les agents métiers ne sont pas encore construits.
+**V1.2.3** disponible : délais de chargement réduits sur les navigations et l'ouverture/bascule de conversation — cache TanStack Query revu par requête (conversation, Profil, Panel d'administration) avec `placeholderData` sur le détail de conversation pour supprimer le flash d'état vide, pagination par curseur du détail d'une conversation (fenêtre récente par défaut, historique plus ancien chargé au défilement façon ChatGPT), instrumentation de temps légère (`performance.mark`/`performance.measure`, désactivée par défaut) réutilisable par la 1.3.0. Hérite du style de réponse de l'IA (1.2.2 — vouvoiement, Markdown borné) et de l'identité visuelle du poste aux couleurs du cabinet BBASS (palette anthracite/rouge, police Manrope auto-hébergée, logo, favicon) et de la disposition façon ChatGPT (sidebar avec conversations et puce compte, page Profil dédiée, Panel d'administration dédié avec tableaux/étiquettes shadcn/ui). Backend local **poste** (interface React/TypeScript/Vite, shadcn/ui) et API **VM centrale** (comptes administrateurs PostgreSQL, relais Mistral, conversations persistées avec historique borné, résumé glissant et profil de travail, pièces jointes PDF/Word/Excel/image avec extraction et rappel via outil hors fenêtre, suivi de la consommation Mistral — tokens/pages et coût figé au tarif du jour, par conversation côté collaborateur et agrégé par compte côté administrateur). Les agents métiers ne sont pas encore construits.
 
 ## Ce qu'on construit
 
@@ -32,30 +32,33 @@ flowchart LR
 
 ## Semaine du 05 au 09 octobre 2026
 
-Point de départ lundi 5 octobre : **V1.2.2** vient d’être livrée. Point visé pour la semaine : **V1.2.3** puis **V1.3.0**.
+Point visé jeudi 8 octobre : **V1.5.0** (vendredi 9 : RTT).
 
 ```mermaid
 flowchart LR
-  L05["Lundi 5<br/>V1.2.2 livrée"] --> V123["V1.2.3<br/>délais de chargement"]
-  V123 --> V130["V1.3.0<br/>inspecteur échanges modèle"]
+  L05["Lundi 5<br/>V1.2.3 livrée"] --> V130["V1.3.0<br/>inspecteur échanges"]
+  V130 --> V140["V1.4.0<br/>Agent Admin · Moduléo lecture"]
+  V140 --> V08["Jeudi 8<br/>visé V1.5.0"]
 ```
 
 ### Travail réalisé
 
 - **Semaine du 14–18 septembre** — socle jusqu’à **V1.2.0** (comptes admin, persistance conversations, pièces jointes, consommation, front React/TypeScript/Vite).
 - **Depuis** — **V1.2.1** (identité visuelle BBASS, disposition type ChatGPT) ; **V1.2.2** (prompt système de style sur le chat principal ; rendu Markdown borné côté poste).
+- **Lundi 5 octobre** — **V1.2.3** (cache TanStack Query, pagination par curseur du détail de conversation, instrumentation de temps légère).
 
 ### Reste à implémenter
 
-- **V1.2.3** — amélioration des délais de chargement (pages et conversations) : navigations et ouvertures de fil ressenties comme rapides (cache TanStack Query, waterfalls, rendu…).
-- **V1.3.0** — inspecteur des échanges avec le modèle (outil de développement) : voir pour une conversation le payload réel envoyé/reçu à chaque tour (pas seulement les bulles du chat).
+- **V1.3.0** — inspecteur des échanges avec le modèle.
+- **V1.4.0** — premier Agent (pôle Administration) : lecture Moduléo via le chat.
+- **V1.5.0** — workflows n8n, branchés sur Moduléo 1.4.0.
 
-### Attendu pour la fin de semaine (V1.2.3 + V1.3.0)
+### Attendu pour la fin de semaine (V1.5.0)
 
-- **Déjà en place** (socle inchangé) — poste + VM Castries (réseau interne), PostgreSQL, connexion / session, chat Mistral, conversations bornées + résumé + profil, pièces jointes, consommation, comptes administrateurs, UI React BBASS, style de réponse 1.2.2.
-- **V1.2.3** — bascules d’écran et de conversation nettement plus fluides au quotidien.
-- **V1.3.0** — vue / panneau (accès restreint) pour inspecter les appels modèle d’une conversation (system / user / assistant, tools, tokens, types d’appel).
-- **Pas cette semaine** — premier Agent Moduléo (**V1.4.0** dans la feuille de route).
+- **Déjà en place** — poste + VM Castries, PostgreSQL, chat Mistral, conversations bornées + résumé + profil, pièces jointes, consommation, comptes administrateurs, UI React BBASS, style de réponse 1.2.2, navigations et ouvertures de conversation plus fluides (1.2.3).
+- **V1.3.0** — inspecteur (accès restreint) des payloads modèle.
+- **V1.4.0** — Q&A lecture Moduléo depuis le chat.
+- **V1.5.0** — socle n8n branché sur les outils Moduléo 1.4.0.
 
 ## Prérequis
 
