@@ -27,14 +27,8 @@ if errorlevel 1 goto :erreur
 echo [4/8] Verification / demarrage de PostgreSQL (Docker)...
 call "%~dp0scripts\verifier-docker.bat"
 if errorlevel 1 goto :erreur
-echo       (premier lancement : telechargement de l'image postgres, peut prendre quelques minutes)
-docker compose up -d --wait
-if errorlevel 1 (
-    echo.
-    echo [ERREUR] Docker n'a pas pu demarrer PostgreSQL.
-    echo          Verifie que Docker Desktop est bien pret, puis relance ce script.
-    goto :erreur
-)
+call "%~dp0scripts\demarrer-postgres.bat"
+if errorlevel 1 goto :erreur
 echo       PostgreSQL est demarre et pret ^(conteneur bbass-vm-centrale-postgres, port 5432^).
 echo.
 

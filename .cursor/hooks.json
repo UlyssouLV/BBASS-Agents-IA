@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "hooks": {
+    "preToolUse": [
+      {
+        "command": "python3 agents/hooks/gate-code-review/hook.py",
+        "matcher": "Task|Skill|Agent",
+        "failClosed": true
+      }
+    ],
+    "subagentStart": [
+      {
+        "command": "python3 agents/hooks/gate-code-review/hook.py",
+        "failClosed": true
+      }
+    ]
+  }
+}
