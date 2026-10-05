@@ -11,6 +11,10 @@ def _autorisation(jeton: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {jeton}"}
 
 
+def _autorisation_admin(jeton: str, cle_admin: str = "cle-admin-de-test") -> dict[str, str]:
+    return {**_autorisation(jeton), "X-Admin-Key": cle_admin}
+
+
 def _reponse_resume_et_profil(resume_contexte: str = "Résumé") -> str:
     return json.dumps({"resume_contexte": resume_contexte, "profil_travail_delta": ""})
 
@@ -321,3 +325,141 @@ def test_suppression_conversation_supprime_ses_echanges_mais_pas_sa_consommation
     lignes_consommation = db_session.query(Consommation).all()
     assert len(lignes_consommation) > 0
     assert all(l.conversation_id is None for l in lignes_consommation)
+
+
+# --- API de lecture GET /inspecteur/* (spec 1.3.0, ticket #107) --------------
+
+
+def test_inspecteur_sans_jeton_est_refuse(client, monkeypatch):
+    monkeypatch.setenv("VM_ADMIN_KEY", "cle-admin-de-test")
+
+    reponse = client.get("/inspecteur/comptes", headers={"X-Admin-Key": "cle-admin-de-test"})
+
+    assert reponse.status_code == 401
+
+
+def test_inspecteur_avec_jeton_mais_sans_cle_admin_est_refuse(client, jeton_valide, monkeypatch):
+    monkeypatch.setenv("VM_ADMIN_KEY", "cle-admin-de-test")
+
+    reponse = client.get("/inspecteur/comptes", headers=_autorisation(jeton_valide))
+
+    assert reponse.status_code == 401
+
+
+def test_inspecteur_avec_jeton_et_mauvaise_cle_admin_est_refuse(client, jeton_valide, monkeypatch):
+    monkeypatch.setenv("VM_ADMIN_KEY", "cle-admin-de-test")
+
+    reponse = client.get(
+        "/inspecteur/comptes", headers=_autorisation_admin(jeton_valide, "mauvaise-cle")
+    )
+
+    assert reponse.status_code == 401
+
+
+def test_inspecteur_avec_jeton_de_nimporte_quel_compte_et_bonne_cle_est_autorise(
+    client, jeton_valide, monkeypatch
+):
+    # Pas besoin d'un compte est_admin (spec 1.3.0, ADR-0012) : n'importe quel
+    # jeton valide suffit, contrairement à get_compte_admin (routers/comptes.py).
+    monkeypatch.setenv("VM_ADMIN_KEY", "cle-admin-de-test")
+
+    reponse = client.get("/inspecteur/comptes", headers=_autorisation_admin(jeton_valide))
+
+    assert reponse.status_code == 200
+
+
+def test_navigation_comptes_conversations_echanges_dans_lordre_chronologique(
+    client, mistral_client_factice, jeton_valide, monkeypatch
+):
+    monkeypatch.setenv("VM_ADMIN_KEY", "cle-admin-de-test")
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide, "Bonjour")
+    entetes = _autorisation_admin(jeton_valide)
+
+    reponse_comptes = client.get("/inspecteur/comptes", headers=entetes)
+    assert reponse_comptes.status_code == 200
+    assert {c["identifiant_compte"] for c in reponse_comptes.json()} == {"j.dupont"}
+
+    reponse_conversations = client.get("/inspecteur/comptes/j.dupont/conversations", headers=entetes)
+    assert reponse_conversations.status_code == 200
+    assert [c["id"] for c in reponse_conversations.json()] == [conversation_id]
+
+    reponse_echanges = client.get(
+        f"/inspecteur/conversations/{conversation_id}/echanges", headers=entetes
+    )
+    assert reponse_echanges.status_code == 200
+    echanges = reponse_echanges.json()
+    assert [e["type_appel"] for e in echanges] == ["chat", "titrage"]
+    assert [e["statut"] for e in echanges] == ["succes", "succes"]
+
+
+def test_comptes_sans_aucune_conversation_nest_jamais_liste(
+    client, mistral_client_factice, jeton_valide, monkeypatch
+):
+    # Aucune conversation créée dans ce test : la liste des comptes de
+    # l'inspecteur doit rester vide (spec 1.3.0 — "comptes ayant au moins une
+    # conversation").
+    monkeypatch.setenv("VM_ADMIN_KEY", "cle-admin-de-test")
+
+    reponse = client.get("/inspecteur/comptes", headers=_autorisation_admin(jeton_valide))
+
+    assert reponse.status_code == 200
+    assert reponse.json() == []
+
+
+def test_conversations_dun_compte_inconnu_renvoie_une_liste_vide(client, jeton_valide, monkeypatch):
+    # Portée volontairement sans restriction par compte (spec 1.3.0) : jamais
+    # de 404 pour un identifiant_compte qui n'existe pas, juste une liste vide.
+    monkeypatch.setenv("VM_ADMIN_KEY", "cle-admin-de-test")
+
+    reponse = client.get(
+        "/inspecteur/comptes/inconnu/conversations", headers=_autorisation_admin(jeton_valide)
+    )
+
+    assert reponse.status_code == 200
+    assert reponse.json() == []
+
+
+def test_detail_dun_echange_reussi_contient_le_payload_et_la_reponse(
+    client, mistral_client_factice, jeton_valide, db_session, monkeypatch
+):
+    monkeypatch.setenv("VM_ADMIN_KEY", "cle-admin-de-test")
+    _creer_conversation(client, mistral_client_factice, jeton_valide, "Bonjour")
+    echange_chat = _echanges(db_session)[0]
+
+    reponse = client.get(
+        f"/inspecteur/echanges/{echange_chat.id}", headers=_autorisation_admin(jeton_valide)
+    )
+
+    assert reponse.status_code == 200
+    corps = reponse.json()
+    assert corps["statut"] == "succes"
+    assert corps["erreur"] is None
+    assert corps["requete_payload"]["messages"][-1] == {"role": "user", "content": "Bonjour"}
+    assert corps["reponse_payload"]["choices"][0]["message"]["content"] == "Réponse assistant"
+
+
+def test_detail_dun_echange_en_echec_contient_le_statut_sans_reponse(
+    client, mistral_client_factice, jeton_valide, db_session, monkeypatch
+):
+    monkeypatch.setenv("VM_ADMIN_KEY", "cle-admin-de-test")
+    mistral_client_factice.echouer(RuntimeError("service Mistral indisponible"))
+    client.post("/conversations", json={"message": "Bonjour"}, headers=_autorisation(jeton_valide))
+    echange_echec = _echanges(db_session)[0]
+
+    reponse = client.get(
+        f"/inspecteur/echanges/{echange_echec.id}", headers=_autorisation_admin(jeton_valide)
+    )
+
+    assert reponse.status_code == 200
+    corps = reponse.json()
+    assert corps["statut"] == "echec"
+    assert corps["reponse_payload"] is None
+    assert "service Mistral indisponible" in corps["erreur"]
+
+
+def test_echange_introuvable_renvoie_404(client, jeton_valide, monkeypatch):
+    monkeypatch.setenv("VM_ADMIN_KEY", "cle-admin-de-test")
+
+    reponse = client.get("/inspecteur/echanges/9999", headers=_autorisation_admin(jeton_valide))
+
+    assert reponse.status_code == 404

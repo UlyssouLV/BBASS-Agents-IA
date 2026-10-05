@@ -185,3 +185,35 @@ class CompteConsommationResponse(BaseModel):
     cout_usd: Decimal
     chat: DetailConsommationCategorieResponse
     piece_jointe: DetailConsommationCategorieResponse
+
+
+class InspecteurCompteResponse(BaseModel):
+    identifiant_compte: str
+
+
+class InspecteurConversationResponse(BaseModel):
+    id: int
+    titre: str
+    date_creation: datetime
+    date_derniere_activite: datetime
+
+
+class InspecteurEchangeResumeResponse(BaseModel):
+    id: int
+    type_appel: str
+    statut: str
+    date_creation: datetime
+
+
+class InspecteurEchangeDetailResponse(BaseModel):
+    id: int
+    identifiant_compte: str
+    conversation_id: int | None
+    piece_jointe_id: int | None
+    type_appel: str
+    modele: str
+    requete_payload: dict
+    reponse_payload: dict | None
+    statut: str
+    erreur: str | None
+    date_creation: datetime

@@ -205,3 +205,42 @@ class CompteConsommationResponse(BaseModel):
     cout_usd: Decimal
     chat: DetailConsommationCategorie
     piece_jointe: DetailConsommationCategorie
+
+
+class InspecteurCompteResponse(BaseModel):
+    # Pas de jointure vers Compte (Conversation n'a pas de ForeignKey vers
+    # comptes.identifiant, même convention qu'ailleurs) : seul l'identifiant,
+    # distinct des champs prenom/nom/etc. d'un CompteResponse classique.
+    identifiant_compte: str
+
+
+class InspecteurConversationResponse(BaseModel):
+    id: int
+    titre: str
+    date_creation: datetime
+    date_derniere_activite: datetime
+
+
+class InspecteurEchangeResumeResponse(BaseModel):
+    # Fil chronologique d'une conversation (spec 1.3.0) : juste assez pour la
+    # navigation et l'affichage replié d'une carte d'échange, le détail
+    # complet (payload/réponse) n'étant chargé qu'au dépliage (GET
+    # /inspecteur/echanges/{id}).
+    id: int
+    type_appel: str
+    statut: str
+    date_creation: datetime
+
+
+class InspecteurEchangeDetailResponse(BaseModel):
+    id: int
+    identifiant_compte: str
+    conversation_id: int | None
+    piece_jointe_id: int | None
+    type_appel: str
+    modele: str
+    requete_payload: dict
+    reponse_payload: dict | None
+    statut: str
+    erreur: str | None
+    date_creation: datetime

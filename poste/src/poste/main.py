@@ -9,6 +9,7 @@ from poste.config import POSTE_HOST, POSTE_PORT
 from poste.routers.comptes import router as comptes_router
 from poste.routers.consommation import router as consommation_router
 from poste.routers.conversations import router as conversations_router
+from poste.routers.inspecteur import router as inspecteur_router
 from poste.routers.profil_travail import router as profil_travail_router
 from poste.routers.session import router as session_router
 from poste.session import get_session_store, verifier_session_au_demarrage
@@ -34,6 +35,7 @@ app.include_router(conversations_router)
 app.include_router(profil_travail_router)
 app.include_router(consommation_router)
 app.include_router(comptes_router)
+app.include_router(inspecteur_router)
 app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
 
 
