@@ -13,7 +13,7 @@ def _autorisation(jeton: str) -> dict[str, str]:
 
 
 def _reponse_resume_et_profil(resume_contexte: str = "Résumé") -> str:
-    return json.dumps({"resume_contexte": resume_contexte, "profil_travail_delta": ""})
+    return json.dumps({"resume_contexte": resume_contexte, "profil_travail": None})
 
 
 def _creer_conversation(client, mistral_client_factice, jeton: str, message: str = "Bonjour") -> int:

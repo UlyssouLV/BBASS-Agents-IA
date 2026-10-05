@@ -16,7 +16,7 @@ def _autorisation_admin(jeton: str, cle_admin: str = "cle-admin-de-test") -> dic
 
 
 def _reponse_resume_et_profil(resume_contexte: str = "Résumé") -> str:
-    return json.dumps({"resume_contexte": resume_contexte, "profil_travail_delta": ""})
+    return json.dumps({"resume_contexte": resume_contexte, "profil_travail": None})
 
 
 def _creer_conversation(client, mistral_client_factice, jeton: str, message: str = "Bonjour") -> int:

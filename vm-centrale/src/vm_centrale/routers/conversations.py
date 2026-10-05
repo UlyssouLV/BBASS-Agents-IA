@@ -69,6 +69,8 @@ _TAILLE_EXTRAIT_PIECE_JOINTE_RESUME = 200
 # Plafond du résumé glissant persisté, fixé en dur comme la fenêtre de 3 et
 # énoncé aussi dans le prompt résumé+profil (spec 1.3.1).
 _TAILLE_MAX_RESUME_CONTEXTE = 1500
+# Plafond du profil de travail persisté, même convention (spec 1.3.1).
+_TAILLE_MAX_PROFIL_TRAVAIL = 800
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -130,9 +132,10 @@ def _outils_piece_jointe(pieces_jointes_hors_fenetre: list[PieceJointe]) -> list
     ]
 
 # Sortie structurée stricte (spec V1.1.1) : un seul appel Mistral produit à la
-# fois le résumé glissant mis à jour et une éventuelle mise à jour du profil
-# de travail, pour ne payer le contexte partagé (résumé courant, profil
-# courant, message(s) sortant(s)) qu'une seule fois.
+# fois le résumé glissant mis à jour et, si le profil de travail change, ce
+# profil réécrit en entier (spec 1.3.1 : plus de delta concaténé), pour ne
+# payer le contexte partagé (résumé courant, profil courant, message(s)
+# sortant(s)) qu'une seule fois.
 _SCHEMA_RESUME_ET_PROFIL = {
     "type": "json_schema",
     "json_schema": {
@@ -142,9 +145,9 @@ _SCHEMA_RESUME_ET_PROFIL = {
             "type": "object",
             "properties": {
                 "resume_contexte": {"type": "string"},
-                "profil_travail_delta": {"type": ["string", "null"]},
+                "profil_travail": {"type": ["string", "null"]},
             },
-            "required": ["resume_contexte", "profil_travail_delta"],
+            "required": ["resume_contexte", "profil_travail"],
             "additionalProperties": False,
         },
     },
@@ -344,9 +347,11 @@ def _prompt_resume_et_profil(
         "Message(s) qui sortent de la fenêtre des derniers messages, à "
         f"absorber dans le résumé :\n{echange_sortant}\n\n"
         "Renvoie un objet JSON avec resume_contexte (résumé glissant mis à "
-        "jour, incorporant ces messages sortants) et profil_travail_delta "
-        "(un ajout au profil de travail, vide si rien à ajouter). "
-        "N'inclus jamais dans profil_travail_delta un fait d'identité "
+        "jour, incorporant ces messages sortants) et profil_travail (le "
+        "profil de travail complet, réécrit en entier : il remplace le "
+        "profil actuel, doublons fusionnés, sans aucun doublon ; null si "
+        "rien n'y change). "
+        "N'inclus jamais dans profil_travail un fait d'identité "
         "(prénom, nom, pôle, agence) : ceux-ci sont déjà connus et ne "
         "doivent jamais être réinférés ni modifiés depuis une conversation. "
         "Si un message sortant porte une pièce jointe, n'en garde dans "
@@ -359,11 +364,14 @@ def _prompt_resume_et_profil(
         "résumé. Une URL écrite par le compte est recopiée à l'identique ; "
         "une URL écrite par l'assistant n'est jamais gardée. "
         f"resume_contexte tient en {_TAILLE_MAX_RESUME_CONTEXTE} caractères au plus. "
-        "N'inclus jamais non plus dans profil_travail_delta un trait "
-        "décrivant ton propre comportement d'assistant (ton adopté, "
-        "réflexes de réponse, suggestions d'outils externes que tu "
-        "formules) : seul un trait observé chez le compte lui-même, sa "
-        "façon à lui de travailler, y a sa place."
+        "profil_travail se fonde sur les seules lignes « user » (les "
+        "messages du compte), jamais sur une réponse de l'assistant. "
+        "N'inclus jamais non plus dans profil_travail un trait "
+        "décrivant ton propre comportement d'assistant (liens fournis, "
+        "PDF proposés, vérification annoncée, ton adopté, suggestions "
+        "d'outils externes que tu formules) : seul un trait observé chez "
+        "le compte lui-même, sa façon à lui de travailler, y a sa place. "
+        f"profil_travail tient en {_TAILLE_MAX_PROFIL_TRAVAIL} caractères au plus."
     )
 
 
@@ -1183,7 +1191,7 @@ def _generer_reponse_et_resume(
     try:
         donnees = json.loads(reponse_resume.contenu)
         resume_maj = donnees["resume_contexte"]
-        profil_travail_delta = donnees.get("profil_travail_delta")
+        profil_travail = donnees.get("profil_travail")
     except (json.JSONDecodeError, KeyError, TypeError) as erreur:
         # Distinct du bloc ci-dessus : une réponse reçue mais mal formée n'est
         # pas une panne du relais Mistral, ne doit jamais être journalisée
@@ -1192,7 +1200,7 @@ def _generer_reponse_et_resume(
         logger.exception("Réponse résumé+profil de Mistral invalide")
         raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
 
-    return reponse_chat, resume_maj, profil_travail_delta
+    return reponse_chat, resume_maj, profil_travail
 
 
 @router.post(
@@ -1278,7 +1286,7 @@ def envoyer_message(
 
         compte = db.query(Compte).filter(Compte.identifiant == identifiant_compte).first()
 
-        reponse_chat, resume_maj, profil_travail_delta = _generer_reponse_et_resume(
+        reponse_chat, resume_maj, profil_travail = _generer_reponse_et_resume(
             client,
             messages_pour_mistral,
             tools,
@@ -1297,9 +1305,11 @@ def envoyer_message(
         maintenant = datetime.now(timezone.utc)
         if resume_maj is not None:
             conversation.resume_contexte = plafonner(resume_maj, _TAILLE_MAX_RESUME_CONTEXTE)
-        if profil_travail_delta:
+        if profil_travail and profil_travail.strip():
+            # Remplacé, jamais concaténé (spec 1.3.1) : null ou vide le
+            # laisse intact.
             profil = _recuperer_ou_creer_profil(db, identifiant_compte)
-            profil.contenu = f"{profil.contenu}\n{profil_travail_delta}".strip()
+            profil.contenu = plafonner(profil_travail.strip(), _TAILLE_MAX_PROFIL_TRAVAIL)
             profil.date_derniere_maj = maintenant
 
         message_utilisateur = Message(

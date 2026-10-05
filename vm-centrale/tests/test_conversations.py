@@ -23,10 +23,8 @@ def _creer_conversation(client, mistral_client_factice, jeton: str, message: str
     return reponse.json()["conversation"]["id"]
 
 
-def _reponse_resume_et_profil(resume_contexte: str, profil_travail_delta: str = "") -> str:
-    return json.dumps(
-        {"resume_contexte": resume_contexte, "profil_travail_delta": profil_travail_delta}
-    )
+def _reponse_resume_et_profil(resume_contexte: str, profil_travail: str | None = None) -> str:
+    return json.dumps({"resume_contexte": resume_contexte, "profil_travail": profil_travail})
 
 
 def _jeton_admin(client, seed_compte, identifiant: str = "a.martin") -> str:
@@ -650,6 +648,61 @@ def test_resume_et_profil_se_mettent_a_jour_une_fois_le_seuil_de_3_messages_depa
     assert "Travaille sur des devis Foncier" in profil.json()["contenu"]
 
 
+def _envoyer_tour(client, mistral_client_factice, jeton: str, conversation_id: int, profil: str | None):
+    mistral_client_factice.repondre("Suite", resume_et_profil=_reponse_resume_et_profil("Résumé", profil))
+    client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Et ensuite ?"},
+        headers=_autorisation(jeton),
+    )
+
+
+def test_profil_persiste_est_le_dernier_renvoye_remplace_pas_concatene(
+    client, mistral_client_factice, jeton_valide
+):
+    # #110, conversation 76 : onze deltas concaténés en onze minutes, avec
+    # doublons et traits de l'assistant (spec 1.3.1).
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide, "Bonjour")
+
+    _envoyer_tour(client, mistral_client_factice, jeton_valide, conversation_id, "Prépare des devis Foncier.")
+    _envoyer_tour(
+        client, mistral_client_factice, jeton_valide, conversation_id,
+        "Prépare des devis Foncier. Veut des tableaux.",
+    )
+
+    profil = client.get("/comptes/j.dupont/profil-travail", headers=_autorisation(jeton_valide))
+    assert profil.json()["contenu"] == "Prépare des devis Foncier. Veut des tableaux."
+
+
+@pytest.mark.parametrize("profil_renvoye", [None, ""])
+def test_profil_null_ou_vide_laisse_le_profil_intact(
+    client, mistral_client_factice, jeton_valide, profil_renvoye
+):
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide, "Bonjour")
+
+    _envoyer_tour(client, mistral_client_factice, jeton_valide, conversation_id, "Prépare des devis Foncier.")
+    _envoyer_tour(client, mistral_client_factice, jeton_valide, conversation_id, profil_renvoye)
+
+    profil = client.get("/comptes/j.dupont/profil-travail", headers=_autorisation(jeton_valide))
+    assert profil.json()["contenu"] == "Prépare des devis Foncier."
+
+
+def test_profil_au_dela_du_plafond_est_persiste_coupe_en_fin_de_phrase(
+    client, mistral_client_factice, jeton_valide
+):
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide, "Bonjour")
+    profil_trop_long = "Prépare des devis Foncier pour Castries. " * 40
+
+    _envoyer_tour(client, mistral_client_factice, jeton_valide, conversation_id, profil_trop_long)
+
+    contenu = client.get(
+        "/comptes/j.dupont/profil-travail", headers=_autorisation(jeton_valide)
+    ).json()["contenu"]
+    assert len(contenu) <= 800
+    assert contenu.endswith("Castries.")
+    assert profil_trop_long.startswith(contenu)
+
+
 def test_resume_se_met_a_jour_meme_sans_delta_de_profil(
     client, mistral_client_factice, jeton_valide, db_session
 ):
@@ -711,7 +764,28 @@ def test_prompt_resume_et_profil_exclut_les_traits_de_comportement_de_lassistant
     prompt_resume = mistral_client_factice.appels_structures[-1]
     assert "comportement" in prompt_resume
     assert "assistant" in prompt_resume
-    assert "profil_travail_delta" in prompt_resume
+    assert "profil_travail" in prompt_resume
+    assert "profil_travail_delta" not in prompt_resume
+
+
+def test_prompt_resume_et_profil_reecrit_le_profil_depuis_les_seuls_messages_du_compte(
+    client, mistral_client_factice, jeton_valide
+):
+    # #110, conversation 76 : le profil empilait des traits tirés des
+    # réponses de l'assistant (liens, PDF, vérification) (spec 1.3.1).
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide, "Bonjour")
+
+    _envoyer_tour(client, mistral_client_factice, jeton_valide, conversation_id, None)
+
+    prompt_resume = mistral_client_factice.appels_structures[-1]
+    assert "user" in prompt_resume
+    assert "jamais sur une réponse de l'assistant" in prompt_resume
+    for trait in ("liens", "PDF", "vérification", "ton"):
+        assert trait in prompt_resume
+    assert "réécrit en entier" in prompt_resume
+    assert "doublon" in prompt_resume
+    assert "null" in prompt_resume
+    assert "800 caractères" in prompt_resume
 
 
 def test_prompt_resume_et_profil_ne_fige_pas_les_propositions_de_lassistant(

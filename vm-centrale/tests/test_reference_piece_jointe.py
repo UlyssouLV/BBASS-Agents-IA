@@ -9,7 +9,7 @@ _PDF = ("document.pdf", b"%PDF-1.4 contenu factice", "application/pdf")
 
 
 def _reponse_resume_et_profil(resume_contexte: str = "Résumé") -> str:
-    return json.dumps({"resume_contexte": resume_contexte, "profil_travail_delta": ""})
+    return json.dumps({"resume_contexte": resume_contexte, "profil_travail": None})
 
 
 @pytest.fixture(autouse=True)

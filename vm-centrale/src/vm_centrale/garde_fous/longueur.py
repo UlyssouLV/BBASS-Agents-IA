@@ -1,9 +1,9 @@
 import re
 
-# Le résumé glissant est renvoyé au modèle à chaque tour : sans borne, il
-# grossit et garde ce que le compte a abandonné (#110, conversation 76). Le
-# prompt résumé+profil énonce déjà le plafond ; ce garde-fou le garantit même
-# quand le modèle l'ignore (spec 1.3.1).
+# Le résumé glissant et le profil de travail sont renvoyés au modèle à chaque
+# tour : sans borne, ils grossissent et gardent ce que le compte a abandonné
+# (#110, conversation 76). Le prompt résumé+profil énonce déjà les plafonds ;
+# ce garde-fou les garantit même quand le modèle les ignore (spec 1.3.1).
 
 # Fin de phrase : « . », « ! », « ? » ou « … », éventuellement suivie de
 # guillemets ou parenthèses fermants, puis d'un blanc ou de la fin du texte.
