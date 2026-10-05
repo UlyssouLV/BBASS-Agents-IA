@@ -132,7 +132,14 @@ _SCHEMA_RESUME_ET_PROFIL = {
 # titrage ni résumé+profil, qui gardent leurs consignes dédiées), en tête de
 # la liste de messages — avant résumé glissant / profil de travail / pièce
 # jointe (consigne de comportement générale avant le contexte propre à ce
-# tour), cf. spec 1.2.2.
+# tour), cf. spec 1.2.2. Renforcé après validation manuelle de la 1.2.2
+# (réponses à une question ouverte type « que peux-tu me dire sur... ? ») :
+# la question de relance finale et les faux titres en gras revenaient de
+# façon systématique malgré la première version de cette consigne.
+# Tableaux, blocs de code et liens passés de déconseillés à autorisés le
+# même jour, une fois le rendu Markdown du poste (#93) étendu pour les
+# afficher proprement (table HTML, police mono, pastille de source cliquable)
+# plutôt que les neutraliser.
 _PROMPT_STYLE = (
     "Consigne de style pour ta réponse, à respecter systématiquement :\n"
     "- Ton : vouvoiement, professionnel, cohérent avec un outil de travail "
@@ -143,14 +150,28 @@ _PROMPT_STYLE = (
     "complexité de la question, pas une limite fixe.\n"
     "- Emojis : rares, seulement quand ils portent un vrai signal que le "
     "texte seul ne porterait pas aussi bien (ex. ⚠️ pour un avertissement) ; "
-    "jamais décoratifs ni systématiques.\n"
-    "- Relance finale : pas de question de relance systématique en fin de "
-    "réponse (« Voulez-vous que je... ? » par réflexe). Une question de "
-    "clarification reste possible quand elle est réellement nécessaire à la "
-    "tâche.\n"
+    "jamais décoratifs ni systématiques, jamais en guise de puces pour "
+    "énumérer plusieurs éléments dans un même paragraphe.\n"
+    "- Relance finale : ne termine jamais ta réponse par une question, y "
+    "compris une proposition du type « Souhaitez-vous que je... ? » ou "
+    "« Besoin de précisions sur... ? ». Si une clarification est "
+    "réellement nécessaire à la tâche, pose-la en tout début de réponse, "
+    "jamais en conclusion.\n"
+    "- Titres : n'utilise jamais un texte en gras isolé sur sa propre "
+    "ligne en guise de titre de section (ex. « **1. Missions "
+    "principales** ») ; le gras reste réservé à des mots ou expressions "
+    "au sein d'une phrase ou d'un élément de liste.\n"
+    "- Listes : un seul niveau d'imbrication au maximum ; au-delà, "
+    "reformule en phrases plutôt qu'en sous-listes empilées. Si tu "
+    "énumères plusieurs éléments, utilise toujours une vraie liste à "
+    "puces ou numérotée, jamais des éléments mis bout à bout dans un même "
+    "paragraphe.\n"
     "- Markdown autorisé dans ta réponse : gras, italique, listes à puces "
-    "ou numérotées, paragraphes. Déconseillés : titres, tableaux, "
-    "séparateurs `---`, blocs de code, citations, liens, images."
+    "ou numérotées, paragraphes, tableaux (uniquement quand l'information "
+    "s'y prête vraiment, jamais par réflexe), blocs de code pour du code "
+    "ou une formule, et liens uniquement vers une source réelle que tu "
+    "connais avec certitude (jamais une URL inventée ou approximative). "
+    "Déconseillés : titres, séparateurs `---`, citations, images."
 )
 
 
@@ -160,11 +181,38 @@ def _message_systeme_style() -> dict[str, str]:
 
 def _prompt_titrage(message_utilisateur: str, reponse_assistant: str) -> str:
     return (
-        "Propose un titre court (moins de 8 mots), sans guillemets, résumant "
+        "Propose un titre court (moins de 8 mots), sans guillemets et sans "
+        "aucune mise en forme Markdown (pas de **, #, etc.), résumant "
         "l'échange suivant :\n"
         f"Utilisateur : {message_utilisateur}\n"
         f"Assistant : {reponse_assistant}"
     )
+
+
+# Le titre est affiché en texte brut (BarreLaterale.tsx), jamais passé par le
+# rendu Markdown borné du message assistant (#93) — contrairement à lui, un
+# « ** » résiduel dans le titre s'affiche donc littéralement. La consigne du
+# prompt ci-dessus ne suffit pas à elle seule (constaté lors de la
+# validation manuelle de la 1.2.2 : le titrage reprend parfois le gras de la
+# réponse qu'il résume malgré la consigne) ; ce nettoyage réplique en Python
+# le principe déjà appliqué côté poste pour le corps du message : neutraliser
+# ce que le modèle produit malgré la consigne plutôt que de ne compter que
+# sur elle. Ne s'applique qu'au titre généré par le modèle (ici), jamais à un
+# renommage saisi à la main par un collaborateur (PATCH /conversations/{id}).
+_MARQUEURS_MARKDOWN_TITRE = (
+    (re.compile(r"^#{1,6}\s*"), ""),
+    (re.compile(r"\*\*(.+?)\*\*"), r"\1"),
+    (re.compile(r"__(.+?)__"), r"\1"),
+    (re.compile(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)"), r"\1"),
+    (re.compile(r"(?<!_)_(?!_)(.+?)(?<!_)_(?!_)"), r"\1"),
+)
+
+
+def _nettoyer_titre(titre: str) -> str:
+    titre = titre.strip()
+    for motif, remplacement in _MARQUEURS_MARKDOWN_TITRE:
+        titre = motif.sub(remplacement, titre)
+    return titre.strip()
 
 
 def _message_systeme_piece_jointe(piece_jointe: PieceJointe) -> dict[str, str]:
@@ -441,7 +489,7 @@ def creer_conversation(
             reponse_chat = client.chat(message_pour_mistral)
             reponse = reponse_chat.contenu
             reponse_titrage = client.chat(_prompt_titrage(requete.message, reponse))
-            titre = reponse_titrage.contenu
+            titre = _nettoyer_titre(reponse_titrage.contenu)
         except Exception as erreur:
             db.rollback()
             logger.exception(_MSG_ECHEC_RELAIS_LOG)

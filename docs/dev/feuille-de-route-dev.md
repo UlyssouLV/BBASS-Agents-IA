@@ -34,6 +34,19 @@ Ce n’est **pas** une spec (ça vient après « Ouvre la version »).
 - Une consigne globale V1 vs styles par Agent dès qu’il y en a plusieurs.
 - Mesure simple : mêmes questions de test avant/après sur le modèle actuel (et un second si multi-modèles un jour).
 
+## Ensuite : 1.2.3 — Amélioration des délais de chargement (pages et conversations)
+
+**Constat.** Chaque changement d’écran (chat, profil, admin…) et surtout l’ouverture / le basculement de conversation est **trop lent** au quotidien. Au-delà de l’absence de cache côté front (TanStack Query quasi sans stratégie de `staleTime` / conservation des listes), la latence reste élevée : impression de tout recharger à chaque clic, y compris des données déjà vues.
+
+**Objectif.** Des navigations et des ouvertures de conversation **ressenties comme rapides** : moins d’attentes bloquantes, réutilisation intelligente de ce qui est déjà en mémoire, et identification / réduction des vrais goulots (poste, VM, payload conversations, rendu).
+
+**Pistes à creuser à l’ouverture (pas tranchées).**
+- Cache / invalidation TanStack Query : liste des conversations, détail d’une conversation, profil, conso — conserver au changement d’écran, invalider seulement quand un envoi / rename / delete le justifie.
+- Chargement conversation : payload trop gros (tous les messages d’un coup) ? pagination / fenêtre locale vs tout le fil ; skeleton / contenu précédent pendant le fetch.
+- Réseau : appels en série inutiles, waterfalls poste → VM, timeouts ; mesurer avant d’optimiser.
+- Rendu : coût des animations (frappe réponse), re-renders React au changement de conversation.
+- Critère de succès : scénarios chronométrés (ouvrir une conversation connue, basculer entre deux fils, aller-retour Profil ↔ Chat) avant / après.
+
 ## Ensuite : 1.3.0 — Inspecteur des échanges avec le modèle (outil de développement)
 
 **Objectif.** Une fenêtre / vue **développement** qui montre, pour une conversation, **exactement ce qui a été envoyé et reçu à chaque tour** vers le modèle (et appels annexes : titrage, résumé+profil, OCR, vision, tool calls pièce jointe…) — pas seulement les bulles user/assistant visibles dans le chat.

@@ -94,3 +94,63 @@ html {
 *::-webkit-scrollbar-thumb:hover {
   background-color: var(--scrollbar-thumb-hover);
 }
+
+/* Issue #93 : mise en forme standardisée du Markdown borné d'un message
+   assistant (OngletChat.tsx, ContenuMessageAssistant) — indépendante de la
+   réponse ou du modèle. Espacement entre blocs de premier niveau (p, ul,
+   ol, titres/citations/code neutralisés en <div>) ; puces et numérotation
+   différenciées par niveau d'imbrication, pour distinguer d'un coup d'œil
+   une sous-liste de sa liste parente. */
+.contenu-markdown > :not(:first-child) {
+  margin-top: 0.85rem;
+}
+
+.contenu-markdown ul,
+.contenu-markdown ol {
+  padding-left: 1.25rem;
+}
+
+/* Une sous-liste réduit aussi la taille de police d'un cran (en plus de la
+   puce différente ci-dessous) — la combinaison des deux évite de confondre
+   grandes puces et sous-puces même sur un coup d'œil rapide. Relatif (em) :
+   l'effet se cumule naturellement à chaque niveau d'imbrication
+   supplémentaire. */
+.contenu-markdown ul ul,
+.contenu-markdown ul ol,
+.contenu-markdown ol ul,
+.contenu-markdown ol ol {
+  font-size: 0.925em;
+}
+
+.contenu-markdown ul {
+  list-style-type: disc;
+}
+
+.contenu-markdown ol {
+  list-style-type: decimal;
+}
+
+.contenu-markdown ul ul {
+  list-style-type: circle;
+}
+
+.contenu-markdown ul ul ul {
+  list-style-type: square;
+}
+
+.contenu-markdown ol ol {
+  list-style-type: lower-alpha;
+}
+
+.contenu-markdown ol ol ol {
+  list-style-type: lower-roman;
+}
+
+.contenu-markdown li + li {
+  margin-top: 0.125rem;
+}
+
+.contenu-markdown li > ul,
+.contenu-markdown li > ol {
+  margin-top: 0.125rem;
+}

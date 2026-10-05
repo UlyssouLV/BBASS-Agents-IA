@@ -1,5 +1,17 @@
-import { useEffect, useRef, useState, type DragEvent, type FormEvent } from "react";
 import {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type DragEvent,
+  type FormEvent,
+  type ReactNode,
+} from "react";
+import {
+  Check,
+  Copy,
+  ExternalLink,
   File,
   FileImage,
   FileSpreadsheet,
@@ -10,7 +22,15 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
+import { Highlight, themes } from "prism-react-renderer";
+import * as Prism from "prismjs";
+import "prismjs/components/prism-bash";
+import "prismjs/components/prism-json";
+import "prismjs/components/prism-python";
+import "prismjs/components/prism-sql";
+import "prismjs/components/prism-yaml";
 import Markdown, { type Components } from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -186,45 +206,285 @@ function ChampMessageAvecPieceJointe({
   );
 }
 
-// Issue #93 : allowlist des composants Markdown autorisés dans la bulle de
-// message assistant (spec #91, Solution volet 2). Les balises hors de cette
-// liste (titres, tableaux, séparateurs, blocs de code, HTML brut, liens,
-// images, citations) sont neutralisées par ELEMENTS_MARKDOWN_NEUTRALISES
-// ci-dessous : jamais de marqueur Markdown brut affiché à l'écran. Ce
-// mapping reste le point d'extension naturel pour de futurs types de blocs
-// (cf. feuille de route, section « Plus tard »).
-const ESPACEMENT_BLOC_MARKDOWN = "[&:not(:first-child)]:mt-2";
-const COMPOSANTS_MARKDOWN_MESSAGE: Components = {
-  p: ({ children }) => <p className={ESPACEMENT_BLOC_MARKDOWN}>{children}</p>,
-  ul: ({ children }) => <ul className={cn(ESPACEMENT_BLOC_MARKDOWN, "list-disc pl-5")}>{children}</ul>,
-  ol: ({ children }) => <ol className={cn(ESPACEMENT_BLOC_MARKDOWN, "list-decimal pl-5")}>{children}</ol>,
+// Issue #93, étendu lors de la validation manuelle de la 1.2.2
+// (2026-10-05) : allowlist des composants Markdown autorisés dans la bulle
+// de message assistant (spec #91, Solution volet 2) : gras, italique,
+// listes (imbriquées ou non), paragraphes, tableaux (remark-gfm, sans quoi
+// la syntaxe `|...|` n'est jamais reconnue comme un tableau et s'affiche
+// telle quelle — marqueurs bruts — plutôt que d'être neutralisée), blocs
+// de code et liens (en pastille séparée du texte, voir LienSource). Le
+// reste (titres, citations) est neutralisé en bloc générique ci-dessous
+// plutôt que simplement « déplié » (unwrapDisallowed) — un titre ou une
+// citation dépliée perd son élément englobant et se retrouve orpheline,
+// collée sans espacement au contenu précédent. Les balises purement
+// inline une fois neutralisées (image, rayé GFM) restent dépliées via
+// ELEMENTS_MARKDOWN_DEPLIES : elles finissent de toute façon à
+// l'intérieur d'un bloc déjà espacé ; une case à cocher de liste de
+// tâches GFM (`input`) n'a pas de contenu à déplier, elle disparaît
+// simplement (ce n'est pas un type de bloc envisagé par cette allowlist).
+// La mise en forme (espacement entre blocs, puces différenciées par
+// niveau d'imbrication) est portée par la classe `.contenu-markdown` dans
+// index.css plutôt que par des classes par composant : un rendu
+// standardisé qui ne dépend ni de la réponse ni du modèle. Ce mapping
+// reste le point d'extension naturel pour de futurs types de blocs (cf.
+// feuille de route, section « Plus tard »). `skipHtml` sur <Markdown>
+// ci-dessous neutralise le HTML brut (ex. `<br>`) : sans lui, un nœud
+// HTML échappe à disallowedElements (ce n'est pas un élément du même
+// type) et s'affiche tel quel, marqueurs bruts inclus.
+function BlocMarkdownNeutralise({ children }: Readonly<{ children?: ReactNode }>) {
+  return <div>{children}</div>;
+}
+
+// Issue #91/#93, ajusté après validation manuelle de la 1.2.2 : même fond
+// que la bulle (bg-muted) sur toute la largeur, sans distinction d'en-tête
+// ni marge interne généreuse, un tableau se fondait dans le reste du
+// message plutôt que de se lire comme un tableau. `bg-background` tranche
+// avec la bulle qui l'entoure. Premier essai d'en-tête en `bg-muted` : ce
+// token est en réalité identique à `--secondary` et au fond de la bulle
+// elle-même (voir index.css), donc toujours aucun contraste visible — l'en-
+// tête utilise à la place une teinte anthracite (`--primary`) à faible
+// opacité, propre au tableau et distincte des deux autres fonds.
+function Tableau({ children }: Readonly<{ children?: ReactNode }>) {
+  return (
+    <div className="overflow-x-auto rounded-md border border-border bg-background">
+      <table className="w-full border-collapse text-left text-sm">{children}</table>
+    </div>
+  );
+}
+
+function EnTeteCelluleTableau({ children }: Readonly<{ children?: ReactNode }>) {
+  return <th className="border-b border-border bg-primary/10 px-3 py-2 font-semibold">{children}</th>;
+}
+
+function CelluleTableau({ children }: Readonly<{ children?: ReactNode }>) {
+  return <td className="border-b border-border px-3 py-2 align-top">{children}</td>;
+}
+
+// Bouton « Copier » générique, en haut à droite d'un bloc au survol — même
+// convention que le bouton « … » de BarreLaterale.tsx (opacity-0 +
+// group-hover/group-focus-within). Pris isolément de BlocCode pour rester
+// le point d'extension naturel de futurs types de blocs porteurs d'un
+// contenu à copier intégralement (cellule de document, etc. — cf. feuille
+// de route, section « Plus tard ») : il leur suffira de l'envelopper avec
+// leur propre `obtenirTexte`, sans dupliquer l'affordance.
+function BlocAvecBoutonCopier({
+  children,
+  obtenirTexte,
+}: Readonly<{ children: ReactNode; obtenirTexte: () => string }>) {
+  const [copie, setCopie] = useState(false);
+
+  async function copier() {
+    try {
+      await navigator.clipboard.writeText(obtenirTexte());
+      setCopie(true);
+      window.setTimeout(() => setCopie(false), 1500);
+    } catch {
+      // Presse-papiers indisponible (permissions, contexte non sécurisé) :
+      // rien d'autre à faire, le bouton reste silencieusement sans effet.
+    }
+  }
+
+  return (
+    <div className="group relative">
+      {children}
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="absolute right-1 top-1 size-6 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+        onClick={copier}
+        aria-label="Copier"
+      >
+        {copie ? <Check className="size-3.5" aria-hidden="true" /> : <Copy className="size-3.5" aria-hidden="true" />}
+      </Button>
+    </div>
+  );
+}
+
+// Un bloc de code (```…```, mdast "code") devient <pre><code>, du code
+// inline (`…`) devient juste <code> : react-markdown n'expose pas de prop
+// pour distinguer les deux au niveau du composant `code`, d'où ce contexte
+// posé par BlocCode — lu par CodeEnLigne pour ne pas empiler deux styles
+// de « boîte » (celle du bloc, puis celle du chip inline) l'un dans
+// l'autre. Le texte à copier est lu depuis le DOM (`textContent` du
+// <pre>) plutôt que reconstruit à partir de `children` (React, pas une
+// chaîne) : fiable quel que soit l'imbrication de spans produite par une
+// éventuelle coloration syntaxique future.
+const DansBlocCodeContext = createContext(false);
+
+// Issue #95 : langages couverts par la coloration syntaxique — le cabinet
+// (cf. l'issue) ; pas d'exhaustivité au-delà. La clé est le suffixe de la
+// classe "language-xxx" posée par react-markdown/rehype sur le noeud
+// `code` d'après le fence Markdown (```python```, etc.), la valeur le nom
+// de grammaire Prism correspondant (chargée ci-dessus via
+// "prismjs/components/prism-*").
+const LANGAGES_COLORES: Readonly<Record<string, string>> = {
+  python: "python",
+  bash: "bash",
+  json: "json",
+  yaml: "yaml",
+  sql: "sql",
 };
-const ELEMENTS_MARKDOWN_NEUTRALISES = [
-  "h1",
-  "h2",
-  "h3",
-  "h4",
-  "h5",
-  "h6",
-  "table",
-  "thead",
-  "tbody",
-  "tr",
-  "th",
-  "td",
-  "hr",
-  "pre",
-  "code",
-  "a",
-  "img",
-  "blockquote",
-];
+
+// Le langage déclaré sur le fence n'est lisible que sur le noeud hast du
+// <pre> (son unique enfant `code` porte la classe "language-xxx") : une
+// fois `children` rendu par react-markdown pour atteindre BlocCode, le
+// composant `code` (CodeEnLigne) a déjà consommé et remplacé cette classe
+// par la sienne. `node` (non typé ici : le type hast exact n'est pas
+// exposé par react-markdown au-delà de `unknown`) est donc lu par
+// inspection défensive plutôt que via `children`.
+function noeudCodeDuBloc(noeudPre: unknown): unknown {
+  const enfants = (noeudPre as { children?: unknown[] } | undefined)?.children;
+  const premier = enfants?.[0];
+  return (premier as { tagName?: string } | undefined)?.tagName === "code" ? premier : undefined;
+}
+
+function langageColoreDuBloc(noeudPre: unknown): string | null {
+  const classes = (noeudCodeDuBloc(noeudPre) as { properties?: { className?: unknown } } | undefined)?.properties
+    ?.className;
+  const classe = Array.isArray(classes)
+    ? classes.find((valeur): valeur is string => typeof valeur === "string" && valeur.startsWith("language-"))
+    : undefined;
+  if (!classe) {
+    return null;
+  }
+  return LANGAGES_COLORES[classe.slice("language-".length).toLowerCase()] ?? null;
+}
+
+function texteBrutDuNoeud(noeud: unknown): string {
+  const n = noeud as { type?: string; value?: unknown; children?: unknown[] } | undefined;
+  if (n?.type === "text" && typeof n.value === "string") {
+    return n.value;
+  }
+  return n?.children?.map(texteBrutDuNoeud).join("") ?? "";
+}
+
+// Un bloc de code dont le langage est reconnu (LANGAGES_COLORES) reçoit une
+// coloration syntaxique sur fond sombre (thème `vsDark`, rendu proche d'un
+// IDE standard) ; sinon (langage absent du fence ou non reconnu), le bloc
+// garde le rendu neutre d'origine (texte brut, fond clair) — pas de
+// régression visuelle pour les langages hors périmètre.
+function BlocCode({ node, children }: Readonly<{ node?: unknown; children?: ReactNode }>) {
+  const refPre = useRef<HTMLPreElement>(null);
+  const langage = langageColoreDuBloc(node);
+
+  if (langage) {
+    const code = texteBrutDuNoeud(noeudCodeDuBloc(node));
+    return (
+      <DansBlocCodeContext.Provider value={true}>
+        <BlocAvecBoutonCopier obtenirTexte={() => refPre.current?.textContent ?? ""}>
+          <Highlight prism={Prism} code={code} language={langage} theme={themes.vsDark}>
+            {({ className: classeColoration, style, tokens, getLineProps, getTokenProps }) => (
+              <pre
+                ref={refPre}
+                className={cn(
+                  "overflow-x-auto rounded-sm border border-border p-2 pr-8 font-mono text-xs",
+                  classeColoration
+                )}
+                style={style}
+              >
+                <code>
+                  {tokens.map((ligne, indexLigne) => (
+                    <span key={indexLigne} {...getLineProps({ line: ligne })}>
+                      {ligne.map((jeton, indexJeton) => (
+                        <span key={indexJeton} {...getTokenProps({ token: jeton })} />
+                      ))}
+                      {indexLigne < tokens.length - 1 ? "\n" : null}
+                    </span>
+                  ))}
+                </code>
+              </pre>
+            )}
+          </Highlight>
+        </BlocAvecBoutonCopier>
+      </DansBlocCodeContext.Provider>
+    );
+  }
+
+  return (
+    <DansBlocCodeContext.Provider value={true}>
+      <BlocAvecBoutonCopier obtenirTexte={() => refPre.current?.textContent ?? ""}>
+        <pre
+          ref={refPre}
+          className="overflow-x-auto rounded-sm border border-border bg-background p-2 pr-8 font-mono text-xs"
+        >
+          {children}
+        </pre>
+      </BlocAvecBoutonCopier>
+    </DansBlocCodeContext.Provider>
+  );
+}
+
+function CodeEnLigne({ children }: Readonly<{ children?: ReactNode }>) {
+  const dansUnBloc = useContext(DansBlocCodeContext);
+  if (dansUnBloc) {
+    return <code className="font-mono text-xs">{children}</code>;
+  }
+  return (
+    <code className="rounded-sm border border-border bg-background px-1 py-0.5 font-mono text-[0.85em]">
+      {children}
+    </code>
+  );
+}
+
+// Un lien n'est plus neutralisé en texte brut : le texte de l'ancre reste
+// du texte normal (jamais souligné/bleu comme un lien classique, pour ne
+// pas laisser croire que toute la phrase est cliquable), suivi d'une
+// pastille séparée — seul élément réellement cliquable, même esprit que
+// les bulles de citation de source d'autres assistants. `rel`
+// noopener+noreferrer et le `urlTransform` par défaut de react-markdown
+// (actif tant qu'on ne le surcharge pas ici) protègent contre les schémas
+// d'URL dangereux (`javascript:`, etc.).
+function LienSource({ href, children }: Readonly<{ href?: string; children?: ReactNode }>) {
+  if (!href) {
+    return <>{children}</>;
+  }
+  return (
+    <>
+      {children}
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="ms-1 inline-flex size-4 translate-y-[-1px] items-center justify-center rounded-full bg-primary/10 align-middle text-primary hover:bg-primary/20"
+        aria-label={`Ouvrir la source : ${href}`}
+      >
+        <ExternalLink className="size-2.5" aria-hidden="true" />
+      </a>
+    </>
+  );
+}
+
+const COMPOSANTS_MARKDOWN_MESSAGE: Components = {
+  h1: BlocMarkdownNeutralise,
+  h2: BlocMarkdownNeutralise,
+  h3: BlocMarkdownNeutralise,
+  h4: BlocMarkdownNeutralise,
+  h5: BlocMarkdownNeutralise,
+  h6: BlocMarkdownNeutralise,
+  blockquote: BlocMarkdownNeutralise,
+  table: Tableau,
+  th: EnTeteCelluleTableau,
+  td: CelluleTableau,
+  pre: BlocCode,
+  code: CodeEnLigne,
+  a: LienSource,
+};
+const ELEMENTS_MARKDOWN_DEPLIES = ["hr", "img", "del", "input"];
 
 function ContenuMessageAssistant({ texte }: Readonly<{ texte: string }>) {
   return (
-    <Markdown components={COMPOSANTS_MARKDOWN_MESSAGE} disallowedElements={ELEMENTS_MARKDOWN_NEUTRALISES} unwrapDisallowed>
-      {texte}
-    </Markdown>
+    <div className="contenu-markdown">
+      <Markdown
+        skipHtml
+        remarkPlugins={[remarkGfm]}
+        components={COMPOSANTS_MARKDOWN_MESSAGE}
+        disallowedElements={ELEMENTS_MARKDOWN_DEPLIES}
+        unwrapDisallowed
+      >
+        {texte}
+      </Markdown>
+    </div>
   );
 }
 
