@@ -128,6 +128,36 @@ _SCHEMA_RESUME_ET_PROFIL = {
 }
 
 
+# Déclaré uniquement sur l'appel de réponse de chat principal (jamais
+# titrage ni résumé+profil, qui gardent leurs consignes dédiées), en tête de
+# la liste de messages — avant résumé glissant / profil de travail / pièce
+# jointe (consigne de comportement générale avant le contexte propre à ce
+# tour), cf. spec 1.2.2.
+_PROMPT_STYLE = (
+    "Consigne de style pour ta réponse, à respecter systématiquement :\n"
+    "- Ton : vouvoiement, professionnel, cohérent avec un outil de travail "
+    "de cabinet.\n"
+    "- Longueur : pas de remplissage par réflexe (pas de préambule inutile, "
+    "pas de plan en sections pour une question simple, pas de conclusion "
+    "qui ne sert à rien) ; la longueur réelle de ta réponse suit la "
+    "complexité de la question, pas une limite fixe.\n"
+    "- Emojis : rares, seulement quand ils portent un vrai signal que le "
+    "texte seul ne porterait pas aussi bien (ex. ⚠️ pour un avertissement) ; "
+    "jamais décoratifs ni systématiques.\n"
+    "- Relance finale : pas de question de relance systématique en fin de "
+    "réponse (« Voulez-vous que je... ? » par réflexe). Une question de "
+    "clarification reste possible quand elle est réellement nécessaire à la "
+    "tâche.\n"
+    "- Markdown autorisé dans ta réponse : gras, italique, listes à puces "
+    "ou numérotées, paragraphes. Déconseillés : titres, tableaux, "
+    "séparateurs `---`, blocs de code, citations, liens, images."
+)
+
+
+def _message_systeme_style() -> dict[str, str]:
+    return {"role": "system", "content": _PROMPT_STYLE}
+
+
 def _prompt_titrage(message_utilisateur: str, reponse_assistant: str) -> str:
     return (
         "Propose un titre court (moins de 8 mots), sans guillemets, résumant "
@@ -169,7 +199,7 @@ def _construire_messages_pour_mistral(
     # message) : sans lui, la réponse de chat elle-même ignorerait tout ce
     # que le profil a appris de la façon de travailler du compte, alors que
     # c'est justement sa raison d'être (contexte pour l'IA qui répond).
-    messages: list[dict[str, str]] = []
+    messages: list[dict[str, str]] = [_message_systeme_style()]
     if conversation.resume_contexte:
         messages.append({"role": "system", "content": conversation.resume_contexte})
     if profil_travail:
@@ -394,12 +424,14 @@ def creer_conversation(
                 db, identifiant_compte, requete.piece_jointe_id, conversation.id
             )
 
-        message_pour_mistral: str | list[dict[str, str]] = requete.message
+        # Même prompt de style qu'_construire_messages_pour_mistral ci-dessus,
+        # en tête : ce chemin couvre le tout premier message d'une
+        # conversation, l'autre chemin menant au même appel de chat principal
+        # (spec 1.2.2).
+        message_pour_mistral: list[dict[str, str]] = [_message_systeme_style()]
         if piece_jointe is not None:
-            message_pour_mistral = [
-                _message_systeme_piece_jointe(piece_jointe),
-                {"role": "user", "content": requete.message},
-            ]
+            message_pour_mistral.append(_message_systeme_piece_jointe(piece_jointe))
+        message_pour_mistral.append({"role": "user", "content": requete.message})
 
         # Les deux appels Mistral (réponse, puis titrage) sont faits avant
         # toute autre écriture en base : en cas d'échec de l'un ou l'autre,
