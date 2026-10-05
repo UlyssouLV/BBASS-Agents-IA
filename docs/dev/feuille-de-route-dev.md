@@ -15,25 +15,9 @@ Ce n’est **pas** une spec (ça vient après « Ouvre la version »).
 - **1.2.1** — Identité visuelle du poste calquée sur le logo BBASS Géomètre-Expert (couleurs, police Manrope auto-hébergée, logo, favicon) et disposition façon ChatGPT (sidebar avec conversations et puce compte, page Profil dédiée, Panel d'administration dédié avec tableaux/étiquettes shadcn-ui) ; aucun changement côté VM centrale ni du contrat API.
 - **1.2.2** — Style de réponse de l'IA : prompt système de style (vm-centrale) sur l'appel de chat principal uniquement (vouvoiement, pas de remplissage réflexe, emojis rares et signifiants, pas de relance systématique en fin de réponse, Markdown borné autorisé — gras/italique/listes/paragraphes), jamais sur le titrage ni le résumé + profil de travail. Rendu Markdown borné côté poste (`react-markdown`, allowlist `strong`/`em`/`ul`/`ol`/`li`/`p`, tout le reste neutralisé au rendu), en remplacement du texte brut affiché jusqu'ici.
 - **1.2.3** — Amélioration des délais de chargement (pages et conversations) : cache TanStack Query revu par requête (liste des conversations, détail de conversation, Profil, Panel d'administration), `placeholderData` sur le détail de conversation pour garder l'ancien contenu affiché pendant le rafraîchissement ; pagination par curseur de `GET /conversations/{id}` (vm-centrale), fenêtre de messages la plus récente par défaut, historique plus ancien chargé au défilement façon ChatGPT (pas de pagination par page) ; instrumentation de temps légère (`performance.mark`/`performance.measure`) sur l'ouverture/bascule de conversation, Profil et Panel d'administration, désactivée par défaut, posée pour être réutilisée par la 1.3.0.
+- **1.3.0** — Inspecteur des échanges avec le modèle (outil de développement) : Mode développeur ouvert par `Ctrl+Maj+D` depuis n'importe quel compte, dans un nouvel onglet `/inspecteur`, débloqué par la Clé d'administration VM (saisie en mémoire de l'onglet, jamais stockée) ; accès à toutes les conversations de tous les comptes ([ADR-0012](../adr/0012-mode-developpeur-cle-admin-vm-tous-comptes.md)) — comptes → conversations → fil chronologique des échanges. Chaque appel Mistral réel (chat, titrage, résumé+profil, OCR, vision, chaque aller-retour de tool calling) est capturé dans une table `echanges_inspecteur` séparée de `Consommation` (payload exact envoyé, réponse brute, statut succès/échec), supprimée en cascade avec la conversation ; un échange en échec survit au rollback du tour ; pièce jointe affichée comme référence cliquable plutôt qu'en texte brut ; jamais la clé API Mistral dans un échange. Historique seulement, lecture seule.
 
-## Prochaine : 1.3.0 — Inspecteur des échanges avec le modèle (outil de développement)
-
-**Objectif.** Une fenêtre / vue **développement** qui montre, pour une conversation, **exactement ce qui a été envoyé et reçu à chaque tour** vers le modèle (et appels annexes : titrage, résumé+profil, OCR, vision, tool calls pièce jointe…) — pas seulement les bulles user/assistant visibles dans le chat.
-
-**Pourquoi.** Aujourd’hui on ne voit côté UI que le message collaborateur et la réponse affichée. On ne voit pas le prompt réel (résumé glissant, profil de travail, messages système pièce jointe, fenêtre des 3 derniers, outils proposés, contenu extrait injecté, etc.). Indispensable pour déboguer style (1.2.2), Agents / Moduléo (1.4.0), déploiement (1.5.0), n8n (1.6.0), PJ (1.7.0) et comprendre coût / tokens (lien avec 1.1.3).
-
-**Périmètre envisagé.**
-- Par conversation : liste des tours / appels, chacun avec le **payload** envoyé (messages `system` / `user` / `assistant`, tools, extraits de pièces jointes, métadonnées utiles : modèle, tokens, type d’appel).
-- Réponse brute du modèle (avant éventuel post-traitement / animation UI).
-- Accès restreint (compte administrateur et/ou flag dev) : contenu potentiellement sensible, pas un écran collaborateur standard.
-
-**Recherche / décisions à trancher à l’ouverture.**
-- Persister les payloads en base (rejouables après coup) vs journal éphémère / logs VM seulement.
-- Où vit l’UI : panneau dans le poste, page admin, ou outil hors appli (logs structurés).
-- Volume : tronquer les très gros extraits PJ à l’affichage tout en gardant la trace qu’ils étaient présents.
-- Ne pas exposer la clé API Mistral ni les secrets dans cette vue.
-
-## Ensuite : 1.4.0 — Moduléo en lecture (outil transverse) + premier branchement via l’Agent Administration
+## Prochaine : 1.4.0 — Moduléo en lecture (outil transverse) + premier branchement via l’Agent Administration
 
 **Moduléo n’est pas « l’outil du pôle Administration ».** C’est un logiciel **cabinet**, susceptible d’être utilisé par **tous les pôles**, avec des **restrictions / allowlists différentes** selon le pôle (et l’Agent) qui l’appelle. Le pôle Administration est seulement le **premier** à brancher Moduléo dans le chat (premier Agent métier + premier jeu d’outils Moduléo), pas le propriétaire exclusif de l’intégration.
 
