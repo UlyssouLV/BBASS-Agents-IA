@@ -20,6 +20,7 @@ from vm_centrale.inspecteur import (
     enregistrer_echange_echec,
     enregistrer_echange_succes,
     payload_depuis_erreur,
+    reponse_depuis_erreur,
 )
 from vm_centrale.mistral_client import (
     AppelOutilDemande,
@@ -527,6 +528,10 @@ def creer_conversation(
         # l'inspecteur ; conversation_id=None pour ces deux échecs (la
         # conversation flushée plus haut n'existe plus en base une fois le
         # rollback fait, aucune ligne ne peut la référencer par FK).
+        # piece_jointe_id=None aussi : la pièce jointe peut être rattachée
+        # plus tard à une autre conversation puis supprimée avec elle
+        # (supprimer_conversation), ce qui laisserait cette ligne sans
+        # conversation pointer vers une pièce jointe disparue.
         try:
             reponse_chat = client.chat(message_pour_mistral)
         except Exception as erreur:
@@ -535,7 +540,7 @@ def creer_conversation(
                 db,
                 identifiant_compte=identifiant_compte,
                 conversation_id=None,
-                piece_jointe_id=piece_jointe_id,
+                piece_jointe_id=None,
                 type_appel="chat",
                 modele=MODELE_CHAT,
                 requete_payload=payload_depuis_erreur(erreur),
@@ -824,6 +829,7 @@ def _creer_piece_jointe(
                 type_appel=type_appel,
                 modele=MODELE_OCR if type_appel == "ocr" else MODELE_CHAT,
                 requete_payload=payload_depuis_erreur(erreur),
+                reponse_payload=reponse_depuis_erreur(erreur),
                 erreur=str(erreur),
             )
         logger.exception("Échec de l'appel au relais Mistral (OCR)")
@@ -1007,6 +1013,11 @@ def _resoudre_reponse_chat(
             # piece_jointe_id de la pièce rechargée par l'outil non connu ici
             # (l'exception interrompt _traiter_appel_outil avant son retour) :
             # champ optionnel, laissé vide plutôt que doubler la résolution.
+            # Rollback d'abord : enregistrer_echange_echec commite, et la
+            # Consommation + l'échange succès de la demande d'outil ci-dessus
+            # ne doivent pas survivre à un tour qui échoue (jamais de coût
+            # compté deux fois si l'utilisateur relance).
+            db.rollback()
             enregistrer_echange_echec(
                 db,
                 identifiant_compte=identifiant_compte,
@@ -1020,6 +1031,7 @@ def _resoudre_reponse_chat(
             logger.exception(_MSG_ECHEC_RELAIS_LOG)
             raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
     except Exception as erreur:
+        db.rollback()
         enregistrer_echange_echec(
             db,
             identifiant_compte=identifiant_compte,
@@ -1123,11 +1135,16 @@ def _generer_reponse_et_resume(
             # Pas de piece_jointe_id unique ici (spec 1.3.0) : un appel
             # résumé+profil peut absorber plusieurs messages sortants, donc
             # plusieurs pièces jointes potentiellement différentes — jamais
-            # une seule référence à privilégier arbitrairement.
+            # une seule référence à privilégier arbitrairement. Rollback
+            # d'abord (enregistrer_echange_echec commite) : la Consommation et
+            # l'échange succès du chat déjà résolu ci-dessus ne doivent pas
+            # survivre à ce tour, dont aucun message n'est persisté.
+            conversation_id = conversation.id
+            db.rollback()
             enregistrer_echange_echec(
                 db,
                 identifiant_compte=identifiant_compte,
-                conversation_id=conversation.id,
+                conversation_id=conversation_id,
                 piece_jointe_id=None,
                 type_appel="resume_et_profil",
                 modele=MODELE_CHAT,

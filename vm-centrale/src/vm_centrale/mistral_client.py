@@ -56,9 +56,13 @@ class ErreurAppelMistral(Exception):
     # l'inspecteur (spec 1.3.0) même quand aucune réponse n'a jamais été
     # obtenue. Capturé après construction du payload mais avant l'ajout de
     # l'en-tête Authorization ci-dessous : ne porte jamais la clé API.
-    def __init__(self, message: str, payload_envoye: dict) -> None:
+    # `reponse_brute` : renseignée seulement quand une réponse a bien été
+    # reçue mais n'a pas pu être exploitée par l'appelant (ex. sortie
+    # structurée illisible de l'analyse d'image).
+    def __init__(self, message: str, payload_envoye: dict, reponse_brute: dict | None = None) -> None:
         super().__init__(message)
         self.payload_envoye = payload_envoye
+        self.reponse_brute = reponse_brute
 
 
 class AppelOutilDemande(Exception):

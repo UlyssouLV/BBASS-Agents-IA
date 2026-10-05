@@ -15,6 +15,12 @@ def payload_depuis_erreur(erreur: Exception) -> dict:
     return getattr(erreur, "payload_envoye", None) or {}
 
 
+def reponse_depuis_erreur(erreur: Exception) -> dict | None:
+    # Même principe que payload_depuis_erreur : la réponse brute n'existe que
+    # si Mistral a répondu avant l'échec (voir ErreurAppelMistral).
+    return getattr(erreur, "reponse_brute", None)
+
+
 def enregistrer_echange_succes(
     db: Session,
     *,
@@ -57,6 +63,7 @@ def enregistrer_echange_echec(
     modele: str,
     requete_payload: dict,
     erreur: str,
+    reponse_payload: dict | None = None,
 ) -> None:
     # Commité indépendamment (spec 1.3.0), contrairement à un échange réussi
     # ci-dessus : l'appelant a déjà fait (ou n'a rien à faire) son propre
@@ -71,7 +78,7 @@ def enregistrer_echange_echec(
             type_appel=type_appel,
             modele=modele,
             requete_payload=requete_payload,
-            reponse_payload=None,
+            reponse_payload=reponse_payload,
             statut="echec",
             erreur=erreur,
             date_creation=datetime.now(timezone.utc),

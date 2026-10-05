@@ -463,3 +463,122 @@ def test_echange_introuvable_renvoie_404(client, jeton_valide, monkeypatch):
     reponse = client.get("/inspecteur/echanges/9999", headers=_autorisation_admin(jeton_valide))
 
     assert reponse.status_code == 404
+
+
+def test_echec_resume_apres_chat_reussi_ne_persiste_ni_consommation_ni_echange_succes(
+    client, mistral_client_factice, jeton_valide, db_session, monkeypatch
+):
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide)
+    echanges_avant = len(_echanges(db_session))
+    consommations_avant = db_session.query(Consommation).count()
+
+    def _resume_en_echec(*args, **kwargs):
+        raise RuntimeError("résumé indisponible")
+
+    monkeypatch.setattr(
+        "vm_centrale.routers.conversations._appeler_resume_et_profil", _resume_en_echec
+    )
+    mistral_client_factice.repondre("Suite")
+    reponse = client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Et ensuite ?"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert reponse.status_code == 502
+    # Le chat a réussi, mais le tour a échoué : ni son coût ni son échange
+    # « succès » ne doivent survivre (sinon comptés deux fois à la relance).
+    assert db_session.query(Consommation).count() == consommations_avant
+    nouveaux_echanges = _echanges(db_session)[echanges_avant:]
+    assert [(e.type_appel, e.statut) for e in nouveaux_echanges] == [("resume_et_profil", "echec")]
+    assert nouveaux_echanges[0].conversation_id == conversation_id
+
+
+def test_echec_second_appel_outil_ne_persiste_pas_la_demande_doutil(
+    client, mistral_client_factice, jeton_valide, db_session, monkeypatch
+):
+    mistral_client_factice.repondre_ocr("Plan de masse détaillé")
+    piece_jointe_id = _televerser_sans_conversation(client, jeton_valide)
+    mistral_client_factice.repondre("Première réponse", "Titre")
+    conversation_id = client.post(
+        "/conversations",
+        json={"message": "Regarde ce document", "piece_jointe_id": piece_jointe_id},
+        headers=_autorisation(jeton_valide),
+    ).json()["conversation"]["id"]
+    mistral_client_factice.repondre("Deuxième réponse", resume_et_profil=_reponse_resume_et_profil())
+    client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Et ensuite ?"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    echanges_avant = len(_echanges(db_session))
+    consommations_avant = db_session.query(Consommation).count()
+
+    def _second_appel_en_echec(*args, **kwargs):
+        raise RuntimeError("second appel indisponible")
+
+    monkeypatch.setattr(
+        "vm_centrale.routers.conversations._traiter_appel_outil", _second_appel_en_echec
+    )
+    mistral_client_factice.repondre_avec_appel_outil(
+        "obtenir_contenu_piece_jointe", {"piece_jointe_id": piece_jointe_id}
+    )
+    mistral_client_factice.repondre("Inutilisée", resume_et_profil=_reponse_resume_et_profil())
+    reponse = client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Rappelle-moi le contenu exact du plan"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert reponse.status_code == 502
+    assert db_session.query(Consommation).count() == consommations_avant
+    nouveaux_echanges = _echanges(db_session)[echanges_avant:]
+    assert [(e.type_appel, e.statut) for e in nouveaux_echanges] == [("chat", "echec")]
+
+
+def test_reponse_vision_illisible_conserve_payload_et_reponse_brute(
+    client, mistral_client_factice, jeton_valide, db_session
+):
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide)
+    echanges_avant = len(_echanges(db_session))
+    mistral_client_factice.repondre("Inutilisée", resume_et_profil="pas du JSON")
+
+    reponse = client.post(
+        f"/conversations/{conversation_id}/pieces-jointes",
+        files={"fichier": ("plan.png", b"contenu factice png", "image/png")},
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert reponse.status_code == 502
+    nouveaux_echanges = _echanges(db_session)[echanges_avant:]
+    assert len(nouveaux_echanges) == 1
+    echange = nouveaux_echanges[0]
+    assert echange.type_appel == "vision"
+    assert echange.statut == "echec"
+    assert echange.requete_payload["response_format"]["json_schema"]["name"] == "analyse_image"
+    assert echange.reponse_payload == {"choices": [{"message": {"content": "pas du JSON"}}]}
+
+
+def test_echec_premier_message_avec_piece_jointe_ne_la_reference_pas(
+    client, mistral_client_factice, jeton_valide, db_session
+):
+    # L'échange en échec n'a pas de conversation : il ne doit pas non plus
+    # garder une référence vers une pièce jointe qui pourra être supprimée
+    # plus tard avec une autre conversation.
+    mistral_client_factice.repondre_ocr("Plan de masse détaillé")
+    piece_jointe_id = _televerser_sans_conversation(client, jeton_valide)
+    mistral_client_factice.echouer(RuntimeError("service Mistral indisponible"))
+
+    reponse = client.post(
+        "/conversations",
+        json={"message": "Regarde ce document", "piece_jointe_id": piece_jointe_id},
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert reponse.status_code == 502
+    echanges = _echanges(db_session)
+    assert len(echanges) == 1
+    assert echanges[0].statut == "echec"
+    assert echanges[0].conversation_id is None
+    assert echanges[0].piece_jointe_id is None
