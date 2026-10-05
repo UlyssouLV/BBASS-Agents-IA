@@ -3,13 +3,14 @@ name: finaliser-la-version
 description: >-
   When the user says « Finalise la version », « finalize the version »,
   « clôture la version », or asks to ship/squash-merge the current version
-  PR, create the GitHub Release, and delete the feature branch. Not for a
-  single child ticket or /implement.
+  PR, create the GitHub Release, and delete the feature branch. Reads the
+  Sonar quality gate once on the PR HEAD before the tag. Not for a single
+  child ticket or /implement.
 ---
 
 # Finalise the version
 
-Triggered by **« Finalise la version »** (or equivalent). Release and squash go through **`creer-release`** (`/crel`) and **`fusionner-pr`** (`/mpr`), not inline. Docs commit goes through **`commit`** (`/c -a -p`).
+Triggered by **« Finalise la version »** (or equivalent), only after the user accepted a **`/code-review`** of this branch. Do **not** run `/code-review` here. Release and squash go through **`creer-release`** (`/crel`) and **`fusionner-pr`** (`/mpr`), not inline. Docs commit goes through **`commit`** (`/c -a -p`). The quality gate is step 3, after that review and after the docs.
 
 A version = one feature branch + one PR that ships a **set** of child issues (parent spec). Starting a version is skill `ouvrir-la-version`.
 
@@ -48,13 +49,27 @@ Read each role below (paths from `agents/roles.yml`), against the parent spec / 
 
 If anything is stale: **stop the release**. Update those files on the **feature branch**, then run skill **`commit`** as if the user had typed **`/c -a -p`**. Then re-read this section. Do **not** `/crel` or `/mpr` until this gate is green — the tag must include the docs.
 
-## 3. Release, then squash
+## 3. Quality gate
+
+One read, on the PR `HEAD` after the docs commit. This analysis covers the branch, not one child. Do not reopen children. Do not add a label.
+
+Load `.env` the same way **`quality-gate`** does. If any of that skill’s three `SONAR_*` keys is missing or empty → continue. One line that Sonar is skipped. Do not `/qg`. Do not `/cqg`.
+
+Otherwise run **`quality-gate`** as if **`/qg -w`**.
+
+- No analysis for `HEAD` after the wait → **stop**. Do not `/crel` or `/mpr`.
+- **`OK`** → continue.
+- Not **`OK`** (`ERROR`, `WARN`, …) → run skill **`corriger-quality-gate`** as if **`/cqg`**.
+  - That skill stopped without a code change (policy / user needed) → **stop**. Do not `/crel` or `/mpr`.
+  - Working tree dirty after the fix → run **`/t`** (fail → **stop**). Stage the files that fix touched and run skill **`commit`** as if **`/c -p`**. Then **`/qg -w`** once. Not **`OK`**, or no analysis this time → **stop**. Do not `/crel` or `/mpr`.
+
+## 4. Release, then squash
 
 Run skill **`creer-release`** as if the user had typed **`/crel vX.Y.Z`**. That skill owns title (`VX.Y.Z — <purpose>`) and notes layout. Wait until the release is visible.
 
 Then run skill **`fusionner-pr`** as if the user had typed **`/mpr`**.
 
-## 4. Stop
+## 5. Stop
 
 Do not start the next version’s branch unless the user asks.
 

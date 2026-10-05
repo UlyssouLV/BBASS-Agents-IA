@@ -2,7 +2,7 @@
 
 ## Cycle
 
-**« Ouvre la version »** → implement each child (close when tests are green) → **« Finalise la version »**. The **parent** spec closes via `Fixes` on the squash. Do **not** leave implemented children Open. Do **not** close the parent from `encadrer-implement`. New repo: **`/init`** / **« Initialise le repo »**.
+**« Ouvre la version »** → implement each child (close when tests are green) → human tests → **`/code-review`** → **« Finalise la version »** (quality gate, then **`/cqg`** if it is not `OK`). The **parent** spec closes via `Fixes` on the squash. Do **not** leave implemented children Open. Do **not** close the parent from `encadrer-implement`. New repo: **`/init`** / **« Initialise le repo »**.
 
 - **« Initialise le repo »** (`/init`): skill `initialise-le-repo`
 - **« Ouvre la version »** (must include **`X.Y.Z`**): skill `ouvrir-la-version`
@@ -23,7 +23,7 @@ See `agents/domain.md`. File roles and path lookup: `agents/roles.yml`. `/code-r
 
 ## Tests
 
-HTTP-boundary tests only (observable responses). Do not praise or require tests of internal function calls. Same convention as V1 and `docs/specs/`. Pytest: `/t`. Quality gate: `/qg`. Both: `/vf` / « Vérifie la fiabilité du code ». Fix a red gate: `/cqg`.
+HTTP-boundary tests only (observable responses). Do not praise or require tests of internal function calls. Same convention as V1 and `docs/specs/`. Pytest: `/t`. Quality gate: `/qg` (`-w` waits up to 15 min for the CI analysis of this HEAD). Both: `/vf` / « Vérifie la fiabilité du code ». Fix a red gate: `/cqg`. `encadrer-implement` closes the child after the push and does not wait for Sonar. After human tests and an accepted `/code-review`, `finaliser-la-version` runs `/qg -w` once on the PR HEAD before the tag, then `/cqg` if the gate is not `OK`.
 
 ## Docs
 

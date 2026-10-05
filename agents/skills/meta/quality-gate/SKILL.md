@@ -59,7 +59,7 @@ Pick **one** ref, in this order:
 A `component not found` on `branch=$BRANCH` is normal for a short-lived branch that Sonar only knows as a PR. Continue with the PR list.
 
 - **Without `-w`:** no ref whose commit **matches** `HEAD` → **stop**.
-- **With `-w`:** repeat **these two list calls** every **15 s**, up to **12** times (3 min). Stop the poll as soon as a ref’s commit **matches** `HEAD`. Still none after 12 tries → **stop**.
+- **With `-w`:** repeat **these two list calls** every **15 s**, up to **60** times (15 min). The analysis is a GitHub Actions run (tests, coverage, scan). Stop the poll as soon as a ref’s commit **matches** `HEAD`. Still none after 60 tries → **stop**.
 
 ## 4. Gate status
 

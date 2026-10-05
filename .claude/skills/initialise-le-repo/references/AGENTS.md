@@ -2,7 +2,7 @@
 
 ## Cycle
 
-**« Ouvre la version »** → implement each child (close when tests are green and the quality gate is `OK` or skipped) → **« Finalise la version »**. The **parent** spec closes via `Fixes` on the squash. Do **not** leave implemented children Open. Do **not** close the parent from `encadrer-implement`.
+**« Ouvre la version »** → implement each child (close when tests are green) → human tests → **`/code-review`** → **« Finalise la version »** (quality gate, then **`/cqg`** if it is not `OK`). The **parent** spec closes via `Fixes` on the squash. Do **not** leave implemented children Open. Do **not** close the parent from `encadrer-implement`.
 
 - **« Initialise le repo »** (`/init`): skill `initialise-le-repo` (already done in this repo)
 - **« Augmente la feuille de route de dev »** (`/afr`): skill `augmenter-la-feuille-de-route-dev`
@@ -24,7 +24,7 @@ See `agents/domain.md`. File roles and path lookup: `agents/roles.yml`. `/code-r
 
 ## Tests
 
-Tests: `/t`. Quality gate: `/qg` (`-w` waits until the Sonar PR or branch list shows this HEAD; no poll if credentials are missing; never the default `main` gate). Both: `/vf` / « Vérifie la fiabilité du code ». Fix a red gate: `/cqg`. After `/implement` commit: `encadrer-implement` skips Sonar when credentials are missing; otherwise `/qg -w`, then `/cqg` if the gate is red.
+Tests: `/t`. Quality gate: `/qg` (`-w` waits up to 15 min until the Sonar PR or branch list shows this HEAD; no poll if credentials are missing; never the default `main` gate). Both: `/vf` / « Vérifie la fiabilité du code ». Fix a red gate: `/cqg`. `encadrer-implement` closes the child after the push and does not wait for Sonar. After human tests and an accepted `/code-review`, `finaliser-la-version` runs `/qg -w` once on the PR HEAD before the tag, then `/cqg` if the gate is not `OK`.
 
 ## Git
 
