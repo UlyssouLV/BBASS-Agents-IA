@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from vm_centrale.mistral_client import Usage
 
@@ -11,6 +11,11 @@ class InfoConsommationAnalyse:
     modele: str
     usage: Usage | None = None
     pages_traitees: int | None = None
+    # Payload exact envoyé et réponse brute reçue par ce même appel Mistral
+    # (spec 1.3.0, inspecteur des échanges) — repris tel quel de
+    # ReponseOcr/ReponseChat, jamais reconstruit.
+    payload_envoye: dict = field(default_factory=dict)
+    reponse_brute: dict = field(default_factory=dict)
 
 
 @dataclass

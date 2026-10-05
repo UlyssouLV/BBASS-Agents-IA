@@ -10,19 +10,32 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
-from vm_centrale.analyse_pieces_jointes import TYPES_SUPPORTES, analyser
+from vm_centrale.analyse_pieces_jointes import TYPES_SUPPORTES, analyser, type_appel_mistral
 from vm_centrale.autorisation import get_identifiant_compte_du_jeton
 from vm_centrale.concurrence import cache_idempotence, verrous_comptes
-from vm_centrale.config import MODELE_CHAT, PIECES_JOINTES_DIR
+from vm_centrale.config import MODELE_CHAT, MODELE_OCR, PIECES_JOINTES_DIR
 from vm_centrale.consommation import enregistrer_consommation
 from vm_centrale.database import get_db
+from vm_centrale.inspecteur import (
+    enregistrer_echange_echec,
+    enregistrer_echange_succes,
+    payload_depuis_erreur,
+)
 from vm_centrale.mistral_client import (
     AppelOutilDemande,
     MistralClient,
     ReponseChat,
     get_mistral_client,
 )
-from vm_centrale.models import Compte, Consommation, Conversation, Message, PieceJointe, ProfilTravail
+from vm_centrale.models import (
+    Compte,
+    Consommation,
+    Conversation,
+    EchangeInspecteur,
+    Message,
+    PieceJointe,
+    ProfilTravail,
+)
 from vm_centrale.schemas import (
     ConversationCreeRequest,
     ConversationCreeResponse,
@@ -495,6 +508,7 @@ def creer_conversation(
             piece_jointe = _recuperer_piece_jointe_du_compte(
                 db, identifiant_compte, requete.piece_jointe_id, conversation.id
             )
+        piece_jointe_id = piece_jointe.id if piece_jointe is not None else None
 
         # Même builder qu'envoyer_message ci-dessous : ce chemin couvre le
         # tout premier message d'une conversation (jamais de résumé glissant
@@ -507,23 +521,76 @@ def creer_conversation(
         # Les deux appels Mistral (réponse, puis titrage) sont faits avant
         # toute autre écriture en base : en cas d'échec de l'un ou l'autre,
         # rollback (annule aussi la conversation flushée ci-dessus) — aucune
-        # conversation fantôme n'est persistée.
+        # conversation fantôme n'est persistée. Essayés séparément (plutôt
+        # qu'un seul try englobant les deux, comme avant la spec 1.3.0) pour
+        # savoir lequel des deux a échoué et l'enregistrer comme tel dans
+        # l'inspecteur ; conversation_id=None pour ces deux échecs (la
+        # conversation flushée plus haut n'existe plus en base une fois le
+        # rollback fait, aucune ligne ne peut la référencer par FK).
         try:
             reponse_chat = client.chat(message_pour_mistral)
-            reponse = reponse_chat.contenu
-            reponse_titrage = client.chat(_prompt_titrage(requete.message, reponse))
-            titre = _nettoyer_titre(reponse_titrage.contenu)
         except Exception as erreur:
             db.rollback()
+            enregistrer_echange_echec(
+                db,
+                identifiant_compte=identifiant_compte,
+                conversation_id=None,
+                piece_jointe_id=piece_jointe_id,
+                type_appel="chat",
+                modele=MODELE_CHAT,
+                requete_payload=payload_depuis_erreur(erreur),
+                erreur=str(erreur),
+            )
             logger.exception(_MSG_ECHEC_RELAIS_LOG)
             raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
+
+        reponse = reponse_chat.contenu
+
+        try:
+            reponse_titrage = client.chat(_prompt_titrage(requete.message, reponse))
+        except Exception as erreur:
+            db.rollback()
+            enregistrer_echange_echec(
+                db,
+                identifiant_compte=identifiant_compte,
+                conversation_id=None,
+                piece_jointe_id=None,
+                type_appel="titrage",
+                modele=MODELE_CHAT,
+                requete_payload=payload_depuis_erreur(erreur),
+                erreur=str(erreur),
+            )
+            logger.exception(_MSG_ECHEC_RELAIS_LOG)
+            raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
+
+        titre = _nettoyer_titre(reponse_titrage.contenu)
 
         conversation.titre = titre
         enregistrer_consommation(
             db, identifiant_compte, conversation.id, "chat", MODELE_CHAT, usage=reponse_chat.usage
         )
+        enregistrer_echange_succes(
+            db,
+            identifiant_compte=identifiant_compte,
+            conversation_id=conversation.id,
+            piece_jointe_id=piece_jointe_id,
+            type_appel="chat",
+            modele=MODELE_CHAT,
+            requete_payload=reponse_chat.payload_envoye,
+            reponse_payload=reponse_chat.reponse_brute,
+        )
         enregistrer_consommation(
             db, identifiant_compte, conversation.id, "titrage", MODELE_CHAT, usage=reponse_titrage.usage
+        )
+        enregistrer_echange_succes(
+            db,
+            identifiant_compte=identifiant_compte,
+            conversation_id=conversation.id,
+            piece_jointe_id=None,
+            type_appel="titrage",
+            modele=MODELE_CHAT,
+            requete_payload=reponse_titrage.payload_envoye,
+            reponse_payload=reponse_titrage.reponse_brute,
         )
 
         message_utilisateur = Message(
@@ -651,6 +718,13 @@ def supprimer_conversation(
 ) -> None:
     conversation = _recuperer_conversation_du_compte(db, conversation_id, identifiant_compte)
 
+    # echanges_inspecteur disparaît avec sa conversation (FK ON DELETE
+    # CASCADE, spec 1.3.0) — contrairement à Consommation ci-dessous.
+    # Supprimé ici explicitement, comme Message/PieceJointe plus bas, pour un
+    # comportement identique quel que soit le moteur de base (la base de
+    # test SQLite n'applique pas les contraintes FK par défaut).
+    db.query(EchangeInspecteur).filter(EchangeInspecteur.conversation_id == conversation.id).delete()
+
     # Consommation n'a pas de cascade ORM déclarée sur Conversation (spec
     # 1.1.3) : la ligne survit à la conversation qui l'a produite, seul le
     # rattachement disparaît — jamais de suppression en cascade comme pour
@@ -734,6 +808,24 @@ def _creer_piece_jointe(
         # survivre à un échec de l'appel Mistral.
         db.rollback()
         chemin_absolu.unlink(missing_ok=True)
+        type_appel = type_appel_mistral(fichier.content_type)
+        if type_appel is not None and conversation_id is not None:
+            # conversation_id=None (upload via POST /pieces-jointes, sans
+            # conversation encore) n'a sa place nulle part dans l'inspecteur
+            # (spec 1.3.0, navigation uniquement par conversation) : aucune
+            # ligne dans ce cas. piece_jointe_id=None : la ligne PieceJointe
+            # flushée ci-dessus a été annulée par le rollback, aucune ligne
+            # ne peut plus la référencer par FK.
+            enregistrer_echange_echec(
+                db,
+                identifiant_compte=identifiant_compte,
+                conversation_id=conversation_id,
+                piece_jointe_id=None,
+                type_appel=type_appel,
+                modele=MODELE_OCR if type_appel == "ocr" else MODELE_CHAT,
+                requete_payload=payload_depuis_erreur(erreur),
+                erreur=str(erreur),
+            )
         logger.exception("Échec de l'appel au relais Mistral (OCR)")
         raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
 
@@ -749,6 +841,17 @@ def _creer_piece_jointe(
             usage=resultat.consommation.usage,
             pages_traitees=resultat.consommation.pages_traitees,
         )
+        if conversation_id is not None:
+            enregistrer_echange_succes(
+                db,
+                identifiant_compte=identifiant_compte,
+                conversation_id=conversation_id,
+                piece_jointe_id=piece_jointe.id,
+                type_appel=resultat.consommation.type_appel,
+                modele=resultat.consommation.modele,
+                requete_payload=resultat.consommation.payload_envoye,
+                reponse_payload=resultat.consommation.reponse_brute,
+            )
     db.commit()
     db.refresh(piece_jointe)
 
@@ -829,7 +932,7 @@ def _traiter_appel_outil(
     demande: AppelOutilDemande,
     db: Session,
     conversation_id: int,
-) -> ReponseChat:
+) -> tuple[ReponseChat, int | None]:
     # Un seul outil déclaré pour cette version (spec 1.1.2) : seul le premier
     # appel demandé est traité.
     appel = demande.appels[0]
@@ -841,15 +944,20 @@ def _traiter_appel_outil(
         # rattachée à une autre conversation, même confidentialité que
         # _recuperer_piece_jointe_du_compte.
         contenu_outil = _PIECE_JOINTE_OUTIL_INTROUVABLE
+        piece_jointe_id: int | None = None
     else:
         contenu_outil = piece_jointe.contenu_extrait or ""
+        piece_jointe_id = piece_jointe.id
 
     messages_second_appel = [
         *messages_pour_mistral,
         demande.message_assistant,
         {"role": "tool", "tool_call_id": appel.id, "name": appel.nom, "content": contenu_outil},
     ]
-    return client.chat(messages_second_appel)
+    # piece_jointe_id renvoyé à part (spec 1.3.0) : c'est celui de la pièce
+    # jointe relue par l'outil, distinct de celle éventuellement jointe au
+    # nouveau message de ce tour (voir _resoudre_reponse_chat ci-dessous).
+    return client.chat(messages_second_appel), piece_jointe_id
 
 
 def _resoudre_reponse_chat(
@@ -859,12 +967,16 @@ def _resoudre_reponse_chat(
     db: Session,
     conversation_id: int,
     identifiant_compte: str,
+    piece_jointe_id: int | None,
 ) -> ReponseChat:
     # Centralise la gestion de AppelOutilDemande (et son propre échec
     # éventuel) pour les deux façons d'obtenir la réponse de chat principale
     # ci-dessous (directe, ou via un ThreadPoolExecutor) : `obtenir_reponse`
     # est soit `futur_reponse.result`, soit un appel direct à
-    # _appeler_reponse_chat.
+    # _appeler_reponse_chat. `piece_jointe_id` : celle éventuellement jointe
+    # au nouveau message de ce tour (spec 1.3.0), pas celle que l'outil
+    # relirait le cas échéant (voir _traiter_appel_outil, qui porte la
+    # sienne séparément).
     try:
         reponse = obtenir_reponse()
     except AppelOutilDemande as demande:
@@ -875,17 +987,64 @@ def _resoudre_reponse_chat(
         enregistrer_consommation(
             db, identifiant_compte, conversation_id, "chat", MODELE_CHAT, usage=demande.usage
         )
+        # Demande d'outil = un échange à part entière, succès (Mistral a
+        # bien répondu), distinct du second appel ci-dessous (spec 1.3.0).
+        enregistrer_echange_succes(
+            db,
+            identifiant_compte=identifiant_compte,
+            conversation_id=conversation_id,
+            piece_jointe_id=piece_jointe_id,
+            type_appel="chat",
+            modele=MODELE_CHAT,
+            requete_payload=demande.payload_envoye,
+            reponse_payload=demande.reponse_brute,
+        )
         try:
-            reponse = _traiter_appel_outil(client, messages_pour_mistral, demande, db, conversation_id)
+            reponse, piece_jointe_id = _traiter_appel_outil(
+                client, messages_pour_mistral, demande, db, conversation_id
+            )
         except Exception as erreur:
+            # piece_jointe_id de la pièce rechargée par l'outil non connu ici
+            # (l'exception interrompt _traiter_appel_outil avant son retour) :
+            # champ optionnel, laissé vide plutôt que doubler la résolution.
+            enregistrer_echange_echec(
+                db,
+                identifiant_compte=identifiant_compte,
+                conversation_id=conversation_id,
+                piece_jointe_id=None,
+                type_appel="chat",
+                modele=MODELE_CHAT,
+                requete_payload=payload_depuis_erreur(erreur),
+                erreur=str(erreur),
+            )
             logger.exception(_MSG_ECHEC_RELAIS_LOG)
             raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
     except Exception as erreur:
+        enregistrer_echange_echec(
+            db,
+            identifiant_compte=identifiant_compte,
+            conversation_id=conversation_id,
+            piece_jointe_id=piece_jointe_id,
+            type_appel="chat",
+            modele=MODELE_CHAT,
+            requete_payload=payload_depuis_erreur(erreur),
+            erreur=str(erreur),
+        )
         logger.exception(_MSG_ECHEC_RELAIS_LOG)
         raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
 
     enregistrer_consommation(
         db, identifiant_compte, conversation_id, "chat", MODELE_CHAT, usage=reponse.usage
+    )
+    enregistrer_echange_succes(
+        db,
+        identifiant_compte=identifiant_compte,
+        conversation_id=conversation_id,
+        piece_jointe_id=piece_jointe_id,
+        type_appel="chat",
+        modele=MODELE_CHAT,
+        requete_payload=reponse.payload_envoye,
+        reponse_payload=reponse.reponse_brute,
     )
     return reponse
 
@@ -917,6 +1076,7 @@ def _generer_reponse_et_resume(
     profil_actuel: str,
     compte: Compte | None,
     pieces_jointes_sortantes: dict[int, PieceJointe],
+    piece_jointe_id: int | None,
 ) -> tuple[ReponseChat, str | None, str | None]:
     # Comme pour la création (cf. creer_conversation) : les appels Mistral
     # sont faits avant toute écriture, pour ne jamais persister un message
@@ -933,6 +1093,7 @@ def _generer_reponse_et_resume(
             db,
             conversation.id,
             identifiant_compte,
+            piece_jointe_id,
         )
         return reponse_chat, None, None
 
@@ -954,10 +1115,25 @@ def _generer_reponse_et_resume(
             db,
             conversation.id,
             identifiant_compte,
+            piece_jointe_id,
         )
         try:
             reponse_resume = futur_resume.result()
         except Exception as erreur:
+            # Pas de piece_jointe_id unique ici (spec 1.3.0) : un appel
+            # résumé+profil peut absorber plusieurs messages sortants, donc
+            # plusieurs pièces jointes potentiellement différentes — jamais
+            # une seule référence à privilégier arbitrairement.
+            enregistrer_echange_echec(
+                db,
+                identifiant_compte=identifiant_compte,
+                conversation_id=conversation.id,
+                piece_jointe_id=None,
+                type_appel="resume_et_profil",
+                modele=MODELE_CHAT,
+                requete_payload=payload_depuis_erreur(erreur),
+                erreur=str(erreur),
+            )
             logger.exception(_MSG_ECHEC_RELAIS_LOG)
             raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
 
@@ -968,6 +1144,16 @@ def _generer_reponse_et_resume(
         "resume_et_profil",
         MODELE_CHAT,
         usage=reponse_resume.usage,
+    )
+    enregistrer_echange_succes(
+        db,
+        identifiant_compte=identifiant_compte,
+        conversation_id=conversation.id,
+        piece_jointe_id=None,
+        type_appel="resume_et_profil",
+        modele=MODELE_CHAT,
+        requete_payload=reponse_resume.payload_envoye,
+        reponse_payload=reponse_resume.reponse_brute,
     )
     try:
         donnees = json.loads(reponse_resume.contenu)
@@ -1013,6 +1199,7 @@ def envoyer_message(
             piece_jointe = _recuperer_piece_jointe_du_compte(
                 db, identifiant_compte, requete.piece_jointe_id, conversation.id
             )
+        piece_jointe_id = piece_jointe.id if piece_jointe is not None else None
 
         derniers_messages = (
             db.query(Message)
@@ -1077,6 +1264,7 @@ def envoyer_message(
             profil_actuel,
             compte,
             pieces_jointes_sortantes,
+            piece_jointe_id,
         )
 
         reponse = reponse_chat.contenu

@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from vm_centrale.database import Base
@@ -131,6 +131,50 @@ class Consommation(Base):
     # Figé au tarif du jour de l'appel (spec 1.1.3) : jamais recalculé à la
     # lecture, même si les constantes de tarif de config.py changent ensuite.
     cout_usd: Mapped[Decimal] = mapped_column(Numeric)
+    date_creation: Mapped[datetime] = mapped_column(DateTime)
+
+
+class EchangeInspecteur(Base):
+    # Inspecteur des échanges avec le modèle (spec 1.3.0), distincte de
+    # Consommation : capture le payload exact envoyé et la réponse brute
+    # reçue pour chaque appel Mistral réel, pas seulement des métadonnées
+    # agrégées. Outil de débogage technique, jamais consulté par le code
+    # applicatif lui-même.
+    __tablename__ = "echanges_inspecteur"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    identifiant_compte: Mapped[str] = mapped_column(String, index=True)
+    # Nullable, bien que la spec 1.3.0 ne le présente pas ainsi : un échec dès
+    # le tout premier appel Mistral de creer_conversation survient avant le
+    # commit de la conversation flushée pour obtenir son id (aucune
+    # conversation fantôme, spec 1.1.2) — le db.rollback() qui annule cette
+    # conversation interdit toute ligne qui la référencerait par FK. ON
+    # DELETE CASCADE ci-dessous ne s'applique simplement jamais à ces lignes
+    # orphelines (NULL n'est jamais affecté par la suppression d'une autre
+    # ligne).
+    conversation_id: Mapped[int | None] = mapped_column(
+        ForeignKey(_FK_CONVERSATIONS_ID, ondelete="CASCADE"), nullable=True, index=True
+    )
+    # Nullable : pas toujours de pièce jointe concernée par l'appel (spec
+    # 1.3.0). Pas de ondelete ici (comme PieceJointe elle-même) : jamais
+    # affecté par la suppression d'une pièce jointe, hors périmètre de ce
+    # ticket.
+    piece_jointe_id: Mapped[int | None] = mapped_column(
+        ForeignKey("pieces_jointes.id"), nullable=True
+    )
+    # Même vocabulaire que Consommation.type_appel : "chat" / "titrage" /
+    # "resume_et_profil" / "ocr" / "vision".
+    type_appel: Mapped[str] = mapped_column(String)
+    modele: Mapped[str] = mapped_column(String)
+    # Payload exact tel que construit juste avant l'appel HTTP à Mistral :
+    # jamais la clé API ni l'en-tête Authorization, ajoutés séparément du
+    # corps JSON, après le moment où ce payload est capturé (spec 1.3.0).
+    requete_payload: Mapped[dict] = mapped_column(JSON)
+    # Nullable : absent pour un échange en échec (statut ci-dessous).
+    reponse_payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # "succes" / "echec".
+    statut: Mapped[str] = mapped_column(String)
+    erreur: Mapped[str | None] = mapped_column(String, nullable=True)
     date_creation: Mapped[datetime] = mapped_column(DateTime)
 
 

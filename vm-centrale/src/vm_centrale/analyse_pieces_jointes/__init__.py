@@ -32,3 +32,18 @@ TYPES_SUPPORTES = frozenset(_EXTRACTEURS_PAR_TYPE)
 def analyser(fichier: bytes, type_mime: str, client: MistralClient) -> ResultatAnalyse:
     extracteur = _EXTRACTEURS_PAR_TYPE[type_mime]
     return extracteur(fichier, type_mime, client)
+
+
+def type_appel_mistral(type_mime: str) -> str | None:
+    # None pour un format sans appel Mistral (docx/xlsx, extraction locale) :
+    # utilisé par l'appelant (routers/conversations.py) pour savoir si un
+    # échec d'analyser() mérite une ligne echanges_inspecteur (spec 1.3.0).
+    # Dérivé de _EXTRACTEURS_PAR_TYPE ci-dessus plutôt que d'une liste de
+    # types MIME dupliquée, pour rester en phase avec elle sans entretien
+    # séparé.
+    extracteur = _EXTRACTEURS_PAR_TYPE.get(type_mime)
+    if extracteur is pdf.analyser:
+        return "ocr"
+    if extracteur is image.analyser:
+        return "vision"
+    return None

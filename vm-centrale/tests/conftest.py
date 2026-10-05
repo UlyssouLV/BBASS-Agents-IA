@@ -12,6 +12,7 @@ from vm_centrale.main import app
 from vm_centrale.mistral_client import (
     AppelOutil,
     AppelOutilDemande,
+    ErreurAppelMistral,
     ReponseChat,
     ReponseOcr,
     Usage,
@@ -108,9 +109,25 @@ class ClientMistralFactice:
     def ocr(self, document: bytes, type_mime: str) -> ReponseOcr:
         with self._verrou:
             self.appels_ocr.append((document, type_mime))
+            # payload_envoye/reponse_brute factices (spec 1.3.0) : comme pour
+            # Usage ci-dessus, juste assez pour que le contrat
+            # MistralClient.ocr() (ReponseOcr) soit bien celui consommé par
+            # les appelants (vm_centrale.inspecteur), pas une reproduction
+            # fidèle du vrai payload base64 construit par MistralClient.
+            payload = {"model": "mistral-ocr-factice", "document": {"type": "document_url"}}
             if self._exception_ocr is not None:
-                raise self._exception_ocr
-            return ReponseOcr(contenu=self._reponse_ocr, pages_processed=_PAGES_PROCESSED_FACTICE)
+                raise ErreurAppelMistral(
+                    str(self._exception_ocr), payload_envoye=payload
+                ) from self._exception_ocr
+            return ReponseOcr(
+                contenu=self._reponse_ocr,
+                pages_processed=_PAGES_PROCESSED_FACTICE,
+                payload_envoye=payload,
+                reponse_brute={
+                    "pages": [{"markdown": self._reponse_ocr}],
+                    "usage_info": {"pages_processed": _PAGES_PROCESSED_FACTICE},
+                },
+            )
 
     def repondre(self, *reponses: str, resume_et_profil: str | None = None) -> None:
         # `reponses` : file pour les appels sans response_format (réponse de
@@ -146,14 +163,37 @@ class ClientMistralFactice:
                 self.appels_reponse.append(messages)
                 self.tools_appels_reponse.append(tools)
 
+            # payload_envoye factice (spec 1.3.0) : reprend la forme réelle du
+            # payload MistralClient (model/messages/response_format/tools),
+            # suffisant pour que les appelants (vm_centrale.inspecteur) aient
+            # quelque chose à persister, sans reproduire le modèle réel.
+            # Normalisation str -> liste de messages comme le vrai
+            # MistralClient.chat() (titrage/résumé+profil l'appellent avec une
+            # simple chaîne) : messages_recus/appels_reponse ci-dessus gardent
+            # eux la valeur brute reçue, pour ne pas casser les assertions
+            # existantes qui testent dessus par inclusion de sous-chaîne.
+            messages_normalises = (
+                [{"role": "user", "content": messages}] if isinstance(messages, str) else messages
+            )
+            payload: dict = {"model": "mistral-factice", "messages": messages_normalises}
+            if response_format is not None:
+                payload["response_format"] = response_format
+            if tools is not None:
+                payload["tools"] = tools
+
             if self._exception is not None:
-                raise self._exception
+                raise ErreurAppelMistral(str(self._exception), payload_envoye=payload) from self._exception
 
             if response_format is not None:
                 assert self._reponse_structuree is not None, (
                     "Aucune réponse structurée configurée : passer resume_et_profil= à repondre()"
                 )
-                return ReponseChat(contenu=self._reponse_structuree, usage=_USAGE_FACTICE)
+                return ReponseChat(
+                    contenu=self._reponse_structuree,
+                    usage=_USAGE_FACTICE,
+                    payload_envoye=payload,
+                    reponse_brute={"choices": [{"message": {"content": self._reponse_structuree}}]},
+                )
 
             if tools and self._appel_outil_a_renvoyer is not None:
                 appel = self._appel_outil_a_renvoyer
@@ -168,12 +208,22 @@ class ClientMistralFactice:
                         }
                     ],
                 }
-                raise AppelOutilDemande([appel], message_assistant, _USAGE_FACTICE)
+                raise AppelOutilDemande(
+                    [appel],
+                    message_assistant,
+                    _USAGE_FACTICE,
+                    payload_envoye=payload,
+                    reponse_brute={"choices": [{"message": message_assistant}]},
+                )
 
             assert self._reponses, "Aucune réponse configurée : appeler repondre() d'abord"
-            if len(self._reponses) > 1:
-                return ReponseChat(contenu=self._reponses.pop(0), usage=_USAGE_FACTICE)
-            return ReponseChat(contenu=self._reponses[0], usage=_USAGE_FACTICE)
+            contenu = self._reponses.pop(0) if len(self._reponses) > 1 else self._reponses[0]
+            return ReponseChat(
+                contenu=contenu,
+                usage=_USAGE_FACTICE,
+                payload_envoye=payload,
+                reponse_brute={"choices": [{"message": {"content": contenu}}]},
+            )
 
 
 @pytest.fixture

@@ -58,6 +58,10 @@ def analyser(fichier: bytes, type_mime: str, client: MistralClient) -> ResultatA
         contenu_extrait=donnees["contenu_extrait"],
         echec_analyse=donnees["echec_analyse"],
         consommation=InfoConsommationAnalyse(
-            type_appel="vision", modele=MODELE_CHAT, usage=reponse.usage
+            type_appel="vision",
+            modele=MODELE_CHAT,
+            usage=reponse.usage,
+            payload_envoye=reponse.payload_envoye,
+            reponse_brute=reponse.reponse_brute,
         ),
     )
