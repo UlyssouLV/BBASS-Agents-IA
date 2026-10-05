@@ -385,7 +385,7 @@
             <div class="toc-row">
               <a href="#reste-a-implementer">Reste à implémenter</a>
               <span class="toc-dots" aria-hidden="true"></span>
-              <span class="toc-ref">jusqu’à V1.5.0</span>
+              <span class="toc-ref">à partir de V1.3.1</span>
             </div>
           </li>
           <li>
@@ -403,6 +403,8 @@
             </div>
             <ol>
               <li><a href="#version-1-2-2">V1.2.2 — Style de réponse de l’IA</a></li>
+              <li><a href="#version-1-2-3">V1.2.3 — Délais de chargement</a></li>
+              <li><a href="#version-1-3-0">V1.3.0 — Inspecteur des échanges</a></li>
             </ol>
           </li>
           <li>
@@ -423,15 +425,18 @@
       <h3>Lundi 5 octobre</h3>
       <ul>
         <li>Point de départ : <strong>V1.2.1</strong> (identité visuelle et disposition aux couleurs du cabinet).</li>
-        <li>Développement puis livraison de la <strong>V1.2.2</strong> : ton professionnel des réponses de l’IA ; affichage enrichi dans le chat (mise en forme, tableaux, blocs de code colorés, liens vers les sources).</li>
-        <li>Planification de la suite de la semaine : Agent Administration (consultation Moduléo), puis automatisations ; objectif de livraison visé pour jeudi 8.</li>
+        <li>Livraison de la <strong>V1.2.2</strong> (13:27) : ton professionnel des réponses de l’IA ; affichage enrichi dans le chat (mise en forme, blocs de code colorés, liens vers les sources).</li>
+        <li>Livraison de la <strong>V1.2.3</strong> (14:52) : conversations et écrans plus fluides (cache, historique chargé au défilement, mesures de temps pour le suivi).</li>
+        <li>Livraison de la <strong>V1.3.0</strong> (17:04) : Mode développeur et inspecteur des échanges avec le modèle (voir exactement ce qui est envoyé à Mistral et ce qui revient, y compris en cas d’échec).</li>
+        <li>Essai manuel après livraison : le chat invente encore un rapport, des chiffres et des liens, puis les réinjecte dans sa mémoire — ouverture de la <strong>V1.3.1</strong> pour corriger ça ; premier chantier déjà avancé (garde-fous centralisés, retrait des URL inventées dans la réponse).</li>
+        <li>Planification de la suite : finir la V1.3.1, puis recherche web (V1.4.0), Moduléo en lecture (V1.5.0) et déploiement postes (V1.6.0, priorité avant le retour à l’école).</li>
       </ul>
     </div>
 
     <div class="jour">
       <h3>Mardi 6 octobre</h3>
       <ul>
-        <li>À compléter.</li>
+        <li>À compléter. <span class="echeance">Suite prévue : poursuivre / livrer la V1.3.1.</span></li>
       </ul>
     </div>
 
@@ -445,7 +450,7 @@
     <div class="jour">
       <h3>Jeudi 8 octobre</h3>
       <ul>
-        <li>À compléter. <span class="echeance">Point visé : livraison V1.5.0.</span></li>
+        <li>À compléter. <span class="echeance">Horizon semaine : avancer vers Moduléo lecture (V1.5.0) et déploiement postes (V1.6.0).</span></li>
       </ul>
     </div>
 
@@ -461,20 +466,33 @@
     <section class="bloc" id="reste-a-implementer">
     <h2>Reste à implémenter</h2>
     <ul>
-      <li><strong>V1.2.3</strong> — améliorer la fluidité à l’ouverture des conversations et au changement d’écran.</li>
-      <li><strong>V1.3.0</strong> — outil de suivi des échanges avec l’IA (pour le développement et le contrôle qualité).</li>
-      <li><strong>V1.4.0</strong> — premier Agent métier (pôle Administration) : pouvoir interroger Moduléo depuis le chat (consultation).</li>
-      <li><strong>V1.5.0</strong> — automatisations (enchaînements d’actions), en s’appuyant sur Moduléo.</li>
+      <li><strong>V1.3.1</strong> — le chat ne fige plus ses inventions (consignes resserrées, résumé et profil de travail fiables, garde-fous). <em>Ouverte lundi 5 ; en cours.</em></li>
+      <li><strong>V1.4.0</strong> — recherche web dans le chat (outil exécuté par la VM, pour citer une vraie page plutôt qu’une adresse inventée).</li>
+      <li><strong>V1.4.1</strong> — mémoire des pièces jointes de la conversation (rappel de ce qui a déjà été joint hors de la fenêtre récente).</li>
+      <li><strong>V1.5.0</strong> — Moduléo en lecture seule depuis le chat, via le premier Agent métier (pôle Administration).</li>
+      <li><strong>V1.6.0</strong> — déploiement postes (CI/CD, conteneurisation, installateur) — priorité avant l’absence à l’école.</li>
+      <li><strong>V1.7.0</strong> — workflows n8n (automatisations), branchés sur Moduléo.</li>
     </ul>
     </section>
 
     <section class="bloc" id="livre-pour">
     <h2>Livré pour le 05/10/2026</h2>
     <div class="recap">
-      <p><strong>Point lundi 5 octobre — livré : V1.2.2</strong></p>
+      <p><strong>Point lundi 5 octobre — livré : V1.2.2, V1.2.3 et V1.3.0</strong> (V1.3.1 ouverte en fin de journée)</p>
+      <h3>Style et lecture du chat (V1.2.2)</h3>
       <ul>
         <li>Réponses de l’IA au ton professionnel : vouvoiement, sans remplissage ni relance systématique en fin de message ; emojis seulement quand ils portent un vrai signal.</li>
-        <li>Affichage structuré dans le chat : mise en forme, tableaux, blocs de code colorés, liens cliquables vers les sources citées.</li>
+        <li>Affichage structuré : mise en forme (gras, listes), blocs de code colorés selon le langage, liens cliquables vers les sources citées.</li>
+      </ul>
+      <h3>Fluidité (V1.2.3)</h3>
+      <ul>
+        <li>Retour sur une conversation déjà ouverte sans écran de chargement vide ; conversations longues : messages récents d’abord, historique plus ancien au défilement.</li>
+        <li>Mesures de temps optionnelles (désactivées par défaut) pour objectiver où passe le temps à l’ouverture des écrans.</li>
+      </ul>
+      <h3>Inspecteur / Mode développeur (V1.3.0)</h3>
+      <ul>
+        <li>Raccourci <code>Ctrl+Maj+D</code> : nouvel onglet inspecteur, débloqué par la Clé d’administration VM (jamais stockée).</li>
+        <li>Lecture de toutes les conversations de tous les comptes : chaque appel Mistral réel (chat, titrage, résumé, OCR, vision, outils) avec payload, réponse et statut succès/échec.</li>
       </ul>
     </div>
     </section>
@@ -490,7 +508,29 @@
         </div>
         <div class="version-body">
         <p>Jusqu’ici, les réponses du chat manquaient d’un ton stable et s’affichaient en texte brut. Cette version fixe un style professionnel pour l’IA : vouvoiement, réponses directes sans remplissage, emojis seulement quand ils portent un vrai signal, pas de question de relance systématique en fin de message.</p>
-        <p>Dans le chat, les réponses s’affichent désormais de façon structurée : mise en forme (gras, listes), tableaux, blocs de code avec coloration selon le langage, et liens cliquables vers les sources citées — pour une lecture claire, adaptée au travail quotidien du cabinet.</p>
+        <p>Dans le chat, les réponses s’affichent désormais de façon structurée : mise en forme (gras, listes), blocs de code avec coloration selon le langage, et liens cliquables vers les sources citées — pour une lecture claire, adaptée au travail quotidien du cabinet.</p>
+        </div>
+      </div>
+
+      <div class="version" id="version-1-2-3">
+        <div class="version-head">
+          <h3>V1.2.3 — Amélioration des délais de chargement</h3>
+          <span class="deploye">Déployé le 05/10/2026 à 14:52</span>
+        </div>
+        <div class="version-body">
+        <p>Changer d’écran ou rouvrir une conversation était perçu comme trop lent au quotidien. Cette version garde le contenu déjà vu à l’écran pendant le rafraîchissement, et pour une conversation longue n’envoie d’abord que les messages les plus récents : l’historique plus ancien se charge en remontant le fil, comme dans ChatGPT.</p>
+        <p>Une instrumentation de temps légère (désactivée par défaut) permet de mesurer où passe le temps à l’ouverture d’une conversation, du Profil ou du Panel d’administration — utile pour la suite du développement, sans rien changer pour un usage courant.</p>
+        </div>
+      </div>
+
+      <div class="version" id="version-1-3-0">
+        <div class="version-head">
+          <h3>V1.3.0 — Inspecteur des échanges avec le modèle</h3>
+          <span class="deploye">Déployé le 05/10/2026 à 17:04</span>
+        </div>
+        <div class="version-body">
+        <p>Jusqu’ici, on ne voyait dans l’interface que le message du collaborateur et la réponse affichée. Impossible de comprendre après coup pourquoi l’IA avait répondu ainsi : le prompt réel, le résumé, le profil de travail ou un appel en échec restaient invisibles.</p>
+        <p>Le Mode développeur (<code>Ctrl+Maj+D</code>) ouvre un onglet inspecteur, débloqué par la Clé d’administration VM. On peut parcourir les conversations de tous les comptes et déplier chaque appel Mistral (chat, titrage, résumé, OCR, vision, outils) : ce qui a été envoyé, ce qui est revenu, succès ou échec. Lecture seule, historique seulement — un outil de développement et de contrôle qualité, pas un écran métier du quotidien.</p>
         </div>
       </div>
     </section>

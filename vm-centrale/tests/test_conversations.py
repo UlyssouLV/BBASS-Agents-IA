@@ -1150,6 +1150,8 @@ def test_consigne_de_style_commence_par_la_capacite_reelle(
     assert "aucun accès à Internet" in premiere_ligne
     assert "lien" in premiere_ligne
     assert "vérifié" in premiere_ligne
+    assert "n'inventes jamais" in premiere_ligne
+    assert "question de confirmation" in premiere_ligne
     assert "que le compte a lui-même écrite dans cette conversation" in consigne["content"]
     assert "que tu connais avec certitude" not in consigne["content"]
 
