@@ -65,3 +65,4 @@ Do not start the next version’s branch unless the user asks.
 - Commit / push → `commit` (`/c`)
 - Child wrap → `encadrer-implement`
 - Open a version → `ouvrir-la-version`
+- Feuille de route de dev only → `augmenter-la-feuille-de-route-dev` (`/afr`)

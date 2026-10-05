@@ -2,7 +2,7 @@
 
 ## Fin d’un `/implement` (enfant)
 
-La dernière action du plugin `/implement` est, dans ce dépôt, le skill **`encadrer-implement`**.
+La dernière action du plugin `/implement` est, dans ce dépôt, le skill **`encadrer-implement`** (`/t`, `/c -p`, `/qg -w`, `/cqg` si le gate est rouge, `/cci`).
 
 Un hook (`.claude/hooks/gate-code-review.py`) refuse le skill `/code-review` tant que le message utilisateur courant ne le demande pas, **sauf** « Finalise la version ». Pour un review vs `main` hors Finalise, tape `/code-review` toi-même.
 

@@ -74,6 +74,7 @@ Propose: **`/clear`**, then **`/implement #<first>`** where `#first` is the firs
 
 ## Not this skill
 
+- Feuille de route de dev only (list / argue / write versions) → `augmenter-la-feuille-de-route-dev` (`/afr`)
 - Branch only → `ouvrir-branche` (`/ob`)
 - Commit / push → `commit` (`/c`)
 - PR only → `ouvrir-pr` (`/opr`)
