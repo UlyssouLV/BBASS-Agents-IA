@@ -4,7 +4,7 @@ Logiciel d'agents IA pour le cabinet de géomètres-experts BBASS. L'objectif es
 
 ## État actuel
 
-**V1.3.0** disponible : Mode développeur (outil de débogage, pas un écran métier) — `Ctrl+Maj+D` depuis n'importe quel compte ouvre un nouvel onglet `/inspecteur`, débloqué par la Clé d'administration VM, qui montre pour toute conversation de tout compte ([ADR-0012](docs/adr/0012-mode-developpeur-cle-admin-vm-tous-comptes.md)) chaque appel Mistral réel dans l'ordre (chat, titrage, résumé+profil, OCR, vision, tool calling) avec le payload exact envoyé et la réponse brute reçue, échecs compris. Hérite de la V1.2.3 : délais de chargement réduits sur les navigations et l'ouverture/bascule de conversation — cache TanStack Query revu par requête (conversation, Profil, Panel d'administration) avec `placeholderData` sur le détail de conversation pour supprimer le flash d'état vide, pagination par curseur du détail d'une conversation (fenêtre récente par défaut, historique plus ancien chargé au défilement façon ChatGPT), instrumentation de temps légère (`performance.mark`/`performance.measure`, désactivée par défaut) réutilisée par la 1.3.0. Hérite aussi du style de réponse de l'IA (1.2.2 — vouvoiement, Markdown borné) et de l'identité visuelle du poste aux couleurs du cabinet BBASS (palette anthracite/rouge, police Manrope auto-hébergée, logo, favicon) et de la disposition façon ChatGPT (sidebar avec conversations et puce compte, page Profil dédiée, Panel d'administration dédié avec tableaux/étiquettes shadcn/ui). Backend local **poste** (interface React/TypeScript/Vite, shadcn/ui) et API **VM centrale** (comptes administrateurs PostgreSQL, relais Mistral, conversations persistées avec historique borné, résumé glissant et profil de travail, pièces jointes PDF/Word/Excel/image avec extraction et rappel via outil hors fenêtre, suivi de la consommation Mistral — tokens/pages et coût figé au tarif du jour, par conversation côté collaborateur et agrégé par compte côté administrateur). Les agents métiers ne sont pas encore construits.
+**V1.3.1** disponible : le chat ne fige plus ses inventions ([#110](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/110)). L'IA ne propose plus de lien (seule une URL écrite par le compte peut ressortir) ni de fait inventé sans demande explicite ; une pièce jointe est décrite par son seul extrait ; le résumé glissant note comme « proposé, non vérifié » ce que l'assistant a affirmé (plafond 1 500 caractères) ; le profil de travail est réécrit en entier sous 800 caractères au lieu d'empiler. Des garde-fous côté VM (`vm_centrale/garde_fous/`) retirent les URL que le compte n'a pas écrites et, sans document, remplacent une réponse chiffrée par une phrase fixe. Hérite de la **V1.3.0** : Mode développeur (outil de débogage, pas un écran métier) — `Ctrl+Maj+D` depuis n'importe quel compte ouvre un nouvel onglet `/inspecteur`, débloqué par la Clé d'administration VM, qui montre pour toute conversation de tout compte ([ADR-0012](docs/adr/0012-mode-developpeur-cle-admin-vm-tous-comptes.md)) chaque appel Mistral réel dans l'ordre (chat, titrage, résumé+profil, OCR, vision, tool calling) avec le payload exact envoyé et la réponse brute reçue, échecs compris. Hérite de la V1.2.3 : délais de chargement réduits sur les navigations et l'ouverture/bascule de conversation — cache TanStack Query revu par requête (conversation, Profil, Panel d'administration) avec `placeholderData` sur le détail de conversation pour supprimer le flash d'état vide, pagination par curseur du détail d'une conversation (fenêtre récente par défaut, historique plus ancien chargé au défilement façon ChatGPT), instrumentation de temps légère (`performance.mark`/`performance.measure`, désactivée par défaut) réutilisée par la 1.3.0. Hérite aussi du style de réponse de l'IA (1.2.2 — vouvoiement, Markdown borné) et de l'identité visuelle du poste aux couleurs du cabinet BBASS (palette anthracite/rouge, police Manrope auto-hébergée, logo, favicon) et de la disposition façon ChatGPT (sidebar avec conversations et puce compte, page Profil dédiée, Panel d'administration dédié avec tableaux/étiquettes shadcn/ui). Backend local **poste** (interface React/TypeScript/Vite, shadcn/ui) et API **VM centrale** (comptes administrateurs PostgreSQL, relais Mistral, conversations persistées avec historique borné, résumé glissant et profil de travail, pièces jointes PDF/Word/Excel/image avec extraction et rappel via outil hors fenêtre, suivi de la consommation Mistral — tokens/pages et coût figé au tarif du jour, par conversation côté collaborateur et agrégé par compte côté administrateur). Les agents métiers ne sont pas encore construits.
 
 ## Ce qu'on construit
 
@@ -32,12 +32,11 @@ flowchart LR
 
 ## Semaine du 05 au 09 octobre 2026
 
-Point visé jeudi 8 octobre : enchaînement jusqu’à **V1.7.0** (n8n) — **priorité V1.6.0** (déploiement postes / CI/CD), puis **V1.7.0** si le temps le permet. Avant Moduléo : **V1.3.1** (le chat ne fige plus ses inventions) et **V1.4.0** (recherche web). Vendredi 9 : RTT.
+Point visé jeudi 8 octobre : enchaînement jusqu’à **V1.7.0** (n8n) — **priorité V1.6.0** (déploiement postes / CI/CD), puis **V1.7.0** si le temps le permet. Avant Moduléo : **V1.4.0** (recherche web), après la **V1.3.1** livrée (le chat ne fige plus ses inventions). Vendredi 9 : RTT.
 
 ```mermaid
 flowchart LR
-  L05["Lundi 5<br/>V1.2.3 et V1.3.0 livrées"] --> V131["V1.3.1<br/>inventions du chat"]
-  V131 --> V140["V1.4.0<br/>recherche web"]
+  L05["Lundi 5<br/>V1.2.3, V1.3.0 et V1.3.1 livrées"] --> V140["V1.4.0<br/>recherche web"]
   V140 --> V150["V1.5.0<br/>Moduléo lecture"]
   V150 --> V160["V1.6.0<br/>déploiement · priorité"]
   V160 --> V08["Jeudi 8<br/>visé aussi V1.7.0 n8n"]
@@ -47,11 +46,10 @@ flowchart LR
 
 - **Semaine du 14–18 septembre** — socle jusqu’à **V1.2.0** (comptes admin, persistance conversations, pièces jointes, consommation, front React/TypeScript/Vite).
 - **Depuis** — **V1.2.1** (identité visuelle BBASS, disposition type ChatGPT) ; **V1.2.2** (prompt système de style sur le chat principal ; rendu Markdown borné côté poste).
-- **Lundi 5 octobre** — **V1.2.3** (cache TanStack Query, pagination par curseur du détail de conversation, instrumentation de temps légère) ; **V1.3.0** (Mode développeur : inspecteur des échanges avec le modèle).
+- **Lundi 5 octobre** — **V1.2.3** (cache TanStack Query, pagination par curseur du détail de conversation, instrumentation de temps légère) ; **V1.3.0** (Mode développeur : inspecteur des échanges avec le modèle) ; **V1.3.1** (le chat ne fige plus ses inventions, [#110](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/110) : consignes, résumé glissant, profil de travail, garde-fous URL et chiffres).
 
 ### Reste à implémenter
 
-- **V1.3.1** — le chat ne fige plus ses inventions ([#110](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/110)) : consignes, résumé glissant, profil de travail. Sans document, un chiffre que le compte n’a pas écrit est remplacé par une phrase fixe de la VM.
 - **V1.4.0** — recherche web dans le chat (outil exécuté par la VM ; le modèle ne cite qu’une URL revenue de l’outil, et un chiffre seulement s’il est dans le texte ramené). Les function calling du modèle sont centralisés.
 - **V1.5.0** — Moduléo en lecture (outil transverse), premier branchement via l’Agent Administration.
 - **V1.6.0** — déploiement postes : CI/CD, conteneurisation, installateur / logiciel d’accès au chat (backend local obligatoire) — **priorité**.
@@ -59,8 +57,7 @@ flowchart LR
 
 ### Attendu pour la fin de semaine (V1.6.0 prioritaire, V1.7.0 visé)
 
-- **Déjà en place** — poste + VM Castries, PostgreSQL, chat Mistral, conversations bornées + résumé + profil, pièces jointes, consommation, comptes administrateurs, UI React BBASS, style 1.2.2, fluidité 1.2.3, inspecteur des échanges 1.3.0.
-- **V1.3.1** — le résumé et le profil ne réinjectent plus les inventions du modèle comme des faits. Sans document, un chiffre inventé est remplacé par une phrase fixe.
+- **Déjà en place** — poste + VM Castries, PostgreSQL, chat Mistral, conversations bornées + résumé + profil, pièces jointes, consommation, comptes administrateurs, UI React BBASS, style 1.2.2, fluidité 1.2.3, inspecteur des échanges 1.3.0, chat sans inventions figées 1.3.1.
 - **V1.4.0** — une demande « trouve-moi… » passe par une recherche réelle ; la réponse ne garde que les chiffres du texte ramené.
 - **V1.5.0** — Q&A lecture Moduléo depuis le chat (pour usage collab pendant l’absence alternance).
 - **V1.6.0** — pouvoir **installer / mettre à jour** le logiciel sur les postes (CI/CD, Docker si retenu, installateur ; UI pywebview et/ou navigateur — à trancher).
