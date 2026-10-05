@@ -10,6 +10,7 @@ import {
 } from "react";
 import {
   Check,
+  Code2,
   Copy,
   ExternalLink,
   File,
@@ -24,11 +25,7 @@ import {
 } from "lucide-react";
 import { Highlight, themes } from "prism-react-renderer";
 import * as Prism from "prismjs";
-import "prismjs/components/prism-bash";
-import "prismjs/components/prism-json";
-import "prismjs/components/prism-python";
-import "prismjs/components/prism-sql";
-import "prismjs/components/prism-yaml";
+import grammairesPrismBrut from "prismjs/components.json";
 import Markdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -270,7 +267,8 @@ function CelluleTableau({ children }: Readonly<{ children?: ReactNode }>) {
 function BlocAvecBoutonCopier({
   children,
   obtenirTexte,
-}: Readonly<{ children: ReactNode; obtenirTexte: () => string }>) {
+  classeBouton,
+}: Readonly<{ children: ReactNode; obtenirTexte: () => string; classeBouton?: string }>) {
   const [copie, setCopie] = useState(false);
 
   async function copier() {
@@ -291,7 +289,10 @@ function BlocAvecBoutonCopier({
         type="button"
         variant="ghost"
         size="icon"
-        className="absolute right-1 top-1 size-6 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+        className={cn(
+          "absolute right-1 top-1 size-6 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100",
+          classeBouton
+        )}
         onClick={copier}
         aria-label="Copier"
       >
@@ -312,19 +313,90 @@ function BlocAvecBoutonCopier({
 // éventuelle coloration syntaxique future.
 const DansBlocCodeContext = createContext(false);
 
-// Issue #95 : langages couverts par la coloration syntaxique — le cabinet
-// (cf. l'issue) ; pas d'exhaustivité au-delà. La clé est le suffixe de la
-// classe "language-xxx" posée par react-markdown/rehype sur le noeud
-// `code` d'après le fence Markdown (```python```, etc.), la valeur le nom
-// de grammaire Prism correspondant (chargée ci-dessus via
-// "prismjs/components/prism-*").
-const LANGAGES_COLORES: Readonly<Record<string, string>> = {
-  python: "python",
-  bash: "bash",
-  json: "json",
-  yaml: "yaml",
-  sql: "sql",
-};
+// Issue #97 : au lieu d'une liste `LANGAGES_COLORES` maintenue à la main
+// (une entrée + un import statique par langage, périmètre #95 limité à
+// python/bash/json/yaml/sql), les quelque 290 grammaires du paquet sont
+// enregistrées ici une fois pour toutes sous forme de chargeurs
+// dynamiques : `import.meta.glob` les recense au build (Vite sait alors
+// produire un chunk par fichier), mais un seul chargeur est réellement
+// invoqué à l'exécution — celui du langage effectivement déclaré sur le
+// fence d'un bloc donné (voir chargerGrammairePrism plus bas). Le motif
+// d'exclusion écarte les variantes minifiées (`*.min.js`) dès cette étape
+// de recensement : ne pas produire de chunk de build pour un fichier
+// qu'aucun appel ne référencera jamais.
+const CHARGEURS_GRAMMAIRE_PRISM = import.meta.glob([
+  "/node_modules/prismjs/components/prism-*.js",
+  "!**/*.min.js",
+]);
+
+function cheminGrammairePrism(identifiant: string): string {
+  return `/node_modules/prismjs/components/prism-${identifiant}.js`;
+}
+
+interface MetaLangagePrism {
+  require?: string | string[];
+  alias?: string | string[];
+}
+
+// Métadonnées officielles de Prism (alias de langage, dépendances entre
+// grammaires — ex. "tsx" requiert "jsx" puis "javascript" puis "clike")
+// plutôt qu'une table ad hoc : ce fichier JSON est déjà présent dans le
+// paquet prismjs (dépendance existante, cf. #95).
+const META_LANGAGES_PRISM = (grammairesPrismBrut as { languages: Record<string, MetaLangagePrism> }).languages;
+
+function normaliserEnListe(valeur: string | string[] | undefined): string[] {
+  if (!valeur) {
+    return [];
+  }
+  return Array.isArray(valeur) ? valeur : [valeur];
+}
+
+// Alias -> identifiant canonique (ex. "js" et "ts" -> "javascript"/
+// "typescript", "html"/"xml"/"svg" -> "markup") : construit depuis
+// META_LANGAGES_PRISM, pas à la main, pour rester synchronisé avec le
+// paquet installé.
+const CANONIQUE_PAR_ALIAS: ReadonlyMap<string, string> = (() => {
+  const table = new Map<string, string>();
+  for (const [identifiant, meta] of Object.entries(META_LANGAGES_PRISM)) {
+    table.set(identifiant, identifiant);
+    for (const alias of normaliserEnListe(meta.alias)) {
+      table.set(alias, identifiant);
+    }
+  }
+  return table;
+})();
+
+// Une grammaire Prism suppose souvent une autre déjà enregistrée (ex. php
+// requiert markup-templating, qui requiert markup) : cette chaîne doit
+// être chargée dans l'ordre, base d'abord, sous peine de laisser la
+// grammaire finale s'étendre depuis un langage de base manquant.
+function cheneDependances(identifiant: string, vus: Set<string> = new Set()): string[] {
+  if (vus.has(identifiant)) {
+    return [];
+  }
+  vus.add(identifiant);
+  const requises = normaliserEnListe(META_LANGAGES_PRISM[identifiant]?.require).flatMap((requise) =>
+    cheneDependances(requise, vus)
+  );
+  return [...requises, identifiant];
+}
+
+// Charge, dans l'ordre de dépendance, chaque grammaire de la chaîne pas
+// encore enregistrée sur Prism. Lève dès qu'un maillon n'a pas de fichier
+// correspondant dans le paquet : l'appelant retombe alors sur le rendu
+// neutre (déjà affiché par défaut pendant le chargement).
+async function chargerGrammairePrism(identifiant: string): Promise<void> {
+  for (const etape of cheneDependances(identifiant)) {
+    if (Prism.languages[etape]) {
+      continue;
+    }
+    const chargeur = CHARGEURS_GRAMMAIRE_PRISM[cheminGrammairePrism(etape)];
+    if (!chargeur) {
+      throw new Error(`Aucune grammaire Prism pour « ${etape} ».`);
+    }
+    await chargeur();
+  }
+}
 
 // Le langage déclaré sur le fence n'est lisible que sur le noeud hast du
 // <pre> (son unique enfant `code` porte la classe "language-xxx") : une
@@ -339,16 +411,13 @@ function noeudCodeDuBloc(noeudPre: unknown): unknown {
   return (premier as { tagName?: string } | undefined)?.tagName === "code" ? premier : undefined;
 }
 
-function langageColoreDuBloc(noeudPre: unknown): string | null {
+function langueDeclareeDuBloc(noeudPre: unknown): string | null {
   const classes = (noeudCodeDuBloc(noeudPre) as { properties?: { className?: unknown } } | undefined)?.properties
     ?.className;
   const classe = Array.isArray(classes)
     ? classes.find((valeur): valeur is string => typeof valeur === "string" && valeur.startsWith("language-"))
     : undefined;
-  if (!classe) {
-    return null;
-  }
-  return LANGAGES_COLORES[classe.slice("language-".length).toLowerCase()] ?? null;
+  return classe ? classe.slice("language-".length).toLowerCase() : null;
 }
 
 function texteBrutDuNoeud(noeud: unknown): string {
@@ -359,57 +428,90 @@ function texteBrutDuNoeud(noeud: unknown): string {
   return n?.children?.map(texteBrutDuNoeud).join("") ?? "";
 }
 
-// Un bloc de code dont le langage est reconnu (LANGAGES_COLORES) reçoit une
-// coloration syntaxique sur fond sombre (thème `vsDark`, rendu proche d'un
-// IDE standard) ; sinon (langage absent du fence ou non reconnu), le bloc
-// garde le rendu neutre d'origine (texte brut, fond clair) — pas de
-// régression visuelle pour les langages hors périmètre.
+// En-tête façon ChatGPT (icône + nom du langage déclaré sur le fence, tel
+// quel) commune aux deux rendus ci-dessous : affichée que la coloration
+// réussisse ou non, pour que seule la présence de couleur par token
+// distingue un bloc couvert d'un bloc neutre, jamais la mise en page.
+function EnTeteBlocCode({ langage }: Readonly<{ langage: string | null }>) {
+  return (
+    <div className="flex items-center gap-1.5 border-b border-white/10 px-2 py-1 text-[0.7rem] opacity-70">
+      <Code2 className="size-3" aria-hidden="true" />
+      {langage}
+    </div>
+  );
+}
+
+// Issue #97 : la coloration (thème `vsDark`) et le rendu neutre d'un
+// langage non couvert partagent désormais le même fond sombre — un bloc
+// de code a toujours la même apparence de base, langage reconnu ou non,
+// seule la couleur par token distingue les deux (`themes.vsDark.plain`
+// porte ce fond + cette couleur de texte par défaut, posé une fois sur le
+// conteneur commun plutôt que dupliqué entre les deux rendus).
 function BlocCode({ node, children }: Readonly<{ node?: unknown; children?: ReactNode }>) {
   const refPre = useRef<HTMLPreElement>(null);
-  const langage = langageColoreDuBloc(node);
+  const langueDeclaree = langueDeclareeDuBloc(node);
+  const canonique = langueDeclaree ? (CANONIQUE_PAR_ALIAS.get(langueDeclaree) ?? null) : null;
+  const [grammairePrete, setGrammairePrete] = useState(false);
 
-  if (langage) {
-    const code = texteBrutDuNoeud(noeudCodeDuBloc(node));
-    return (
-      <DansBlocCodeContext.Provider value={true}>
-        <BlocAvecBoutonCopier obtenirTexte={() => refPre.current?.textContent ?? ""}>
-          <Highlight prism={Prism} code={code} language={langage} theme={themes.vsDark}>
-            {({ className: classeColoration, style, tokens, getLineProps, getTokenProps }) => (
-              <pre
-                ref={refPre}
-                className={cn(
-                  "overflow-x-auto rounded-sm border border-border p-2 pr-8 font-mono text-xs",
-                  classeColoration
-                )}
-                style={style}
-              >
-                <code>
-                  {tokens.map((ligne, indexLigne) => (
-                    <span key={indexLigne} {...getLineProps({ line: ligne })}>
-                      {ligne.map((jeton, indexJeton) => (
-                        <span key={indexJeton} {...getTokenProps({ token: jeton })} />
-                      ))}
-                      {indexLigne < tokens.length - 1 ? "\n" : null}
-                    </span>
+  useEffect(() => {
+    setGrammairePrete(false);
+    if (!canonique) {
+      return;
+    }
+    if (Prism.languages[canonique]) {
+      setGrammairePrete(true);
+      return;
+    }
+    let annule = false;
+    chargerGrammairePrism(canonique)
+      .then(() => {
+        if (!annule) {
+          setGrammairePrete(true);
+        }
+      })
+      .catch(() => {
+        // Pas de grammaire Prism pour ce langage (ou un de ses prérequis) :
+        // le bloc garde le rendu neutre, déjà affiché par défaut.
+      });
+    return () => {
+      annule = true;
+    };
+  }, [canonique]);
+
+  const corps =
+    grammairePrete && canonique ? (
+      <Highlight prism={Prism} code={texteBrutDuNoeud(noeudCodeDuBloc(node))} language={canonique} theme={themes.vsDark}>
+        {({ className: classeColoration, style, tokens, getLineProps, getTokenProps }) => (
+          <pre ref={refPre} className={cn("overflow-x-auto p-2 pr-8 font-mono text-xs", classeColoration)} style={style}>
+            <code>
+              {tokens.map((ligne, indexLigne) => (
+                <span key={indexLigne} {...getLineProps({ line: ligne })}>
+                  {ligne.map((jeton, indexJeton) => (
+                    <span key={indexJeton} {...getTokenProps({ token: jeton })} />
                   ))}
-                </code>
-              </pre>
-            )}
-          </Highlight>
-        </BlocAvecBoutonCopier>
-      </DansBlocCodeContext.Provider>
+                  {indexLigne < tokens.length - 1 ? "\n" : null}
+                </span>
+              ))}
+            </code>
+          </pre>
+        )}
+      </Highlight>
+    ) : (
+      <pre ref={refPre} className="overflow-x-auto p-2 pr-8 font-mono text-xs" style={themes.vsDark.plain}>
+        {children}
+      </pre>
     );
-  }
 
   return (
     <DansBlocCodeContext.Provider value={true}>
-      <BlocAvecBoutonCopier obtenirTexte={() => refPre.current?.textContent ?? ""}>
-        <pre
-          ref={refPre}
-          className="overflow-x-auto rounded-sm border border-border bg-background p-2 pr-8 font-mono text-xs"
-        >
-          {children}
-        </pre>
+      <BlocAvecBoutonCopier
+        obtenirTexte={() => refPre.current?.textContent ?? ""}
+        classeBouton="text-white/70 hover:bg-white/10 hover:text-white"
+      >
+        <div className="overflow-hidden rounded-sm border border-border" style={themes.vsDark.plain}>
+          <EnTeteBlocCode langage={langueDeclaree} />
+          {corps}
+        </div>
       </BlocAvecBoutonCopier>
     </DansBlocCodeContext.Provider>
   );
