@@ -1,5 +1,6 @@
 import {
   createContext,
+  memo,
   useContext,
   useEffect,
   useRef,
@@ -577,7 +578,14 @@ const COMPOSANTS_MARKDOWN_MESSAGE: Components = {
 };
 const ELEMENTS_MARKDOWN_DEPLIES = ["hr", "img", "del", "input"];
 
-function ContenuMessageAssistant({ texte }: Readonly<{ texte: string }>) {
+// memo (seule prop : `texte`) : sans lui, chaque frappe dans le champ de
+// message (état local du même composant OngletChat) ré-exécute ce
+// composant pour tout l'historique affiché, et donc tout le pipeline
+// Markdown/remark-gfm/Prism pour des messages dont le contenu n'a pas
+// changé.
+const ContenuMessageAssistant = memo(function ContenuMessageAssistant({
+  texte,
+}: Readonly<{ texte: string }>) {
   return (
     <div className="contenu-markdown">
       <Markdown
@@ -591,7 +599,7 @@ function ContenuMessageAssistant({ texte }: Readonly<{ texte: string }>) {
       </Markdown>
     </div>
   );
-}
+});
 
 // Issue #84 : le message du collaborateur ne doit pas apparaître d'un bloc
 // en haut à droite de la conversation ; il glisse depuis la zone de saisie (juste en
@@ -649,7 +657,18 @@ function TexteAnimeReponse({ texte, onTermine }: Readonly<{ texte: string; onTer
     return () => window.clearTimeout(delai);
   }, [longueurAffichee, texte, caracteresParEtape, onTermine]);
 
-  return <ContenuMessageAssistant texte={texte.slice(0, longueurAffichee)} />;
+  // Tant que le texte révélé est tronqué, affiche du texte brut plutôt que
+  // de le repasser par le pipeline Markdown/remark-gfm/Prism à chaque étape
+  // (#99) : une syntaxe encore incomplète (lien, tableau, bloc de code non
+  // refermé) s'y afficherait brute ou cassée pendant plusieurs frames avant
+  // de « sauter » dans sa forme stylée une fois close. Le rendu Markdown
+  // complet n'intervient donc qu'une seule fois, à la toute fin de
+  // l'animation, plutôt qu'à chaque étape.
+  const texteAffiche = texte.slice(0, longueurAffichee);
+  if (longueurAffichee < texte.length) {
+    return <p className="whitespace-pre-wrap">{texteAffiche}</p>;
+  }
+  return <ContenuMessageAssistant texte={texteAffiche} />;
 }
 
 // Réécriture React de la section #onglet-chat d'app.js : ne porte plus que

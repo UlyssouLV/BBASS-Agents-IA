@@ -206,12 +206,19 @@ def _prompt_titrage(message_utilisateur: str, reponse_assistant: str) -> str:
 # ce que le modèle produit malgré la consigne plutôt que de ne compter que
 # sur elle. Ne s'applique qu'au titre généré par le modèle (ici), jamais à un
 # renommage saisi à la main par un collaborateur (PATCH /conversations/{id}).
+#
+# Chaque motif exige en plus qu'aucun caractère alphanumérique ne touche
+# directement les marqueurs par l'extérieur (`(?<!\w)` / `(?!\w)`) : sans
+# cette garde, une paire de "*" ou "_" purement incidente (ex. "10*2 et
+# 5*3", un calcul ; "mon_profil_travail", un identifiant) est elle aussi
+# appariée et son contenu supprimé, alors qu'il ne s'agit pas d'une
+# emphase Markdown.
 _MARQUEURS_MARKDOWN_TITRE = (
     (re.compile(r"^#{1,6}\s*"), ""),
-    (re.compile(r"\*\*(.+?)\*\*"), r"\1"),
-    (re.compile(r"__(.+?)__"), r"\1"),
-    (re.compile(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)"), r"\1"),
-    (re.compile(r"(?<!_)_(?!_)(.+?)(?<!_)_(?!_)"), r"\1"),
+    (re.compile(r"(?<!\w)\*\*(.+?)\*\*(?!\w)"), r"\1"),
+    (re.compile(r"(?<!\w)__(.+?)__(?!\w)"), r"\1"),
+    (re.compile(r"(?<!\w)(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)(?!\w)"), r"\1"),
+    (re.compile(r"(?<!\w)(?<!_)_(?!_)(.+?)(?<!_)_(?!_)(?!\w)"), r"\1"),
 )
 
 
@@ -241,7 +248,7 @@ def _message_systeme_piece_jointe(piece_jointe: PieceJointe) -> dict[str, str]:
 
 
 def _construire_messages_pour_mistral(
-    conversation: Conversation,
+    resume_contexte: str,
     derniers_messages: list[Message],
     nouveau_message: str,
     profil_travail: str,
@@ -254,9 +261,14 @@ def _construire_messages_pour_mistral(
     # message) : sans lui, la réponse de chat elle-même ignorerait tout ce
     # que le profil a appris de la façon de travailler du compte, alors que
     # c'est justement sa raison d'être (contexte pour l'IA qui répond).
+    # Reçoit resume_contexte/derniers_messages déjà extraits (plutôt qu'une
+    # Conversation) : le tout premier message d'une conversation
+    # (creer_conversation) n'a ni résumé ni historique, et réutilise ainsi
+    # ce même builder avec une liste vide et une chaîne vide plutôt que de
+    # dupliquer l'assemblage [style, pièce jointe ?, user].
     messages: list[dict[str, str]] = [_message_systeme_style()]
-    if conversation.resume_contexte:
-        messages.append({"role": "system", "content": conversation.resume_contexte})
+    if resume_contexte:
+        messages.append({"role": "system", "content": resume_contexte})
     if profil_travail:
         messages.append(
             {"role": "system", "content": f"Profil de travail du compte : {profil_travail}"}
@@ -479,14 +491,13 @@ def creer_conversation(
                 db, identifiant_compte, requete.piece_jointe_id, conversation.id
             )
 
-        # Même prompt de style qu'_construire_messages_pour_mistral ci-dessus,
-        # en tête : ce chemin couvre le tout premier message d'une
-        # conversation, l'autre chemin menant au même appel de chat principal
-        # (spec 1.2.2).
-        message_pour_mistral: list[dict[str, str]] = [_message_systeme_style()]
-        if piece_jointe is not None:
-            message_pour_mistral.append(_message_systeme_piece_jointe(piece_jointe))
-        message_pour_mistral.append({"role": "user", "content": requete.message})
+        # Même builder qu'envoyer_message ci-dessous : ce chemin couvre le
+        # tout premier message d'une conversation (jamais de résumé glissant
+        # ni d'historique à ce stade), l'autre chemin menant au même appel de
+        # chat principal (spec 1.2.2).
+        message_pour_mistral = _construire_messages_pour_mistral(
+            "", [], requete.message, "", piece_jointe
+        )
 
         # Les deux appels Mistral (réponse, puis titrage) sont faits avant
         # toute autre écriture en base : en cas d'échec de l'un ou l'autre,
@@ -1002,7 +1013,7 @@ def envoyer_message(
         # puis écraser l'une des deux mises à jour au commit).
         profil_actuel = _contenu_profil_actuel(db, identifiant_compte)
         messages_pour_mistral = _construire_messages_pour_mistral(
-            conversation, derniers_messages, requete.message, profil_actuel, piece_jointe
+            conversation.resume_contexte, derniers_messages, requete.message, profil_actuel, piece_jointe
         )
 
         # Un message sort de la fenêtre des 3 derniers dès que ce tour (2 nouveaux
