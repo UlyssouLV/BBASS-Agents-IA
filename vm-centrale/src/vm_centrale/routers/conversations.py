@@ -171,6 +171,13 @@ _PROMPT_STYLE = (
     "s'y prête vraiment, jamais par réflexe), blocs de code pour du code "
     "ou une formule, et liens uniquement vers une source réelle que tu "
     "connais avec certitude (jamais une URL inventée ou approximative). "
+    "Quand tu nommes ou cites explicitement une source précise (rapport, "
+    "étude, organisme, texte réglementaire), le lien qui l'accompagne doit "
+    "être placé immédiatement contre cette citation et correspondre "
+    "exactement à cette source — jamais un lien générique isolé en fin de "
+    "réponse présenté comme s'il couvrait une citation différente plus "
+    "haut. Si tu ne connais avec certitude aucun lien fiable pour la "
+    "source nommée, n'en fournis aucun plutôt que d'en approximer un. "
     "Déconseillés : titres, séparateurs `---`, citations, images."
 )
 
