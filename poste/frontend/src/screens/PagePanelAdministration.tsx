@@ -2,6 +2,8 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useComptesConsommationQuery, useComptesQuery } from "@/hooks/useComptes";
+import { usePerfChargementPage } from "@/lib/instrumentationTemps";
 import { OngletComptes } from "@/onglets/OngletComptes";
 import { OngletConsommations } from "@/onglets/OngletConsommations";
 
@@ -18,6 +20,15 @@ interface PagePanelAdministrationProps {
 // composants shadcn/ui Table et Badge (voir OngletComptes/OngletConsommations).
 export function PagePanelAdministration({ onRetour }: Readonly<PagePanelAdministrationProps>) {
   const [onglet, setOnglet] = useState("comptes");
+
+  // Issue #102 : même logique que PageProfil.tsx — les deux onglets sont
+  // montés simultanément (TabsContent forceMount), ces appels ne font que
+  // lire le statut des requêtes déjà déclenchées par OngletComptes /
+  // OngletConsommations (même cache TanStack Query, pas de requête
+  // supplémentaire).
+  const comptesQuery = useComptesQuery();
+  const comptesConsommationQuery = useComptesConsommationQuery();
+  usePerfChargementPage("panel-administration", !comptesQuery.isLoading && !comptesConsommationQuery.isLoading);
 
   return (
     <main className="mx-auto mt-8 w-full max-w-4xl px-4">

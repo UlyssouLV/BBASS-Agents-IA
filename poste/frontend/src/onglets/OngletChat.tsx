@@ -39,6 +39,7 @@ import {
   type Message,
 } from "@/hooks/useConversations";
 import { messageErreur } from "@/lib/api";
+import { usePerfChargementParCle } from "@/lib/instrumentationTemps";
 import { cn } from "@/lib/utils";
 
 // Mêmes extensions/types qu'app.js (formulaireNouvelleConversation /
@@ -715,6 +716,11 @@ export function OngletChat({ conversationOuverteId, onConversationCreee }: Reado
   const conversationQuery = useConversationQuery(conversationOuverteId);
   const creerConversationMutation = useCreerConversationMutation();
   const envoyerMessageMutation = useEnvoyerMessageMutation();
+
+  // Issue #102 : temps entre une ouverture/bascule de conversation
+  // (changement de conversationOuverteId, porté par EcranCompte.tsx) et
+  // l'arrivée de son contenu.
+  usePerfChargementParCle("conversation", conversationOuverteId, conversationQuery.isFetching);
 
   // Une fois la frappe terminée, rebascule sur les données live dès qu'elles
   // contiennent bien ce tour (message + réponse), sans attendre davantage :
