@@ -21,9 +21,12 @@ export default defineConfig({
     outDir: path.resolve(__dirname, "../src/poste/static"),
     emptyOutDir: true,
   },
+  // La route /inspecteur elle-même (sans slash final) reste servie par Vite
+  // en dev (repli SPA sur index.html) : seules les routes API /inspecteur/*
+  // sont relayées au poste.
   server: {
     proxy: {
-      "^/(connexion|deconnexion|mot-de-passe|compte|conversations|pieces-jointes|profil-travail|comptes|consommation)":
+      "^/(connexion|deconnexion|mot-de-passe|compte|conversations|pieces-jointes|profil-travail|comptes|consommation|inspecteur/)":
         {
           target: "http://127.0.0.1:8100",
           changeOrigin: true,

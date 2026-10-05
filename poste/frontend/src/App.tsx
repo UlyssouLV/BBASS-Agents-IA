@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
 import { useSession } from "@/hooks/useSession";
@@ -5,9 +7,26 @@ import { EcranChangementMotDePasse } from "@/screens/EcranChangementMotDePasse";
 import { EcranCompte } from "@/screens/EcranCompte";
 import { EcranConnexion } from "@/screens/EcranConnexion";
 
+// Mode développeur (spec 1.3.0) : raccourci discret, actif quel que soit
+// l'écran affiché (connexion comprise), qui ouvre l'inspecteur des échanges
+// avec le modèle dans un nouvel onglet — le chat en cours reste inchangé.
+function useRaccourciInspecteur() {
+  useEffect(() => {
+    function gererTouche(evenement: KeyboardEvent) {
+      if (evenement.ctrlKey && evenement.shiftKey && !evenement.altKey && evenement.key.toLowerCase() === "d") {
+        evenement.preventDefault();
+        window.open("/inspecteur", "_blank", "noopener");
+      }
+    }
+    globalThis.addEventListener("keydown", gererTouche);
+    return () => globalThis.removeEventListener("keydown", gererTouche);
+  }, []);
+}
+
 export function App() {
   const { compte, chargementInitial, erreurInitiale, reessayerChargementInitial, connexion, changerMotDePasse, deconnexion } =
     useSession();
+  useRaccourciInspecteur();
 
   return (
     <>

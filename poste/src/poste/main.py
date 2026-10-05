@@ -44,6 +44,15 @@ def index() -> FileResponse:
     return FileResponse(_STATIC_DIR / "index.html")
 
 
+# Mode développeur (spec 1.3.0) : point d'entrée séparé ouvert dans un nouvel
+# onglet par Ctrl+Maj+D, servi par le même build que la racine — main.tsx
+# choisit l'écran selon le chemin. Route exacte, distincte des routes API
+# /inspecteur/* (routers/inspecteur.py).
+@app.get("/inspecteur")
+def inspecteur() -> FileResponse:
+    return FileResponse(_STATIC_DIR / "index.html")
+
+
 def run() -> None:
     import uvicorn
 
