@@ -13,28 +13,9 @@ Ce n’est **pas** une spec (ça vient après « Ouvre la version »).
 - **1.1.3** — Consommation : une ligne `Consommation` par appel Mistral réel (chat, titrage, résumé+profil, OCR, vision), tokens ou pages selon le type, coût figé au tarif du jour de l'appel (pas d'API de tarification Mistral, tarifs en dur dans le code). Fenêtre Consommation côté collaborateur (total + classement des conversations par coût) ; onglet Consommations côté administrateur (comptes classés par coût, jamais de détail par conversation).
 - **1.2.0** — Interface poste réécrite en React/TypeScript/Vite (shadcn/ui, Tailwind, TanStack Query), build committé dans git (jamais de Node.js requis sur un poste, [ADR-0010](../adr/0010-front-poste-react-typescript-vite.md)) ; écran comptes (compte administrateur) passé de blocs empilés à une table avec une modale par action.
 - **1.2.1** — Identité visuelle du poste calquée sur le logo BBASS Géomètre-Expert (couleurs, police Manrope auto-hébergée, logo, favicon) et disposition façon ChatGPT (sidebar avec conversations et puce compte, page Profil dédiée, Panel d'administration dédié avec tableaux/étiquettes shadcn-ui) ; aucun changement côté VM centrale ni du contrat API.
+- **1.2.2** — Style de réponse de l'IA : prompt système de style (vm-centrale) sur l'appel de chat principal uniquement (vouvoiement, pas de remplissage réflexe, emojis rares et signifiants, pas de relance systématique en fin de réponse, Markdown borné autorisé — gras/italique/listes/paragraphes), jamais sur le titrage ni le résumé + profil de travail. Rendu Markdown borné côté poste (`react-markdown`, allowlist `strong`/`em`/`ul`/`ol`/`li`/`p`, tout le reste neutralisé au rendu), en remplacement du texte brut affiché jusqu'ici.
 
-## Prochaine : 1.2.2 — Style de réponse de l’IA (ton, format, rendu)
-
-**Constat.** Les réponses actuelles sont souvent longues, très structurées (titres `##`, gras `**…**`, listes, tableaux, séparateurs `---`, emojis ✅/❌, questions de relance en fin), ce qui sonne « ChatGPT générique » plus que « collaborateur BBASS ». Le front affiche aujourd’hui le **texte brut** (`message.contenu` dans une balise `<p>`, sans rendu Markdown) : les `**` et `##` apparaissent donc littéralement, ce qui aggrave l’effet bizarre. Aucun message système de style n’est envoyé au modèle pour le chat — seulement résumé glissant, profil de travail, et contexte pièce jointe (1.1.1 / 1.1.2).
-
-**Ce n’est pas un format standard imposé à tous les modèles.** C’est un **comportement par défaut fréquent** après entraînement / alignement (assistant « utile », structuré, pédagogique). Chaque famille de modèles (Mistral, GPT, Claude…) a ses tics ; sans consigne, le style **varie** d’un modèle à l’autre et même d’un tour à l’autre. Ce n’est pas un schéma API unique partagé — c’est du Markdown / prose libre que le modèle invente.
-
-**Comment on contrôle ça (pas besoin de tool calling / MCP pour le style).**
-- **Levier principal : un prompt système de style** (consignes stables côté VM : ton cabinet, longueur, quand utiliser listes / titres, français, pas de blabla de fin, etc.). Suffisant pour la majorité des cas. Pas de MCP ni d’outil dédié « changer le style » : le style n’est pas une action à appeler, c’est une **consigne permanente**.
-- **Rendu front (optionnel mais lié)** : soit on **interdit** le Markdown côté modèle et on garde du texte simple ; soit on **autorise** un Markdown borné et on le **rend** proprement (titres, gras, listes) — aujourd’hui ni l’un ni l’autre n’est tranché, d’où l’affichage brut des `**`.
-- **Sortie structurée (JSON)** : utile pour des écrans métier (fiche, plan d’automate Moduléo…), pas pour remplacer le style de la prose du chat.
-- **Par Agent / pôle (plus tard)** : un Agent Administration / Moduléo n’aura pas forcément le même ton qu’un Agent Foncier ; le style peut devenir une brique par Agent une fois 1.4.0+ en place.
-
-**Objectif.** Des réponses lisibles, professionnelles, stables d’un tour à l’autre (et autant que possible d’un modèle à l’autre via la même consigne), adaptées au cabinet — sans essay encyclopédique non demandé.
-
-**Recherche / décisions à trancher à l’ouverture.**
-- Contenu du prompt de style (longueur max relative, Markdown oui/non/borné, tutoiement vs vouvoiement, signature / relance en fin de message).
-- Rendu : texte brut contraint vs Markdown rendu côté React.
-- Une consigne globale V1 vs styles par Agent dès qu’il y en a plusieurs.
-- Mesure simple : mêmes questions de test avant/après sur le modèle actuel (et un second si multi-modèles un jour).
-
-## Ensuite : 1.2.3 — Amélioration des délais de chargement (pages et conversations)
+## Prochaine : 1.2.3 — Amélioration des délais de chargement (pages et conversations)
 
 **Constat.** Chaque changement d’écran (chat, profil, admin…) et surtout l’ouverture / le basculement de conversation est **trop lent** au quotidien. Au-delà de l’absence de cache côté front (TanStack Query quasi sans stratégie de `staleTime` / conservation des listes), la latence reste élevée : impression de tout recharger à chaque clic, y compris des données déjà vues.
 
