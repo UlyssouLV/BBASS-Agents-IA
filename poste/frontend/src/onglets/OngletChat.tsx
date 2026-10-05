@@ -12,7 +12,6 @@ import {
   Check,
   Code2,
   Copy,
-  ExternalLink,
   File,
   FileImage,
   FileSpreadsheet,
@@ -209,7 +208,8 @@ function ChampMessageAvecPieceJointe({
 // listes (imbriquées ou non), paragraphes, tableaux (remark-gfm, sans quoi
 // la syntaxe `|...|` n'est jamais reconnue comme un tableau et s'affiche
 // telle quelle — marqueurs bruts — plutôt que d'être neutralisée), blocs
-// de code et liens (en pastille séparée du texte, voir LienSource). Le
+// de code et liens (ancre cliquable sur le texte de citation, voir
+// LienSource). Le
 // reste (titres, citations) est neutralisé en bloc générique ci-dessous
 // plutôt que simplement « déplié » (unwrapDisallowed) — un titre ou une
 // citation dépliée perd son élément englobant et se retrouve orpheline,
@@ -529,11 +529,18 @@ function CodeEnLigne({ children }: Readonly<{ children?: ReactNode }>) {
   );
 }
 
-// Un lien n'est plus neutralisé en texte brut : le texte de l'ancre reste
-// du texte normal (jamais souligné/bleu comme un lien classique, pour ne
-// pas laisser croire que toute la phrase est cliquable), suivi d'une
-// pastille séparée — seul élément réellement cliquable, même esprit que
-// les bulles de citation de source d'autres assistants. `rel`
+// Issue #98 : le texte de l'ancre est lui-même l'élément cliquable (`href`
+// visible au survol, comportement natif du navigateur) plutôt qu'une
+// pastille greffée en fin de citation — retour terrain #93/#96 : la
+// pastille seule était trop peu visible pour repérer où se trouvent les
+// sources dans une réponse. `text-accent` (plutôt que `--primary`, déjà
+// utilisé par le tableau) est le token du design system explicitement
+// réservé aux liens (voir index.css) ; seul le texte exact de l'ancre porte
+// cette couleur, jamais la phrase environnante qui la contient, donc rien
+// ne laisse croire que cette phrase serait cliquable au-delà de la
+// citation. Pas de soulignement au repos (cf. décision #93 : ne pas
+// alourdir chaque citation sourcée), seulement au survol/focus, en plus de
+// la couleur — deux affordances cumulées plutôt qu'une. `rel`
 // noopener+noreferrer et le `urlTransform` par défaut de react-markdown
 // (actif tant qu'on ne le surcharge pas ici) protègent contre les schémas
 // d'URL dangereux (`javascript:`, etc.).
@@ -542,18 +549,14 @@ function LienSource({ href, children }: Readonly<{ href?: string; children?: Rea
     return <>{children}</>;
   }
   return (
-    <>
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-accent underline-offset-2 hover:underline focus-visible:underline"
+    >
       {children}
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="ms-1 inline-flex size-4 translate-y-[-1px] items-center justify-center rounded-full bg-primary/10 align-middle text-primary hover:bg-primary/20"
-        aria-label={`Ouvrir la source : ${href}`}
-      >
-        <ExternalLink className="size-2.5" aria-hidden="true" />
-      </a>
-    </>
+    </a>
   );
 }
 
