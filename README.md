@@ -4,7 +4,7 @@ Logiciel d'agents IA pour le cabinet de géomètres-experts BBASS. L'objectif es
 
 ## État actuel
 
-**V1.2.2** disponible : style de réponse de l'IA — prompt système de style sur l'appel de chat principal (vouvoiement, pas de remplissage réflexe, emojis rares, pas de relance systématique, Markdown borné autorisé), jamais sur le titrage ni le résumé + profil de travail ; rendu Markdown borné côté poste (gras, italique, listes) remplaçant l'affichage en texte brut. Hérite de l'identité visuelle du poste aux couleurs du cabinet BBASS (palette anthracite/rouge, police Manrope auto-hébergée, logo, favicon) et de la disposition façon ChatGPT (sidebar avec conversations et puce compte, page Profil dédiée, Panel d'administration dédié avec tableaux/étiquettes shadcn/ui). Backend local **poste** (interface React/TypeScript/Vite, shadcn/ui) et API **VM centrale** (comptes administrateurs PostgreSQL, relais Mistral, conversations persistées avec historique borné, résumé glissant et profil de travail, pièces jointes PDF/Word/Excel/image avec extraction et rappel via outil hors fenêtre, suivi de la consommation Mistral — tokens/pages et coût figé au tarif du jour, par conversation côté collaborateur et agrégé par compte côté administrateur). Les agents métiers ne sont pas encore construits.
+**V1.2.3** disponible : délais de chargement réduits sur les navigations et l'ouverture/bascule de conversation — cache TanStack Query revu par requête (conversation, Profil, Panel d'administration) avec `placeholderData` sur le détail de conversation pour supprimer le flash d'état vide, pagination par curseur du détail d'une conversation (fenêtre récente par défaut, historique plus ancien chargé au défilement façon ChatGPT), instrumentation de temps légère (`performance.mark`/`performance.measure`, désactivée par défaut) réutilisable par la 1.3.0. Hérite du style de réponse de l'IA (1.2.2 — vouvoiement, Markdown borné) et de l'identité visuelle du poste aux couleurs du cabinet BBASS (palette anthracite/rouge, police Manrope auto-hébergée, logo, favicon) et de la disposition façon ChatGPT (sidebar avec conversations et puce compte, page Profil dédiée, Panel d'administration dédié avec tableaux/étiquettes shadcn/ui). Backend local **poste** (interface React/TypeScript/Vite, shadcn/ui) et API **VM centrale** (comptes administrateurs PostgreSQL, relais Mistral, conversations persistées avec historique borné, résumé glissant et profil de travail, pièces jointes PDF/Word/Excel/image avec extraction et rappel via outil hors fenêtre, suivi de la consommation Mistral — tokens/pages et coût figé au tarif du jour, par conversation côté collaborateur et agrégé par compte côté administrateur). Les agents métiers ne sont pas encore construits.
 
 ## Ce qu'on construit
 
@@ -19,19 +19,9 @@ Une application composée d'un backend Python et d'une interface web (HTML/CSS/J
 - Urbanisme
 - Détection de réseaux
 
-## Semaine du 14 au 18 septembre 2026
+## Architecture
 
-Point visé vendredi 18 septembre : **V1.3.0**.
-
-```mermaid
-flowchart LR
-  L14["Lundi 14<br/>socle chat"] --> M15["Mardi 15<br/>V1.1.0 comptes"]
-  M15 --> Me16["Mercredi 16<br/>V1.1.1 persistance"]
-  Me16 --> J17["Jeudi 17<br/>V1.1.2 pièces jointes"]
-  J17 --> J17b["Jeudi 17<br/>V1.1.3 consommation"]
-  J17b --> V120["V1.2.0<br/>interface poste"]
-  V120 --> V18["Vendredi 18<br/>visé V1.3.0"]
-```
+Le poste n’appelle jamais Mistral directement : tout passe par la VM centrale (réseau interne), qui détient aussi PostgreSQL et la clé API.
 
 ```mermaid
 flowchart LR
@@ -40,24 +30,35 @@ flowchart LR
   VM --> M["API Mistral"]
 ```
 
+## Semaine du 05 au 09 octobre 2026
+
+Point visé jeudi 8 octobre : **V1.5.0** (vendredi 9 : RTT).
+
+```mermaid
+flowchart LR
+  L05["Lundi 5<br/>V1.2.3 livrée"] --> V130["V1.3.0<br/>inspecteur échanges"]
+  V130 --> V140["V1.4.0<br/>Agent Admin · Moduléo lecture"]
+  V140 --> V08["Jeudi 8<br/>visé V1.5.0"]
+```
+
 ### Travail réalisé
 
-- **Lundi 14** — environnement (éditeur, Git), dépôt GitHub, glossaire, spécifications, ADR ; première interface de chat ; API Mistral via la VM avec des comptes de test.
-- **Mardi 15** — socle chat (Pay as you go Mistral) ; **V1.1.0** (comptes administrateurs, collaborateurs, pôles, mots de passe, révocation de session) et tests utilisateurs ; échange Topo sans suite immédiate.
-- **Mercredi 16** — **V1.1.1** (persistance des conversations côté VM centrale : PostgreSQL, plusieurs fils par compte, historique multi-tours borné, résumé glissant, profil de travail) et écrans poste correspondants (conversations, profil de travail en lecture seule).
-- **Jeudi 17** — **V1.1.2** (pièces jointes : upload PDF/Word/Excel/image, extraction OCR/locale/vision, contenu injecté dans le chat, mention courte dans le résumé glissant, rappel via outil hors fenêtre) et zone de dépôt minimale côté poste ; **V1.1.3** (suivi de la consommation : une ligne par appel Mistral réel — chat, titrage, résumé+profil, OCR, vision —, tokens ou pages, coût figé au tarif du jour ; fenêtre Consommation côté collaborateur, onglet Consommations côté administrateur).
-- **V1.2.0** — interface poste réécrite en React/TypeScript/Vite (shadcn/ui, TanStack Query), écran comptes avec modales au lieu de blocs empilés, style posé via le plugin `frontend-design`.
+- **Semaine du 14–18 septembre** — socle jusqu’à **V1.2.0** (comptes admin, persistance conversations, pièces jointes, consommation, front React/TypeScript/Vite).
+- **Depuis** — **V1.2.1** (identité visuelle BBASS, disposition type ChatGPT) ; **V1.2.2** (prompt système de style sur le chat principal ; rendu Markdown borné côté poste).
+- **Lundi 5 octobre** — **V1.2.3** (cache TanStack Query, pagination par curseur du détail de conversation, instrumentation de temps légère).
 
 ### Reste à implémenter
 
-- **V1.3.0** — premier agent, pôle Administration, Moduléo (API, serveur de test, lecture seule, plan d’automatisme sans écriture ni exécution).
+- **V1.3.0** — inspecteur des échanges avec le modèle.
+- **V1.4.0** — premier Agent (pôle Administration) : lecture Moduléo via le chat.
+- **V1.5.0** — workflows n8n, branchés sur Moduléo 1.4.0.
 
-### Attendu pour la fin de semaine (V1.3.0)
+### Attendu pour la fin de semaine (V1.5.0)
 
-- **Architecture** — logiciel sur le poste (interface web locale) ; VM à Castries, réseau interne seulement. La VM détient les comptes, les conversations et la clé API Mistral. PostgreSQL sur la VM (plus SQLite) ; Postgres local via Docker en développement.
-- **Connexion et chat** — identifiant / mot de passe ; session conservée (compte Windows) jusqu’à déconnexion ou révocation. Chat vers Mistral ; affichage prénom, nom, identifiant, agence et pôle(s). Plusieurs conversations par compte, persistées sur la VM (reprise après rechargement, relance, autre machine). Titre auto, renommage, suppression. Historique borné (3 derniers messages + résumé). Profil de travail consultable, sans modifier l’identité du compte. Conversations privées (y compris vis-à-vis d’un administrateur). Pièces jointes stockées sur la VM et transmises à Mistral. Suivi de consommation (tokens, dates, modèle, coût). UX poste minimale (modales, écran comptes).
-- **Comptes administrateurs** — droit global, distinct du pôle Administration. Premier administrateur créé en base à la main ; ensuite liste / création / modification depuis le poste (identité, email, agence, un ou plusieurs des six pôles). Mot de passe aléatoire à la création ou réinitialisation, à changer avant le chat. Déconnexion forcée. Promotion, rétrogradation et suppression : clé d’administration VM en plus ; impossible de supprimer ou rétrograder le dernier administrateur.
-- **Premier agent** — pôle Administration, Moduléo, serveur de test : version minimale pour montrer que ça marche.
+- **Déjà en place** — poste + VM Castries, PostgreSQL, chat Mistral, conversations bornées + résumé + profil, pièces jointes, consommation, comptes administrateurs, UI React BBASS, style de réponse 1.2.2, navigations et ouvertures de conversation plus fluides (1.2.3).
+- **V1.3.0** — inspecteur (accès restreint) des payloads modèle.
+- **V1.4.0** — Q&A lecture Moduléo depuis le chat.
+- **V1.5.0** — socle n8n branché sur les outils Moduléo 1.4.0.
 
 ## Prérequis
 

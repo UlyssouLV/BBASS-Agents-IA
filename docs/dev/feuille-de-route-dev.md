@@ -14,25 +14,13 @@ Ce n’est **pas** une spec (ça vient après « Ouvre la version »).
 - **1.2.0** — Interface poste réécrite en React/TypeScript/Vite (shadcn/ui, Tailwind, TanStack Query), build committé dans git (jamais de Node.js requis sur un poste, [ADR-0010](../adr/0010-front-poste-react-typescript-vite.md)) ; écran comptes (compte administrateur) passé de blocs empilés à une table avec une modale par action.
 - **1.2.1** — Identité visuelle du poste calquée sur le logo BBASS Géomètre-Expert (couleurs, police Manrope auto-hébergée, logo, favicon) et disposition façon ChatGPT (sidebar avec conversations et puce compte, page Profil dédiée, Panel d'administration dédié avec tableaux/étiquettes shadcn-ui) ; aucun changement côté VM centrale ni du contrat API.
 - **1.2.2** — Style de réponse de l'IA : prompt système de style (vm-centrale) sur l'appel de chat principal uniquement (vouvoiement, pas de remplissage réflexe, emojis rares et signifiants, pas de relance systématique en fin de réponse, Markdown borné autorisé — gras/italique/listes/paragraphes), jamais sur le titrage ni le résumé + profil de travail. Rendu Markdown borné côté poste (`react-markdown`, allowlist `strong`/`em`/`ul`/`ol`/`li`/`p`, tout le reste neutralisé au rendu), en remplacement du texte brut affiché jusqu'ici.
+- **1.2.3** — Amélioration des délais de chargement (pages et conversations) : cache TanStack Query revu par requête (liste des conversations, détail de conversation, Profil, Panel d'administration), `placeholderData` sur le détail de conversation pour garder l'ancien contenu affiché pendant le rafraîchissement ; pagination par curseur de `GET /conversations/{id}` (vm-centrale), fenêtre de messages la plus récente par défaut, historique plus ancien chargé au défilement façon ChatGPT (pas de pagination par page) ; instrumentation de temps légère (`performance.mark`/`performance.measure`) sur l'ouverture/bascule de conversation, Profil et Panel d'administration, désactivée par défaut, posée pour être réutilisée par la 1.3.0.
 
-## Prochaine : 1.2.3 — Amélioration des délais de chargement (pages et conversations)
-
-**Constat.** Chaque changement d’écran (chat, profil, admin…) et surtout l’ouverture / le basculement de conversation est **trop lent** au quotidien. Au-delà de l’absence de cache côté front (TanStack Query quasi sans stratégie de `staleTime` / conservation des listes), la latence reste élevée : impression de tout recharger à chaque clic, y compris des données déjà vues.
-
-**Objectif.** Des navigations et des ouvertures de conversation **ressenties comme rapides** : moins d’attentes bloquantes, réutilisation intelligente de ce qui est déjà en mémoire, et identification / réduction des vrais goulots (poste, VM, payload conversations, rendu).
-
-**Pistes à creuser à l’ouverture (pas tranchées).**
-- Cache / invalidation TanStack Query : liste des conversations, détail d’une conversation, profil, conso — conserver au changement d’écran, invalider seulement quand un envoi / rename / delete le justifie.
-- Chargement conversation : payload trop gros (tous les messages d’un coup) ? pagination / fenêtre locale vs tout le fil ; skeleton / contenu précédent pendant le fetch.
-- Réseau : appels en série inutiles, waterfalls poste → VM, timeouts ; mesurer avant d’optimiser.
-- Rendu : coût des animations (frappe réponse), re-renders React au changement de conversation.
-- Critère de succès : scénarios chronométrés (ouvrir une conversation connue, basculer entre deux fils, aller-retour Profil ↔ Chat) avant / après.
-
-## Ensuite : 1.3.0 — Inspecteur des échanges avec le modèle (outil de développement)
+## Prochaine : 1.3.0 — Inspecteur des échanges avec le modèle (outil de développement)
 
 **Objectif.** Une fenêtre / vue **développement** qui montre, pour une conversation, **exactement ce qui a été envoyé et reçu à chaque tour** vers le modèle (et appels annexes : titrage, résumé+profil, OCR, vision, tool calls pièce jointe…) — pas seulement les bulles user/assistant visibles dans le chat.
 
-**Pourquoi.** Aujourd’hui on ne voit côté UI que le message collaborateur et la réponse affichée. On ne voit pas le prompt réel (résumé glissant, profil de travail, messages système pièce jointe, fenêtre des 3 derniers, outils proposés, contenu extrait injecté, etc.). Indispensable pour déboguer style (1.2.2), Agents (1.4.0), PJ (1.5.0) et comprendre coût / tokens (lien avec 1.1.3).
+**Pourquoi.** Aujourd’hui on ne voit côté UI que le message collaborateur et la réponse affichée. On ne voit pas le prompt réel (résumé glissant, profil de travail, messages système pièce jointe, fenêtre des 3 derniers, outils proposés, contenu extrait injecté, etc.). Indispensable pour déboguer style (1.2.2), Agents / Moduléo (1.4.0), n8n (1.5.0), PJ (1.6.0) et comprendre coût / tokens (lien avec 1.1.3).
 
 **Périmètre envisagé.**
 - Par conversation : liste des tours / appels, chacun avec le **payload** envoyé (messages `system` / `user` / `assistant`, tools, extraits de pièces jointes, métadonnées utiles : modèle, tokens, type d’appel).
@@ -45,19 +33,57 @@ Ce n’est **pas** une spec (ça vient après « Ouvre la version »).
 - Volume : tronquer les très gros extraits PJ à l’affichage tout en gardant la trace qu’ils étaient présents.
 - Ne pas exposer la clé API Mistral ni les secrets dans cette vue.
 
-## Ensuite : 1.4.0 — Premier Agent (pôle Administration), axé Moduléo
+## Ensuite : 1.4.0 — Premier Agent (pôle Administration) : lecture Moduléo via le chat
 
-Premier **Agent** métier. Pôle **Administration**. Premier périmètre logiciel : **Moduléo** (utilisé par tout le cabinet), pas tout le métier d’un coup.
+Premier **Agent** métier. Pôle **Administration**. Premier logiciel : **Moduléo** (utilisé par tout le cabinet).
 
-**Objectif.** Avancer **lentement** et le plus **sûrement** possible. Configurer l’Agent pour qu’il comprenne Moduléo et puisse, d’abord en **lecture** (pas d’écriture sur le serveur Moduléo) : s’appuyer sur la doc / l’API, récupérer de l’information. Les **automatismes** ne sont pas obligatoires dès le premier livrable : le modèle conversationnel doit déjà être capable de **pondre un plan d’implémentation** d’un automate Moduléo (comment on les générera / brancherait plus tard).
+**Objectif.** Depuis un prompt dans le chat, demander des **éléments issus de Moduléo** (via l’API, en **lecture seule**) et obtenir une **réponse utile** (ex. affaire, intervenants, … selon allowlist). Pas d’écriture Moduléo. Pas de n8n dans ce livrable : les appels passent par des **outils** (tool calling) + client HTTP **dans la VM** (Python), pas un workflow par route API.
+
+**Hors périmètre 1.4.0 (→ 1.5.0).** Orchestration / création de workflows **n8n**, automatismes multi-étapes, écriture Moduléo.
+
+**Orientation déploiement (tranchée pour 1.4.0, à garder en tête pour la suite).** Un Agent = configuration métier (prompt, pôle, outils) dans le flux chat de la **VM centrale**, pas un conteneur Docker par Agent / par pôle. Docker reste ce qu’il est aujourd’hui (ex. Postgres) ; pas de micro-services Agent pour ce premier livrable. Motif : prompts et outils légers (lecture API) n’ont pas de runtime propre — un conteneur par Agent ajouterait ops (réseau, versions, healthchecks) sans gain réel de déploiement, alors que plus tard peu de tech sera sur place pour l’opérer.
+
+**Piste pour plus tard (pas 1.4.0)** — quand le besoin d’indépendance de déploiement / zéro coupure se confirmera (itérer un Agent sans republier les autres, éviter de couper le chat) :
+- d’abord privilégier **config rechargeable** / hot-reload et, si besoin, **rolling** du cœur VM ;
+- isoler en conteneur seulement ce qui a un **vrai cycle de vie** (adaptateur Moduléo en écriture, bac à sable d’exécution, dépendances lourdes, instance n8n) — plutôt **par système / capacité à risque** que « un Docker = un pôle » ;
+- ne microservicer les Agents par pôle que si hot-reload + adaptateurs ne suffisent plus.
+
+**Proposition d’organisation du code (explorée, pas tranchée).** Idée de **paquetiser** le premier Agent dans la VM (dossier dédié + README capacités + docs), cohérente avec « Agent = consigne / outils dans la VM ». Ce qui suit a été exploré en discussion ; **ce n’est pas encore une décision** — à l’ouverture de la 1.4.0 on peut encore retenir autre chose si une meilleure idée apparaît.
+
+- **Découpage privilégié dans cette exploration** : Agent du pôle **Administration** d’un côté, intégration **Moduléo** de l’autre (Moduléo est le premier logiciel utilisé par cet Agent, pas l’Agent lui-même). Ex. `vm-centrale/src/vm_centrale/agents/administration/` + `…/integrations/moduleo/` (noms exacts à trancher). Variante plus simple au tout début : un seul dossier `moduleo/` avec note « sert le pôle Administration » — à scinder dès qu’Admin gagne un autre logiciel.
+- **Emplacement** : code sous `src/vm_centrale/` (importable par le routeur chat, comme `analyse_pieces_jointes/`), pas un dossier docs orphelin à côté de `tests/`. Le pack `agents/` à la racine du dépôt reste **dev only** (skills/hooks Cursor/Claude, non déployé) — distinct des Agents métier runtime ; un README parent dans le dossier Agents métier le rappelle.
+- **Vocabulaire runtime** : `consigne` (prompt) + `outils/` (schémas tool calling Mistral + handlers Python) + `client/` (HTTP Moduléo lecture seule). **Pas** de `skills/` / `hooks/` façon pack de développement — fausse analogie. Pas un outil / workflow par endpoint de la [doc API Moduléo](https://mwa-kpw-api.kipaware.fr/api/documentation) : plutôt une **allowlist** d’outils métier (ou un client HTTP borné), pour limiter tokens et surface d’erreur.
+- **Docs** : `docs/` + README d’arborescence (ce qui est injecté dans le prompt vs rappelé via outil vs référence humaine) ; sous-dossiers type `api/` (endpoints retenus, limites, auth) et `metier/` si besoin. Pas toute la doc Moduléo brute sans triage (coût tokens).
+- **À prévoir aussi** : allowlist explicite des capacités actuelles (`capacites.md` ou section figée du README) ; petit **registre / loader** pour brancher consignes + outils sans if spaghetti dans `conversations.py` ; secrets Moduléo dans `.env` / config VM, jamais dans `docs/` ; tests HTTP-boundary dans `vm-centrale/tests/`.
+- **Hors proposition pour le premier livrable** : un Docker / service par Agent ; hooks façon Claude/Cursor ; n8n.
 
 **Recherche / tests.**
 
-- API Moduléo : ce qu’elle permet, limites, auth.
-- Essais uniquement sur un **serveur de test**.
-- Comment on branchera (plus tard) des automatismes sans les activer trop tôt en prod.
+- API Moduléo : auth, limites, endpoints utiles pour le Q&A Admin (serveur de **test** uniquement).
+- Scénarios chat : ex. « retrouve l’affaire X / ses intervenants » → outil → réponse.
+- Trancher / amender la proposition d’organisation ci-dessus à l’ouverture (ou documenter une alternative retenue).
 
-## Ensuite : 1.5.0 — Analyse et traitement des pièces jointes, approfondis
+## Ensuite : 1.5.0 — Workflows n8n (socle d’automatisation), branchés sur Moduléo 1.4.0
+
+S’appuie sur les **outils / client Moduléo lecture** livrés en 1.4.0. n8n devient le **runtime d’automatisation** (scénarios multi-étapes, plus tard d’autres logiciels), pas un miroir 1:1 de chaque route API.
+
+**Objectif.** Intégrer **n8n** (self-host envisagé sur le LAN) de façon **sûre** : l’Agent / la VM peut s’appuyer sur des workflows (déclencher, et selon garde-fous créer/modifier **inactifs**, idéalement depuis templates) en réutilisant ce qu’on sait déjà faire côté Moduléo. Les collaborateurs pourront à terme orchestrer des automates au-delà du simple Q&A chat — sans god-mode CRUD n8n ni activation libre en prod dès le premier jet.
+
+**Périmètre envisagé.**
+- Instance n8n de test ; client API / webhooks côté VM ; dossier d’intégration (ex. `integrations/n8n/`).
+- Outils Agent bornés : list/get, exécuter un workflow existant, créer/update **inactif** (templates de préférence) ; activer / delete / credentials sous contrôle strict (admin ou validation).
+- Premiers workflows utiles Admin qui **composent** des appels Moduléo (réutiliser la logique 1.4.0), pas « un workflow par endpoint ».
+- Mistral peut **aider** à concevoir / paramétrer un automate ; l’exécution du workflow elle-même ne consomme pas de tokens (seuls les tours de chat + résultats réinjectés en consomment).
+
+**Recherche / décisions à trancher à l’ouverture.**
+- Self-host Docker vs autre ; où tourne n8n par rapport à la VM.
+- Contrat outils chat ↔ n8n (webhook vs API execute).
+- Gouvernance : qui active un workflow ; audit des exécutions.
+- Comment réexposer ou appeler la stack Moduléo 1.4.0 depuis n8n (HTTP Request vers Moduléo vs rappel d’un service VM).
+
+## Ensuite : 1.6.0 — Analyse et traitement des pièces jointes, approfondis
+
+*(Anciennement numérotée 1.5.0 — décalée pour intercaler n8n en 1.5.0.)*
 
 S’appuie sur la [1.1.2](../specs/v1.1.2-pieces-jointes.md) (pipeline d’extraction, une pièce jointe par message) et sur le premier **Agent** métier livré en 1.4.0. Deux limites actées volontairement en 1.1.2 sont à lever ici, pas avant : **plusieurs pièces jointes par message**, et un **traitement spécifique par pôle** (un agent Foncier ne traite pas un document comme un agent Urbanisme) — demande explicite du cabinet dès le grilling de 1.1.2, remise à plus tard faute d’Agent réel pour la justifier.
 
@@ -91,7 +117,7 @@ Constat (grilling 1.2.0) : à terme, plus aucune personne qualifiée ne sera sur
 Implications déjà identifiées à creuser plus tard :
 - Cette contrainte pèse sur les choix techniques pris dès 1.2.0 (ex. TypeScript plutôt que JS nu, pour donner un filet de sécurité à la compilation en l'absence de relecture humaine technique).
 - Reste à définir : à quoi ressemble concrètement le flux de validation (où/comment un compte administrateur voit et approuve un changement), le périmètre de ce que l'agent peut faire seul vs ce qui nécessite une validation, et les garde-fous (rollback, tests obligatoires avant validation, etc.).
-- Tests front (grilling 1.2.0) : pas de tests dédiés côté UI React en 1.2.0 (on reste sur les tests pytest HTTP-boundary existants + validation visuelle par l'admin). À une version pas encore numérotée : ajouter un filet de sécurité automatisé côté UI (ex. Playwright) puisque seul un agent IA maintient ce code sans relecture humaine technique — pertinent surtout quand le volume d'écrans aura grossi (1.3.0, 1.4.0, 1.5.0 et au-delà).
+- Tests front (grilling 1.2.0) : pas de tests dédiés côté UI React en 1.2.0 (on reste sur les tests pytest HTTP-boundary existants + validation visuelle par l'admin). À une version pas encore numérotée : ajouter un filet de sécurité automatisé côté UI (ex. Playwright) puisque seul un agent IA maintient ce code sans relecture humaine technique — pertinent surtout quand le volume d'écrans aura grossi (1.3.0, 1.4.0, 1.5.0, 1.6.0 et au-delà).
 
 ### Lanceur poste (exécutable, pywebview)
 
@@ -127,7 +153,7 @@ Ce n’est **pas** le même objet que la 1.1.1 (résumé glissant de conversatio
 
 À creuser seulement si le besoin métier le justifie (doc Moduléo / Agents, corpus par pôle, multi-providers, etc.) :
 - Mémoire inter-conversationnelle plus fine que le seul profil de travail synthétique.
-- RAG sur un corpus cabinet, distinct des pièces jointes du fil courant (1.1.2 / 1.5.0).
+- RAG sur un corpus cabinet, distinct des pièces jointes du fil courant (1.1.2 / 1.6.0).
 - **Optimisation du résumé+profil actuel (1.1.1)** — **dans la même version** que le reste de ce chantier mémoire, pas une version à part. Aujourd’hui, dès qu’il y a des messages sortants, chaque tour fait **1 chat + 1 appel résumé/profil** (agrégés tous les deux en « Chat » côté conso) : fiable, mais ~2× les requêtes après le premier message. Pistes à trancher alors : résumé moins fréquent (tous les N tours / seuil de tokens), résumé en arrière-plan après la réponse affichée (façon *Dreaming*), ou mémoire à la demande (outil / notes) — en gardant éventuellement le combo résumé léger + embeddings pour le long terme.
 
 ### Éléments de réponse visuels plus riches dans le chat (graphiques, documents générés)

@@ -124,12 +124,16 @@ def lister_conversations(
 )
 def consulter_conversation(
     conversation_id: int,
+    # Relayés tels quels à vm-centrale sans être interprétés ici (spec
+    # 1.2.3) : voir VmCentraleClient.consulter_conversation.
+    avant_id: int | None = None,
+    limite: int | None = None,
     client: VmCentraleClient = Depends(get_vm_centrale_client),
     session: SessionStore = Depends(get_session_store),
 ) -> ConversationDetailResponse:
     jeton = _jeton_de_session(session)
     try:
-        detail = client.consulter_conversation(jeton, conversation_id)
+        detail = client.consulter_conversation(jeton, conversation_id, avant_id, limite)
     except Exception as erreur:
         raise _erreur_vm_vers_http(session, erreur) from erreur
 
@@ -147,6 +151,7 @@ def consulter_conversation(
             )
             for message in detail.messages
         ],
+        a_des_messages_plus_anciens=detail.a_des_messages_plus_anciens,
     )
 
 

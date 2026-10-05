@@ -27,6 +27,18 @@ const _MSG_ERREUR_RESEAU = "Impossible de joindre le service de gestion des comp
 
 export const CLE_COMPTES = ["comptes"] as const;
 
+// Issue #101 : revue explicite par requête, au-delà du seul défaut global
+// (main.tsx, staleTime: 30_000). Le Panel d'administration est démonté à
+// chaque retour au Chat (voir EcranCompte.tsx) : la liste des comptes reste
+// déjà invalidée immédiatement par ses propres mutations (création,
+// modification, statut admin, suppression), ce délai ne joue donc que pour
+// un changement externe (autre session admin) ; la consommation par compte
+// évolue avec l'usage mais pas à la seconde. Dans les deux cas, une
+// réouverture rapide du Panel ne doit pas déclencher de rafraîchissement
+// visible inutile.
+const _STALE_TIME_COMPTES = 60_000;
+const _STALE_TIME_CONSOMMATION_COMPTES = 60_000;
+
 function _surErreurSession(queryClient: ReturnType<typeof useQueryClient>, erreur: unknown) {
   if (erreur instanceof ErreurApi && erreur.status === 401) {
     marquerSessionExpiree(queryClient);
@@ -76,6 +88,7 @@ export function useComptesConsommationQuery() {
         throw error_;
       }
     },
+    staleTime: _STALE_TIME_CONSOMMATION_COMPTES,
   });
 }
 
@@ -194,6 +207,7 @@ export function useComptesQuery() {
         throw error_;
       }
     },
+    staleTime: _STALE_TIME_COMPTES,
   });
 }
 

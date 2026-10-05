@@ -79,6 +79,8 @@ class VmCentraleClientFactice:
         self._exception_detail_conversation: Exception | None = None
         self._jetons_detail_conversation: list[str] = []
         self._ids_detail_conversation: list[int] = []
+        self._avant_ids_detail_conversation: list[int | None] = []
+        self._limites_detail_conversation: list[int | None] = []
         self._conversation_renommee: Conversation | None = None
         self._exception_renommage_conversation: Exception | None = None
         self._jetons_renommage_conversation: list[str] = []
@@ -378,9 +380,17 @@ class VmCentraleClientFactice:
     def detail_conversation_echoue(self, exception: Exception) -> None:
         self._exception_detail_conversation = exception
 
-    def consulter_conversation(self, jeton: str, conversation_id: int) -> ConversationDetail:
+    def consulter_conversation(
+        self,
+        jeton: str,
+        conversation_id: int,
+        avant_id: int | None = None,
+        limite: int | None = None,
+    ) -> ConversationDetail:
         self._jetons_detail_conversation.append(jeton)
         self._ids_detail_conversation.append(conversation_id)
+        self._avant_ids_detail_conversation.append(avant_id)
+        self._limites_detail_conversation.append(limite)
         if self._exception_detail_conversation is not None:
             raise self._exception_detail_conversation
         assert self._detail_conversation is not None

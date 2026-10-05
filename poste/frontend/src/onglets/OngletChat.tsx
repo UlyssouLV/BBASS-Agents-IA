@@ -3,11 +3,14 @@ import {
   memo,
   useContext,
   useEffect,
+  useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type DragEvent,
   type FormEvent,
   type ReactNode,
+  type UIEvent,
 } from "react";
 import {
   Check,
@@ -39,6 +42,7 @@ import {
   type Message,
 } from "@/hooks/useConversations";
 import { messageErreur } from "@/lib/api";
+import { usePerfChargementParCle } from "@/lib/instrumentationTemps";
 import { cn } from "@/lib/utils";
 
 // Mêmes extensions/types qu'app.js (formulaireNouvelleConversation /
@@ -704,6 +708,13 @@ interface EnvoiEnCours {
   reponse: string;
 }
 
+// Issue #103 : distance au bord haut du fil (en px) sous laquelle un
+// défilement déclenche le chargement de la page précédente — façon ChatGPT
+// (seuil de défilement), jamais un bouton ni un carrousel. Une marge plutôt
+// que 0 : laisse le temps à la page suivante d'arriver avant que le
+// collaborateur n'atteigne réellement le haut du fil.
+const _SEUIL_DECLENCHEMENT_HISTORIQUE_PX = 150;
+
 export function OngletChat({ conversationOuverteId, onConversationCreee }: Readonly<OngletChatProps>) {
   const [champNouveauMessage, setChampNouveauMessage] = useState("");
   const [champMessage, setChampMessage] = useState("");
@@ -711,10 +722,28 @@ export function OngletChat({ conversationOuverteId, onConversationCreee }: Reado
   const [fichierMessage, setFichierMessage] = useState<File | null>(null);
   const [envoiEnCours, setEnvoiEnCours] = useState<EnvoiEnCours | null>(null);
   const messagesAvantEnvoiRef = useRef<Message[]>([]);
+  const refFilMessages = useRef<HTMLDivElement>(null);
+  const hauteurScrollAvantChargementRef = useRef<number | null>(null);
 
   const conversationQuery = useConversationQuery(conversationOuverteId);
   const creerConversationMutation = useCreerConversationMutation();
   const envoyerMessageMutation = useEnvoyerMessageMutation();
+
+  // Issue #103 : pages[0] est toujours la fenêtre la plus récente (titre et
+  // dates lus sur elle, voir useConversationQuery) ; chaque page suivante
+  // remonte un peu plus loin dans l'historique. Remises en ordre
+  // chronologique (la plus ancienne page en premier) pour l'affichage.
+  const pagesConversation = conversationQuery.data?.pages;
+  const titreConversation = pagesConversation?.[0]?.titre;
+  const messagesConversation = useMemo<Message[]>(
+    () => (pagesConversation ? [...pagesConversation].reverse().flatMap((page) => page.messages) : []),
+    [pagesConversation]
+  );
+
+  // Issue #102 : temps entre une ouverture/bascule de conversation
+  // (changement de conversationOuverteId, porté par EcranCompte.tsx) et
+  // l'arrivée de son contenu.
+  usePerfChargementParCle("conversation", conversationOuverteId, conversationQuery.isFetching);
 
   // Une fois la frappe terminée, rebascule sur les données live dès qu'elles
   // contiennent bien ce tour (message + réponse), sans attendre davantage :
@@ -723,11 +752,38 @@ export function OngletChat({ conversationOuverteId, onConversationCreee }: Reado
     if (envoiEnCours?.phase !== "termine") {
       return;
     }
-    const messages = conversationQuery.data?.messages;
-    if (messages && messages.length >= messagesAvantEnvoiRef.current.length + 2) {
+    if (messagesConversation.length >= messagesAvantEnvoiRef.current.length + 2) {
       setEnvoiEnCours(null);
     }
-  }, [envoiEnCours, conversationQuery.data]);
+  }, [envoiEnCours, messagesConversation]);
+
+  // Préserve la position de lecture quand une page plus ancienne vient
+  // d'être insérée au-dessus du contenu déjà affiché (issue #103) : la
+  // hauteur ajoutée en haut du fil est compensée par un ajustement du même
+  // montant du scroll, avant la peinture du nouvel état — sans quoi le fil
+  // sursaute visuellement vers le haut.
+  useLayoutEffect(() => {
+    const conteneur = refFilMessages.current;
+    const hauteurAvantChargement = hauteurScrollAvantChargementRef.current;
+    if (conteneur === null || hauteurAvantChargement === null) {
+      return;
+    }
+    hauteurScrollAvantChargementRef.current = null;
+    conteneur.scrollTop += conteneur.scrollHeight - hauteurAvantChargement;
+  }, [messagesConversation]);
+
+  function gererDefilementFilMessages(evenement: UIEvent<HTMLDivElement>) {
+    const conteneur = evenement.currentTarget;
+    if (
+      conteneur.scrollTop > _SEUIL_DECLENCHEMENT_HISTORIQUE_PX ||
+      !conversationQuery.hasNextPage ||
+      conversationQuery.isFetchingNextPage
+    ) {
+      return;
+    }
+    hauteurScrollAvantChargementRef.current = conteneur.scrollHeight;
+    conversationQuery.fetchNextPage();
+  }
 
   function gererEnvoiNouvelleConversation(evenement: FormEvent<HTMLFormElement>) {
     evenement.preventDefault();
@@ -773,7 +829,7 @@ export function OngletChat({ conversationOuverteId, onConversationCreee }: Reado
     }
     envoyerMessageMutation.reset();
 
-    messagesAvantEnvoiRef.current = conversationQuery.data?.messages ?? [];
+    messagesAvantEnvoiRef.current = messagesConversation;
     setEnvoiEnCours({ message, phase: "attente", reponse: "" });
     setChampMessage("");
 
@@ -802,7 +858,7 @@ export function OngletChat({ conversationOuverteId, onConversationCreee }: Reado
   // bulles optimistes ci-dessous) sans attendre la réponse de la VM.
   const brouillonActif = conversationOuverteId === null && envoiEnCours === null;
   const messagesAffiches: Message[] =
-    envoiEnCours !== null ? messagesAvantEnvoiRef.current : conversationQuery.data?.messages ?? [];
+    envoiEnCours !== null ? messagesAvantEnvoiRef.current : messagesConversation;
 
   const erreurConversationOuverte = messageErreur(
     conversationQuery.error,
@@ -849,14 +905,19 @@ export function OngletChat({ conversationOuverteId, onConversationCreee }: Reado
       ) : (
         <div className="flex min-h-0 flex-1 flex-col">
           <h2 className="mb-2 text-sm font-semibold">
-            {conversationQuery.data?.titre ?? (conversationQuery.isLoading ? "Chargement…" : "")}
+            {titreConversation ?? (conversationQuery.isLoading ? "Chargement…" : "")}
           </h2>
           {erreurConversationOuverte && (
             <p role="alert" className="mb-2 text-sm text-destructive">
               {erreurConversationOuverte}
             </p>
           )}
-          <div role="log" className="mb-3 flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
+          <div
+            ref={refFilMessages}
+            onScroll={gererDefilementFilMessages}
+            role="log"
+            className="mb-3 flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto"
+          >
             {messagesAffiches.map((message) =>
               message.role === "user" ? (
                 <p
