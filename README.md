@@ -32,13 +32,15 @@ flowchart LR
 
 ## Semaine du 05 au 09 octobre 2026
 
-Point visé jeudi 8 octobre : enchaînement jusqu’à **V1.6.0** (n8n) — **priorité V1.5.0** (déploiement postes / CI/CD), puis **V1.6.0** si le temps le permet. Vendredi 9 : RTT.
+Point visé jeudi 8 octobre : enchaînement jusqu’à **V1.7.0** (n8n) — **priorité V1.6.0** (déploiement postes / CI/CD), puis **V1.7.0** si le temps le permet. Avant Moduléo : **V1.3.1** (le chat ne fige plus ses inventions) et **V1.4.0** (recherche web). Vendredi 9 : RTT.
 
 ```mermaid
 flowchart LR
-  L05["Lundi 5<br/>V1.2.3 et V1.3.0 livrées"] --> V140["V1.4.0<br/>Moduléo lecture"]
-  V140 --> V150["V1.5.0<br/>déploiement · priorité"]
-  V150 --> V08["Jeudi 8<br/>visé aussi V1.6.0 n8n"]
+  L05["Lundi 5<br/>V1.2.3 et V1.3.0 livrées"] --> V131["V1.3.1<br/>inventions du chat"]
+  V131 --> V140["V1.4.0<br/>recherche web"]
+  V140 --> V150["V1.5.0<br/>Moduléo lecture"]
+  V150 --> V160["V1.6.0<br/>déploiement · priorité"]
+  V160 --> V08["Jeudi 8<br/>visé aussi V1.7.0 n8n"]
 ```
 
 ### Travail réalisé
@@ -49,16 +51,20 @@ flowchart LR
 
 ### Reste à implémenter
 
-- **V1.4.0** — Moduléo en lecture (outil transverse), premier branchement via l’Agent Administration.
-- **V1.5.0** — déploiement postes : CI/CD, conteneurisation, installateur / logiciel d’accès au chat (backend local obligatoire) — **priorité**.
-- **V1.6.0** — workflows n8n, branchés sur Moduléo 1.4.0 — **proposé cette semaine** après la 1.5.0.
+- **V1.3.1** — le chat ne fige plus ses inventions ([#110](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/110)) : consignes, résumé glissant, profil de travail.
+- **V1.4.0** — recherche web dans le chat (outil exécuté par la VM ; le modèle ne cite qu’une URL revenue de l’outil). Les function calling du modèle sont centralisés.
+- **V1.5.0** — Moduléo en lecture (outil transverse), premier branchement via l’Agent Administration.
+- **V1.6.0** — déploiement postes : CI/CD, conteneurisation, installateur / logiciel d’accès au chat (backend local obligatoire) — **priorité**.
+- **V1.7.0** — workflows n8n, branchés sur Moduléo 1.5.0 — **proposé cette semaine** après la 1.6.0.
 
-### Attendu pour la fin de semaine (V1.5.0 prioritaire, V1.6.0 visé)
+### Attendu pour la fin de semaine (V1.6.0 prioritaire, V1.7.0 visé)
 
 - **Déjà en place** — poste + VM Castries, PostgreSQL, chat Mistral, conversations bornées + résumé + profil, pièces jointes, consommation, comptes administrateurs, UI React BBASS, style 1.2.2, fluidité 1.2.3, inspecteur des échanges 1.3.0.
-- **V1.4.0** — Q&A lecture Moduléo depuis le chat (pour usage collab pendant l’absence alternance).
-- **V1.5.0** — pouvoir **installer / mettre à jour** le logiciel sur les postes (CI/CD, Docker si retenu, installateur ; UI pywebview et/ou navigateur — à trancher).
-- **V1.6.0** — socle n8n branché sur Moduléo 1.4.0 (on tente de le livrer jeudi ; non bloquant si seule la 1.5.0 passe).
+- **V1.3.1** — le résumé et le profil ne réinjectent plus les inventions du modèle comme des faits.
+- **V1.4.0** — une demande « trouve-moi… » passe par une recherche réelle, pas par une URL inventée.
+- **V1.5.0** — Q&A lecture Moduléo depuis le chat (pour usage collab pendant l’absence alternance).
+- **V1.6.0** — pouvoir **installer / mettre à jour** le logiciel sur les postes (CI/CD, Docker si retenu, installateur ; UI pywebview et/ou navigateur — à trancher).
+- **V1.7.0** — socle n8n branché sur Moduléo 1.5.0 (on tente de le livrer jeudi ; non bloquant si seule la 1.6.0 passe).
 
 ## Prérequis
 

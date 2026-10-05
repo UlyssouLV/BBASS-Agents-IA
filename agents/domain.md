@@ -28,3 +28,7 @@ If the concept you need isn't in the glossary yet, that's a signal: either you'r
 If your output contradicts an existing ADR, surface it explicitly rather than silently overriding:
 
 > _Contradicts ADR-\<n\> (\<title\>), but worth reopening because…_
+
+## Centralised packages
+
+A package that centralises a family of mechanisms (e.g. `garde_fous/`, the model's tools) has a `README.md` at its root. It lists each element: what it does, where it is called, since which version, and the incident or reason behind it. Adding, moving or removing an element updates that README in the same commit.
