@@ -16,6 +16,12 @@ from vm_centrale.concurrence import cache_idempotence, verrous_comptes
 from vm_centrale.config import MODELE_CHAT, MODELE_OCR, PIECES_JOINTES_DIR
 from vm_centrale.consommation import enregistrer_consommation
 from vm_centrale.database import get_db
+from vm_centrale.garde_fous import (
+    nettoyer_titre,
+    plafonner,
+    retirer_chiffres_hors_source,
+    retirer_urls_inventees,
+)
 from vm_centrale.inspecteur import (
     enregistrer_echange_echec,
     enregistrer_echange_succes,
@@ -65,6 +71,11 @@ _TAILLE_MAX_PIECE_JOINTE = 20 * 1024 * 1024
 # assez pour que le résumé glissant en tire une mention pertinente, façon
 # description de skill (spec 1.1.2).
 _TAILLE_EXTRAIT_PIECE_JOINTE_RESUME = 200
+# Plafond du résumé glissant persisté, fixé en dur comme la fenêtre de 3 et
+# énoncé aussi dans le prompt résumé+profil (spec 1.3.1).
+_TAILLE_MAX_RESUME_CONTEXTE = 1500
+# Plafond du profil de travail persisté, même convention (spec 1.3.1).
+_TAILLE_MAX_PROFIL_TRAVAIL = 800
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -126,9 +137,10 @@ def _outils_piece_jointe(pieces_jointes_hors_fenetre: list[PieceJointe]) -> list
     ]
 
 # Sortie structurée stricte (spec V1.1.1) : un seul appel Mistral produit à la
-# fois le résumé glissant mis à jour et une éventuelle mise à jour du profil
-# de travail, pour ne payer le contexte partagé (résumé courant, profil
-# courant, message(s) sortant(s)) qu'une seule fois.
+# fois le résumé glissant mis à jour et, si le profil de travail change, ce
+# profil réécrit en entier (spec 1.3.1 : plus de delta concaténé), pour ne
+# payer le contexte partagé (résumé courant, profil courant, message(s)
+# sortant(s)) qu'une seule fois.
 _SCHEMA_RESUME_ET_PROFIL = {
     "type": "json_schema",
     "json_schema": {
@@ -138,9 +150,9 @@ _SCHEMA_RESUME_ET_PROFIL = {
             "type": "object",
             "properties": {
                 "resume_contexte": {"type": "string"},
-                "profil_travail_delta": {"type": ["string", "null"]},
+                "profil_travail": {"type": ["string", "null"]},
             },
-            "required": ["resume_contexte", "profil_travail_delta"],
+            "required": ["resume_contexte", "profil_travail"],
             "additionalProperties": False,
         },
     },
@@ -158,8 +170,22 @@ _SCHEMA_RESUME_ET_PROFIL = {
 # Tableaux, blocs de code et liens passés de déconseillés à autorisés le
 # même jour, une fois le rendu Markdown du poste (#93) étendu pour les
 # afficher proprement (table HTML, police mono, pastille de source cliquable)
-# plutôt que les neutraliser.
+# plutôt que les neutraliser. Capacité réelle placée en tête en 1.3.1
+# (#110, conversation 76) : sans accès à Internet, la « certitude » qu'exigeait
+# l'ancienne ligne des liens n'existe pas — le modèle inventait des liens
+# puis affirmait les avoir vérifiés. Garanti en plus dans le code par
+# garde_fous.retirer_urls_inventees.
 _PROMPT_STYLE = (
+    "Capacité réelle, avant toute autre consigne : tu n'as aucun accès à "
+    "Internet, donc tu ne proposes jamais de lien, de PDF ou d'image à "
+    "télécharger, et tu n'affirmes jamais qu'un lien a été vérifié ; si le "
+    "utilisateur te demande un lien ou un fichier à télécharger, dis-lui d'emblée "
+    "que tu n'as pas accès à Internet. Tu n'inventes jamais un fait, un "
+    "rapport, une source ou un chiffre, sauf si l'utilisateur te demande "
+    "explicitement d'inventer, d'imaginer ou de faire une hypothèse. Si tu "
+    "n'es pas sûr qu'il faille inventer, pose la question de confirmation "
+    "en tout début de réponse, et n'invente rien tant qu'il n'a pas "
+    "confirmé.\n"
     "Consigne de style pour ta réponse, à respecter systématiquement :\n"
     "- Ton : vouvoiement, professionnel, cohérent avec un outil de travail "
     "de cabinet.\n"
@@ -188,15 +214,9 @@ _PROMPT_STYLE = (
     "- Markdown autorisé dans ta réponse : gras, italique, listes à puces "
     "ou numérotées, paragraphes, tableaux (uniquement quand l'information "
     "s'y prête vraiment, jamais par réflexe), blocs de code pour du code "
-    "ou une formule, et liens uniquement vers une source réelle que tu "
-    "connais avec certitude (jamais une URL inventée ou approximative). "
-    "Quand tu nommes ou cites explicitement une source précise (rapport, "
-    "étude, organisme, texte réglementaire), le lien qui l'accompagne doit "
-    "être placé immédiatement contre cette citation et correspondre "
-    "exactement à cette source — jamais un lien générique isolé en fin de "
-    "réponse présenté comme s'il couvrait une citation différente plus "
-    "haut. Si tu ne connais avec certitude aucun lien fiable pour la "
-    "source nommée, n'en fournis aucun plutôt que d'en approximer un. "
+    "ou une formule, et liens uniquement vers une URL que l'utilisateur a "
+    "lui-même écrite dans cette conversation (jamais une autre URL, même "
+    "une que tu crois connaître). "
     "Déconseillés : titres, séparateurs `---`, citations, images."
 )
 
@@ -215,39 +235,6 @@ def _prompt_titrage(message_utilisateur: str, reponse_assistant: str) -> str:
     )
 
 
-# Le titre est affiché en texte brut (BarreLaterale.tsx), jamais passé par le
-# rendu Markdown borné du message assistant (#93) — contrairement à lui, un
-# « ** » résiduel dans le titre s'affiche donc littéralement. La consigne du
-# prompt ci-dessus ne suffit pas à elle seule (constaté lors de la
-# validation manuelle de la 1.2.2 : le titrage reprend parfois le gras de la
-# réponse qu'il résume malgré la consigne) ; ce nettoyage réplique en Python
-# le principe déjà appliqué côté poste pour le corps du message : neutraliser
-# ce que le modèle produit malgré la consigne plutôt que de ne compter que
-# sur elle. Ne s'applique qu'au titre généré par le modèle (ici), jamais à un
-# renommage saisi à la main par un collaborateur (PATCH /conversations/{id}).
-#
-# Chaque motif exige en plus qu'aucun caractère alphanumérique ne touche
-# directement les marqueurs par l'extérieur (`(?<!\w)` / `(?!\w)`) : sans
-# cette garde, une paire de "*" ou "_" purement incidente (ex. "10*2 et
-# 5*3", un calcul ; "mon_profil_travail", un identifiant) est elle aussi
-# appariée et son contenu supprimé, alors qu'il ne s'agit pas d'une
-# emphase Markdown.
-_MARQUEURS_MARKDOWN_TITRE = (
-    (re.compile(r"^#{1,6}\s*"), ""),
-    (re.compile(r"(?<!\w)\*\*(.+?)\*\*(?!\w)"), r"\1"),
-    (re.compile(r"(?<!\w)__(.+?)__(?!\w)"), r"\1"),
-    (re.compile(r"(?<!\w)(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)(?!\w)"), r"\1"),
-    (re.compile(r"(?<!\w)(?<!_)_(?!_)(.+?)(?<!_)_(?!_)(?!\w)"), r"\1"),
-)
-
-
-def _nettoyer_titre(titre: str) -> str:
-    titre = titre.strip()
-    for motif, remplacement in _MARQUEURS_MARKDOWN_TITRE:
-        titre = motif.sub(remplacement, titre)
-    return titre.strip()
-
-
 def _message_systeme_piece_jointe(piece_jointe: PieceJointe) -> dict[str, str]:
     # Même mécanisme que resume_contexte/profil_travail ci-dessous : un
     # message system supplémentaire, propre à cet appel précis (spec 1.1.2).
@@ -255,12 +242,22 @@ def _message_systeme_piece_jointe(piece_jointe: PieceJointe) -> dict[str, str]:
     # 2026-09-17, le modèle traitait cet extrait comme un exemple ou un
     # rappel d'un tour antérieur plutôt que comme le fichier que le compte
     # vient d'envoyer avec le message de ce tour.
+    # Règles de la spec 1.3.1 (issue #110) : le modèle demandait d'envoyer
+    # une image déjà jointe (message au futur), puis la décrivait d'après
+    # le profil de travail au lieu de l'extrait.
     return {
         "role": "system",
         "content": (
-            f"Pièce jointe « {piece_jointe.nom_fichier} » du message que le "
-            "compte vient d'envoyer à ce tour précis — ce n'est ni un "
-            "exemple, ni un rappel d'un tour antérieur. Contenu extrait :\n"
+            f"Pièce jointe « {piece_jointe.nom_fichier} » du message que "
+            "l'utilisateur vient d'envoyer à ce tour précis — ce n'est ni un "
+            "exemple, ni un rappel d'un tour antérieur. Règles :\n"
+            "- Le fichier est déjà joint à ce tour : ne demande pas de "
+            "l'envoyer, même si le message de l'utilisateur est au futur.\n"
+            "- Le contenu extrait ci-dessous est la seule description "
+            "autorisée de ce fichier : n'affirme rien qui en soit absent "
+            "(pas de schéma, de carte, de nœud ni de texte inventé).\n"
+            "- Le profil de travail ne remplace jamais cet extrait.\n"
+            "Contenu extrait :\n"
             f"{piece_jointe.contenu_extrait or ''}"
         ),
     }
@@ -290,13 +287,102 @@ def _construire_messages_pour_mistral(
         messages.append({"role": "system", "content": resume_contexte})
     if profil_travail:
         messages.append(
-            {"role": "system", "content": f"Profil de travail du compte : {profil_travail}"}
+            {"role": "system", "content": f"Profil de travail de l'utilisateur : {profil_travail}"}
         )
     if piece_jointe is not None:
         messages.append(_message_systeme_piece_jointe(piece_jointe))
     messages.extend({"role": m.role, "content": m.contenu} for m in derniers_messages)
     messages.append({"role": "user", "content": nouveau_message})
     return messages
+
+
+# Phrase écrite par la VM, pas par le modèle (conversation 78 : la consigne
+# était dans l'appel, le modèle a quand même rédigé le rapport, puis s'est
+# couvert en bas). Affichée quand la réponse avance une donnée chiffrée que
+# ni le message du tour, ni une pièce jointe, ne contiennent — sauf demande
+# explicite d'inventer, d'imaginer ou de faire une hypothèse.
+_REPONSE_SANS_DONNEES = (
+    "Je n'ai pas accès à Internet et je n'ai pas de document pour appuyer une réponse."
+)
+_MOTIF_INVENTION = re.compile(
+    r"\b(inventer|invente|inventes|inventé|inventée|invention|imaginer|imagine|imagines|"
+    r"imaginé|imaginée|hypothèse|hypothese|hypothèses|hypotheses)\b",
+    re.IGNORECASE,
+)
+_MOTIF_NEGATION = re.compile(r"(?:n['’]|ne\s+)$", re.IGNORECASE)
+
+
+def _demande_invention(message: str) -> bool:
+    for correspondance in _MOTIF_INVENTION.finditer(message):
+        if _MOTIF_NEGATION.search(message[: correspondance.start()]):
+            continue
+        return True
+    return False
+
+
+def _reponse_sans_url_inventee(
+    db: Session, conversation_id: int, nouveau_message: str, reponse: str
+) -> str:
+    # Textes du compte lus en base, pas seulement dans la fenêtre des
+    # derniers messages (spec 1.3.1) : une URL que le compte a donnée il y a
+    # longtemps reste légitime à redonner. Point d'appel unique du garde-fou,
+    # pour le premier message comme pour les suivants (voir
+    # garde_fous/README.md).
+    messages_du_compte = (
+        db.query(Message.contenu)
+        .filter(Message.conversation_id == conversation_id, Message.role == "user")
+        .all()
+    )
+    textes_du_compte = [contenu for (contenu,) in messages_du_compte] + [nouveau_message]
+    return retirer_urls_inventees(reponse, textes_du_compte)
+
+
+def _extraits_pieces_jointes(
+    db: Session, conversation_id: int, piece_jointe: PieceJointe | None
+) -> list[str]:
+    lignes = (
+        db.query(PieceJointe.contenu_extrait)
+        .filter(PieceJointe.conversation_id == conversation_id)
+        .all()
+    )
+    extraits = [extrait for (extrait,) in lignes if extrait and extrait.strip()]
+    extrait_du_tour = piece_jointe.contenu_extrait if piece_jointe is not None else None
+    if extrait_du_tour and extrait_du_tour.strip() and extrait_du_tour not in extraits:
+        extraits.append(extrait_du_tour)
+    return extraits
+
+
+def _reponse_visible(
+    db: Session,
+    conversation_id: int,
+    nouveau_message: str,
+    reponse: str,
+    piece_jointe: PieceJointe | None,
+) -> str:
+    # URL d'abord : un chiffre qui ne vivait que dans une URL inventée
+    # disparaît avec elle, et n'est pas relu comme une donnée.
+    reponse = _reponse_sans_url_inventee(db, conversation_id, nouveau_message, reponse)
+    if _demande_invention(nouveau_message):
+        return reponse
+    messages_du_compte = (
+        db.query(Message.contenu)
+        .filter(Message.conversation_id == conversation_id, Message.role == "user")
+        .all()
+    )
+    extraits = _extraits_pieces_jointes(db, conversation_id, piece_jointe)
+    textes_source = [contenu for (contenu,) in messages_du_compte] + [nouveau_message, *extraits]
+    sans_chiffre_invente = retirer_chiffres_hors_source(reponse, textes_source)
+    if sans_chiffre_invente == reponse:
+        return reponse
+    # Un document, ou un chiffre déjà écrit dans le message du tour : on
+    # retire seulement le chiffre absent. Sans rien de tout ça, la réponse
+    # entière devient la phrase fixe — un rapport troué n'est pas une réponse.
+    message_apporte_une_donnee = (
+        retirer_chiffres_hors_source(nouveau_message, []) != nouveau_message
+    )
+    if extraits or message_apporte_une_donnee:
+        return sans_chiffre_invente
+    return _REPONSE_SANS_DONNEES
 
 
 def _identite_connue(compte: Compte | None) -> str:
@@ -333,29 +419,41 @@ def _prompt_resume_et_profil(
         _ligne_message_sortant(m, pieces_jointes_sortantes.get(m.id)) for m in messages_sortants
     )
     return (
-        "Tu maintiens deux mémoires pour ce compte : un résumé glissant de la "
+        "Tu maintiens deux mémoires pour cet utilisateur : un résumé glissant de la "
         "conversation en cours, et un profil de travail inter-conversationnel "
         "décrivant sa façon de travailler.\n"
-        f"Identité déjà connue du compte, fait acquis — ne cherche jamais à la "
+        f"Identité déjà connue de l'utilisateur, fait acquis — ne cherche jamais à la "
         f"déterminer ni à la modifier : {_identite_connue(compte)}.\n"
         f"Résumé glissant actuel : {resume_contexte or '(vide)'}\n"
         f"Profil de travail actuel : {profil_travail or '(vide)'}\n"
         "Message(s) qui sortent de la fenêtre des derniers messages, à "
         f"absorber dans le résumé :\n{echange_sortant}\n\n"
         "Renvoie un objet JSON avec resume_contexte (résumé glissant mis à "
-        "jour, incorporant ces messages sortants) et profil_travail_delta "
-        "(un ajout au profil de travail, vide si rien à ajouter). "
-        "N'inclus jamais dans profil_travail_delta un fait d'identité "
+        "jour, incorporant ces messages sortants) et profil_travail (le "
+        "profil de travail complet, réécrit en entier : il remplace le "
+        "profil actuel, doublons fusionnés, sans aucun doublon ; null si "
+        "rien n'y change). "
+        "N'inclus jamais dans profil_travail un fait d'identité "
         "(prénom, nom, pôle, agence) : ceux-ci sont déjà connus et ne "
         "doivent jamais être réinférés ni modifiés depuis une conversation. "
         "Si un message sortant porte une pièce jointe, n'en garde dans "
         "resume_contexte qu'une mention courte (façon description de skill : "
         "juste assez pour situer le sujet), jamais son contenu intégral. "
-        "N'inclus jamais non plus dans profil_travail_delta un trait "
-        "décrivant ton propre comportement d'assistant (ton adopté, "
-        "réflexes de réponse, suggestions d'outils externes que tu "
-        "formules) : seul un trait observé chez le compte lui-même, sa "
-        "façon à lui de travailler, y a sa place."
+        "Dans resume_contexte, une affirmation de l'assistant (rapport, "
+        "chiffre, URL) est notée « proposé, non vérifié » : jamais comme un "
+        "fait, jamais comme quelque chose que l'utilisateur a fourni. Un sujet "
+        "que l'utilisateur abandonne (« oublie », « laisse tomber ») sort du "
+        "résumé. Une URL écrite par l'utilisateur est recopiée à l'identique ; "
+        "une URL écrite par l'assistant n'est jamais gardée. "
+        f"resume_contexte tient en {_TAILLE_MAX_RESUME_CONTEXTE} caractères au plus. "
+        "profil_travail se fonde sur les seules lignes « user » (les "
+        "messages de l'utilisateur), jamais sur une réponse de l'assistant. "
+        "N'inclus jamais non plus dans profil_travail un trait "
+        "décrivant ton propre comportement d'assistant (liens fournis, "
+        "PDF proposés, vérification annoncée, ton adopté, suggestions "
+        "d'outils externes que tu formules) : seul un trait observé chez "
+        "l'utilisateur lui-même, sa façon à lui de travailler, y a sa place. "
+        f"profil_travail tient en {_TAILLE_MAX_PROFIL_TRAVAIL} caractères au plus."
     )
 
 
@@ -549,7 +647,9 @@ def creer_conversation(
             logger.exception(_MSG_ECHEC_RELAIS_LOG)
             raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
 
-        reponse = reponse_chat.contenu
+        reponse = _reponse_visible(
+            db, conversation.id, requete.message, reponse_chat.contenu, piece_jointe
+        )
 
         try:
             reponse_titrage = client.chat(_prompt_titrage(requete.message, reponse))
@@ -568,7 +668,7 @@ def creer_conversation(
             logger.exception(_MSG_ECHEC_RELAIS_LOG)
             raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
 
-        titre = _nettoyer_titre(reponse_titrage.contenu)
+        titre = nettoyer_titre(reponse_titrage.contenu)
 
         conversation.titre = titre
         enregistrer_consommation(
@@ -1175,7 +1275,7 @@ def _generer_reponse_et_resume(
     try:
         donnees = json.loads(reponse_resume.contenu)
         resume_maj = donnees["resume_contexte"]
-        profil_travail_delta = donnees.get("profil_travail_delta")
+        profil_travail = donnees.get("profil_travail")
     except (json.JSONDecodeError, KeyError, TypeError) as erreur:
         # Distinct du bloc ci-dessus : une réponse reçue mais mal formée n'est
         # pas une panne du relais Mistral, ne doit jamais être journalisée
@@ -1184,7 +1284,7 @@ def _generer_reponse_et_resume(
         logger.exception("Réponse résumé+profil de Mistral invalide")
         raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
 
-    return reponse_chat, resume_maj, profil_travail_delta
+    return reponse_chat, resume_maj, profil_travail
 
 
 @router.post(
@@ -1270,7 +1370,7 @@ def envoyer_message(
 
         compte = db.query(Compte).filter(Compte.identifiant == identifiant_compte).first()
 
-        reponse_chat, resume_maj, profil_travail_delta = _generer_reponse_et_resume(
+        reponse_chat, resume_maj, profil_travail = _generer_reponse_et_resume(
             client,
             messages_pour_mistral,
             tools,
@@ -1284,14 +1384,18 @@ def envoyer_message(
             piece_jointe_id,
         )
 
-        reponse = reponse_chat.contenu
+        reponse = _reponse_visible(
+            db, conversation.id, requete.message, reponse_chat.contenu, piece_jointe
+        )
 
         maintenant = datetime.now(timezone.utc)
         if resume_maj is not None:
-            conversation.resume_contexte = resume_maj
-        if profil_travail_delta:
+            conversation.resume_contexte = plafonner(resume_maj, _TAILLE_MAX_RESUME_CONTEXTE)
+        if profil_travail and profil_travail.strip():
+            # Remplacé, jamais concaténé (spec 1.3.1) : null ou vide le
+            # laisse intact.
             profil = _recuperer_ou_creer_profil(db, identifiant_compte)
-            profil.contenu = f"{profil.contenu}\n{profil_travail_delta}".strip()
+            profil.contenu = plafonner(profil_travail.strip(), _TAILLE_MAX_PROFIL_TRAVAIL)
             profil.date_derniere_maj = maintenant
 
         message_utilisateur = Message(

@@ -23,10 +23,8 @@ def _creer_conversation(client, mistral_client_factice, jeton: str, message: str
     return reponse.json()["conversation"]["id"]
 
 
-def _reponse_resume_et_profil(resume_contexte: str, profil_travail_delta: str = "") -> str:
-    return json.dumps(
-        {"resume_contexte": resume_contexte, "profil_travail_delta": profil_travail_delta}
-    )
+def _reponse_resume_et_profil(resume_contexte: str, profil_travail: str | None = None) -> str:
+    return json.dumps({"resume_contexte": resume_contexte, "profil_travail": profil_travail})
 
 
 def _jeton_admin(client, seed_compte, identifiant: str = "a.martin") -> str:
@@ -650,6 +648,61 @@ def test_resume_et_profil_se_mettent_a_jour_une_fois_le_seuil_de_3_messages_depa
     assert "Travaille sur des devis Foncier" in profil.json()["contenu"]
 
 
+def _envoyer_tour(client, mistral_client_factice, jeton: str, conversation_id: int, profil: str | None):
+    mistral_client_factice.repondre("Suite", resume_et_profil=_reponse_resume_et_profil("Résumé", profil))
+    client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Et ensuite ?"},
+        headers=_autorisation(jeton),
+    )
+
+
+def test_profil_persiste_est_le_dernier_renvoye_remplace_pas_concatene(
+    client, mistral_client_factice, jeton_valide
+):
+    # #110, conversation 76 : onze deltas concaténés en onze minutes, avec
+    # doublons et traits de l'assistant (spec 1.3.1).
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide, "Bonjour")
+
+    _envoyer_tour(client, mistral_client_factice, jeton_valide, conversation_id, "Prépare des devis Foncier.")
+    _envoyer_tour(
+        client, mistral_client_factice, jeton_valide, conversation_id,
+        "Prépare des devis Foncier. Veut des tableaux.",
+    )
+
+    profil = client.get("/comptes/j.dupont/profil-travail", headers=_autorisation(jeton_valide))
+    assert profil.json()["contenu"] == "Prépare des devis Foncier. Veut des tableaux."
+
+
+@pytest.mark.parametrize("profil_renvoye", [None, ""])
+def test_profil_null_ou_vide_laisse_le_profil_intact(
+    client, mistral_client_factice, jeton_valide, profil_renvoye
+):
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide, "Bonjour")
+
+    _envoyer_tour(client, mistral_client_factice, jeton_valide, conversation_id, "Prépare des devis Foncier.")
+    _envoyer_tour(client, mistral_client_factice, jeton_valide, conversation_id, profil_renvoye)
+
+    profil = client.get("/comptes/j.dupont/profil-travail", headers=_autorisation(jeton_valide))
+    assert profil.json()["contenu"] == "Prépare des devis Foncier."
+
+
+def test_profil_au_dela_du_plafond_est_persiste_coupe_en_fin_de_phrase(
+    client, mistral_client_factice, jeton_valide
+):
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide, "Bonjour")
+    profil_trop_long = "Prépare des devis Foncier pour Castries. " * 40
+
+    _envoyer_tour(client, mistral_client_factice, jeton_valide, conversation_id, profil_trop_long)
+
+    contenu = client.get(
+        "/comptes/j.dupont/profil-travail", headers=_autorisation(jeton_valide)
+    ).json()["contenu"]
+    assert len(contenu) <= 800
+    assert contenu.endswith("Castries.")
+    assert profil_trop_long.startswith(contenu)
+
+
 def test_resume_se_met_a_jour_meme_sans_delta_de_profil(
     client, mistral_client_factice, jeton_valide, db_session
 ):
@@ -711,7 +764,74 @@ def test_prompt_resume_et_profil_exclut_les_traits_de_comportement_de_lassistant
     prompt_resume = mistral_client_factice.appels_structures[-1]
     assert "comportement" in prompt_resume
     assert "assistant" in prompt_resume
-    assert "profil_travail_delta" in prompt_resume
+    assert "profil_travail" in prompt_resume
+    assert "profil_travail_delta" not in prompt_resume
+
+
+def test_prompt_resume_et_profil_reecrit_le_profil_depuis_les_seuls_messages_du_compte(
+    client, mistral_client_factice, jeton_valide
+):
+    # #110, conversation 76 : le profil empilait des traits tirés des
+    # réponses de l'assistant (liens, PDF, vérification) (spec 1.3.1).
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide, "Bonjour")
+
+    _envoyer_tour(client, mistral_client_factice, jeton_valide, conversation_id, None)
+
+    prompt_resume = mistral_client_factice.appels_structures[-1]
+    assert "user" in prompt_resume
+    assert "jamais sur une réponse de l'assistant" in prompt_resume
+    for trait in ("liens", "PDF", "vérification", "ton"):
+        assert trait in prompt_resume
+    assert "réécrit en entier" in prompt_resume
+    assert "doublon" in prompt_resume
+    assert "null" in prompt_resume
+    assert "800 caractères" in prompt_resume
+
+
+def test_prompt_resume_et_profil_ne_fige_pas_les_propositions_de_lassistant(
+    client, mistral_client_factice, jeton_valide
+):
+    # #110, conversation 76 : le rapport OCDE inventé par l'assistant est
+    # devenu « Admin BBASS a partagé un rapport OCDE… », un lien envoyé par
+    # l'assistant un lien partagé par le compte, et les « oublie Citrix »
+    # n'ont pas fait sortir Citrix du résumé (spec 1.3.1).
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide, "Bonjour")
+
+    mistral_client_factice.repondre("Suite", resume_et_profil=_reponse_resume_et_profil("Résumé"))
+    client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Et ensuite ?"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    prompt_resume = mistral_client_factice.appels_structures[-1]
+    assert "proposé, non vérifié" in prompt_resume
+    assert "abandonne" in prompt_resume
+    assert "à l'identique" in prompt_resume
+    assert "URL écrite par l'assistant" in prompt_resume
+    assert "1500 caractères" in prompt_resume
+
+
+def test_resume_au_dela_du_plafond_est_persiste_coupe_en_fin_de_phrase(
+    client, mistral_client_factice, jeton_valide, db_session
+):
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide, "Bonjour")
+    phrase = "Le compte prépare un devis Foncier pour Castries. "
+    resume_trop_long = phrase * 40
+
+    mistral_client_factice.repondre(
+        "Suite", resume_et_profil=_reponse_resume_et_profil(resume_trop_long)
+    )
+    client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Et ensuite ?"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    conversation = db_session.get(Conversation, conversation_id)
+    assert len(conversation.resume_contexte) <= 1500
+    assert conversation.resume_contexte.endswith("Castries.")
+    assert resume_trop_long.startswith(conversation.resume_contexte)
 
 
 def test_profil_travail_renvoie_le_contenu_du_compte_du_jeton(client, jeton_valide, db_session):
@@ -939,3 +1059,200 @@ def test_cle_api_manquante_retourne_une_erreur_propre_et_pas_un_plantage(db_sess
 
     assert reponse.status_code == 502
     assert "MISTRAL_API_KEY" not in reponse.text
+
+
+# Garde-fou URL (spec 1.3.1) : le modèle n'a aucun accès à Internet, toute
+# URL que le compte n'a pas lui-même écrite dans la conversation est
+# inventée.
+def test_premier_message_url_inventee_ni_renvoyee_ni_persistee_texte_du_lien_conserve(
+    client, mistral_client_factice, jeton_valide
+):
+    mistral_client_factice.repondre(
+        "Voir le [rapport OCDE](https://www.oecd.org/rapport-2024.pdf) et "
+        "https://exemple.org/annexe.pdf pour le détail.",
+        "Titre",
+    )
+
+    reponse = client.post(
+        "/conversations",
+        json={"message": "Raconte-moi un rapport"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert reponse.status_code == 200
+    corps = reponse.json()
+    assert "http" not in corps["reponse"]
+    assert "rapport OCDE" in corps["reponse"]
+    detail = client.get(
+        f"/conversations/{corps['conversation']['id']}", headers=_autorisation(jeton_valide)
+    )
+    contenu_assistant = detail.json()["messages"][-1]["contenu"]
+    assert "http" not in contenu_assistant
+    assert "rapport OCDE" in contenu_assistant
+
+
+def test_premier_message_url_ecrite_par_le_compte_est_conservee(
+    client, mistral_client_factice, jeton_valide
+):
+    mistral_client_factice.repondre(
+        "Votre lien : [la page](https://bbass.fr/projets/42).", "Titre"
+    )
+
+    reponse = client.post(
+        "/conversations",
+        json={"message": "Résume https://bbass.fr/projets/42 s'il vous plaît"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert reponse.json()["reponse"] == "Votre lien : [la page](https://bbass.fr/projets/42)."
+
+
+def test_url_du_compte_sortie_de_la_fenetre_passe_et_url_inventee_est_retiree(
+    client, mistral_client_factice, jeton_valide
+):
+    conversation_id = _creer_conversation(
+        client, mistral_client_factice, jeton_valide, "Mon dossier : https://bbass.fr/dossier/7"
+    )
+    # Deux tours de plus : le premier message utilisateur sort de la
+    # fenêtre des 3 derniers messages.
+    _envoyer_messages(client, mistral_client_factice, jeton_valide, conversation_id, 2)
+
+    mistral_client_factice.repondre(
+        "Votre dossier : https://bbass.fr/dossier/7 ; source : "
+        "[étude](https://invente.example/etude).",
+        resume_et_profil=_reponse_resume_et_profil("Résumé"),
+    )
+    reponse = client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Redonne-moi mon lien"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert reponse.status_code == 200
+    contenu = reponse.json()["reponse"]
+    assert "https://bbass.fr/dossier/7" in contenu
+    assert "invente.example" not in contenu
+    assert "étude" in contenu
+    detail = client.get(f"/conversations/{conversation_id}", headers=_autorisation(jeton_valide))
+    assert detail.json()["messages"][-1]["contenu"] == contenu
+
+
+_REPONSE_SANS_DONNEES = (
+    "Je n'ai pas accès à Internet et je n'ai pas de document pour appuyer une réponse."
+)
+
+
+def test_chiffre_absent_sans_document_est_remplace_par_la_phrase_fixe(
+    client, mistral_client_factice, jeton_valide
+):
+    mistral_client_factice.repondre(
+        "Écart de 52,3 ans, soit 22 % de plus.",
+        "Titre",
+    )
+
+    reponse = client.post(
+        "/conversations",
+        json={"message": "Raconte-moi un rapport avec des données"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert reponse.status_code == 200
+    assert reponse.json()["reponse"] == _REPONSE_SANS_DONNEES
+    detail = client.get(
+        f"/conversations/{reponse.json()['conversation']['id']}",
+        headers=_autorisation(jeton_valide),
+    )
+    assert detail.json()["messages"][-1]["contenu"] == _REPONSE_SANS_DONNEES
+
+
+def test_demande_explicite_d_inventer_conserve_le_chiffre(
+    client, mistral_client_factice, jeton_valide
+):
+    mistral_client_factice.repondre("Écart imaginé : 52,3 ans.", "Titre")
+
+    reponse = client.post(
+        "/conversations",
+        json={"message": "Imagine un rapport avec des données"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert reponse.json()["reponse"] == "Écart imaginé : 52,3 ans."
+
+
+def test_chiffre_ecrit_par_le_compte_reste_et_le_chiffre_absent_part(
+    client, mistral_client_factice, jeton_valide
+):
+    mistral_client_factice.repondre(
+        "Le taux est 1,7 %, et l'écart atteint 52,3 ans.",
+        "Titre",
+    )
+
+    reponse = client.post(
+        "/conversations",
+        json={"message": "Le taux indiqué est 1,7 %. Résume-le."},
+        headers=_autorisation(jeton_valide),
+    )
+
+    contenu = reponse.json()["reponse"]
+    assert "1,7" in contenu
+    assert "52,3" not in contenu
+    assert contenu != _REPONSE_SANS_DONNEES
+
+
+def test_piece_jointe_conserve_le_chiffre_de_lextrait(
+    client, mistral_client_factice, jeton_valide, _repertoire_pieces_jointes
+):
+    mistral_client_factice.repondre_ocr("Besoins non satisfaits : 1,7 %.")
+    upload = client.post(
+        "/pieces-jointes",
+        files={"fichier": ("document.pdf", b"%PDF-1.4 contenu factice", "application/pdf")},
+        headers=_autorisation(jeton_valide),
+    )
+    piece_jointe_id = upload.json()["piece_jointe"]["id"]
+    mistral_client_factice.repondre(
+        "Le document indique 1,7 % et un écart de 52,3 ans.",
+        "Titre",
+    )
+
+    reponse = client.post(
+        "/conversations",
+        json={"message": "Que dit ce document ?", "piece_jointe_id": piece_jointe_id},
+        headers=_autorisation(jeton_valide),
+    )
+
+    contenu = reponse.json()["reponse"]
+    assert reponse.status_code == 200
+    assert "1,7" in contenu
+    assert "52,3" not in contenu
+    assert contenu != _REPONSE_SANS_DONNEES
+
+
+def test_consigne_de_style_commence_par_la_capacite_reelle(
+    client, mistral_client_factice, jeton_valide
+):
+    mistral_client_factice.repondre("Réponse", "Titre")
+
+    client.post("/conversations", json={"message": "Bonjour"}, headers=_autorisation(jeton_valide))
+
+    consigne = mistral_client_factice.appels_reponse[0][0]
+    assert consigne["role"] == "system"
+    premiere_ligne = consigne["content"].splitlines()[0]
+    assert "aucun accès à Internet" in premiere_ligne
+    assert "lien" in premiere_ligne
+    assert "vérifié" in premiere_ligne
+    assert "n'inventes jamais" in premiere_ligne
+    assert "question de confirmation" in premiere_ligne
+    assert "que l'utilisateur a lui-même écrite dans cette conversation" in consigne["content"]
+    assert "que tu connais avec certitude" not in consigne["content"]
+
+
+def test_titre_genere_est_nettoye_de_sa_mise_en_forme_markdown(
+    client, mistral_client_factice, jeton_valide
+):
+    mistral_client_factice.repondre("Réponse", "## **Bilan** du projet 10*2")
+
+    reponse = client.post(
+        "/conversations", json={"message": "Bonjour"}, headers=_autorisation(jeton_valide)
+    )
+
+    assert reponse.json()["conversation"]["titre"] == "Bilan du projet 10*2"

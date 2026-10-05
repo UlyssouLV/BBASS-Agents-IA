@@ -52,7 +52,7 @@ Un fil d'échanges avec l'IA rattaché à un compte, nommé automatiquement à p
 _Avoid_: fil, thread, session de chat (Session ci-dessus a déjà un sens différent)
 
 **Profil de travail**:
-Un résumé synthétique par compte de sa façon de travailler, construit au fil de ses conversations pour donner à l'IA un contexte sur qui lui parle. Distinct de l'historique d'une conversation donnée. Ne porte jamais de fait d'identité (prénom, nom, pôle, agence) : ceux-ci restent uniquement portés par Compte, jamais réinférés depuis une conversation. Consultable en lecture seule par le compte concerné ; pas par un compte administrateur.
+Un résumé synthétique par compte de sa façon de travailler, construit au fil de ses conversations pour donner à l'IA un contexte sur qui lui parle. Distinct de l'historique d'une conversation donnée. Ne porte jamais de fait d'identité (prénom, nom, pôle, agence) : ceux-ci restent uniquement portés par Compte, jamais réinférés depuis une conversation. Fondé sur les seuls messages du compte, jamais sur les réponses de l'assistant ni sur un trait décrivant l'assistant ; réécrit en entier à chaque mise à jour (jamais empilé), sous un plafond de longueur ([spec 1.3.1](docs/specs/v1.3.1-chat-ne-fige-plus-ses-inventions.md)). Consultable en lecture seule par le compte concerné ; pas par un compte administrateur.
 _Avoid_: mémoire (ambigu avec le résumé propre à chaque conversation, voir la spec 1.1.1), profil utilisateur
 
 **Pièce jointe**:
@@ -70,3 +70,7 @@ _Avoid_: mode admin, mode debug (le terme retenu dans le produit est « Mode dé
 **Échange**:
 Un appel Mistral réel capturé pour le Mode développeur — le payload exact envoyé et la réponse brute reçue (ou le statut d'échec), pour un type d'appel donné (chat, titrage, résumé+profil, OCR, vision) ([spec 1.3.0](docs/specs/v1.3.0-inspecteur-echanges-modele.md)). Distinct d'un Message (le contenu visible dans le chat) et d'une ligne de Consommation (ses métadonnées de facturation) : les trois coexistent pour un même tour sans se dupliquer entre eux.
 _Avoid_: appel (seul, trop vague), tour (un tour de chat peut produire plusieurs échanges, ex. tool calling)
+
+**Garde-fou**:
+Une correction appliquée par la VM centrale à ce que le modèle produit malgré sa consigne (ex. retirer une URL ou un chiffre que le compte n'a pas écrit, remplacer par une phrase fixe une réponse chiffrée sans document, plafonner le résumé glissant ou le profil de travail, nettoyer le Markdown d'un titre) ([spec 1.3.1](docs/specs/v1.3.1-chat-ne-fige-plus-ses-inventions.md)). Tous regroupés dans `vm-centrale/src/vm_centrale/garde_fous/`, listés dans son `README.md`. Ne remplace pas la consigne : il garantit ce qu'elle seule ne garantit pas.
+_Avoid_: filtre, sanitizer
