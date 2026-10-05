@@ -10,6 +10,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
+import Markdown, { type Components } from "react-markdown";
 
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -185,6 +186,48 @@ function ChampMessageAvecPieceJointe({
   );
 }
 
+// Issue #93 : allowlist des composants Markdown autorisés dans la bulle de
+// message assistant (spec #91, Solution volet 2). Les balises hors de cette
+// liste (titres, tableaux, séparateurs, blocs de code, HTML brut, liens,
+// images, citations) sont neutralisées par ELEMENTS_MARKDOWN_NEUTRALISES
+// ci-dessous : jamais de marqueur Markdown brut affiché à l'écran. Ce
+// mapping reste le point d'extension naturel pour de futurs types de blocs
+// (cf. feuille de route, section « Plus tard »).
+const ESPACEMENT_BLOC_MARKDOWN = "[&:not(:first-child)]:mt-2";
+const COMPOSANTS_MARKDOWN_MESSAGE: Components = {
+  p: ({ children }) => <p className={ESPACEMENT_BLOC_MARKDOWN}>{children}</p>,
+  ul: ({ children }) => <ul className={cn(ESPACEMENT_BLOC_MARKDOWN, "list-disc pl-5")}>{children}</ul>,
+  ol: ({ children }) => <ol className={cn(ESPACEMENT_BLOC_MARKDOWN, "list-decimal pl-5")}>{children}</ol>,
+};
+const ELEMENTS_MARKDOWN_NEUTRALISES = [
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+  "table",
+  "thead",
+  "tbody",
+  "tr",
+  "th",
+  "td",
+  "hr",
+  "pre",
+  "code",
+  "a",
+  "img",
+  "blockquote",
+];
+
+function ContenuMessageAssistant({ texte }: Readonly<{ texte: string }>) {
+  return (
+    <Markdown components={COMPOSANTS_MARKDOWN_MESSAGE} disallowedElements={ELEMENTS_MARKDOWN_NEUTRALISES} unwrapDisallowed>
+      {texte}
+    </Markdown>
+  );
+}
+
 // Issue #84 : le message du collaborateur ne doit pas apparaître d'un bloc
 // en haut à droite de la conversation ; il glisse depuis la zone de saisie (juste en
 // dessous) vers sa place définitive. requestAnimationFrame plutôt qu'un
@@ -241,7 +284,7 @@ function TexteAnimeReponse({ texte, onTermine }: Readonly<{ texte: string; onTer
     return () => window.clearTimeout(delai);
   }, [longueurAffichee, texte, caracteresParEtape, onTermine]);
 
-  return <>{texte.slice(0, longueurAffichee)}</>;
+  return <ContenuMessageAssistant texte={texte.slice(0, longueurAffichee)} />;
 }
 
 // Réécriture React de la section #onglet-chat d'app.js : ne porte plus que
@@ -430,18 +473,20 @@ export function OngletChat({ conversationOuverteId, onConversationCreee }: Reado
             </p>
           )}
           <div role="log" className="mb-3 flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
-            {messagesAffiches.map((message) => (
-              <p
-                key={message.id}
-                className={
-                  message.role === "user"
-                    ? "self-end rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground"
-                    : "max-w-[70%] self-start rounded-md bg-muted px-3 py-1.5 text-sm"
-                }
-              >
-                {message.contenu}
-              </p>
-            ))}
+            {messagesAffiches.map((message) =>
+              message.role === "user" ? (
+                <p
+                  key={message.id}
+                  className="self-end rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground"
+                >
+                  {message.contenu}
+                </p>
+              ) : (
+                <div key={message.id} className="max-w-[70%] self-start rounded-md bg-muted px-3 py-1.5 text-sm">
+                  <ContenuMessageAssistant texte={message.contenu} />
+                </div>
+              )
+            )}
             {envoiEnCours && (
               <>
                 <BulleMessageEnvoye texte={envoiEnCours.message} />
@@ -451,14 +496,14 @@ export function OngletChat({ conversationOuverteId, onConversationCreee }: Reado
                     Réflexion…
                   </output>
                 ) : (
-                  <p className="max-w-[70%] self-start rounded-md bg-muted px-3 py-1.5 text-sm">
+                  <div className="max-w-[70%] self-start rounded-md bg-muted px-3 py-1.5 text-sm">
                     <TexteAnimeReponse
                       texte={envoiEnCours.reponse}
                       onTermine={() =>
                         setEnvoiEnCours((precedent) => (precedent ? { ...precedent, phase: "termine" } : precedent))
                       }
                     />
-                  </p>
+                  </div>
                 )}
               </>
             )}
