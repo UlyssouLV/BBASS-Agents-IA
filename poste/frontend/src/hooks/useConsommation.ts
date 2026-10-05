@@ -29,6 +29,12 @@ export interface Consommation {
 
 const _MSG_ERREUR_RESEAU = "Impossible de joindre le service de consommation. Réessayez plus tard.";
 
+// Issue #101 : revue explicite par requête, au-delà du seul défaut global
+// (main.tsx, staleTime: 30_000) — évolue avec l'usage mais pas à la seconde ;
+// un aller-retour Chat <-> Profil (qui démonte cette requête, voir
+// EcranCompte.tsx) ne doit pas déclencher de rafraîchissement visible.
+const _STALE_TIME_CONSOMMATION = 60_000;
+
 async function chargerConsommation(): Promise<Consommation> {
   return appelApi<Consommation>(
     "/consommation",
@@ -56,6 +62,7 @@ export function useConsommationQuery() {
         throw error_;
       }
     },
+    staleTime: _STALE_TIME_CONSOMMATION,
   });
 }
 

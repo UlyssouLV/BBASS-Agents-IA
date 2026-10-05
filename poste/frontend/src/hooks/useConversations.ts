@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { appelApi, ErreurApi } from "@/lib/api";
 import { marquerSessionExpiree } from "@/hooks/useSession";
@@ -61,6 +61,14 @@ const _MSG_ERREUR_RESEAU_CONVERSATIONS = "Impossible de joindre le service de co
 const _MSG_ERREUR_RESEAU_PIECES_JOINTES = "Impossible de joindre le service de pièces jointes. Réessayez plus tard.";
 
 export const CLE_CONVERSATIONS = ["conversations"] as const;
+
+// Issue #101 : revue explicite par requête, au-delà du seul défaut global
+// (main.tsx, staleTime: 30_000) — la liste reste invalidée immédiatement par
+// ses propres mutations (création/renommage/suppression), ce délai ne joue
+// donc que pour un changement externe pendant un aller-retour Chat <->
+// Profil/Panel d'administration (la sidebar qui la porte est démontée dans
+// ces deux vues, voir EcranCompte.tsx).
+const _STALE_TIME_LISTE_CONVERSATIONS = 60_000;
 
 export function cleConversation(id: number) {
   return ["conversations", id] as const;
@@ -237,6 +245,7 @@ export function useConversationsQuery() {
         throw error_;
       }
     },
+    staleTime: _STALE_TIME_LISTE_CONVERSATIONS,
   });
 }
 
@@ -253,6 +262,13 @@ export function useConversationQuery(id: number | null) {
       }
     },
     enabled: id !== null,
+    // Issue #101 : rebasculer vers une conversation déjà visitée ne doit
+    // plus retomber sur un état vide / « Chargement… » pendant le
+    // rechargement, même si son cache a expiré (gcTime) entre deux visites —
+    // l'ancien contenu (celui de la conversation quittée) reste affiché
+    // jusqu'à l'arrivée du nouveau, au lieu de disparaître dès le changement
+    // de queryKey.
+    placeholderData: keepPreviousData,
   });
 }
 

@@ -12,6 +12,12 @@ export interface ProfilTravail {
 
 const _MSG_ERREUR_RESEAU = "Impossible de joindre le service de profil de travail. Réessayez plus tard.";
 
+// Issue #101 : revue explicite par requête, au-delà du seul défaut global
+// (main.tsx, staleTime: 30_000) — contenu renseigné manuellement et modifié
+// rarement, un aller-retour Chat <-> Profil (qui démonte cette requête, voir
+// EcranCompte.tsx) ne doit pas déclencher de rafraîchissement visible.
+const _STALE_TIME_PROFIL_TRAVAIL = 5 * 60_000;
+
 async function chargerProfilTravail(): Promise<ProfilTravail> {
   return appelApi<ProfilTravail>(
     "/profil-travail",
@@ -37,5 +43,6 @@ export function useProfilTravailQuery() {
         throw error_;
       }
     },
+    staleTime: _STALE_TIME_PROFIL_TRAVAIL,
   });
 }
