@@ -19,19 +19,9 @@ Une application composée d'un backend Python et d'une interface web (HTML/CSS/J
 - Urbanisme
 - Détection de réseaux
 
-## Semaine du 14 au 18 septembre 2026
+## Architecture
 
-Point visé vendredi 18 septembre : **V1.3.0**.
-
-```mermaid
-flowchart LR
-  L14["Lundi 14<br/>socle chat"] --> M15["Mardi 15<br/>V1.1.0 comptes"]
-  M15 --> Me16["Mercredi 16<br/>V1.1.1 persistance"]
-  Me16 --> J17["Jeudi 17<br/>V1.1.2 pièces jointes"]
-  J17 --> J17b["Jeudi 17<br/>V1.1.3 consommation"]
-  J17b --> V120["V1.2.0<br/>interface poste"]
-  V120 --> V18["Vendredi 18<br/>visé V1.3.0"]
-```
+Le poste n’appelle jamais Mistral directement : tout passe par la VM centrale (réseau interne), qui détient aussi PostgreSQL et la clé API.
 
 ```mermaid
 flowchart LR
@@ -40,24 +30,32 @@ flowchart LR
   VM --> M["API Mistral"]
 ```
 
+## Semaine du 05 au 09 octobre 2026
+
+Point de départ lundi 5 octobre : **V1.2.2** vient d’être livrée. Point visé pour la semaine : **V1.2.3** puis **V1.3.0**.
+
+```mermaid
+flowchart LR
+  L05["Lundi 5<br/>V1.2.2 livrée"] --> V123["V1.2.3<br/>délais de chargement"]
+  V123 --> V130["V1.3.0<br/>inspecteur échanges modèle"]
+```
+
 ### Travail réalisé
 
-- **Lundi 14** — environnement (éditeur, Git), dépôt GitHub, glossaire, spécifications, ADR ; première interface de chat ; API Mistral via la VM avec des comptes de test.
-- **Mardi 15** — socle chat (Pay as you go Mistral) ; **V1.1.0** (comptes administrateurs, collaborateurs, pôles, mots de passe, révocation de session) et tests utilisateurs ; échange Topo sans suite immédiate.
-- **Mercredi 16** — **V1.1.1** (persistance des conversations côté VM centrale : PostgreSQL, plusieurs fils par compte, historique multi-tours borné, résumé glissant, profil de travail) et écrans poste correspondants (conversations, profil de travail en lecture seule).
-- **Jeudi 17** — **V1.1.2** (pièces jointes : upload PDF/Word/Excel/image, extraction OCR/locale/vision, contenu injecté dans le chat, mention courte dans le résumé glissant, rappel via outil hors fenêtre) et zone de dépôt minimale côté poste ; **V1.1.3** (suivi de la consommation : une ligne par appel Mistral réel — chat, titrage, résumé+profil, OCR, vision —, tokens ou pages, coût figé au tarif du jour ; fenêtre Consommation côté collaborateur, onglet Consommations côté administrateur).
-- **V1.2.0** — interface poste réécrite en React/TypeScript/Vite (shadcn/ui, TanStack Query), écran comptes avec modales au lieu de blocs empilés, style posé via le plugin `frontend-design`.
+- **Semaine du 14–18 septembre** — socle jusqu’à **V1.2.0** (comptes admin, persistance conversations, pièces jointes, consommation, front React/TypeScript/Vite).
+- **Depuis** — **V1.2.1** (identité visuelle BBASS, disposition type ChatGPT) ; **V1.2.2** (prompt système de style sur le chat principal ; rendu Markdown borné côté poste).
 
 ### Reste à implémenter
 
-- **V1.3.0** — premier agent, pôle Administration, Moduléo (API, serveur de test, lecture seule, plan d’automatisme sans écriture ni exécution).
+- **V1.2.3** — amélioration des délais de chargement (pages et conversations) : navigations et ouvertures de fil ressenties comme rapides (cache TanStack Query, waterfalls, rendu…).
+- **V1.3.0** — inspecteur des échanges avec le modèle (outil de développement) : voir pour une conversation le payload réel envoyé/reçu à chaque tour (pas seulement les bulles du chat).
 
-### Attendu pour la fin de semaine (V1.3.0)
+### Attendu pour la fin de semaine (V1.2.3 + V1.3.0)
 
-- **Architecture** — logiciel sur le poste (interface web locale) ; VM à Castries, réseau interne seulement. La VM détient les comptes, les conversations et la clé API Mistral. PostgreSQL sur la VM (plus SQLite) ; Postgres local via Docker en développement.
-- **Connexion et chat** — identifiant / mot de passe ; session conservée (compte Windows) jusqu’à déconnexion ou révocation. Chat vers Mistral ; affichage prénom, nom, identifiant, agence et pôle(s). Plusieurs conversations par compte, persistées sur la VM (reprise après rechargement, relance, autre machine). Titre auto, renommage, suppression. Historique borné (3 derniers messages + résumé). Profil de travail consultable, sans modifier l’identité du compte. Conversations privées (y compris vis-à-vis d’un administrateur). Pièces jointes stockées sur la VM et transmises à Mistral. Suivi de consommation (tokens, dates, modèle, coût). UX poste minimale (modales, écran comptes).
-- **Comptes administrateurs** — droit global, distinct du pôle Administration. Premier administrateur créé en base à la main ; ensuite liste / création / modification depuis le poste (identité, email, agence, un ou plusieurs des six pôles). Mot de passe aléatoire à la création ou réinitialisation, à changer avant le chat. Déconnexion forcée. Promotion, rétrogradation et suppression : clé d’administration VM en plus ; impossible de supprimer ou rétrograder le dernier administrateur.
-- **Premier agent** — pôle Administration, Moduléo, serveur de test : version minimale pour montrer que ça marche.
+- **Déjà en place** (socle inchangé) — poste + VM Castries (réseau interne), PostgreSQL, connexion / session, chat Mistral, conversations bornées + résumé + profil, pièces jointes, consommation, comptes administrateurs, UI React BBASS, style de réponse 1.2.2.
+- **V1.2.3** — bascules d’écran et de conversation nettement plus fluides au quotidien.
+- **V1.3.0** — vue / panneau (accès restreint) pour inspecter les appels modèle d’une conversation (system / user / assistant, tools, tokens, types d’appel).
+- **Pas cette semaine** — premier Agent Moduléo (**V1.4.0** dans la feuille de route).
 
 ## Prérequis
 
