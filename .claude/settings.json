@@ -10,7 +10,11 @@
           {
             "type": "command",
             "command": "py",
-            "args": ["-3", ".claude/hooks/gate-code-review.py"],
+            "args": [
+              "-3",
+              "-c",
+              "import runpy, subprocess, sys; from pathlib import Path; r = Path(subprocess.check_output(['git', 'rev-parse', '--show-toplevel'], text=True).strip()); runpy.run_path(str(r / '.claude' / 'hooks' / 'gate-code-review.py'), run_name='__main__')"
+            ],
             "statusMessage": "Vérifie que /code-review est bien demandé"
           }
         ]

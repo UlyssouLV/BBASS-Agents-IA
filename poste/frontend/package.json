@@ -23,6 +23,7 @@
     "lucide-react": "^1.47.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-markdown": "^10.1.0",
     "sonner": "^1.7.4",
     "tailwind-merge": "^2.5.5"
   },
