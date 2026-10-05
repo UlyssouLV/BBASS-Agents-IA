@@ -226,12 +226,22 @@ def _message_systeme_piece_jointe(piece_jointe: PieceJointe) -> dict[str, str]:
     # 2026-09-17, le modèle traitait cet extrait comme un exemple ou un
     # rappel d'un tour antérieur plutôt que comme le fichier que le compte
     # vient d'envoyer avec le message de ce tour.
+    # Règles de la spec 1.3.1 (issue #110) : le modèle demandait d'envoyer
+    # une image déjà jointe (message au futur), puis la décrivait d'après
+    # le profil de travail au lieu de l'extrait.
     return {
         "role": "system",
         "content": (
             f"Pièce jointe « {piece_jointe.nom_fichier} » du message que le "
             "compte vient d'envoyer à ce tour précis — ce n'est ni un "
-            "exemple, ni un rappel d'un tour antérieur. Contenu extrait :\n"
+            "exemple, ni un rappel d'un tour antérieur. Règles :\n"
+            "- Le fichier est déjà joint à ce tour : ne demande pas de "
+            "l'envoyer, même si le message du compte est au futur.\n"
+            "- Le contenu extrait ci-dessous est la seule description "
+            "autorisée de ce fichier : n'affirme rien qui en soit absent "
+            "(pas de schéma, de carte, de nœud ni de texte inventé).\n"
+            "- Le profil de travail ne remplace jamais cet extrait.\n"
+            "Contenu extrait :\n"
             f"{piece_jointe.contenu_extrait or ''}"
         ),
     }

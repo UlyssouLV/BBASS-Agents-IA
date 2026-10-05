@@ -216,6 +216,33 @@ def test_message_systeme_piece_jointe_precise_que_cest_le_fichier_du_tour_couran
     assert "tour antérieur" in message_systeme_pj["content"]
 
 
+def test_message_systeme_piece_jointe_interdit_de_redemander_le_fichier_et_dinventer(
+    client, mistral_client_factice, jeton_valide
+):
+    # Spec 1.3.1 (issue #110) : le modèle demandait d'envoyer une image déjà
+    # jointe (message au futur), puis la décrivait d'après le profil de travail.
+    mistral_client_factice.repondre_ocr("Un chat roux assis sur un canapé")
+    piece_jointe_id = _televerser_sans_conversation(client, jeton_valide)
+
+    mistral_client_factice.repondre("Première réponse", "Titre")
+    client.post(
+        "/conversations",
+        json={"message": "Je vais t'envoyer une image", "piece_jointe_id": piece_jointe_id},
+        headers=_autorisation(jeton_valide),
+    )
+
+    messages_appel_reponse = mistral_client_factice.appels_reponse[0]
+    contenu = next(
+        m for m in messages_appel_reponse if m["role"] == "system" and "document.pdf" in m["content"]
+    )["content"]
+    assert "déjà joint" in contenu
+    assert "ne demande pas de l'envoyer" in contenu
+    assert "futur" in contenu
+    assert "seule description autorisée" in contenu
+    assert "schéma" in contenu
+    assert "profil de travail ne remplace jamais" in contenu
+
+
 def test_url_inventee_retiree_de_la_reponse_finale_apres_un_appel_doutil(
     client, mistral_client_factice, jeton_valide
 ):
