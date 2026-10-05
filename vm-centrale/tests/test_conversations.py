@@ -714,6 +714,52 @@ def test_prompt_resume_et_profil_exclut_les_traits_de_comportement_de_lassistant
     assert "profil_travail_delta" in prompt_resume
 
 
+def test_prompt_resume_et_profil_ne_fige_pas_les_propositions_de_lassistant(
+    client, mistral_client_factice, jeton_valide
+):
+    # #110, conversation 76 : le rapport OCDE inventé par l'assistant est
+    # devenu « Admin BBASS a partagé un rapport OCDE… », un lien envoyé par
+    # l'assistant un lien partagé par le compte, et les « oublie Citrix »
+    # n'ont pas fait sortir Citrix du résumé (spec 1.3.1).
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide, "Bonjour")
+
+    mistral_client_factice.repondre("Suite", resume_et_profil=_reponse_resume_et_profil("Résumé"))
+    client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Et ensuite ?"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    prompt_resume = mistral_client_factice.appels_structures[-1]
+    assert "proposé, non vérifié" in prompt_resume
+    assert "abandonne" in prompt_resume
+    assert "à l'identique" in prompt_resume
+    assert "URL écrite par l'assistant" in prompt_resume
+    assert "1500 caractères" in prompt_resume
+
+
+def test_resume_au_dela_du_plafond_est_persiste_coupe_en_fin_de_phrase(
+    client, mistral_client_factice, jeton_valide, db_session
+):
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide, "Bonjour")
+    phrase = "Le compte prépare un devis Foncier pour Castries. "
+    resume_trop_long = phrase * 40
+
+    mistral_client_factice.repondre(
+        "Suite", resume_et_profil=_reponse_resume_et_profil(resume_trop_long)
+    )
+    client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Et ensuite ?"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    conversation = db_session.get(Conversation, conversation_id)
+    assert len(conversation.resume_contexte) <= 1500
+    assert conversation.resume_contexte.endswith("Castries.")
+    assert resume_trop_long.startswith(conversation.resume_contexte)
+
+
 def test_profil_travail_renvoie_le_contenu_du_compte_du_jeton(client, jeton_valide, db_session):
     db_session.add(
         ProfilTravail(

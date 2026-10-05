@@ -16,7 +16,7 @@ from vm_centrale.concurrence import cache_idempotence, verrous_comptes
 from vm_centrale.config import MODELE_CHAT, MODELE_OCR, PIECES_JOINTES_DIR
 from vm_centrale.consommation import enregistrer_consommation
 from vm_centrale.database import get_db
-from vm_centrale.garde_fous import nettoyer_titre, retirer_urls_inventees
+from vm_centrale.garde_fous import nettoyer_titre, plafonner, retirer_urls_inventees
 from vm_centrale.inspecteur import (
     enregistrer_echange_echec,
     enregistrer_echange_succes,
@@ -66,6 +66,9 @@ _TAILLE_MAX_PIECE_JOINTE = 20 * 1024 * 1024
 # assez pour que le résumé glissant en tire une mention pertinente, façon
 # description de skill (spec 1.1.2).
 _TAILLE_EXTRAIT_PIECE_JOINTE_RESUME = 200
+# Plafond du résumé glissant persisté, fixé en dur comme la fenêtre de 3 et
+# énoncé aussi dans le prompt résumé+profil (spec 1.3.1).
+_TAILLE_MAX_RESUME_CONTEXTE = 1500
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -349,6 +352,13 @@ def _prompt_resume_et_profil(
         "Si un message sortant porte une pièce jointe, n'en garde dans "
         "resume_contexte qu'une mention courte (façon description de skill : "
         "juste assez pour situer le sujet), jamais son contenu intégral. "
+        "Dans resume_contexte, une affirmation de l'assistant (rapport, "
+        "chiffre, URL) est notée « proposé, non vérifié » : jamais comme un "
+        "fait, jamais comme quelque chose que le compte a fourni. Un sujet "
+        "que le compte abandonne (« oublie », « laisse tomber ») sort du "
+        "résumé. Une URL écrite par le compte est recopiée à l'identique ; "
+        "une URL écrite par l'assistant n'est jamais gardée. "
+        f"resume_contexte tient en {_TAILLE_MAX_RESUME_CONTEXTE} caractères au plus. "
         "N'inclus jamais non plus dans profil_travail_delta un trait "
         "décrivant ton propre comportement d'assistant (ton adopté, "
         "réflexes de réponse, suggestions d'outils externes que tu "
@@ -1286,7 +1296,7 @@ def envoyer_message(
 
         maintenant = datetime.now(timezone.utc)
         if resume_maj is not None:
-            conversation.resume_contexte = resume_maj
+            conversation.resume_contexte = plafonner(resume_maj, _TAILLE_MAX_RESUME_CONTEXTE)
         if profil_travail_delta:
             profil = _recuperer_ou_creer_profil(db, identifiant_compte)
             profil.contenu = f"{profil.contenu}\n{profil_travail_delta}".strip()
