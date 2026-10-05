@@ -16,6 +16,7 @@ from vm_centrale.concurrence import cache_idempotence, verrous_comptes
 from vm_centrale.config import MODELE_CHAT, MODELE_OCR, PIECES_JOINTES_DIR
 from vm_centrale.consommation import enregistrer_consommation
 from vm_centrale.database import get_db
+from vm_centrale.garde_fous import nettoyer_titre, retirer_urls_inventees
 from vm_centrale.inspecteur import (
     enregistrer_echange_echec,
     enregistrer_echange_succes,
@@ -158,8 +159,17 @@ _SCHEMA_RESUME_ET_PROFIL = {
 # Tableaux, blocs de code et liens passés de déconseillés à autorisés le
 # même jour, une fois le rendu Markdown du poste (#93) étendu pour les
 # afficher proprement (table HTML, police mono, pastille de source cliquable)
-# plutôt que les neutraliser.
+# plutôt que les neutraliser. Capacité réelle placée en tête en 1.3.1
+# (#110, conversation 76) : sans accès à Internet, la « certitude » qu'exigeait
+# l'ancienne ligne des liens n'existe pas — le modèle inventait des liens
+# puis affirmait les avoir vérifiés. Garanti en plus dans le code par
+# garde_fous.retirer_urls_inventees.
 _PROMPT_STYLE = (
+    "Capacité réelle, avant toute autre consigne : tu n'as aucun accès à "
+    "Internet, donc tu ne proposes jamais de lien, de PDF ou d'image à "
+    "télécharger, et tu n'affirmes jamais qu'un lien a été vérifié ; si le "
+    "compte te demande un lien ou un fichier à télécharger, dis-lui d'emblée "
+    "que tu n'as pas accès à Internet.\n"
     "Consigne de style pour ta réponse, à respecter systématiquement :\n"
     "- Ton : vouvoiement, professionnel, cohérent avec un outil de travail "
     "de cabinet.\n"
@@ -188,15 +198,9 @@ _PROMPT_STYLE = (
     "- Markdown autorisé dans ta réponse : gras, italique, listes à puces "
     "ou numérotées, paragraphes, tableaux (uniquement quand l'information "
     "s'y prête vraiment, jamais par réflexe), blocs de code pour du code "
-    "ou une formule, et liens uniquement vers une source réelle que tu "
-    "connais avec certitude (jamais une URL inventée ou approximative). "
-    "Quand tu nommes ou cites explicitement une source précise (rapport, "
-    "étude, organisme, texte réglementaire), le lien qui l'accompagne doit "
-    "être placé immédiatement contre cette citation et correspondre "
-    "exactement à cette source — jamais un lien générique isolé en fin de "
-    "réponse présenté comme s'il couvrait une citation différente plus "
-    "haut. Si tu ne connais avec certitude aucun lien fiable pour la "
-    "source nommée, n'en fournis aucun plutôt que d'en approximer un. "
+    "ou une formule, et liens uniquement vers une URL que le compte a "
+    "lui-même écrite dans cette conversation (jamais une autre URL, même "
+    "une que tu crois connaître). "
     "Déconseillés : titres, séparateurs `---`, citations, images."
 )
 
@@ -213,39 +217,6 @@ def _prompt_titrage(message_utilisateur: str, reponse_assistant: str) -> str:
         f"Utilisateur : {message_utilisateur}\n"
         f"Assistant : {reponse_assistant}"
     )
-
-
-# Le titre est affiché en texte brut (BarreLaterale.tsx), jamais passé par le
-# rendu Markdown borné du message assistant (#93) — contrairement à lui, un
-# « ** » résiduel dans le titre s'affiche donc littéralement. La consigne du
-# prompt ci-dessus ne suffit pas à elle seule (constaté lors de la
-# validation manuelle de la 1.2.2 : le titrage reprend parfois le gras de la
-# réponse qu'il résume malgré la consigne) ; ce nettoyage réplique en Python
-# le principe déjà appliqué côté poste pour le corps du message : neutraliser
-# ce que le modèle produit malgré la consigne plutôt que de ne compter que
-# sur elle. Ne s'applique qu'au titre généré par le modèle (ici), jamais à un
-# renommage saisi à la main par un collaborateur (PATCH /conversations/{id}).
-#
-# Chaque motif exige en plus qu'aucun caractère alphanumérique ne touche
-# directement les marqueurs par l'extérieur (`(?<!\w)` / `(?!\w)`) : sans
-# cette garde, une paire de "*" ou "_" purement incidente (ex. "10*2 et
-# 5*3", un calcul ; "mon_profil_travail", un identifiant) est elle aussi
-# appariée et son contenu supprimé, alors qu'il ne s'agit pas d'une
-# emphase Markdown.
-_MARQUEURS_MARKDOWN_TITRE = (
-    (re.compile(r"^#{1,6}\s*"), ""),
-    (re.compile(r"(?<!\w)\*\*(.+?)\*\*(?!\w)"), r"\1"),
-    (re.compile(r"(?<!\w)__(.+?)__(?!\w)"), r"\1"),
-    (re.compile(r"(?<!\w)(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)(?!\w)"), r"\1"),
-    (re.compile(r"(?<!\w)(?<!_)_(?!_)(.+?)(?<!_)_(?!_)(?!\w)"), r"\1"),
-)
-
-
-def _nettoyer_titre(titre: str) -> str:
-    titre = titre.strip()
-    for motif, remplacement in _MARQUEURS_MARKDOWN_TITRE:
-        titre = motif.sub(remplacement, titre)
-    return titre.strip()
 
 
 def _message_systeme_piece_jointe(piece_jointe: PieceJointe) -> dict[str, str]:
@@ -297,6 +268,23 @@ def _construire_messages_pour_mistral(
     messages.extend({"role": m.role, "content": m.contenu} for m in derniers_messages)
     messages.append({"role": "user", "content": nouveau_message})
     return messages
+
+
+def _reponse_sans_url_inventee(
+    db: Session, conversation_id: int, nouveau_message: str, reponse: str
+) -> str:
+    # Textes du compte lus en base, pas seulement dans la fenêtre des
+    # derniers messages (spec 1.3.1) : une URL que le compte a donnée il y a
+    # longtemps reste légitime à redonner. Point d'appel unique du garde-fou,
+    # pour le premier message comme pour les suivants (voir
+    # garde_fous/README.md).
+    messages_du_compte = (
+        db.query(Message.contenu)
+        .filter(Message.conversation_id == conversation_id, Message.role == "user")
+        .all()
+    )
+    textes_du_compte = [contenu for (contenu,) in messages_du_compte] + [nouveau_message]
+    return retirer_urls_inventees(reponse, textes_du_compte)
 
 
 def _identite_connue(compte: Compte | None) -> str:
@@ -549,7 +537,7 @@ def creer_conversation(
             logger.exception(_MSG_ECHEC_RELAIS_LOG)
             raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
 
-        reponse = reponse_chat.contenu
+        reponse = _reponse_sans_url_inventee(db, conversation.id, requete.message, reponse_chat.contenu)
 
         try:
             reponse_titrage = client.chat(_prompt_titrage(requete.message, reponse))
@@ -568,7 +556,7 @@ def creer_conversation(
             logger.exception(_MSG_ECHEC_RELAIS_LOG)
             raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
 
-        titre = _nettoyer_titre(reponse_titrage.contenu)
+        titre = nettoyer_titre(reponse_titrage.contenu)
 
         conversation.titre = titre
         enregistrer_consommation(
@@ -1284,7 +1272,7 @@ def envoyer_message(
             piece_jointe_id,
         )
 
-        reponse = reponse_chat.contenu
+        reponse = _reponse_sans_url_inventee(db, conversation.id, requete.message, reponse_chat.contenu)
 
         maintenant = datetime.now(timezone.utc)
         if resume_maj is not None:

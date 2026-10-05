@@ -939,3 +939,108 @@ def test_cle_api_manquante_retourne_une_erreur_propre_et_pas_un_plantage(db_sess
 
     assert reponse.status_code == 502
     assert "MISTRAL_API_KEY" not in reponse.text
+
+
+# Garde-fou URL (spec 1.3.1) : le modèle n'a aucun accès à Internet, toute
+# URL que le compte n'a pas lui-même écrite dans la conversation est
+# inventée.
+def test_premier_message_url_inventee_ni_renvoyee_ni_persistee_texte_du_lien_conserve(
+    client, mistral_client_factice, jeton_valide
+):
+    mistral_client_factice.repondre(
+        "Voir le [rapport OCDE](https://www.oecd.org/rapport-2024.pdf) et "
+        "https://exemple.org/annexe.pdf pour le détail.",
+        "Titre",
+    )
+
+    reponse = client.post(
+        "/conversations",
+        json={"message": "Raconte-moi un rapport"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert reponse.status_code == 200
+    corps = reponse.json()
+    assert "http" not in corps["reponse"]
+    assert "rapport OCDE" in corps["reponse"]
+    detail = client.get(
+        f"/conversations/{corps['conversation']['id']}", headers=_autorisation(jeton_valide)
+    )
+    contenu_assistant = detail.json()["messages"][-1]["contenu"]
+    assert "http" not in contenu_assistant
+    assert "rapport OCDE" in contenu_assistant
+
+
+def test_premier_message_url_ecrite_par_le_compte_est_conservee(
+    client, mistral_client_factice, jeton_valide
+):
+    mistral_client_factice.repondre(
+        "Votre lien : [la page](https://bbass.fr/projets/42).", "Titre"
+    )
+
+    reponse = client.post(
+        "/conversations",
+        json={"message": "Résume https://bbass.fr/projets/42 s'il vous plaît"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert reponse.json()["reponse"] == "Votre lien : [la page](https://bbass.fr/projets/42)."
+
+
+def test_url_du_compte_sortie_de_la_fenetre_passe_et_url_inventee_est_retiree(
+    client, mistral_client_factice, jeton_valide
+):
+    conversation_id = _creer_conversation(
+        client, mistral_client_factice, jeton_valide, "Mon dossier : https://bbass.fr/dossier/7"
+    )
+    # Deux tours de plus : le premier message utilisateur sort de la
+    # fenêtre des 3 derniers messages.
+    _envoyer_messages(client, mistral_client_factice, jeton_valide, conversation_id, 2)
+
+    mistral_client_factice.repondre(
+        "Votre dossier : https://bbass.fr/dossier/7 ; source : "
+        "[étude](https://invente.example/etude).",
+        resume_et_profil=_reponse_resume_et_profil("Résumé"),
+    )
+    reponse = client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Redonne-moi mon lien"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert reponse.status_code == 200
+    contenu = reponse.json()["reponse"]
+    assert "https://bbass.fr/dossier/7" in contenu
+    assert "invente.example" not in contenu
+    assert "étude" in contenu
+    detail = client.get(f"/conversations/{conversation_id}", headers=_autorisation(jeton_valide))
+    assert detail.json()["messages"][-1]["contenu"] == contenu
+
+
+def test_consigne_de_style_commence_par_la_capacite_reelle(
+    client, mistral_client_factice, jeton_valide
+):
+    mistral_client_factice.repondre("Réponse", "Titre")
+
+    client.post("/conversations", json={"message": "Bonjour"}, headers=_autorisation(jeton_valide))
+
+    consigne = mistral_client_factice.appels_reponse[0][0]
+    assert consigne["role"] == "system"
+    premiere_ligne = consigne["content"].splitlines()[0]
+    assert "aucun accès à Internet" in premiere_ligne
+    assert "lien" in premiere_ligne
+    assert "vérifié" in premiere_ligne
+    assert "que le compte a lui-même écrite dans cette conversation" in consigne["content"]
+    assert "que tu connais avec certitude" not in consigne["content"]
+
+
+def test_titre_genere_est_nettoye_de_sa_mise_en_forme_markdown(
+    client, mistral_client_factice, jeton_valide
+):
+    mistral_client_factice.repondre("Réponse", "## **Bilan** du projet 10*2")
+
+    reponse = client.post(
+        "/conversations", json={"message": "Bonjour"}, headers=_autorisation(jeton_valide)
+    )
+
+    assert reponse.json()["conversation"]["titre"] == "Bilan du projet 10*2"

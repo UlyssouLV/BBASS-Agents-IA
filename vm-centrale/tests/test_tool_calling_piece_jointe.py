@@ -214,3 +214,29 @@ def test_message_systeme_piece_jointe_precise_que_cest_le_fichier_du_tour_couran
     assert "ce tour précis" in message_systeme_pj["content"]
     assert "exemple" in message_systeme_pj["content"]
     assert "tour antérieur" in message_systeme_pj["content"]
+
+
+def test_url_inventee_retiree_de_la_reponse_finale_apres_un_appel_doutil(
+    client, mistral_client_factice, jeton_valide
+):
+    # Garde-fou URL (spec 1.3.1) : s'applique aussi à la réponse du second
+    # appel, celui qui suit la relecture de la pièce jointe par l'outil.
+    conversation_id, piece_jointe_id = _amener_piece_jointe_hors_fenetre(
+        client, mistral_client_factice, jeton_valide
+    )
+
+    mistral_client_factice.repondre_avec_appel_outil(
+        "obtenir_contenu_piece_jointe", {"piece_jointe_id": piece_jointe_id}
+    )
+    mistral_client_factice.repondre(
+        "Le plan est [téléchargeable ici](https://plans.example/plan.pdf).",
+        resume_et_profil=_reponse_resume_et_profil(),
+    )
+    reponse = client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Rappelle-moi le plan"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert reponse.status_code == 200
+    assert reponse.json()["reponse"] == "Le plan est téléchargeable ici."
