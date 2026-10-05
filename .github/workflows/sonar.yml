@@ -1,0 +1,60 @@
+name: SonarQube Cloud
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  sonarqube:
+    name: SonarQube Cloud
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            requirements-ci.txt
+            vm-centrale/pyproject.toml
+            poste/pyproject.toml
+
+      - name: Install
+        run: |
+          python -m pip install --only-binary :all: --require-hashes -r requirements-ci.txt
+          python -m pip install --only-binary :all: --no-binary vm-centrale --no-deps -e "./vm-centrale"
+          python -m pip install --only-binary :all: --no-binary poste --no-deps -e "./poste"
+
+      - name: Tests vm-centrale
+        run: |
+          python -m pytest vm-centrale/tests \
+            --rootdir=vm-centrale \
+            -c vm-centrale/pyproject.toml \
+            --cov=vm-centrale/src/vm_centrale \
+            --cov-report=xml:coverage-vm.xml \
+            --cov-branch \
+            --cov-config=.coveragerc
+
+      - name: Tests poste
+        env:
+          PYTHON_KEYRING_BACKEND: keyring.backends.fail.Keyring
+        run: |
+          python -m pytest poste/tests \
+            --rootdir=poste \
+            -c poste/pyproject.toml \
+            --cov=poste/src/poste \
+            --cov-report=xml:coverage-poste.xml \
+            --cov-branch \
+            --cov-config=.coveragerc
+
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@c7ee0f9df90b7aa20e8dcf9695dcfe2e7da5b4f2 # v7
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}

@@ -16,7 +16,7 @@ When a skill mentions a role (e.g. "apply the AFK-ready triage label"), use the 
 
 GitHub issues are **Open** or **Closed**. There is **no** `awaiting-merge` label.
 
-When `/implement` finishes green: skill `encadrer-implement` commits, pushes, **removes `ready-for-agent`**, then **`gh issue close`** on that **child**. Closing the blocker updates GitHub **Blocking** / **Blocked by** so the next tickets can start.
+When `/implement` finishes green: skill `encadrer-implement` commits, pushes, **removes `ready-for-agent`**, then **`gh issue close`** on that **child**. It does **not** wait for the Sonar quality gate, and there is **no** label for that wait. Closing the blocker updates GitHub **Blocking** / **Blocked by** so the next tickets can start. `finaliser-la-version` reads the gate once, on the current PR `HEAD`, after the user accepted a `/code-review`.
 
 The **parent** spec stays Open until squash-merge (`Fixes #<parent>`). Once children exist it is **Blocked by** each of them (no `ready-for-agent` on the parent). Code can still exist only on the feature branch until « Finalise la version ».
 

@@ -390,9 +390,9 @@
           </li>
           <li>
             <div class="toc-row">
-              <a href="#attendu-fin-de-semaine">Attendu pour le 08/10/2026</a>
+              <a href="#livre-pour">Livré pour le 05/10/2026</a>
               <span class="toc-dots" aria-hidden="true"></span>
-              <span class="toc-ref">jeudi 8 oct.</span>
+              <span class="toc-ref">lundi 5 oct.</span>
             </div>
           </li>
           <li>
@@ -422,10 +422,9 @@
     <div class="jour">
       <h3>Lundi 5 octobre</h3>
       <ul>
-        <li>Point de départ : <strong>V1.2.2</strong> livrée (style de réponse de l’IA ; rendu Markdown borné côté poste).</li>
-        <li>Mise à jour de la feuille de route : <strong>1.4.0</strong> = Agent Administration, Q&amp;A lecture Moduléo ; <strong>1.5.0</strong> = workflows n8n branchés sur Moduléo ; PJ approfondies décalées en <strong>1.6.0</strong>.</li>
-        <li>Mise à jour du README (semaine du 05–09 oct.) : point visé jeudi 8 = <strong>V1.5.0</strong> ; vendredi 9 = RTT.</li>
-        <li>À compléter en fin de journée (implémentations du jour).</li>
+        <li>Point de départ : <strong>V1.2.1</strong> (identité visuelle et disposition aux couleurs du cabinet).</li>
+        <li>Développement puis livraison de la <strong>V1.2.2</strong> : ton professionnel des réponses de l’IA ; affichage enrichi dans le chat (mise en forme, tableaux, blocs de code colorés, liens vers les sources).</li>
+        <li>Planification de la suite de la semaine : Agent Administration (consultation Moduléo), puis automatisations ; objectif de livraison visé pour jeudi 8.</li>
       </ul>
     </div>
 
@@ -462,38 +461,27 @@
     <section class="bloc" id="reste-a-implementer">
     <h2>Reste à implémenter</h2>
     <ul>
-      <li><strong>V1.2.3</strong> — délais de chargement (pages et conversations).</li>
-      <li><strong>V1.3.0</strong> — inspecteur des échanges avec le modèle.</li>
-      <li><strong>V1.4.0</strong> — premier Agent (pôle Administration) : lecture Moduléo via le chat.</li>
-      <li><strong>V1.5.0</strong> — workflows n8n, branchés sur Moduléo 1.4.0.</li>
+      <li><strong>V1.2.3</strong> — améliorer la fluidité à l’ouverture des conversations et au changement d’écran.</li>
+      <li><strong>V1.3.0</strong> — outil de suivi des échanges avec l’IA (pour le développement et le contrôle qualité).</li>
+      <li><strong>V1.4.0</strong> — premier Agent métier (pôle Administration) : pouvoir interroger Moduléo depuis le chat (consultation).</li>
+      <li><strong>V1.5.0</strong> — automatisations (enchaînements d’actions), en s’appuyant sur Moduléo.</li>
     </ul>
     </section>
 
-    <section class="bloc" id="attendu-fin-de-semaine">
-    <h2>Attendu pour le 08/10/2026</h2>
+    <section class="bloc" id="livre-pour">
+    <h2>Livré pour le 05/10/2026</h2>
     <div class="recap">
-      <p><strong>Point jeudi 8 octobre — visé : V1.5.0</strong> (vendredi 9 : RTT)</p>
-      <h3>Déjà en place</h3>
+      <p><strong>Point lundi 5 octobre — livré : V1.2.2</strong></p>
       <ul>
-        <li>Poste + VM Castries, PostgreSQL, chat Mistral, conversations bornées + résumé + profil, pièces jointes, consommation, comptes administrateurs, UI React BBASS, style de réponse 1.2.2.</li>
-      </ul>
-      <h3>À livrer d’ici jeudi</h3>
-      <ul>
-        <li><strong>V1.2.3</strong> — navigations et ouvertures de conversation plus fluides.</li>
-        <li><strong>V1.3.0</strong> — inspecteur (accès restreint) des payloads modèle.</li>
-        <li><strong>V1.4.0</strong> — Q&amp;A lecture Moduléo depuis le chat.</li>
-        <li><strong>V1.5.0</strong> — socle n8n branché sur les outils Moduléo 1.4.0.</li>
-      </ul>
-      <h3>Hors semaine</h3>
-      <ul>
-        <li>PJ approfondies (<strong>V1.6.0</strong> dans la feuille de route).</li>
+        <li>Réponses de l’IA au ton professionnel : vouvoiement, sans remplissage ni relance systématique en fin de message ; emojis seulement quand ils portent un vrai signal.</li>
+        <li>Affichage structuré dans le chat : mise en forme, tableaux, blocs de code colorés, liens cliquables vers les sources citées.</li>
       </ul>
     </div>
     </section>
 
     <section class="bloc versions" id="descriptif-versions">
       <h2>Descriptif des versions</h2>
-      <p class="lead">Versions livrées depuis le bilan précédent (ou en début de cette semaine). Les versions 1.2.3 à 1.5.0 seront ajoutées ici au fil des déploiements.</p>
+      <p class="lead">Versions livrées depuis le bilan précédent.</p>
 
       <div class="version" id="version-1-2-2">
         <div class="version-head">
@@ -501,8 +489,8 @@
           <span class="deploye">Déployé le 05/10/2026 à 13:27</span>
         </div>
         <div class="version-body">
-        <p>Jusqu’ici, la réponse affichée dans le chat était du texte brut, sans consigne stable de ton. Cette version ajoute un prompt système de style sur l’appel de chat principal uniquement : vouvoiement, pas de remplissage réflexe, emojis rares et signifiants, pas de relance systématique en fin de réponse, Markdown borné autorisé (gras, italique, listes, paragraphes). Ce prompt ne s’applique ni au titrage ni au résumé + profil de travail.</p>
-        <p>Côté poste, le rendu passe par un Markdown borné (<code>react-markdown</code>, allowlist <code>strong</code> / <code>em</code> / <code>ul</code> / <code>ol</code> / <code>li</code> / <code>p</code> ; le reste est neutralisé à l’affichage), à la place du texte brut.</p>
+        <p>Jusqu’ici, les réponses du chat manquaient d’un ton stable et s’affichaient en texte brut. Cette version fixe un style professionnel pour l’IA : vouvoiement, réponses directes sans remplissage, emojis seulement quand ils portent un vrai signal, pas de question de relance systématique en fin de message.</p>
+        <p>Dans le chat, les réponses s’affichent désormais de façon structurée : mise en forme (gras, listes), tableaux, blocs de code avec coloration selon le langage, et liens cliquables vers les sources citées — pour une lecture claire, adaptée au travail quotidien du cabinet.</p>
         </div>
       </div>
     </section>
@@ -514,8 +502,7 @@
       -->
       <div class="agenda-placeholder">
         <strong>Emploi du temps quotidien</strong>
-        Image à venir : déposer <code>agenda-quotidien-tableau.png</code> dans ce dossier,<br />
-        puis remplacer ce encadré par la balise <code>&lt;img&gt;</code> (comme la semaine 14–18 sept.).
+        Document à venir (tableau d’emploi du temps de la semaine).
       </div>
     </section>
   </div>

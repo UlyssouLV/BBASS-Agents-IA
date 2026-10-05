@@ -48,7 +48,7 @@ L'état de connexion d'un compte sur un poste. Persiste au-delà de la fermeture
 _Avoid_: session applicative limitée au process (ancien comportement, remplacé)
 
 **Conversation**:
-Un fil d'échanges avec l'IA rattaché à un compte, nommé automatiquement à partir de son premier message. Un compte peut avoir plusieurs conversations. Persistée par la VM centrale ([ADR-0008](docs/adr/0008-postgresql-vm-centrale.md)), jamais par le stockage propre de Mistral — voir la Solution de [la spec 1.1.1](docs/specs/v1.1.1-persistance-conversations.md) pour les raisons (confidentialité, isolation entre comptes). Strictement privée à son compte : ni un autre compte ni un compte administrateur n'y accède.
+Un fil d'échanges avec l'IA rattaché à un compte, nommé automatiquement à partir de son premier message. Un compte peut avoir plusieurs conversations. Persistée par la VM centrale ([ADR-0008](docs/adr/0008-postgresql-vm-centrale.md)), jamais par le stockage propre de Mistral — voir la Solution de [la spec 1.1.1](docs/specs/v1.1.1-persistance-conversations.md) pour les raisons (confidentialité, isolation entre comptes). Strictement privée à son compte : ni un autre compte ni un compte administrateur n'y accède, sauf via le [Mode développeur](#language) ([ADR-0012](docs/adr/0012-mode-developpeur-cle-admin-vm-tous-comptes.md)).
 _Avoid_: fil, thread, session de chat (Session ci-dessus a déjà un sens différent)
 
 **Profil de travail**:
@@ -56,9 +56,17 @@ Un résumé synthétique par compte de sa façon de travailler, construit au fil
 _Avoid_: mémoire (ambigu avec le résumé propre à chaque conversation, voir la spec 1.1.1), profil utilisateur
 
 **Pièce jointe**:
-Un fichier (PDF, Word, Excel ou image) joint par un collaborateur à un message d'une [Conversation](#language) ([ADR-0009](docs/adr/0009-pieces-jointes-jamais-mistral-files-api.md), [spec 1.1.2](docs/specs/v1.1.2-pieces-jointes.md)). Le fichier original est stocké sur la VM centrale (jamais chez Mistral, jamais via sa Files API) ; son contenu est extrait avant tout envoi à Mistral (OCR pour un PDF, extraction locale pour Word/Excel, appel vision Mistral pour une image, seul cas sans Zero Data Retention par défaut). Strictement privée à la conversation qui la porte, au même titre que le reste de son contenu : ni un autre compte ni un compte administrateur n'y accède. Une seule par message pour cette version.
+Un fichier (PDF, Word, Excel ou image) joint par un collaborateur à un message d'une [Conversation](#language) ([ADR-0009](docs/adr/0009-pieces-jointes-jamais-mistral-files-api.md), [spec 1.1.2](docs/specs/v1.1.2-pieces-jointes.md)). Le fichier original est stocké sur la VM centrale (jamais chez Mistral, jamais via sa Files API) ; son contenu est extrait avant tout envoi à Mistral (OCR pour un PDF, extraction locale pour Word/Excel, appel vision Mistral pour une image, seul cas sans Zero Data Retention par défaut). Strictement privée à la conversation qui la porte, au même titre que le reste de son contenu : ni un autre compte ni un compte administrateur n'y accède, sauf via le [Mode développeur](#language) ([ADR-0012](docs/adr/0012-mode-developpeur-cle-admin-vm-tous-comptes.md)). Une seule par message pour cette version.
 _Avoid_: document, fichier (seul, ambigu avec le fichier physique sur disque), attachment
 
 **Consommation**:
 Un enregistrement d'un appel Mistral effectué pour le compte d'un collaborateur — tokens ou pages traitées selon le type d'appel, modèle utilisé, coût figé au tarif du jour de l'appel, date ([spec 1.1.3](docs/specs/v1.1.3-consommation.md)). Rattachée à une [Conversation](#language) quand applicable, mais conservée même si celle-ci est supprimée (seul le rattachement disparaît, pas la ligne). Consultable par le compte concerné (son propre détail par conversation) et, de façon agrégée par compte seulement (jamais par conversation), par un compte administrateur.
 _Avoid_: usage (trop vague, déjà le nom du champ brut renvoyé par Mistral), coût (un attribut de la Consommation, pas le concept lui-même)
+
+**Mode développeur**:
+Un mode d'accès technique du poste, déclenché par un raccourci clavier depuis n'importe quel compte connecté, débloqué par la Clé d'administration VM plutôt que par un droit de compte ([spec 1.3.0](docs/specs/v1.3.0-inspecteur-echanges-modele.md), [ADR-0012](docs/adr/0012-mode-developpeur-cle-admin-vm-tous-comptes.md)). Donne accès à l'inspecteur des échanges, lui-même outil de débogage, pas un écran métier destiné à l'usage quotidien d'un collaborateur ou d'un compte administrateur.
+_Avoid_: mode admin, mode debug (le terme retenu dans le produit est « Mode développeur »)
+
+**Échange**:
+Un appel Mistral réel capturé pour le Mode développeur — le payload exact envoyé et la réponse brute reçue (ou le statut d'échec), pour un type d'appel donné (chat, titrage, résumé+profil, OCR, vision) ([spec 1.3.0](docs/specs/v1.3.0-inspecteur-echanges-modele.md)). Distinct d'un Message (le contenu visible dans le chat) et d'une ligne de Consommation (ses métadonnées de facturation) : les trois coexistent pour un même tour sans se dupliquer entre eux.
+_Avoid_: appel (seul, trop vague), tour (un tour de chat peut produire plusieurs échanges, ex. tool calling)

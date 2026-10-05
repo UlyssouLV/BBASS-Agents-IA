@@ -3,7 +3,7 @@ import json
 
 from vm_centrale.analyse_pieces_jointes.resultat import InfoConsommationAnalyse, ResultatAnalyse
 from vm_centrale.config import MODELE_CHAT
-from vm_centrale.mistral_client import MistralClient
+from vm_centrale.mistral_client import ErreurAppelMistral, MistralClient
 
 # Seul format sans alternative locale (spec 1.1.2, ADR-0009) : le fichier est
 # transmis à l'appel vision Mistral (chat completions, MODELE_CHAT — pas de
@@ -53,11 +53,27 @@ def analyser(fichier: bytes, type_mime: str, client: MistralClient) -> ResultatA
         }
     ]
     reponse = client.chat(messages, response_format=_SCHEMA_ANALYSE_IMAGE)
-    donnees = json.loads(reponse.contenu)
+    try:
+        donnees = json.loads(reponse.contenu)
+        contenu_extrait = donnees["contenu_extrait"]
+        echec_analyse = donnees["echec_analyse"]
+    except (json.JSONDecodeError, KeyError, TypeError) as erreur:
+        # Réponse reçue mais inexploitable : remontée comme un échec d'appel
+        # portant le payload envoyé et la réponse brute, pour que l'échange
+        # en échec reste débogable dans l'inspecteur (spec 1.3.0).
+        raise ErreurAppelMistral(
+            f"Réponse vision de Mistral invalide : {erreur}",
+            payload_envoye=reponse.payload_envoye,
+            reponse_brute=reponse.reponse_brute,
+        ) from erreur
     return ResultatAnalyse(
-        contenu_extrait=donnees["contenu_extrait"],
-        echec_analyse=donnees["echec_analyse"],
+        contenu_extrait=contenu_extrait,
+        echec_analyse=echec_analyse,
         consommation=InfoConsommationAnalyse(
-            type_appel="vision", modele=MODELE_CHAT, usage=reponse.usage
+            type_appel="vision",
+            modele=MODELE_CHAT,
+            usage=reponse.usage,
+            payload_envoye=reponse.payload_envoye,
+            reponse_brute=reponse.reponse_brute,
         ),
     )

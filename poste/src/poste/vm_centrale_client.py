@@ -65,6 +65,13 @@ class PieceJointeRefuseeError(Exception):
     pass
 
 
+class EchangeIntrouvableError(Exception):
+    # 404 de la VM sur GET /inspecteur/echanges/{id} : id inexistant. Pas de
+    # confidentialité à préserver ici (spec 1.3.0, ADR-0012) contrairement à
+    # ConversationIntrouvableError/PieceJointeIntrouvableError ci-dessus.
+    pass
+
+
 class DernierAdministrateurError(Exception):
     # 409 de la VM : la rétrogradation ou la suppression ferait passer le
     # nombre de comptes administrateur à zéro (garde-fou dernier
@@ -199,6 +206,42 @@ class CompteConsommation:
     cout_usd: Decimal
     chat: DetailConsommationCategorie
     piece_jointe: DetailConsommationCategorie
+
+
+@dataclass
+class InspecteurCompte:
+    identifiant_compte: str
+
+
+@dataclass
+class InspecteurConversation:
+    id: int
+    titre: str
+    date_creation: datetime
+    date_derniere_activite: datetime
+
+
+@dataclass
+class InspecteurEchangeResume:
+    id: int
+    type_appel: str
+    statut: str
+    date_creation: datetime
+
+
+@dataclass
+class InspecteurEchangeDetail:
+    id: int
+    identifiant_compte: str
+    conversation_id: int | None
+    piece_jointe_id: int | None
+    type_appel: str
+    modele: str
+    requete_payload: dict
+    reponse_payload: dict | None
+    statut: str
+    erreur: str | None
+    date_creation: datetime
 
 
 def _champs_compte_admin(corps: dict) -> dict:
@@ -362,6 +405,61 @@ def _lever_si_action_avec_cle_admin_refusee(reponse: httpx.Response) -> None:
         raise AccesAdminRequisError()
     if reponse.status_code == 409:
         raise DernierAdministrateurError(reponse.json()["detail"])
+
+
+def _vers_inspecteur_compte(corps: dict) -> InspecteurCompte:
+    return InspecteurCompte(identifiant_compte=corps["identifiant_compte"])
+
+
+def _vers_inspecteur_conversation(corps: dict) -> InspecteurConversation:
+    return InspecteurConversation(
+        id=corps["id"],
+        titre=corps["titre"],
+        date_creation=datetime.fromisoformat(corps["date_creation"]),
+        date_derniere_activite=datetime.fromisoformat(corps["date_derniere_activite"]),
+    )
+
+
+def _vers_inspecteur_echange_resume(corps: dict) -> InspecteurEchangeResume:
+    return InspecteurEchangeResume(
+        id=corps["id"],
+        type_appel=corps["type_appel"],
+        statut=corps["statut"],
+        date_creation=datetime.fromisoformat(corps["date_creation"]),
+    )
+
+
+def _vers_inspecteur_echange_detail(corps: dict) -> InspecteurEchangeDetail:
+    return InspecteurEchangeDetail(
+        id=corps["id"],
+        identifiant_compte=corps["identifiant_compte"],
+        conversation_id=corps["conversation_id"],
+        piece_jointe_id=corps["piece_jointe_id"],
+        type_appel=corps["type_appel"],
+        modele=corps["modele"],
+        requete_payload=corps["requete_payload"],
+        reponse_payload=corps["reponse_payload"],
+        statut=corps["statut"],
+        erreur=corps["erreur"],
+        date_creation=datetime.fromisoformat(corps["date_creation"]),
+    )
+
+
+def _lever_si_inspecteur_refuse(reponse: httpx.Response) -> None:
+    # Partagée par les quatre endpoints /inspecteur/* : même régime que
+    # _lever_si_action_avec_cle_admin_refusee (jeton + X-Admin-Key), mais sans
+    # notion de droits est_admin (jeton de n'importe quel compte, spec 1.3.0 —
+    # vm_centrale.autorisation.get_identifiant_compte_du_jeton), donc jamais
+    # de 403 possible ici.
+    if reponse.status_code == 401:
+        if reponse.json().get("detail") == _CLE_ADMIN_INVALIDE_DETAIL:
+            raise CleAdminInvalideError()
+        raise JetonInvalideError()
+
+
+def _lever_si_echange_introuvable(reponse: httpx.Response) -> None:
+    if reponse.status_code == 404:
+        raise EchangeIntrouvableError()
 
 
 class VmCentraleClient:
@@ -702,6 +800,49 @@ class VmCentraleClient:
         if reponse.status_code == 404:
             raise CompteInexistantError()
         reponse.raise_for_status()
+
+    def lister_comptes_inspecteur(self, jeton: str, cle_admin_vm: str) -> list[InspecteurCompte]:
+        reponse = _http_client.get(
+            f"{VM_CENTRALE_BASE_URL}/inspecteur/comptes",
+            headers={"Authorization": f"Bearer {jeton}", "X-Admin-Key": cle_admin_vm},
+        )
+        _lever_si_inspecteur_refuse(reponse)
+        reponse.raise_for_status()
+        return [_vers_inspecteur_compte(compte) for compte in reponse.json()]
+
+    def lister_conversations_inspecteur(
+        self, jeton: str, identifiant_compte: str, cle_admin_vm: str
+    ) -> list[InspecteurConversation]:
+        reponse = _http_client.get(
+            f"{VM_CENTRALE_BASE_URL}/inspecteur/comptes/{quote(identifiant_compte, safe='')}/conversations",
+            headers={"Authorization": f"Bearer {jeton}", "X-Admin-Key": cle_admin_vm},
+        )
+        _lever_si_inspecteur_refuse(reponse)
+        reponse.raise_for_status()
+        return [_vers_inspecteur_conversation(conversation) for conversation in reponse.json()]
+
+    def lister_echanges_inspecteur(
+        self, jeton: str, conversation_id: int, cle_admin_vm: str
+    ) -> list[InspecteurEchangeResume]:
+        reponse = _http_client.get(
+            f"{VM_CENTRALE_BASE_URL}/inspecteur/conversations/{conversation_id}/echanges",
+            headers={"Authorization": f"Bearer {jeton}", "X-Admin-Key": cle_admin_vm},
+        )
+        _lever_si_inspecteur_refuse(reponse)
+        reponse.raise_for_status()
+        return [_vers_inspecteur_echange_resume(echange) for echange in reponse.json()]
+
+    def consulter_echange_inspecteur(
+        self, jeton: str, echange_id: int, cle_admin_vm: str
+    ) -> InspecteurEchangeDetail:
+        reponse = _http_client.get(
+            f"{VM_CENTRALE_BASE_URL}/inspecteur/echanges/{echange_id}",
+            headers={"Authorization": f"Bearer {jeton}", "X-Admin-Key": cle_admin_vm},
+        )
+        _lever_si_inspecteur_refuse(reponse)
+        _lever_si_echange_introuvable(reponse)
+        reponse.raise_for_status()
+        return _vers_inspecteur_echange_detail(reponse.json())
 
 
 def get_vm_centrale_client() -> VmCentraleClient:

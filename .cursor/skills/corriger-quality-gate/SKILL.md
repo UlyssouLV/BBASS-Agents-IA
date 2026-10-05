@@ -4,7 +4,7 @@ description: >-
   After a red Sonar quality gate, fix the code until the failed conditions
   are addressed or the remaining issues need the user. Use when the user
   types `/cqg` or says « Corriger le quality gate », or when
-  encadrer-implement finds a red `/qg`. Do not merge. Do not tag. Do not
+  finaliser-la-version finds a red `/qg`. Do not merge. Do not tag. Do not
   `/qg` again on the same HEAD SHA.
 ---
 
@@ -42,4 +42,4 @@ Done when `/qg` was already green, after one fix pass, or after a stop that need
 - Read-only gate: `quality-gate` (`/qg`)
 - Tests: `lancer-tests` (`/t`)
 - Tests then gate: `verifier-la-fiabilite` (`/vf`)
-- Implement wrap (wait, `/cqg`, commit, re-check): `encadrer-implement`
+- Version wrap (wait, `/cqg`, commit, re-check, then tag): `finaliser-la-version`

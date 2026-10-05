@@ -34,12 +34,35 @@ class Usage:
 class ReponseChat:
     contenu: str
     usage: Usage
+    # Payload exact envoyé et réponse brute reçue (spec 1.3.0, inspecteur des
+    # échanges) : capturés ici plutôt que reconstruits par l'appelant, seul
+    # ce module connaît la forme exacte du payload réellement posté.
+    payload_envoye: dict
+    reponse_brute: dict
 
 
 @dataclass(frozen=True)
 class ReponseOcr:
     contenu: str
     pages_processed: int
+    payload_envoye: dict
+    reponse_brute: dict
+
+
+class ErreurAppelMistral(Exception):
+    # Lève à la place de l'exception brute (httpx, JSON malformé...) sur tout
+    # échec de .chat()/.ocr() : porte le payload exact qui allait être
+    # envoyé, pour que l'appelant puisse quand même tracer l'échange dans
+    # l'inspecteur (spec 1.3.0) même quand aucune réponse n'a jamais été
+    # obtenue. Capturé après construction du payload mais avant l'ajout de
+    # l'en-tête Authorization ci-dessous : ne porte jamais la clé API.
+    # `reponse_brute` : renseignée seulement quand une réponse a bien été
+    # reçue mais n'a pas pu être exploitée par l'appelant (ex. sortie
+    # structurée illisible de l'analyse d'image).
+    def __init__(self, message: str, payload_envoye: dict, reponse_brute: dict | None = None) -> None:
+        super().__init__(message)
+        self.payload_envoye = payload_envoye
+        self.reponse_brute = reponse_brute
 
 
 class AppelOutilDemande(Exception):
@@ -48,7 +71,14 @@ class AppelOutilDemande(Exception):
     # tel quel pour être réinjecté par l'appelant dans le second appel, comme
     # l'exige le protocole (l'API attend ce message avant le rôle `tool` qui
     # porte le résultat).
-    def __init__(self, appels: list[AppelOutil], message_assistant: dict, usage: Usage) -> None:
+    def __init__(
+        self,
+        appels: list[AppelOutil],
+        message_assistant: dict,
+        usage: Usage,
+        payload_envoye: dict,
+        reponse_brute: dict,
+    ) -> None:
         super().__init__("Mistral a demandé un appel d'outil")
         self.appels = appels
         self.message_assistant = message_assistant
@@ -56,6 +86,11 @@ class AppelOutilDemande(Exception):
         # (spec 1.1.3) même sans contenu texte final : à tracer au même titre
         # qu'un appel de chat normal par le ticket suivant.
         self.usage = usage
+        # Spec 1.3.0 : cette demande d'outil est elle-même un échange à part
+        # entière dans l'inspecteur (statut succès, Mistral a bien répondu),
+        # distinct du second appel une fois le résultat de l'outil réinjecté.
+        self.payload_envoye = payload_envoye
+        self.reponse_brute = reponse_brute
 
 
 def _usage_depuis_reponse(usage_brut: Mapping[str, int]) -> Usage:
@@ -98,15 +133,18 @@ class MistralClient:
         if tools is not None:
             payload["tools"] = tools
 
-        reponse = _http_client.post(
-            _API_URL_CHAT,
-            headers={"Authorization": f"Bearer {api_key}"},
-            json=payload,
-        )
-        reponse.raise_for_status()
-        corps = reponse.json()
-        message = corps["choices"][0]["message"]
-        usage = _usage_depuis_reponse(corps["usage"])
+        try:
+            reponse = _http_client.post(
+                _API_URL_CHAT,
+                headers={"Authorization": f"Bearer {api_key}"},
+                json=payload,
+            )
+            reponse.raise_for_status()
+            corps = reponse.json()
+            message = corps["choices"][0]["message"]
+            usage = _usage_depuis_reponse(corps["usage"])
+        except Exception as erreur:
+            raise ErreurAppelMistral(str(erreur), payload_envoye=payload) from erreur
 
         tool_calls = message.get("tool_calls")
         if tool_calls:
@@ -118,9 +156,13 @@ class MistralClient:
                 )
                 for appel in tool_calls
             ]
-            raise AppelOutilDemande(appels, message, usage)
+            raise AppelOutilDemande(
+                appels, message, usage, payload_envoye=payload, reponse_brute=corps
+            )
 
-        return ReponseChat(contenu=message["content"], usage=usage)
+        return ReponseChat(
+            contenu=message["content"], usage=usage, payload_envoye=payload, reponse_brute=corps
+        )
 
     def ocr(self, document: bytes, type_mime: str) -> ReponseOcr:
         # Appel stateless dédié à /v1/ocr (forme de requête/réponse distincte
@@ -134,16 +176,23 @@ class MistralClient:
             "document": {"type": "document_url", "document_url": document_url},
         }
 
-        reponse = _http_client.post(
-            _API_URL_OCR,
-            headers={"Authorization": f"Bearer {api_key}"},
-            json=payload,
-        )
-        reponse.raise_for_status()
-        corps = reponse.json()
-        contenu = "\n\n".join(page["markdown"] for page in corps["pages"])
+        try:
+            reponse = _http_client.post(
+                _API_URL_OCR,
+                headers={"Authorization": f"Bearer {api_key}"},
+                json=payload,
+            )
+            reponse.raise_for_status()
+            corps = reponse.json()
+            contenu = "\n\n".join(page["markdown"] for page in corps["pages"])
+        except Exception as erreur:
+            raise ErreurAppelMistral(str(erreur), payload_envoye=payload) from erreur
+
         return ReponseOcr(
-            contenu=contenu, pages_processed=corps["usage_info"]["pages_processed"]
+            contenu=contenu,
+            pages_processed=corps["usage_info"]["pages_processed"],
+            payload_envoye=payload,
+            reponse_brute=corps,
         )
 
 

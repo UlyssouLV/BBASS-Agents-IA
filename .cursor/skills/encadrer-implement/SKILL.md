@@ -2,16 +2,17 @@
 name: encadrer-implement
 description: >-
   Green pytest after a child GitHub ticket, or the implement plugin's closing
-  step: `/t`, `/c -p`, `/qg -w`, `/cqg` if the gate is red, `/cci #<n>`,
-  then the next unblocked child or ask the user to test then Finalise la
-  version. Load this as soon as /implement tests pass.
+  step: `/t`, `/c -p`, `/cci #<n>`, then the next unblocked child or ask the
+  user to test, then `/code-review`, then Finalise la version. Do not wait
+  for the quality gate. Do not run `/code-review` here.
+  Load this as soon as /implement tests pass.
 ---
 
 # Wrap `/implement`
 
 Use the plugin **`/implement`** for TDD and the ticket body. **This skill owns the end of the run.** The plugin’s last line is a review step; in this repo that last line is **this skill, from Tests onward**.
 
-Git, tests, the gate, and closing the child go through the skills below, not inline. Do **not** close the **parent** spec (squash `Fixes #<parent>` does that). Do **not** `/implement` the parent.
+Git, tests, and closing the child go through the skills below, not inline. The quality gate is not this skill. Do **not** close the **parent** spec (squash `Fixes #<parent>` does that). Do **not** `/implement` the parent.
 
 ## 1. Tests
 
@@ -23,23 +24,13 @@ Stage **only** the ticket files. Never `.env`, `*.db`, `.venv/`, secrets. Do **n
 
 Then run skill **`commit`** as if the user had typed **`/c -p`**.
 
-## 3. Quality gate
+Do **not** `/qg`, `/qg -w`, or `/cqg`. Do **not** leave the child Open while Sonar runs. Do **not** add a label for that wait. The gate is one read of the PR `HEAD`, in `finaliser-la-version`.
 
-Load `.env` the same way **`quality-gate`** does. If any of that skill’s three `SONAR_*` keys is missing or empty → continue **now**. One line that Sonar is skipped. Do not `/qg`. Do not wait. Do not `/cqg`.
-
-Otherwise run **`quality-gate`** as if **`/qg -w`**.
-
-- No analysis for `HEAD` after the wait → continue. One line that Sonar is skipped. Do not `/cqg`.
-- **`OK`** → continue.
-- Not **`OK`** (`ERROR`, `WARN`, …) → run skill **`corriger-quality-gate`** as if **`/cqg`**.
-  - That skill stopped without a code change (policy / user needed) → **stop**. No `/cci`.
-  - Working tree dirty after the fix → run **`/t`** (fail → **stop**, no `/cci`). Then stage the ticket files and run **`/c -p`**. Then **`/qg -w`** once. Not **`OK`**, or no analysis this time → **stop**. No `/cci`.
-
-## 4. Close the child
+## 3. Close the child
 
 Run skill **`fermer-ticket-enfant`** as if the user had typed **`/cci #<n>`** (`<n>` = the child just implemented). No `-t` (tests already ran). That skill refuses if `<n>` is not a child.
 
-## 5. More child tickets on this PR?
+## 4. More child tickets on this PR?
 
 Find the parent (`## Parent` / `Part of #n` on the issue you just finished). List **open** children of that parent.
 
@@ -57,7 +48,7 @@ A remaining ticket is **unblocked** when GitHub reports no open blockers (`issue
 
 - Stop after telling the user, in French, exactly this handoff (adapt only the parent/PR numbers if useful):
 
-  Tous les tickets ont été implémentés. Veuillez faire des tests pour valider que tout est fonctionnel ; lorsque ce sera bon, lancez le skill **Finalise la version** (`finaliser-la-version`).
+  Tous les tickets ont été implémentés. Veuillez faire des tests pour valider que tout est fonctionnel. Si c’est bon, lancez `/code-review`. Si la revue est bonne, lancez le skill **Finalise la version** (`finaliser-la-version`) : le quality gate est lu à ce moment-là, et s’il n’est pas OK c’est `/cqg`, pas la release.
 
 - Do not merge, tag, or start the next version.
 

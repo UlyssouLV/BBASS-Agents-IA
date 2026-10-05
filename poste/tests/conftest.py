@@ -12,6 +12,10 @@ from poste.vm_centrale_client import (
     Conversation,
     ConversationCree,
     ConversationDetail,
+    InspecteurCompte,
+    InspecteurConversation,
+    InspecteurEchangeDetail,
+    InspecteurEchangeResume,
     PieceJointeCreee,
     ProfilTravail,
     VerificationReussie,
@@ -110,6 +114,25 @@ class VmCentraleClientFactice:
         self._exception_televersement_piece_jointe_sans_conversation: Exception | None = None
         self._jetons_televersement_piece_jointe_sans_conversation: list[str] = []
         self._requetes_televersement_piece_jointe_sans_conversation: list[dict] = []
+        self._inspecteur_comptes: list[InspecteurCompte] = []
+        self._exception_inspecteur_comptes: Exception | None = None
+        self._jetons_inspecteur_comptes: list[str] = []
+        self._cles_admin_inspecteur_comptes: list[str] = []
+        self._inspecteur_conversations: list[InspecteurConversation] = []
+        self._exception_inspecteur_conversations: Exception | None = None
+        self._jetons_inspecteur_conversations: list[str] = []
+        self._identifiants_inspecteur_conversations: list[str] = []
+        self._cles_admin_inspecteur_conversations: list[str] = []
+        self._inspecteur_echanges: list[InspecteurEchangeResume] = []
+        self._exception_inspecteur_echanges: Exception | None = None
+        self._jetons_inspecteur_echanges: list[str] = []
+        self._ids_conversation_inspecteur_echanges: list[int] = []
+        self._cles_admin_inspecteur_echanges: list[str] = []
+        self._inspecteur_echange_detail: InspecteurEchangeDetail | None = None
+        self._exception_inspecteur_echange_detail: Exception | None = None
+        self._jetons_inspecteur_echange_detail: list[str] = []
+        self._ids_inspecteur_echange_detail: list[int] = []
+        self._cles_admin_inspecteur_echange_detail: list[str] = []
 
     def accepter(
         self,
@@ -509,6 +532,72 @@ class VmCentraleClientFactice:
             raise self._exception_profil_travail
         assert self._profil_travail is not None
         return self._profil_travail
+
+    def inspecteur_comptes_retournes(self, comptes: list[InspecteurCompte]) -> None:
+        self._inspecteur_comptes = comptes
+        self._exception_inspecteur_comptes = None
+
+    def inspecteur_comptes_echoue(self, exception: Exception) -> None:
+        self._exception_inspecteur_comptes = exception
+
+    def lister_comptes_inspecteur(self, jeton: str, cle_admin_vm: str) -> list[InspecteurCompte]:
+        self._jetons_inspecteur_comptes.append(jeton)
+        self._cles_admin_inspecteur_comptes.append(cle_admin_vm)
+        if self._exception_inspecteur_comptes is not None:
+            raise self._exception_inspecteur_comptes
+        return self._inspecteur_comptes
+
+    def inspecteur_conversations_retournees(self, conversations: list[InspecteurConversation]) -> None:
+        self._inspecteur_conversations = conversations
+        self._exception_inspecteur_conversations = None
+
+    def inspecteur_conversations_echoue(self, exception: Exception) -> None:
+        self._exception_inspecteur_conversations = exception
+
+    def lister_conversations_inspecteur(
+        self, jeton: str, identifiant_compte: str, cle_admin_vm: str
+    ) -> list[InspecteurConversation]:
+        self._jetons_inspecteur_conversations.append(jeton)
+        self._identifiants_inspecteur_conversations.append(identifiant_compte)
+        self._cles_admin_inspecteur_conversations.append(cle_admin_vm)
+        if self._exception_inspecteur_conversations is not None:
+            raise self._exception_inspecteur_conversations
+        return self._inspecteur_conversations
+
+    def inspecteur_echanges_retournes(self, echanges: list[InspecteurEchangeResume]) -> None:
+        self._inspecteur_echanges = echanges
+        self._exception_inspecteur_echanges = None
+
+    def inspecteur_echanges_echoue(self, exception: Exception) -> None:
+        self._exception_inspecteur_echanges = exception
+
+    def lister_echanges_inspecteur(
+        self, jeton: str, conversation_id: int, cle_admin_vm: str
+    ) -> list[InspecteurEchangeResume]:
+        self._jetons_inspecteur_echanges.append(jeton)
+        self._ids_conversation_inspecteur_echanges.append(conversation_id)
+        self._cles_admin_inspecteur_echanges.append(cle_admin_vm)
+        if self._exception_inspecteur_echanges is not None:
+            raise self._exception_inspecteur_echanges
+        return self._inspecteur_echanges
+
+    def inspecteur_echange_detail_retourne(self, echange: InspecteurEchangeDetail) -> None:
+        self._inspecteur_echange_detail = echange
+        self._exception_inspecteur_echange_detail = None
+
+    def inspecteur_echange_detail_echoue(self, exception: Exception) -> None:
+        self._exception_inspecteur_echange_detail = exception
+
+    def consulter_echange_inspecteur(
+        self, jeton: str, echange_id: int, cle_admin_vm: str
+    ) -> InspecteurEchangeDetail:
+        self._jetons_inspecteur_echange_detail.append(jeton)
+        self._ids_inspecteur_echange_detail.append(echange_id)
+        self._cles_admin_inspecteur_echange_detail.append(cle_admin_vm)
+        if self._exception_inspecteur_echange_detail is not None:
+            raise self._exception_inspecteur_echange_detail
+        assert self._inspecteur_echange_detail is not None
+        return self._inspecteur_echange_detail
 
     def consommation_retournee(self, consommation: Consommation) -> None:
         self._consommation = consommation

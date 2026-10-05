@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { App } from "@/App";
+import { PageInspecteur } from "@/screens/PageInspecteur";
 
 import "./index.css";
 
@@ -17,10 +18,15 @@ const queryClient = new QueryClient({
   },
 });
 
+// Mode développeur (spec 1.3.0) : /inspecteur est un point d'entrée séparé
+// de l'application principale, servi par le même build (poste main.py),
+// ouvert dans un nouvel onglet par Ctrl+Maj+D (voir App.tsx).
+const estInspecteur = globalThis.location.pathname === "/inspecteur";
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <App />
+      {estInspecteur ? <PageInspecteur /> : <App />}
     </QueryClientProvider>
   </StrictMode>
 );

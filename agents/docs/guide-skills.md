@@ -103,7 +103,7 @@ Détecte le runner par racine (pytest + venv, sinon `npm test`). Inconnu → sto
 
 **Commande :** `/qg`
 
-**Options :** aucune.
+**Options :** `-w` attend que l’analyse CI du SHA `HEAD` apparaisse (jusqu’à 15 min).
 
 **Corps :** inutile ; le skill lit le Quality Gate Sonar du SHA `HEAD`.
 
@@ -320,7 +320,7 @@ Ouvre la version 1.3.0
 
 **Corps :** inutile en général (le ticket suffit).
 
-TDD du ticket (plugin `/implement`). La **fin** : **`/t`**, **`/c -p`**, **`/cci #<n>`**, puis le suivant ou **Finalise la version**. Skill `encadrer-implement`. Ne pas l’appeler à la place de `/implement`.
+TDD du ticket (plugin `/implement`). La **fin** : **`/t`**, **`/c -p`**, **`/cci #<n>`**, puis le suivant. Au dernier ticket : tests humains, puis **`/code-review`**, puis **Finalise la version**. Skill `encadrer-implement`. Ne pas l’appeler à la place de `/implement`.
 
 **Exemple :**
 
@@ -338,7 +338,7 @@ TDD du ticket (plugin `/implement`). La **fin** : **`/t`**, **`/c -p`**, **`/cci
 
 **Corps :** inutile.
 
-Enfants Closed + docs à jour (`/c -a -p` si besoin), puis **`/crel`**, puis **`/mpr`**. Skill `finaliser-la-version`.
+Après une **`/code-review`** acceptée : enfants Closed + docs à jour (`/c -a -p` si besoin), puis **`/qg -w`** (puis **`/cqg`** si le gate n’est pas `OK`), puis **`/crel`**, puis **`/mpr`**. Skill `finaliser-la-version`. Ne relance pas `/code-review`.
 
 **Exemple :**
 

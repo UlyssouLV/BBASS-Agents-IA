@@ -9,6 +9,7 @@ from poste.config import POSTE_HOST, POSTE_PORT
 from poste.routers.comptes import router as comptes_router
 from poste.routers.consommation import router as consommation_router
 from poste.routers.conversations import router as conversations_router
+from poste.routers.inspecteur import router as inspecteur_router
 from poste.routers.profil_travail import router as profil_travail_router
 from poste.routers.session import router as session_router
 from poste.session import get_session_store, verifier_session_au_demarrage
@@ -34,11 +35,21 @@ app.include_router(conversations_router)
 app.include_router(profil_travail_router)
 app.include_router(consommation_router)
 app.include_router(comptes_router)
+app.include_router(inspecteur_router)
 app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
 
 
 @app.get("/")
 def index() -> FileResponse:
+    return FileResponse(_STATIC_DIR / "index.html")
+
+
+# Mode développeur (spec 1.3.0) : point d'entrée séparé ouvert dans un nouvel
+# onglet par Ctrl+Maj+D, servi par le même build que la racine — main.tsx
+# choisit l'écran selon le chemin. Route exacte, distincte des routes API
+# /inspecteur/* (routers/inspecteur.py).
+@app.get("/inspecteur")
+def inspecteur() -> FileResponse:
     return FileResponse(_STATIC_DIR / "index.html")
 
 
