@@ -214,8 +214,8 @@ export function BarreLaterale({
                     type="button"
                     className={
                       estOuverte
-                        ? "flex-1 truncate rounded-sm px-1.5 py-1 text-left text-sm"
-                        : "flex-1 truncate rounded-sm px-1.5 py-1 text-left text-sm hover:bg-secondary/50"
+                        ? "line-clamp-2 flex-1 break-words rounded-sm px-1.5 py-1 text-left text-sm"
+                        : "line-clamp-2 flex-1 break-words rounded-sm px-1.5 py-1 text-left text-sm hover:bg-secondary/50"
                     }
                     onClick={() => onSelectionnerConversation(conversation.id)}
                   >

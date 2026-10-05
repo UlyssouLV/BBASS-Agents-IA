@@ -1,5 +1,18 @@
-import { useEffect, useRef, useState, type DragEvent, type FormEvent } from "react";
 import {
+  createContext,
+  memo,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type DragEvent,
+  type FormEvent,
+  type ReactNode,
+} from "react";
+import {
+  Check,
+  Code2,
+  Copy,
   File,
   FileImage,
   FileSpreadsheet,
@@ -10,6 +23,11 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
+import { Highlight, themes } from "prism-react-renderer";
+import * as Prism from "prismjs";
+import grammairesPrismBrut from "prismjs/components.json";
+import Markdown, { type Components } from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -185,6 +203,404 @@ function ChampMessageAvecPieceJointe({
   );
 }
 
+// Issue #93, étendu lors de la validation manuelle de la 1.2.2
+// (2026-10-05) : allowlist des composants Markdown autorisés dans la bulle
+// de message assistant (spec #91, Solution volet 2) : gras, italique,
+// listes (imbriquées ou non), paragraphes, tableaux (remark-gfm, sans quoi
+// la syntaxe `|...|` n'est jamais reconnue comme un tableau et s'affiche
+// telle quelle — marqueurs bruts — plutôt que d'être neutralisée), blocs
+// de code et liens (ancre cliquable sur le texte de citation, voir
+// LienSource). Le
+// reste (titres, citations) est neutralisé en bloc générique ci-dessous
+// plutôt que simplement « déplié » (unwrapDisallowed) — un titre ou une
+// citation dépliée perd son élément englobant et se retrouve orpheline,
+// collée sans espacement au contenu précédent. Les balises purement
+// inline une fois neutralisées (image, rayé GFM) restent dépliées via
+// ELEMENTS_MARKDOWN_DEPLIES : elles finissent de toute façon à
+// l'intérieur d'un bloc déjà espacé ; une case à cocher de liste de
+// tâches GFM (`input`) n'a pas de contenu à déplier, elle disparaît
+// simplement (ce n'est pas un type de bloc envisagé par cette allowlist).
+// La mise en forme (espacement entre blocs, puces différenciées par
+// niveau d'imbrication) est portée par la classe `.contenu-markdown` dans
+// index.css plutôt que par des classes par composant : un rendu
+// standardisé qui ne dépend ni de la réponse ni du modèle. Ce mapping
+// reste le point d'extension naturel pour de futurs types de blocs (cf.
+// feuille de route, section « Plus tard »). `skipHtml` sur <Markdown>
+// ci-dessous neutralise le HTML brut (ex. `<br>`) : sans lui, un nœud
+// HTML échappe à disallowedElements (ce n'est pas un élément du même
+// type) et s'affiche tel quel, marqueurs bruts inclus.
+function BlocMarkdownNeutralise({ children }: Readonly<{ children?: ReactNode }>) {
+  return <div>{children}</div>;
+}
+
+// Issue #91/#93, ajusté après validation manuelle de la 1.2.2 : même fond
+// que la bulle (bg-muted) sur toute la largeur, sans distinction d'en-tête
+// ni marge interne généreuse, un tableau se fondait dans le reste du
+// message plutôt que de se lire comme un tableau. `bg-background` tranche
+// avec la bulle qui l'entoure. Premier essai d'en-tête en `bg-muted` : ce
+// token est en réalité identique à `--secondary` et au fond de la bulle
+// elle-même (voir index.css), donc toujours aucun contraste visible — l'en-
+// tête utilise à la place une teinte anthracite (`--primary`) à faible
+// opacité, propre au tableau et distincte des deux autres fonds.
+function Tableau({ children }: Readonly<{ children?: ReactNode }>) {
+  return (
+    <div className="overflow-x-auto rounded-md border border-border bg-background">
+      <table className="w-full border-collapse text-left text-sm">{children}</table>
+    </div>
+  );
+}
+
+function EnTeteCelluleTableau({ children }: Readonly<{ children?: ReactNode }>) {
+  return <th className="border-b border-border bg-primary/10 px-3 py-2 font-semibold">{children}</th>;
+}
+
+function CelluleTableau({ children }: Readonly<{ children?: ReactNode }>) {
+  return <td className="border-b border-border px-3 py-2 align-top">{children}</td>;
+}
+
+// Bouton « Copier » générique, en haut à droite d'un bloc au survol — même
+// convention que le bouton « … » de BarreLaterale.tsx (opacity-0 +
+// group-hover/group-focus-within). Pris isolément de BlocCode pour rester
+// le point d'extension naturel de futurs types de blocs porteurs d'un
+// contenu à copier intégralement (cellule de document, etc. — cf. feuille
+// de route, section « Plus tard ») : il leur suffira de l'envelopper avec
+// leur propre `obtenirTexte`, sans dupliquer l'affordance.
+function BlocAvecBoutonCopier({
+  children,
+  obtenirTexte,
+  classeBouton,
+}: Readonly<{ children: ReactNode; obtenirTexte: () => string; classeBouton?: string }>) {
+  const [copie, setCopie] = useState(false);
+
+  async function copier() {
+    try {
+      await navigator.clipboard.writeText(obtenirTexte());
+      setCopie(true);
+      window.setTimeout(() => setCopie(false), 1500);
+    } catch {
+      // Presse-papiers indisponible (permissions, contexte non sécurisé) :
+      // rien d'autre à faire, le bouton reste silencieusement sans effet.
+    }
+  }
+
+  return (
+    <div className="group relative">
+      {children}
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className={cn(
+          "absolute right-1 top-1 size-6 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100",
+          classeBouton
+        )}
+        onClick={copier}
+        aria-label="Copier"
+      >
+        {copie ? <Check className="size-3.5" aria-hidden="true" /> : <Copy className="size-3.5" aria-hidden="true" />}
+      </Button>
+    </div>
+  );
+}
+
+// Un bloc de code (```…```, mdast "code") devient <pre><code>, du code
+// inline (`…`) devient juste <code> : react-markdown n'expose pas de prop
+// pour distinguer les deux au niveau du composant `code`, d'où ce contexte
+// posé par BlocCode — lu par CodeEnLigne pour ne pas empiler deux styles
+// de « boîte » (celle du bloc, puis celle du chip inline) l'un dans
+// l'autre. Le texte à copier est lu depuis le DOM (`textContent` du
+// <pre>) plutôt que reconstruit à partir de `children` (React, pas une
+// chaîne) : fiable quel que soit l'imbrication de spans produite par une
+// éventuelle coloration syntaxique future.
+const DansBlocCodeContext = createContext(false);
+
+// Issue #97 : au lieu d'une liste `LANGAGES_COLORES` maintenue à la main
+// (une entrée + un import statique par langage, périmètre #95 limité à
+// python/bash/json/yaml/sql), les quelque 290 grammaires du paquet sont
+// enregistrées ici une fois pour toutes sous forme de chargeurs
+// dynamiques : `import.meta.glob` les recense au build (Vite sait alors
+// produire un chunk par fichier), mais un seul chargeur est réellement
+// invoqué à l'exécution — celui du langage effectivement déclaré sur le
+// fence d'un bloc donné (voir chargerGrammairePrism plus bas). Le motif
+// d'exclusion écarte les variantes minifiées (`*.min.js`) dès cette étape
+// de recensement : ne pas produire de chunk de build pour un fichier
+// qu'aucun appel ne référencera jamais.
+const CHARGEURS_GRAMMAIRE_PRISM = import.meta.glob([
+  "/node_modules/prismjs/components/prism-*.js",
+  "!**/*.min.js",
+]);
+
+function cheminGrammairePrism(identifiant: string): string {
+  return `/node_modules/prismjs/components/prism-${identifiant}.js`;
+}
+
+interface MetaLangagePrism {
+  require?: string | string[];
+  alias?: string | string[];
+}
+
+// Métadonnées officielles de Prism (alias de langage, dépendances entre
+// grammaires — ex. "tsx" requiert "jsx" puis "javascript" puis "clike")
+// plutôt qu'une table ad hoc : ce fichier JSON est déjà présent dans le
+// paquet prismjs (dépendance existante, cf. #95).
+const META_LANGAGES_PRISM = (grammairesPrismBrut as { languages: Record<string, MetaLangagePrism> }).languages;
+
+function normaliserEnListe(valeur: string | string[] | undefined): string[] {
+  if (!valeur) {
+    return [];
+  }
+  return Array.isArray(valeur) ? valeur : [valeur];
+}
+
+// Alias -> identifiant canonique (ex. "js" et "ts" -> "javascript"/
+// "typescript", "html"/"xml"/"svg" -> "markup") : construit depuis
+// META_LANGAGES_PRISM, pas à la main, pour rester synchronisé avec le
+// paquet installé.
+const CANONIQUE_PAR_ALIAS: ReadonlyMap<string, string> = (() => {
+  const table = new Map<string, string>();
+  for (const [identifiant, meta] of Object.entries(META_LANGAGES_PRISM)) {
+    table.set(identifiant, identifiant);
+    for (const alias of normaliserEnListe(meta.alias)) {
+      table.set(alias, identifiant);
+    }
+  }
+  return table;
+})();
+
+// Une grammaire Prism suppose souvent une autre déjà enregistrée (ex. php
+// requiert markup-templating, qui requiert markup) : cette chaîne doit
+// être chargée dans l'ordre, base d'abord, sous peine de laisser la
+// grammaire finale s'étendre depuis un langage de base manquant.
+function cheneDependances(identifiant: string, vus: Set<string> = new Set()): string[] {
+  if (vus.has(identifiant)) {
+    return [];
+  }
+  vus.add(identifiant);
+  const requises = normaliserEnListe(META_LANGAGES_PRISM[identifiant]?.require).flatMap((requise) =>
+    cheneDependances(requise, vus)
+  );
+  return [...requises, identifiant];
+}
+
+// Charge, dans l'ordre de dépendance, chaque grammaire de la chaîne pas
+// encore enregistrée sur Prism. Lève dès qu'un maillon n'a pas de fichier
+// correspondant dans le paquet : l'appelant retombe alors sur le rendu
+// neutre (déjà affiché par défaut pendant le chargement).
+async function chargerGrammairePrism(identifiant: string): Promise<void> {
+  for (const etape of cheneDependances(identifiant)) {
+    if (Prism.languages[etape]) {
+      continue;
+    }
+    const chargeur = CHARGEURS_GRAMMAIRE_PRISM[cheminGrammairePrism(etape)];
+    if (!chargeur) {
+      throw new Error(`Aucune grammaire Prism pour « ${etape} ».`);
+    }
+    await chargeur();
+  }
+}
+
+// Le langage déclaré sur le fence n'est lisible que sur le noeud hast du
+// <pre> (son unique enfant `code` porte la classe "language-xxx") : une
+// fois `children` rendu par react-markdown pour atteindre BlocCode, le
+// composant `code` (CodeEnLigne) a déjà consommé et remplacé cette classe
+// par la sienne. `node` (non typé ici : le type hast exact n'est pas
+// exposé par react-markdown au-delà de `unknown`) est donc lu par
+// inspection défensive plutôt que via `children`.
+function noeudCodeDuBloc(noeudPre: unknown): unknown {
+  const enfants = (noeudPre as { children?: unknown[] } | undefined)?.children;
+  const premier = enfants?.[0];
+  return (premier as { tagName?: string } | undefined)?.tagName === "code" ? premier : undefined;
+}
+
+function langueDeclareeDuBloc(noeudPre: unknown): string | null {
+  const classes = (noeudCodeDuBloc(noeudPre) as { properties?: { className?: unknown } } | undefined)?.properties
+    ?.className;
+  const classe = Array.isArray(classes)
+    ? classes.find((valeur): valeur is string => typeof valeur === "string" && valeur.startsWith("language-"))
+    : undefined;
+  return classe ? classe.slice("language-".length).toLowerCase() : null;
+}
+
+function texteBrutDuNoeud(noeud: unknown): string {
+  const n = noeud as { type?: string; value?: unknown; children?: unknown[] } | undefined;
+  if (n?.type === "text" && typeof n.value === "string") {
+    return n.value;
+  }
+  return n?.children?.map(texteBrutDuNoeud).join("") ?? "";
+}
+
+// En-tête façon ChatGPT (icône + nom du langage déclaré sur le fence, tel
+// quel) commune aux deux rendus ci-dessous : affichée que la coloration
+// réussisse ou non, pour que seule la présence de couleur par token
+// distingue un bloc couvert d'un bloc neutre, jamais la mise en page.
+function EnTeteBlocCode({ langage }: Readonly<{ langage: string | null }>) {
+  return (
+    <div className="flex items-center gap-1.5 border-b border-white/10 px-2 py-1 text-[0.7rem] opacity-70">
+      <Code2 className="size-3" aria-hidden="true" />
+      {langage}
+    </div>
+  );
+}
+
+// Issue #97 : la coloration (thème `vsDark`) et le rendu neutre d'un
+// langage non couvert partagent désormais le même fond sombre — un bloc
+// de code a toujours la même apparence de base, langage reconnu ou non,
+// seule la couleur par token distingue les deux (`themes.vsDark.plain`
+// porte ce fond + cette couleur de texte par défaut, posé une fois sur le
+// conteneur commun plutôt que dupliqué entre les deux rendus).
+function BlocCode({ node, children }: Readonly<{ node?: unknown; children?: ReactNode }>) {
+  const refPre = useRef<HTMLPreElement>(null);
+  const langueDeclaree = langueDeclareeDuBloc(node);
+  const canonique = langueDeclaree ? (CANONIQUE_PAR_ALIAS.get(langueDeclaree) ?? null) : null;
+  const [grammairePrete, setGrammairePrete] = useState(false);
+
+  useEffect(() => {
+    setGrammairePrete(false);
+    if (!canonique) {
+      return;
+    }
+    if (Prism.languages[canonique]) {
+      setGrammairePrete(true);
+      return;
+    }
+    let annule = false;
+    chargerGrammairePrism(canonique)
+      .then(() => {
+        if (!annule) {
+          setGrammairePrete(true);
+        }
+      })
+      .catch(() => {
+        // Pas de grammaire Prism pour ce langage (ou un de ses prérequis) :
+        // le bloc garde le rendu neutre, déjà affiché par défaut.
+      });
+    return () => {
+      annule = true;
+    };
+  }, [canonique]);
+
+  const corps =
+    grammairePrete && canonique ? (
+      <Highlight prism={Prism} code={texteBrutDuNoeud(noeudCodeDuBloc(node))} language={canonique} theme={themes.vsDark}>
+        {({ className: classeColoration, style, tokens, getLineProps, getTokenProps }) => (
+          <pre ref={refPre} className={cn("overflow-x-auto p-2 pr-8 font-mono text-xs", classeColoration)} style={style}>
+            <code>
+              {tokens.map((ligne, indexLigne) => (
+                <span key={indexLigne} {...getLineProps({ line: ligne })}>
+                  {ligne.map((jeton, indexJeton) => (
+                    <span key={indexJeton} {...getTokenProps({ token: jeton })} />
+                  ))}
+                  {indexLigne < tokens.length - 1 ? "\n" : null}
+                </span>
+              ))}
+            </code>
+          </pre>
+        )}
+      </Highlight>
+    ) : (
+      <pre ref={refPre} className="overflow-x-auto p-2 pr-8 font-mono text-xs" style={themes.vsDark.plain}>
+        {children}
+      </pre>
+    );
+
+  return (
+    <DansBlocCodeContext.Provider value={true}>
+      <BlocAvecBoutonCopier
+        obtenirTexte={() => refPre.current?.textContent ?? ""}
+        classeBouton="text-white/70 hover:bg-white/10 hover:text-white"
+      >
+        <div className="overflow-hidden rounded-sm border border-border" style={themes.vsDark.plain}>
+          <EnTeteBlocCode langage={langueDeclaree} />
+          {corps}
+        </div>
+      </BlocAvecBoutonCopier>
+    </DansBlocCodeContext.Provider>
+  );
+}
+
+function CodeEnLigne({ children }: Readonly<{ children?: ReactNode }>) {
+  const dansUnBloc = useContext(DansBlocCodeContext);
+  if (dansUnBloc) {
+    return <code className="font-mono text-xs">{children}</code>;
+  }
+  return (
+    <code className="rounded-sm border border-border bg-background px-1 py-0.5 font-mono text-[0.85em]">
+      {children}
+    </code>
+  );
+}
+
+// Issue #98 : le texte de l'ancre est lui-même l'élément cliquable (`href`
+// visible au survol, comportement natif du navigateur) plutôt qu'une
+// pastille greffée en fin de citation — retour terrain #93/#96 : la
+// pastille seule était trop peu visible pour repérer où se trouvent les
+// sources dans une réponse. `text-accent` (plutôt que `--primary`, déjà
+// utilisé par le tableau) est le token du design system explicitement
+// réservé aux liens (voir index.css) ; seul le texte exact de l'ancre porte
+// cette couleur, jamais la phrase environnante qui la contient, donc rien
+// ne laisse croire que cette phrase serait cliquable au-delà de la
+// citation. Pas de soulignement au repos (cf. décision #93 : ne pas
+// alourdir chaque citation sourcée), seulement au survol/focus, en plus de
+// la couleur — deux affordances cumulées plutôt qu'une. `rel`
+// noopener+noreferrer et le `urlTransform` par défaut de react-markdown
+// (actif tant qu'on ne le surcharge pas ici) protègent contre les schémas
+// d'URL dangereux (`javascript:`, etc.).
+function LienSource({ href, children }: Readonly<{ href?: string; children?: ReactNode }>) {
+  if (!href) {
+    return <>{children}</>;
+  }
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-accent underline-offset-2 hover:underline focus-visible:underline"
+    >
+      {children}
+    </a>
+  );
+}
+
+const COMPOSANTS_MARKDOWN_MESSAGE: Components = {
+  h1: BlocMarkdownNeutralise,
+  h2: BlocMarkdownNeutralise,
+  h3: BlocMarkdownNeutralise,
+  h4: BlocMarkdownNeutralise,
+  h5: BlocMarkdownNeutralise,
+  h6: BlocMarkdownNeutralise,
+  blockquote: BlocMarkdownNeutralise,
+  table: Tableau,
+  th: EnTeteCelluleTableau,
+  td: CelluleTableau,
+  pre: BlocCode,
+  code: CodeEnLigne,
+  a: LienSource,
+};
+const ELEMENTS_MARKDOWN_DEPLIES = ["hr", "img", "del", "input"];
+
+// memo (seule prop : `texte`) : sans lui, chaque frappe dans le champ de
+// message (état local du même composant OngletChat) ré-exécute ce
+// composant pour tout l'historique affiché, et donc tout le pipeline
+// Markdown/remark-gfm/Prism pour des messages dont le contenu n'a pas
+// changé.
+const ContenuMessageAssistant = memo(function ContenuMessageAssistant({
+  texte,
+}: Readonly<{ texte: string }>) {
+  return (
+    <div className="contenu-markdown">
+      <Markdown
+        skipHtml
+        remarkPlugins={[remarkGfm]}
+        components={COMPOSANTS_MARKDOWN_MESSAGE}
+        disallowedElements={ELEMENTS_MARKDOWN_DEPLIES}
+        unwrapDisallowed
+      >
+        {texte}
+      </Markdown>
+    </div>
+  );
+});
+
 // Issue #84 : le message du collaborateur ne doit pas apparaître d'un bloc
 // en haut à droite de la conversation ; il glisse depuis la zone de saisie (juste en
 // dessous) vers sa place définitive. requestAnimationFrame plutôt qu'un
@@ -241,7 +657,18 @@ function TexteAnimeReponse({ texte, onTermine }: Readonly<{ texte: string; onTer
     return () => window.clearTimeout(delai);
   }, [longueurAffichee, texte, caracteresParEtape, onTermine]);
 
-  return <>{texte.slice(0, longueurAffichee)}</>;
+  // Tant que le texte révélé est tronqué, affiche du texte brut plutôt que
+  // de le repasser par le pipeline Markdown/remark-gfm/Prism à chaque étape
+  // (#99) : une syntaxe encore incomplète (lien, tableau, bloc de code non
+  // refermé) s'y afficherait brute ou cassée pendant plusieurs frames avant
+  // de « sauter » dans sa forme stylée une fois close. Le rendu Markdown
+  // complet n'intervient donc qu'une seule fois, à la toute fin de
+  // l'animation, plutôt qu'à chaque étape.
+  const texteAffiche = texte.slice(0, longueurAffichee);
+  if (longueurAffichee < texte.length) {
+    return <p className="whitespace-pre-wrap">{texteAffiche}</p>;
+  }
+  return <ContenuMessageAssistant texte={texteAffiche} />;
 }
 
 // Réécriture React de la section #onglet-chat d'app.js : ne porte plus que
@@ -430,18 +857,20 @@ export function OngletChat({ conversationOuverteId, onConversationCreee }: Reado
             </p>
           )}
           <div role="log" className="mb-3 flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
-            {messagesAffiches.map((message) => (
-              <p
-                key={message.id}
-                className={
-                  message.role === "user"
-                    ? "self-end rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground"
-                    : "max-w-[70%] self-start rounded-md bg-muted px-3 py-1.5 text-sm"
-                }
-              >
-                {message.contenu}
-              </p>
-            ))}
+            {messagesAffiches.map((message) =>
+              message.role === "user" ? (
+                <p
+                  key={message.id}
+                  className="self-end rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground"
+                >
+                  {message.contenu}
+                </p>
+              ) : (
+                <div key={message.id} className="max-w-[70%] self-start rounded-md bg-muted px-3 py-1.5 text-sm">
+                  <ContenuMessageAssistant texte={message.contenu} />
+                </div>
+              )
+            )}
             {envoiEnCours && (
               <>
                 <BulleMessageEnvoye texte={envoiEnCours.message} />
@@ -451,14 +880,14 @@ export function OngletChat({ conversationOuverteId, onConversationCreee }: Reado
                     Réflexion…
                   </output>
                 ) : (
-                  <p className="max-w-[70%] self-start rounded-md bg-muted px-3 py-1.5 text-sm">
+                  <div className="max-w-[70%] self-start rounded-md bg-muted px-3 py-1.5 text-sm">
                     <TexteAnimeReponse
                       texte={envoiEnCours.reponse}
                       onTermine={() =>
                         setEnvoiEnCours((precedent) => (precedent ? { ...precedent, phase: "termine" } : precedent))
                       }
                     />
-                  </p>
+                  </div>
                 )}
               </>
             )}

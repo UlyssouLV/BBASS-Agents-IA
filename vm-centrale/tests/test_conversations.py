@@ -53,7 +53,8 @@ def test_premier_message_cree_la_conversation_persiste_les_messages_et_titre(
     corps = reponse.json()
     assert corps["conversation"]["titre"] == "Salutations"
     assert corps["reponse"] == "Bonjour, comment puis-je vous aider ?"
-    assert mistral_client_factice.messages_recus[0] == "Bonjour"
+    # Prompt de style de l'appel de chat principal (spec 1.2.2), en tête.
+    assert mistral_client_factice.messages_recus[0][-1] == {"role": "user", "content": "Bonjour"}
 
     conversation_id = corps["conversation"]["id"]
     detail = client.get(f"/conversations/{conversation_id}", headers=_autorisation(jeton_valide))
@@ -78,7 +79,11 @@ def test_titre_genere_par_un_appel_mistral_dedie_a_partir_du_premier_echange(
     assert reponse.json()["conversation"]["titre"] == "Titre auto-généré"
     # Un appel dédié, distinct de celui produisant la réponse de chat.
     assert len(mistral_client_factice.messages_recus) == 2
-    assert mistral_client_factice.messages_recus[0] == "Question initiale"
+    # Prompt de style de l'appel de chat principal (spec 1.2.2), en tête.
+    assert mistral_client_factice.messages_recus[0][-1] == {
+        "role": "user",
+        "content": "Question initiale",
+    }
     assert "Question initiale" in mistral_client_factice.messages_recus[1]
     assert "Réponse" in mistral_client_factice.messages_recus[1]
 
@@ -421,13 +426,15 @@ def test_prompt_envoye_ne_contient_jamais_lintegralite_de_lhistorique(
     # l'ordre d'arrivée entre les deux n'est pas garanti, donc pas question
     # d'indexer messages_recus par position ici.
     messages_envoyes = mistral_client_factice.appels_reponse[-1]
-    assert messages_envoyes[0] == {"role": "system", "content": "Résumé glissant"}
+    # Prompt de style (spec 1.2.2) toujours en tête, avant le résumé glissant.
+    assert messages_envoyes[1] == {"role": "system", "content": "Résumé glissant"}
     assert messages_envoyes[-1] == {"role": "user", "content": "Dernier message"}
     contenus = [m["content"] for m in messages_envoyes]
     assert "Message 1" not in contenus
-    # Résumé + au plus 3 derniers messages + le nouveau message (le profil de
-    # travail est vide dans ce test, donc pas de message système en plus).
-    assert len(messages_envoyes) <= 5
+    # Style + résumé + au plus 3 derniers messages + le nouveau message (le
+    # profil de travail est vide dans ce test, donc pas de message système en
+    # plus).
+    assert len(messages_envoyes) <= 6
 
 
 def test_envoyer_message_echec_appel_mistral_ne_persiste_rien(

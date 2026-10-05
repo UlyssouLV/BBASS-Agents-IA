@@ -128,13 +128,105 @@ _SCHEMA_RESUME_ET_PROFIL = {
 }
 
 
+# Déclaré uniquement sur l'appel de réponse de chat principal (jamais
+# titrage ni résumé+profil, qui gardent leurs consignes dédiées), en tête de
+# la liste de messages — avant résumé glissant / profil de travail / pièce
+# jointe (consigne de comportement générale avant le contexte propre à ce
+# tour), cf. spec 1.2.2. Renforcé après validation manuelle de la 1.2.2
+# (réponses à une question ouverte type « que peux-tu me dire sur... ? ») :
+# la question de relance finale et les faux titres en gras revenaient de
+# façon systématique malgré la première version de cette consigne.
+# Tableaux, blocs de code et liens passés de déconseillés à autorisés le
+# même jour, une fois le rendu Markdown du poste (#93) étendu pour les
+# afficher proprement (table HTML, police mono, pastille de source cliquable)
+# plutôt que les neutraliser.
+_PROMPT_STYLE = (
+    "Consigne de style pour ta réponse, à respecter systématiquement :\n"
+    "- Ton : vouvoiement, professionnel, cohérent avec un outil de travail "
+    "de cabinet.\n"
+    "- Longueur : pas de remplissage par réflexe (pas de préambule inutile, "
+    "pas de plan en sections pour une question simple, pas de conclusion "
+    "qui ne sert à rien) ; la longueur réelle de ta réponse suit la "
+    "complexité de la question, pas une limite fixe.\n"
+    "- Emojis : rares, seulement quand ils portent un vrai signal que le "
+    "texte seul ne porterait pas aussi bien (ex. ⚠️ pour un avertissement) ; "
+    "jamais décoratifs ni systématiques, jamais en guise de puces pour "
+    "énumérer plusieurs éléments dans un même paragraphe.\n"
+    "- Relance finale : ne termine jamais ta réponse par une question, y "
+    "compris une proposition du type « Souhaitez-vous que je... ? » ou "
+    "« Besoin de précisions sur... ? ». Si une clarification est "
+    "réellement nécessaire à la tâche, pose-la en tout début de réponse, "
+    "jamais en conclusion.\n"
+    "- Titres : n'utilise jamais un texte en gras isolé sur sa propre "
+    "ligne en guise de titre de section (ex. « **1. Missions "
+    "principales** ») ; le gras reste réservé à des mots ou expressions "
+    "au sein d'une phrase ou d'un élément de liste.\n"
+    "- Listes : un seul niveau d'imbrication au maximum ; au-delà, "
+    "reformule en phrases plutôt qu'en sous-listes empilées. Si tu "
+    "énumères plusieurs éléments, utilise toujours une vraie liste à "
+    "puces ou numérotée, jamais des éléments mis bout à bout dans un même "
+    "paragraphe.\n"
+    "- Markdown autorisé dans ta réponse : gras, italique, listes à puces "
+    "ou numérotées, paragraphes, tableaux (uniquement quand l'information "
+    "s'y prête vraiment, jamais par réflexe), blocs de code pour du code "
+    "ou une formule, et liens uniquement vers une source réelle que tu "
+    "connais avec certitude (jamais une URL inventée ou approximative). "
+    "Quand tu nommes ou cites explicitement une source précise (rapport, "
+    "étude, organisme, texte réglementaire), le lien qui l'accompagne doit "
+    "être placé immédiatement contre cette citation et correspondre "
+    "exactement à cette source — jamais un lien générique isolé en fin de "
+    "réponse présenté comme s'il couvrait une citation différente plus "
+    "haut. Si tu ne connais avec certitude aucun lien fiable pour la "
+    "source nommée, n'en fournis aucun plutôt que d'en approximer un. "
+    "Déconseillés : titres, séparateurs `---`, citations, images."
+)
+
+
+def _message_systeme_style() -> dict[str, str]:
+    return {"role": "system", "content": _PROMPT_STYLE}
+
+
 def _prompt_titrage(message_utilisateur: str, reponse_assistant: str) -> str:
     return (
-        "Propose un titre court (moins de 8 mots), sans guillemets, résumant "
+        "Propose un titre court (moins de 8 mots), sans guillemets et sans "
+        "aucune mise en forme Markdown (pas de **, #, etc.), résumant "
         "l'échange suivant :\n"
         f"Utilisateur : {message_utilisateur}\n"
         f"Assistant : {reponse_assistant}"
     )
+
+
+# Le titre est affiché en texte brut (BarreLaterale.tsx), jamais passé par le
+# rendu Markdown borné du message assistant (#93) — contrairement à lui, un
+# « ** » résiduel dans le titre s'affiche donc littéralement. La consigne du
+# prompt ci-dessus ne suffit pas à elle seule (constaté lors de la
+# validation manuelle de la 1.2.2 : le titrage reprend parfois le gras de la
+# réponse qu'il résume malgré la consigne) ; ce nettoyage réplique en Python
+# le principe déjà appliqué côté poste pour le corps du message : neutraliser
+# ce que le modèle produit malgré la consigne plutôt que de ne compter que
+# sur elle. Ne s'applique qu'au titre généré par le modèle (ici), jamais à un
+# renommage saisi à la main par un collaborateur (PATCH /conversations/{id}).
+#
+# Chaque motif exige en plus qu'aucun caractère alphanumérique ne touche
+# directement les marqueurs par l'extérieur (`(?<!\w)` / `(?!\w)`) : sans
+# cette garde, une paire de "*" ou "_" purement incidente (ex. "10*2 et
+# 5*3", un calcul ; "mon_profil_travail", un identifiant) est elle aussi
+# appariée et son contenu supprimé, alors qu'il ne s'agit pas d'une
+# emphase Markdown.
+_MARQUEURS_MARKDOWN_TITRE = (
+    (re.compile(r"^#{1,6}\s*"), ""),
+    (re.compile(r"(?<!\w)\*\*(.+?)\*\*(?!\w)"), r"\1"),
+    (re.compile(r"(?<!\w)__(.+?)__(?!\w)"), r"\1"),
+    (re.compile(r"(?<!\w)(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)(?!\w)"), r"\1"),
+    (re.compile(r"(?<!\w)(?<!_)_(?!_)(.+?)(?<!_)_(?!_)(?!\w)"), r"\1"),
+)
+
+
+def _nettoyer_titre(titre: str) -> str:
+    titre = titre.strip()
+    for motif, remplacement in _MARQUEURS_MARKDOWN_TITRE:
+        titre = motif.sub(remplacement, titre)
+    return titre.strip()
 
 
 def _message_systeme_piece_jointe(piece_jointe: PieceJointe) -> dict[str, str]:
@@ -156,7 +248,7 @@ def _message_systeme_piece_jointe(piece_jointe: PieceJointe) -> dict[str, str]:
 
 
 def _construire_messages_pour_mistral(
-    conversation: Conversation,
+    resume_contexte: str,
     derniers_messages: list[Message],
     nouveau_message: str,
     profil_travail: str,
@@ -169,9 +261,14 @@ def _construire_messages_pour_mistral(
     # message) : sans lui, la réponse de chat elle-même ignorerait tout ce
     # que le profil a appris de la façon de travailler du compte, alors que
     # c'est justement sa raison d'être (contexte pour l'IA qui répond).
-    messages: list[dict[str, str]] = []
-    if conversation.resume_contexte:
-        messages.append({"role": "system", "content": conversation.resume_contexte})
+    # Reçoit resume_contexte/derniers_messages déjà extraits (plutôt qu'une
+    # Conversation) : le tout premier message d'une conversation
+    # (creer_conversation) n'a ni résumé ni historique, et réutilise ainsi
+    # ce même builder avec une liste vide et une chaîne vide plutôt que de
+    # dupliquer l'assemblage [style, pièce jointe ?, user].
+    messages: list[dict[str, str]] = [_message_systeme_style()]
+    if resume_contexte:
+        messages.append({"role": "system", "content": resume_contexte})
     if profil_travail:
         messages.append(
             {"role": "system", "content": f"Profil de travail du compte : {profil_travail}"}
@@ -394,12 +491,13 @@ def creer_conversation(
                 db, identifiant_compte, requete.piece_jointe_id, conversation.id
             )
 
-        message_pour_mistral: str | list[dict[str, str]] = requete.message
-        if piece_jointe is not None:
-            message_pour_mistral = [
-                _message_systeme_piece_jointe(piece_jointe),
-                {"role": "user", "content": requete.message},
-            ]
+        # Même builder qu'envoyer_message ci-dessous : ce chemin couvre le
+        # tout premier message d'une conversation (jamais de résumé glissant
+        # ni d'historique à ce stade), l'autre chemin menant au même appel de
+        # chat principal (spec 1.2.2).
+        message_pour_mistral = _construire_messages_pour_mistral(
+            "", [], requete.message, "", piece_jointe
+        )
 
         # Les deux appels Mistral (réponse, puis titrage) sont faits avant
         # toute autre écriture en base : en cas d'échec de l'un ou l'autre,
@@ -409,7 +507,7 @@ def creer_conversation(
             reponse_chat = client.chat(message_pour_mistral)
             reponse = reponse_chat.contenu
             reponse_titrage = client.chat(_prompt_titrage(requete.message, reponse))
-            titre = reponse_titrage.contenu
+            titre = _nettoyer_titre(reponse_titrage.contenu)
         except Exception as erreur:
             db.rollback()
             logger.exception(_MSG_ECHEC_RELAIS_LOG)
@@ -915,7 +1013,7 @@ def envoyer_message(
         # puis écraser l'une des deux mises à jour au commit).
         profil_actuel = _contenu_profil_actuel(db, identifiant_compte)
         messages_pour_mistral = _construire_messages_pour_mistral(
-            conversation, derniers_messages, requete.message, profil_actuel, piece_jointe
+            conversation.resume_contexte, derniers_messages, requete.message, profil_actuel, piece_jointe
         )
 
         # Un message sort de la fenêtre des 3 derniers dès que ce tour (2 nouveaux
