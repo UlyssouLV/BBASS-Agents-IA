@@ -16,7 +16,12 @@ from vm_centrale.concurrence import cache_idempotence, verrous_comptes
 from vm_centrale.config import MODELE_CHAT, MODELE_OCR, PIECES_JOINTES_DIR
 from vm_centrale.consommation import enregistrer_consommation
 from vm_centrale.database import get_db
-from vm_centrale.garde_fous import nettoyer_titre, plafonner, retirer_urls_inventees
+from vm_centrale.garde_fous import (
+    nettoyer_titre,
+    plafonner,
+    retirer_chiffres_hors_source,
+    retirer_urls_inventees,
+)
 from vm_centrale.inspecteur import (
     enregistrer_echange_echec,
     enregistrer_echange_succes,
@@ -174,9 +179,9 @@ _PROMPT_STYLE = (
     "Capacité réelle, avant toute autre consigne : tu n'as aucun accès à "
     "Internet, donc tu ne proposes jamais de lien, de PDF ou d'image à "
     "télécharger, et tu n'affirmes jamais qu'un lien a été vérifié ; si le "
-    "compte te demande un lien ou un fichier à télécharger, dis-lui d'emblée "
+    "utilisateur te demande un lien ou un fichier à télécharger, dis-lui d'emblée "
     "que tu n'as pas accès à Internet. Tu n'inventes jamais un fait, un "
-    "rapport, une source ou un chiffre, sauf si le compte te demande "
+    "rapport, une source ou un chiffre, sauf si l'utilisateur te demande "
     "explicitement d'inventer, d'imaginer ou de faire une hypothèse. Si tu "
     "n'es pas sûr qu'il faille inventer, pose la question de confirmation "
     "en tout début de réponse, et n'invente rien tant qu'il n'a pas "
@@ -209,7 +214,7 @@ _PROMPT_STYLE = (
     "- Markdown autorisé dans ta réponse : gras, italique, listes à puces "
     "ou numérotées, paragraphes, tableaux (uniquement quand l'information "
     "s'y prête vraiment, jamais par réflexe), blocs de code pour du code "
-    "ou une formule, et liens uniquement vers une URL que le compte a "
+    "ou une formule, et liens uniquement vers une URL que l'utilisateur a "
     "lui-même écrite dans cette conversation (jamais une autre URL, même "
     "une que tu crois connaître). "
     "Déconseillés : titres, séparateurs `---`, citations, images."
@@ -243,11 +248,11 @@ def _message_systeme_piece_jointe(piece_jointe: PieceJointe) -> dict[str, str]:
     return {
         "role": "system",
         "content": (
-            f"Pièce jointe « {piece_jointe.nom_fichier} » du message que le "
-            "compte vient d'envoyer à ce tour précis — ce n'est ni un "
+            f"Pièce jointe « {piece_jointe.nom_fichier} » du message que "
+            "l'utilisateur vient d'envoyer à ce tour précis — ce n'est ni un "
             "exemple, ni un rappel d'un tour antérieur. Règles :\n"
             "- Le fichier est déjà joint à ce tour : ne demande pas de "
-            "l'envoyer, même si le message du compte est au futur.\n"
+            "l'envoyer, même si le message de l'utilisateur est au futur.\n"
             "- Le contenu extrait ci-dessous est la seule description "
             "autorisée de ce fichier : n'affirme rien qui en soit absent "
             "(pas de schéma, de carte, de nœud ni de texte inventé).\n"
@@ -282,13 +287,37 @@ def _construire_messages_pour_mistral(
         messages.append({"role": "system", "content": resume_contexte})
     if profil_travail:
         messages.append(
-            {"role": "system", "content": f"Profil de travail du compte : {profil_travail}"}
+            {"role": "system", "content": f"Profil de travail de l'utilisateur : {profil_travail}"}
         )
     if piece_jointe is not None:
         messages.append(_message_systeme_piece_jointe(piece_jointe))
     messages.extend({"role": m.role, "content": m.contenu} for m in derniers_messages)
     messages.append({"role": "user", "content": nouveau_message})
     return messages
+
+
+# Phrase écrite par la VM, pas par le modèle (conversation 78 : la consigne
+# était dans l'appel, le modèle a quand même rédigé le rapport, puis s'est
+# couvert en bas). Affichée quand la réponse avance une donnée chiffrée que
+# ni le message du tour, ni une pièce jointe, ne contiennent — sauf demande
+# explicite d'inventer, d'imaginer ou de faire une hypothèse.
+_REPONSE_SANS_DONNEES = (
+    "Je n'ai pas accès à Internet et je n'ai pas de document pour appuyer une réponse."
+)
+_MOTIF_INVENTION = re.compile(
+    r"\b(inventer|invente|inventes|inventé|inventée|invention|imaginer|imagine|imagines|"
+    r"imaginé|imaginée|hypothèse|hypothese|hypothèses|hypotheses)\b",
+    re.IGNORECASE,
+)
+_MOTIF_NEGATION = re.compile(r"(?:n['’]|ne\s+)$", re.IGNORECASE)
+
+
+def _demande_invention(message: str) -> bool:
+    for correspondance in _MOTIF_INVENTION.finditer(message):
+        if _MOTIF_NEGATION.search(message[: correspondance.start()]):
+            continue
+        return True
+    return False
 
 
 def _reponse_sans_url_inventee(
@@ -306,6 +335,54 @@ def _reponse_sans_url_inventee(
     )
     textes_du_compte = [contenu for (contenu,) in messages_du_compte] + [nouveau_message]
     return retirer_urls_inventees(reponse, textes_du_compte)
+
+
+def _extraits_pieces_jointes(
+    db: Session, conversation_id: int, piece_jointe: PieceJointe | None
+) -> list[str]:
+    lignes = (
+        db.query(PieceJointe.contenu_extrait)
+        .filter(PieceJointe.conversation_id == conversation_id)
+        .all()
+    )
+    extraits = [extrait for (extrait,) in lignes if extrait and extrait.strip()]
+    extrait_du_tour = piece_jointe.contenu_extrait if piece_jointe is not None else None
+    if extrait_du_tour and extrait_du_tour.strip() and extrait_du_tour not in extraits:
+        extraits.append(extrait_du_tour)
+    return extraits
+
+
+def _reponse_visible(
+    db: Session,
+    conversation_id: int,
+    nouveau_message: str,
+    reponse: str,
+    piece_jointe: PieceJointe | None,
+) -> str:
+    # URL d'abord : un chiffre qui ne vivait que dans une URL inventée
+    # disparaît avec elle, et n'est pas relu comme une donnée.
+    reponse = _reponse_sans_url_inventee(db, conversation_id, nouveau_message, reponse)
+    if _demande_invention(nouveau_message):
+        return reponse
+    messages_du_compte = (
+        db.query(Message.contenu)
+        .filter(Message.conversation_id == conversation_id, Message.role == "user")
+        .all()
+    )
+    extraits = _extraits_pieces_jointes(db, conversation_id, piece_jointe)
+    textes_source = [contenu for (contenu,) in messages_du_compte] + [nouveau_message, *extraits]
+    sans_chiffre_invente = retirer_chiffres_hors_source(reponse, textes_source)
+    if sans_chiffre_invente == reponse:
+        return reponse
+    # Un document, ou un chiffre déjà écrit dans le message du tour : on
+    # retire seulement le chiffre absent. Sans rien de tout ça, la réponse
+    # entière devient la phrase fixe — un rapport troué n'est pas une réponse.
+    message_apporte_une_donnee = (
+        retirer_chiffres_hors_source(nouveau_message, []) != nouveau_message
+    )
+    if extraits or message_apporte_une_donnee:
+        return sans_chiffre_invente
+    return _REPONSE_SANS_DONNEES
 
 
 def _identite_connue(compte: Compte | None) -> str:
@@ -342,10 +419,10 @@ def _prompt_resume_et_profil(
         _ligne_message_sortant(m, pieces_jointes_sortantes.get(m.id)) for m in messages_sortants
     )
     return (
-        "Tu maintiens deux mémoires pour ce compte : un résumé glissant de la "
+        "Tu maintiens deux mémoires pour cet utilisateur : un résumé glissant de la "
         "conversation en cours, et un profil de travail inter-conversationnel "
         "décrivant sa façon de travailler.\n"
-        f"Identité déjà connue du compte, fait acquis — ne cherche jamais à la "
+        f"Identité déjà connue de l'utilisateur, fait acquis — ne cherche jamais à la "
         f"déterminer ni à la modifier : {_identite_connue(compte)}.\n"
         f"Résumé glissant actuel : {resume_contexte or '(vide)'}\n"
         f"Profil de travail actuel : {profil_travail or '(vide)'}\n"
@@ -364,18 +441,18 @@ def _prompt_resume_et_profil(
         "juste assez pour situer le sujet), jamais son contenu intégral. "
         "Dans resume_contexte, une affirmation de l'assistant (rapport, "
         "chiffre, URL) est notée « proposé, non vérifié » : jamais comme un "
-        "fait, jamais comme quelque chose que le compte a fourni. Un sujet "
-        "que le compte abandonne (« oublie », « laisse tomber ») sort du "
-        "résumé. Une URL écrite par le compte est recopiée à l'identique ; "
+        "fait, jamais comme quelque chose que l'utilisateur a fourni. Un sujet "
+        "que l'utilisateur abandonne (« oublie », « laisse tomber ») sort du "
+        "résumé. Une URL écrite par l'utilisateur est recopiée à l'identique ; "
         "une URL écrite par l'assistant n'est jamais gardée. "
         f"resume_contexte tient en {_TAILLE_MAX_RESUME_CONTEXTE} caractères au plus. "
         "profil_travail se fonde sur les seules lignes « user » (les "
-        "messages du compte), jamais sur une réponse de l'assistant. "
+        "messages de l'utilisateur), jamais sur une réponse de l'assistant. "
         "N'inclus jamais non plus dans profil_travail un trait "
         "décrivant ton propre comportement d'assistant (liens fournis, "
         "PDF proposés, vérification annoncée, ton adopté, suggestions "
         "d'outils externes que tu formules) : seul un trait observé chez "
-        "le compte lui-même, sa façon à lui de travailler, y a sa place. "
+        "l'utilisateur lui-même, sa façon à lui de travailler, y a sa place. "
         f"profil_travail tient en {_TAILLE_MAX_PROFIL_TRAVAIL} caractères au plus."
     )
 
@@ -570,7 +647,9 @@ def creer_conversation(
             logger.exception(_MSG_ECHEC_RELAIS_LOG)
             raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
 
-        reponse = _reponse_sans_url_inventee(db, conversation.id, requete.message, reponse_chat.contenu)
+        reponse = _reponse_visible(
+            db, conversation.id, requete.message, reponse_chat.contenu, piece_jointe
+        )
 
         try:
             reponse_titrage = client.chat(_prompt_titrage(requete.message, reponse))
@@ -1305,7 +1384,9 @@ def envoyer_message(
             piece_jointe_id,
         )
 
-        reponse = _reponse_sans_url_inventee(db, conversation.id, requete.message, reponse_chat.contenu)
+        reponse = _reponse_visible(
+            db, conversation.id, requete.message, reponse_chat.contenu, piece_jointe
+        )
 
         maintenant = datetime.now(timezone.utc)
         if resume_maj is not None:

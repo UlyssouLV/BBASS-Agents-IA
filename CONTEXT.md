@@ -72,5 +72,5 @@ Un appel Mistral réel capturé pour le Mode développeur — le payload exact e
 _Avoid_: appel (seul, trop vague), tour (un tour de chat peut produire plusieurs échanges, ex. tool calling)
 
 **Garde-fou**:
-Une correction appliquée par la VM centrale à ce que le modèle produit malgré sa consigne (ex. retirer une URL que le compte n'a pas écrite, plafonner le résumé glissant ou le profil de travail, nettoyer le Markdown d'un titre) ([spec 1.3.1](docs/specs/v1.3.1-chat-ne-fige-plus-ses-inventions.md)). Tous regroupés dans `vm-centrale/src/vm_centrale/garde_fous/`, listés dans son `README.md`. Ne remplace pas la consigne : il garantit ce qu'elle seule ne garantit pas.
+Une correction appliquée par la VM centrale à ce que le modèle produit malgré sa consigne (ex. retirer une URL ou un chiffre que le compte n'a pas écrit, remplacer par une phrase fixe une réponse chiffrée sans document, plafonner le résumé glissant ou le profil de travail, nettoyer le Markdown d'un titre) ([spec 1.3.1](docs/specs/v1.3.1-chat-ne-fige-plus-ses-inventions.md)). Tous regroupés dans `vm-centrale/src/vm_centrale/garde_fous/`, listés dans son `README.md`. Ne remplace pas la consigne : il garantit ce qu'elle seule ne garantit pas.
 _Avoid_: filtre, sanitizer

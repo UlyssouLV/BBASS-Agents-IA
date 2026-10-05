@@ -1137,6 +1137,96 @@ def test_url_du_compte_sortie_de_la_fenetre_passe_et_url_inventee_est_retiree(
     assert detail.json()["messages"][-1]["contenu"] == contenu
 
 
+_REPONSE_SANS_DONNEES = (
+    "Je n'ai pas accès à Internet et je n'ai pas de document pour appuyer une réponse."
+)
+
+
+def test_chiffre_absent_sans_document_est_remplace_par_la_phrase_fixe(
+    client, mistral_client_factice, jeton_valide
+):
+    mistral_client_factice.repondre(
+        "Écart de 52,3 ans, soit 22 % de plus.",
+        "Titre",
+    )
+
+    reponse = client.post(
+        "/conversations",
+        json={"message": "Raconte-moi un rapport avec des données"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert reponse.status_code == 200
+    assert reponse.json()["reponse"] == _REPONSE_SANS_DONNEES
+    detail = client.get(
+        f"/conversations/{reponse.json()['conversation']['id']}",
+        headers=_autorisation(jeton_valide),
+    )
+    assert detail.json()["messages"][-1]["contenu"] == _REPONSE_SANS_DONNEES
+
+
+def test_demande_explicite_d_inventer_conserve_le_chiffre(
+    client, mistral_client_factice, jeton_valide
+):
+    mistral_client_factice.repondre("Écart imaginé : 52,3 ans.", "Titre")
+
+    reponse = client.post(
+        "/conversations",
+        json={"message": "Imagine un rapport avec des données"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert reponse.json()["reponse"] == "Écart imaginé : 52,3 ans."
+
+
+def test_chiffre_ecrit_par_le_compte_reste_et_le_chiffre_absent_part(
+    client, mistral_client_factice, jeton_valide
+):
+    mistral_client_factice.repondre(
+        "Le taux est 1,7 %, et l'écart atteint 52,3 ans.",
+        "Titre",
+    )
+
+    reponse = client.post(
+        "/conversations",
+        json={"message": "Le taux indiqué est 1,7 %. Résume-le."},
+        headers=_autorisation(jeton_valide),
+    )
+
+    contenu = reponse.json()["reponse"]
+    assert "1,7" in contenu
+    assert "52,3" not in contenu
+    assert contenu != _REPONSE_SANS_DONNEES
+
+
+def test_piece_jointe_conserve_le_chiffre_de_lextrait(
+    client, mistral_client_factice, jeton_valide, _repertoire_pieces_jointes
+):
+    mistral_client_factice.repondre_ocr("Besoins non satisfaits : 1,7 %.")
+    upload = client.post(
+        "/pieces-jointes",
+        files={"fichier": ("document.pdf", b"%PDF-1.4 contenu factice", "application/pdf")},
+        headers=_autorisation(jeton_valide),
+    )
+    piece_jointe_id = upload.json()["piece_jointe"]["id"]
+    mistral_client_factice.repondre(
+        "Le document indique 1,7 % et un écart de 52,3 ans.",
+        "Titre",
+    )
+
+    reponse = client.post(
+        "/conversations",
+        json={"message": "Que dit ce document ?", "piece_jointe_id": piece_jointe_id},
+        headers=_autorisation(jeton_valide),
+    )
+
+    contenu = reponse.json()["reponse"]
+    assert reponse.status_code == 200
+    assert "1,7" in contenu
+    assert "52,3" not in contenu
+    assert contenu != _REPONSE_SANS_DONNEES
+
+
 def test_consigne_de_style_commence_par_la_capacite_reelle(
     client, mistral_client_factice, jeton_valide
 ):
@@ -1152,7 +1242,7 @@ def test_consigne_de_style_commence_par_la_capacite_reelle(
     assert "vérifié" in premiere_ligne
     assert "n'inventes jamais" in premiere_ligne
     assert "question de confirmation" in premiere_ligne
-    assert "que le compte a lui-même écrite dans cette conversation" in consigne["content"]
+    assert "que l'utilisateur a lui-même écrite dans cette conversation" in consigne["content"]
     assert "que tu connais avec certitude" not in consigne["content"]
 
 

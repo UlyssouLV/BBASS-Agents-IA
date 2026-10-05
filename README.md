@@ -51,8 +51,8 @@ flowchart LR
 
 ### Reste à implémenter
 
-- **V1.3.1** — le chat ne fige plus ses inventions ([#110](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/110)) : consignes, résumé glissant, profil de travail.
-- **V1.4.0** — recherche web dans le chat (outil exécuté par la VM ; le modèle ne cite qu’une URL revenue de l’outil). Les function calling du modèle sont centralisés.
+- **V1.3.1** — le chat ne fige plus ses inventions ([#110](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/110)) : consignes, résumé glissant, profil de travail. Sans document, un chiffre que le compte n’a pas écrit est remplacé par une phrase fixe de la VM.
+- **V1.4.0** — recherche web dans le chat (outil exécuté par la VM ; le modèle ne cite qu’une URL revenue de l’outil, et un chiffre seulement s’il est dans le texte ramené). Les function calling du modèle sont centralisés.
 - **V1.5.0** — Moduléo en lecture (outil transverse), premier branchement via l’Agent Administration.
 - **V1.6.0** — déploiement postes : CI/CD, conteneurisation, installateur / logiciel d’accès au chat (backend local obligatoire) — **priorité**.
 - **V1.7.0** — workflows n8n, branchés sur Moduléo 1.5.0 — **proposé cette semaine** après la 1.6.0.
@@ -60,8 +60,8 @@ flowchart LR
 ### Attendu pour la fin de semaine (V1.6.0 prioritaire, V1.7.0 visé)
 
 - **Déjà en place** — poste + VM Castries, PostgreSQL, chat Mistral, conversations bornées + résumé + profil, pièces jointes, consommation, comptes administrateurs, UI React BBASS, style 1.2.2, fluidité 1.2.3, inspecteur des échanges 1.3.0.
-- **V1.3.1** — le résumé et le profil ne réinjectent plus les inventions du modèle comme des faits.
-- **V1.4.0** — une demande « trouve-moi… » passe par une recherche réelle, pas par une URL inventée.
+- **V1.3.1** — le résumé et le profil ne réinjectent plus les inventions du modèle comme des faits. Sans document, un chiffre inventé est remplacé par une phrase fixe.
+- **V1.4.0** — une demande « trouve-moi… » passe par une recherche réelle ; la réponse ne garde que les chiffres du texte ramené.
 - **V1.5.0** — Q&A lecture Moduléo depuis le chat (pour usage collab pendant l’absence alternance).
 - **V1.6.0** — pouvoir **installer / mettre à jour** le logiciel sur les postes (CI/CD, Docker si retenu, installateur ; UI pywebview et/ou navigateur — à trancher).
 - **V1.7.0** — socle n8n branché sur Moduléo 1.5.0 (on tente de le livrer jeudi ; non bloquant si seule la 1.6.0 passe).
