@@ -4,7 +4,7 @@ Logiciel d'agents IA pour le cabinet de géomètres-experts BBASS. L'objectif es
 
 ## État actuel
 
-**V1.3.1** disponible : le chat ne fige plus ses inventions ([#110](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/110)). L'IA ne propose plus de lien (seule une URL écrite par le compte peut ressortir) ni de fait inventé sans demande explicite ; une pièce jointe est décrite par son seul extrait ; le résumé glissant note comme « proposé, non vérifié » ce que l'assistant a affirmé (plafond 1 500 caractères) ; le profil de travail est réécrit en entier sous 800 caractères au lieu d'empiler. Des garde-fous côté VM (`vm_centrale/garde_fous/`) retirent les URL que le compte n'a pas écrites et, sans document, remplacent une réponse chiffrée par une phrase fixe. Hérite de la **V1.3.0** : Mode développeur (outil de débogage, pas un écran métier) — `Ctrl+Maj+D` depuis n'importe quel compte ouvre un nouvel onglet `/inspecteur`, débloqué par la Clé d'administration VM, qui montre pour toute conversation de tout compte ([ADR-0012](docs/adr/0012-mode-developpeur-cle-admin-vm-tous-comptes.md)) chaque appel Mistral réel dans l'ordre (chat, titrage, résumé+profil, OCR, vision, tool calling) avec le payload exact envoyé et la réponse brute reçue, échecs compris. Hérite de la V1.2.3 : délais de chargement réduits sur les navigations et l'ouverture/bascule de conversation — cache TanStack Query revu par requête (conversation, Profil, Panel d'administration) avec `placeholderData` sur le détail de conversation pour supprimer le flash d'état vide, pagination par curseur du détail d'une conversation (fenêtre récente par défaut, historique plus ancien chargé au défilement façon ChatGPT), instrumentation de temps légère (`performance.mark`/`performance.measure`, désactivée par défaut) réutilisée par la 1.3.0. Hérite aussi du style de réponse de l'IA (1.2.2 — vouvoiement, Markdown borné) et de l'identité visuelle du poste aux couleurs du cabinet BBASS (palette anthracite/rouge, police Manrope auto-hébergée, logo, favicon) et de la disposition façon ChatGPT (sidebar avec conversations et puce compte, page Profil dédiée, Panel d'administration dédié avec tableaux/étiquettes shadcn/ui). Backend local **poste** (interface React/TypeScript/Vite, shadcn/ui) et API **VM centrale** (comptes administrateurs PostgreSQL, relais Mistral, conversations persistées avec historique borné, résumé glissant et profil de travail, pièces jointes PDF/Word/Excel/image avec extraction et rappel via outil hors fenêtre, suivi de la consommation Mistral — tokens/pages et coût figé au tarif du jour, par conversation côté collaborateur et agrégé par compte côté administrateur). Les agents métiers ne sont pas encore construits.
+**V1.4.0** disponible : recherche web dans le chat ([#117](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/117)). L'IA peut appeler l'outil `rechercher_web` ; la VM interroge un SearXNG auto-hébergé ([ADR-0013](docs/adr/0013-recherche-web-searxng-auto-heberge.md)), lit les pages, les fait passer par un appel d'extraction isolé ([ADR-0014](docs/adr/0014-recherche-web-en-deux-temps-extraction-isolee.md)), et n'autorise que les URL et chiffres issus de ces résultats. Les outils du modèle sont centralisés dans `vm_centrale/outils/` ; la boucle traite tous les appels sur 3 tours au plus ; l'inspecteur montre le déroulé chronologique (Mistral / local, ligne garde-fous). Bug connu à la livraison : quand la recherche ne trouve rien, l'IA invente encore parfois au lieu de le dire ([#131](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/131), correction en **1.4.5**). Hérite de la **V1.3.1** : le chat ne fige plus ses inventions ([#110](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/110)) — pas de lien inventé, faits inventés refusés sans demande explicite, résumé glissant « proposé, non vérifié », profil réécrit en entier, garde-fous URL et chiffres. Hérite de la **V1.3.0** : Mode développeur (`Ctrl+Maj+D`, Clé d'administration VM, [ADR-0012](docs/adr/0012-mode-developpeur-cle-admin-vm-tous-comptes.md)). Hérite aussi de la fluidité 1.2.3, du style 1.2.2 et de l'identité visuelle BBASS. Backend local **poste** (React/TypeScript/Vite) et API **VM centrale** (PostgreSQL, relais Mistral, conversations, pièces jointes, consommation, recherche web). Les agents métiers ne sont pas encore construits.
 
 ## Ce qu'on construit
 
@@ -21,25 +21,26 @@ Une application composée d'un backend Python et d'une interface web (HTML/CSS/J
 
 ## Architecture
 
-Le poste n’appelle jamais Mistral directement : tout passe par la VM centrale (réseau interne), qui détient aussi PostgreSQL et la clé API.
+Le poste n’appelle jamais Mistral directement : tout passe par la VM centrale (réseau interne), qui détient aussi PostgreSQL, la clé API et le moteur de recherche SearXNG.
 
 ```mermaid
 flowchart LR
   P["Poste<br/>UI locale"] -->|"jamais Mistral"| VM["VM Castries<br/>réseau interne"]
   VM --> PG[("PostgreSQL")]
   VM --> M["API Mistral"]
+  VM --> S["SearXNG<br/>localhost"]
 ```
 
 ## Semaine du 05 au 09 octobre 2026
 
-Point visé jeudi 8 octobre : enchaînement jusqu’à **V1.7.0** (n8n) — **priorité V1.6.0** (déploiement postes / CI/CD), puis **V1.7.0** si le temps le permet. Avant Moduléo : **V1.4.0** (recherche web), après la **V1.3.1** livrée (le chat ne fige plus ses inventions). Vendredi 9 : RTT.
+Point visé jeudi 8 octobre : **V1.5.0** (Moduléo lecture), puis **priorité V1.7.0** (déploiement postes / CI/CD), **V1.8.0** (n8n) si le temps le permet. **V1.4.0** livrée le 06/10 (recherche web ; bug connu [#131](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/131) → **1.4.5**). Vendredi 9 : RTT.
 
 ```mermaid
 flowchart LR
-  L05["Lundi 5<br/>V1.2.3, V1.3.0 et V1.3.1 livrées"] --> V140["V1.4.0<br/>recherche web<br/>livraison prévue le 06/10"]
-  V140 --> V150["V1.5.0<br/>Moduléo lecture<br/>livraison prévue le 07/10"]
-  V150 --> V160["V1.6.0<br/>déploiement · priorité<br/>livraison prévue le 07/10"]
-  V160 --> V170["V1.7.0<br/>n8n<br/>livraison prévue le 08/10"]
+  L05["Lundi 5<br/>V1.2.3, V1.3.0 et V1.3.1 livrées"] --> V140["V1.4.0<br/>recherche web<br/>livrée le 06/10"]
+  V140 --> V150["V1.5.0<br/>Moduléo lecture<br/>visé le 07/10"]
+  V150 --> V170["V1.7.0<br/>déploiement · priorité"]
+  V170 --> V180["V1.8.0<br/>n8n<br/>visé le 08/10"]
 ```
 
 ### Travail réalisé
@@ -47,21 +48,22 @@ flowchart LR
 - **Semaine du 14–18 septembre** — socle jusqu’à **V1.2.0** (comptes admin, persistance conversations, pièces jointes, consommation, front React/TypeScript/Vite).
 - **Depuis** — **V1.2.1** (identité visuelle BBASS, disposition type ChatGPT) ; **V1.2.2** (prompt système de style sur le chat principal ; rendu Markdown borné côté poste).
 - **Lundi 5 octobre** — **V1.2.3** (cache TanStack Query, pagination par curseur du détail de conversation, instrumentation de temps légère) ; **V1.3.0** (Mode développeur : inspecteur des échanges avec le modèle) ; **V1.3.1** (le chat ne fige plus ses inventions, [#110](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/110) : consignes, résumé glissant, profil de travail, garde-fous URL et chiffres).
+- **Mardi 6 octobre** — **V1.4.0** (recherche web : SearXNG, `rechercher_web`, extraction isolée, outils centralisés, inspecteur Mistral / local ; bug connu [#131](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/131) → 1.4.5).
 
 ### Reste à implémenter
 
-- **V1.4.0** — recherche web dans le chat (outil exécuté par la VM ; le modèle ne cite qu’une URL revenue de l’outil, et un chiffre seulement s’il est dans le texte ramené). Les function calling du modèle sont centralisés. Bug connu à la livraison : quand la recherche ne trouve rien, l’IA invente encore au lieu de le dire ([#131](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/131), corrigé en 1.4.5).
+- **V1.4.5** — dire « pas trouvé » plutôt qu’inventer après une recherche ([#131](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/131)).
 - **V1.5.0** — Moduléo en lecture (outil transverse), premier branchement via l’Agent Administration.
-- **V1.6.0** — déploiement postes : CI/CD, conteneurisation, installateur / logiciel d’accès au chat (backend local obligatoire) — **priorité**.
-- **V1.7.0** — workflows n8n, branchés sur Moduléo 1.5.0 — **proposé cette semaine** après la 1.6.0.
+- **V1.6.0** — documentation : mémoire conversationnelle et souveraineté des données.
+- **V1.7.0** — déploiement postes : CI/CD, conteneurisation, installateur / logiciel d’accès au chat (backend local obligatoire) — **priorité**.
+- **V1.8.0** — workflows n8n, branchés sur Moduléo 1.5.0 — **proposé cette semaine** après la 1.7.0.
 
-### Attendu pour la fin de semaine (V1.6.0 prioritaire, V1.7.0 visé)
+### Attendu pour la fin de semaine (V1.7.0 prioritaire, V1.8.0 visé)
 
-- **Déjà en place** — poste + VM Castries, PostgreSQL, chat Mistral, conversations bornées + résumé + profil, pièces jointes, consommation, comptes administrateurs, UI React BBASS, style 1.2.2, fluidité 1.2.3, inspecteur des échanges 1.3.0, chat sans inventions figées 1.3.1.
-- **V1.4.0** — une demande « trouve-moi… » passe par une recherche réelle ; la réponse ne garde que les chiffres du texte ramené.
+- **Déjà en place** — poste + VM Castries, PostgreSQL, chat Mistral, conversations bornées + résumé + profil, pièces jointes, consommation, comptes administrateurs, UI React BBASS, style 1.2.2, fluidité 1.2.3, inspecteur 1.3.0, chat sans inventions figées 1.3.1, **recherche web 1.4.0** (SearXNG).
 - **V1.5.0** — Q&A lecture Moduléo depuis le chat (pour usage collab pendant l’absence alternance).
-- **V1.6.0** — pouvoir **installer / mettre à jour** le logiciel sur les postes (CI/CD, Docker si retenu, installateur ; UI pywebview et/ou navigateur — à trancher).
-- **V1.7.0** — socle n8n branché sur Moduléo 1.5.0 (on tente de le livrer jeudi ; non bloquant si seule la 1.6.0 passe).
+- **V1.7.0** — pouvoir **installer / mettre à jour** le logiciel sur les postes (CI/CD, Docker si retenu, installateur ; UI pywebview et/ou navigateur — à trancher).
+- **V1.8.0** — socle n8n branché sur Moduléo 1.5.0 (on tente de le livrer jeudi ; non bloquant si seule la 1.7.0 passe).
 
 ## Prérequis
 
