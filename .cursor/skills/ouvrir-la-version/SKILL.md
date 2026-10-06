@@ -31,7 +31,7 @@ If the current branch is **`main`**: do **not** write roles **`spec`**, **`gloss
 
 ## 3. `/to-spec` (content first)
 
-Matt’s next step is **`/to-spec`**. Synthesize the full spec (problem, solution, user stories, implementation/testing, out of scope). Publish the **parent GitHub issue** (`ready-for-agent`). Do not overwrite a previous version’s spec issue.
+Matt’s next step is **`/to-spec`**. Synthesize the full spec (problem, solution, user stories, implementation/testing, out of scope), plus **Changements apportés aux versions antérieures** in the format of `agents/issue-tracker.md` (*Changes to earlier versions*): `Aucun.` when this version changes nothing an earlier version shipped. Publish the **parent GitHub issue** (`ready-for-agent`). Do not overwrite a previous version’s spec issue.
 
 Still **do not** commit that spec onto `main`.
 

@@ -69,7 +69,11 @@ Run skill **`creer-release`** as if the user had typed **`/crel vX.Y.Z`**. That 
 
 Then run skill **`fusionner-pr`** as if the user had typed **`/mpr`**.
 
-## 5. Stop
+## 5. Annotate earlier versions
+
+Read the spec section **Changements apportés aux versions antérieures** (format and blocks: `agents/issue-tracker.md`, *Changes to earlier versions*). `Aucun.` or no section → one line, go to step 6. Otherwise annotate each row's targets. Never stop the version on this step: a target that fails is listed in the final reply.
+
+## 6. Stop
 
 Do not start the next version’s branch unless the user asks.
 
