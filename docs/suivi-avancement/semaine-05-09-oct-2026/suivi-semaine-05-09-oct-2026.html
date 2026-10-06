@@ -396,14 +396,14 @@
             <div class="toc-row">
               <a href="#reste-a-implementer">Reste à implémenter</a>
               <span class="toc-dots" aria-hidden="true"></span>
-              <span class="toc-ref">à partir de V1.4.0</span>
+              <span class="toc-ref">V1.4.1 → …</span>
             </div>
           </li>
           <li>
             <div class="toc-row">
-              <a href="#livre-pour">Livré pour le 05/10/2026</a>
+              <a href="#livre-pour">Livré pour le 08/10/2026</a>
               <span class="toc-dots" aria-hidden="true"></span>
-              <span class="toc-ref">lundi 5 oct.</span>
+              <span class="toc-ref">jeudi 8 oct.</span>
             </div>
           </li>
           <li>
@@ -419,8 +419,9 @@
               <li><a href="#version-1-3-1">V1.3.1 — Le chat ne fige plus ses inventions</a></li>
               <li><a href="#version-1-4-0">V1.4.0 — Recherche web</a></li>
               <li><a href="#version-1-5-0">V1.5.0 — Moduléo lecture</a></li>
-              <li><a href="#version-1-6-0">V1.6.0 — Déploiement postes</a></li>
-              <li><a href="#version-1-7-0">V1.7.0 — Workflows n8n</a></li>
+              <li><a href="#version-1-6-0">V1.6.0 — Documentation mémoire / souveraineté</a></li>
+              <li><a href="#version-1-7-0">V1.7.0 — Déploiement postes</a></li>
+              <li><a href="#version-1-8-0">V1.8.0 — Workflows n8n</a></li>
             </ol>
           </li>
           <li>
@@ -445,30 +446,29 @@
         <li>Livraison de la <strong>V1.2.3</strong> (14:52) : conversations et écrans plus fluides (cache, historique chargé au défilement, mesures de temps pour le suivi).</li>
         <li>Livraison de la <strong>V1.3.0</strong> (17:04) : Mode développeur et inspecteur des échanges avec le modèle (voir exactement ce qui est envoyé à Mistral et ce qui revient, y compris en cas d’échec).</li>
         <li>Essai manuel après livraison : le chat invente encore un rapport, des chiffres et des liens, puis les réinjecte dans sa mémoire — ouverture puis livraison de la <strong>V1.3.1</strong> (18:48) : consignes resserrées, résumé et profil fiables, garde-fous URL et chiffres.</li>
-        <li>Planification de la suite : recherche web (V1.4.0, livraison prévue le 06/10), Moduléo en lecture (V1.5.0, 07/10), déploiement postes (V1.6.0, 07/10, priorité) et n8n (V1.7.0, 08/10).</li>
+        <li>Planification de la suite.</li>
       </ul>
     </div>
 
     <div class="jour">
       <h3>Mardi 6 octobre</h3>
       <ul>
-        <li>Ouverture et avancement de la <strong>V1.4.0</strong> (recherche web dans le chat) : SearXNG auto-hébergé, outil <code>rechercher_web</code>, lecture des pages, appel d’extraction isolé, registre d’outils, boucle sur 3 tours, inspecteur Mistral / local.</li>
-        <li>Feuille de route mise à jour (tokenizer, cache pages, statut d’attente dynamique, documentation mémoire / souveraineté, décalage déploiement / n8n) ; outils du modèle rangés en paquets documentés.</li>
-        <li><span class="echeance">Livraison prévue V1.4.0 : 06/10.</span></li>
+        <li>Ouverture, implémentation et <strong>livraison de la V1.4.0</strong> (13:25) : recherche web dans le chat — SearXNG auto-hébergé, outil <code>rechercher_web</code>, pages entières nettoyées, appel d’extraction isolé, registre d’outils, boucle sur 3 tours, inspecteur Mistral / local avec ligne garde-fous.</li>
+        <li>Test humain (conversations 85 à 92) puis corrections livrées avec la version : fil d’une autre conversation (#127), URL abîmées par le garde-fou des chiffres (#128), pages à chaîne de certificats incomplète (#129), date du jour pour les recherches d’actualité (#130).</li>
+        <li>Bug connu à la livraison (#131) : quand la recherche ne trouve rien, l’IA invente encore au lieu de le dire — correction reportée en « Plus tard ».</li>
+        <li>Process : les tickets enfants d’une version sont aussi des sub-issues GitHub (compteur Y/Z sur le parent).</li>
       </ul>
     </div>
 
     <div class="jour">
       <h3>Mercredi 7 octobre</h3>
       <ul>
-        <li>À compléter. <span class="echeance">Livraison prévue : V1.5.0 (Moduléo lecture) et V1.6.0 (déploiement postes).</span></li>
       </ul>
     </div>
 
     <div class="jour">
       <h3>Jeudi 8 octobre</h3>
       <ul>
-        <li>À compléter. <span class="echeance">Livraison prévue : V1.7.0 (workflows n8n), si le temps le permet après la V1.6.0.</span></li>
       </ul>
     </div>
 
@@ -484,18 +484,23 @@
     <section class="bloc" id="reste-a-implementer">
     <h2>Reste à implémenter</h2>
     <ul>
-      <li><strong>V1.4.0</strong> — recherche web dans le chat (outil exécuté par la VM, pour citer une vraie page plutôt qu’une adresse inventée). <em>En cours ; livraison prévue le 06/10.</em></li>
       <li><strong>V1.4.1</strong> — mémoire de la conversation (pièces jointes et recherches hors fenêtre).</li>
-      <li><strong>V1.5.0</strong> — Moduléo en lecture seule depuis le chat, via le premier Agent métier (pôle Administration). <em>Livraison prévue le 07/10.</em></li>
-      <li><strong>V1.6.0</strong> — déploiement postes (CI/CD, conteneurisation, installateur) — priorité avant l’absence à l’école. <em>Livraison prévue le 07/10.</em></li>
-      <li><strong>V1.7.0</strong> — workflows n8n (automatisations), branchés sur Moduléo. <em>Livraison prévue le 08/10.</em></li>
+      <li><strong>V1.4.2</strong> — tokenizer Mistral pour le plafond des pages web.</li>
+      <li><strong>V1.4.3</strong> — cache des pages web entre conversations.</li>
+      <li><strong>V1.4.4</strong> — statut d’attente dynamique pendant une réponse.</li>
+      <li><strong>V1.5.0</strong> — Moduléo en lecture seule depuis le chat, via le premier Agent métier (pôle Administration).</li>
+      <li><strong>V1.6.0</strong> — documentation : mémoire conversationnelle et souveraineté des données.</li>
+      <li><strong>V1.7.0</strong> — déploiement postes (CI/CD, conteneurisation, installateur) — priorité avant l’absence à l’école.</li>
+      <li><strong>V1.8.0</strong> — workflows n8n (automatisations), branchés sur Moduléo.</li>
+      <li><strong>V1.9.0</strong> — analyse et traitement des pièces jointes, approfondis.</li>
+      <li><strong>Plus tard</strong> — dire « pas trouvé » plutôt qu’inventer après une recherche (#131, ex-1.4.5) ; optimisation de la recherche web ; pages refusées / PDF ; vérification de la fiabilité des sources ; modes Rapide / Approfondi.</li>
     </ul>
     </section>
 
     <section class="bloc" id="livre-pour">
-    <h2>Livré pour le 05/10/2026</h2>
+    <h2>Livré pour le 08/10/2026</h2>
     <div class="recap">
-      <p><strong>Point lundi 5 octobre — livré : V1.2.2, V1.2.3, V1.3.0 et V1.3.1</strong></p>
+      <p><strong>Point jeudi 8 octobre — livré à ce jour : V1.2.2, V1.2.3, V1.3.0, V1.3.1 et V1.4.0</strong></p>
       <h3>Style et lecture du chat (V1.2.2)</h3>
       <ul>
         <li>Réponses de l’IA au ton professionnel : vouvoiement, sans remplissage ni relance systématique en fin de message ; emojis seulement quand ils portent un vrai signal.</li>
@@ -516,12 +521,19 @@
         <li>Plus de liens inventés (seule une URL écrite par le compte peut ressortir) ; faits inventés refusés sans demande explicite.</li>
         <li>Résumé glissant plafonné qui note « proposé, non vérifié » ; profil de travail réécrit en entier ; garde-fous URL et chiffres côté VM.</li>
       </ul>
+      <h3>Recherche web dans le chat (V1.4.0)</h3>
+      <ul>
+        <li>Le collaborateur demande une information ; la VM cherche via SearXNG (auto-hébergé, sans clé), lit les pages, en extrait l’essentiel, et l’IA répond en citant de vraies URL.</li>
+        <li>Outils du modèle rangés au même endroit ; plusieurs outils possibles dans un même tour (jusqu’à 3 allers-retours) ; l’inspecteur montre tout le déroulé (Mistral / local, garde-fous).</li>
+        <li>Corrections du test humain livrées avec : nouvelle conversation sans fil parasite, URL intactes malgré les chiffres, pages officielles lisibles malgré une chaîne TLS incomplète, année en cours pour une actualité.</li>
+        <li>Bug connu à la livraison (#131) : quand la recherche ne trouve rien, l’IA invente encore parfois — correction reportée en « Plus tard ».</li>
+      </ul>
     </div>
     </section>
 
     <section class="bloc versions" id="descriptif-versions">
       <h2>Descriptif des versions</h2>
-      <p class="lead">Versions livrées depuis le bilan précédent, puis prévisionnel de la semaine (dates de livraison prévue).</p>
+      <p class="lead">Versions livrées depuis le bilan précédent, puis prévisionnel de la semaine (feuille de route à jour au 06/10).</p>
 
       <div class="version" id="version-1-2-2">
         <div class="version-head">
@@ -569,10 +581,11 @@
       <div class="version" id="version-1-4-0">
         <div class="version-head">
           <h3>V1.4.0 — Recherche web dans le chat</h3>
-          <span class="prevu">Livraison prévue le 06/10/2026</span>
+          <span class="deploye">Déployé le 06/10/2026 à 13:25</span>
         </div>
         <div class="version-body">
-        <p>Outil de recherche internet exécuté par la VM : le modèle trouve une page réelle au lieu d’en inventer l’adresse. SearXNG auto-hébergé, lecture des pages, extraction isolée, outils centralisés, boucle sur trois tours. En cours d’implémentation.</p>
+        <p>Outil de recherche internet exécuté par la VM : le modèle trouve une page réelle au lieu d’en inventer l’adresse. SearXNG auto-hébergé (sans clé ni quota), lecture des pages entières, extraction isolée du contexte de conversation, outils centralisés, boucle sur trois tours, inspecteur chronologique. Seules les URL et les chiffres provenant des pages lues restent dans la réponse.</p>
+        <p>Livrée avec un bug connu (#131) : si la recherche ne trouve rien d’utile, l’IA peut encore inventer — correction reportée en « Plus tard ».</p>
         </div>
       </div>
 
@@ -588,21 +601,31 @@
 
       <div class="version" id="version-1-6-0">
         <div class="version-head">
-          <h3>V1.6.0 — Déploiement postes</h3>
-          <span class="prevu">Livraison prévue le 07/10/2026</span>
+          <h3>V1.6.0 — Documentation mémoire et souveraineté</h3>
+          <span class="prevu">Ensuite (après Moduléo lecture)</span>
         </div>
         <div class="version-body">
-        <p>Chaîne de déploiement pour installer et mettre à jour le logiciel sur les postes : CI/CD, conteneurisation si retenue, installateur / accès UI (backend local obligatoire). Priorité de fin de semaine avant l’absence à l’école.</p>
+        <p>Deux documents produit : persistance de la mémoire conversationnelle, et cartographie de la souveraineté des données (ce qui reste chez le cabinet vs Mistral / SearXNG). Pas de nouvelle capacité code hors doc.</p>
         </div>
       </div>
 
       <div class="version" id="version-1-7-0">
         <div class="version-head">
-          <h3>V1.7.0 — Workflows n8n</h3>
+          <h3>V1.7.0 — Déploiement postes</h3>
+          <span class="prevu">Priorité fin de semaine</span>
+        </div>
+        <div class="version-body">
+        <p>Chaîne de déploiement pour installer et mettre à jour le logiciel sur les postes : CI/CD, conteneurisation si retenue, installateur / accès UI (backend local obligatoire). Priorité avant l’absence à l’école.</p>
+        </div>
+      </div>
+
+      <div class="version" id="version-1-8-0">
+        <div class="version-head">
+          <h3>V1.8.0 — Workflows n8n</h3>
           <span class="prevu">Livraison prévue le 08/10/2026</span>
         </div>
         <div class="version-body">
-        <p>Socle d’automatisation n8n, branché sur Moduléo 1.5.0 : déclencher / composer des workflows sans god-mode. Visé jeudi si la V1.6.0 est passée.</p>
+        <p>Socle d’automatisation n8n, branché sur Moduléo 1.5.0 : déclencher / composer des workflows sans god-mode. Visé jeudi si le déploiement le permet.</p>
         </div>
       </div>
     </section>

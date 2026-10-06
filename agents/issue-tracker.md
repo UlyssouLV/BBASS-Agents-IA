@@ -44,6 +44,31 @@ Used by `ouvrir-la-version` (`/to-tickets`) and by any later child created under
 
 Never `/implement` the parent. Closing children is `encadrer-implement` / `fermer-ticket-enfant`; the parent closes via squash `Fixes #<parent>`.
 
+## Changes to earlier versions
+
+A version may change behaviour that an earlier version shipped (a renamed tool, a raised limit, a replaced mechanism). The record is one section of the version spec (role `spec`), written by `ouvrir-la-version` and read by `finaliser-la-version`:
+
+```markdown
+## Changements apportés aux versions antérieures
+
+| Version | Élément | Avant | Après | À annoter |
+| --- | --- | --- | --- | --- |
+| 1.4.0 | Boucle d'outils | 3 appels principaux par message | 5 | `v1.4.0`, #117, #119 |
+```
+
+- One row per changed behaviour. **À annoter**: the earlier release tag and the earlier issues (spec, child) that describe the old behaviour.
+- Nothing changed → the section holds the single line `Aucun.` Missing section = `Aucun.`
+
+After the squash-merge, each row becomes one block, prepended to the earlier release notes (`gh release edit <tag> --notes-file`) and posted as a comment on each listed issue (`gh issue comment`):
+
+```markdown
+> **Modifié en VX.Y.Z** ([#<parent>](<parent url>)) — <Élément>
+> Avant : <Avant>
+> Après : <Après>
+```
+
+Skip a target that already holds the block for `VX.Y.Z` and that element. `Aucun.`, a missing section, or a failed annotation never blocks a release: report it in one line and continue.
+
 ## Wayfinding operations
 
 Used by `/wayfinder`. The **map** is a single issue with **child** issues as tickets.

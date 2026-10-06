@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import re
+from bisect import bisect_right
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timezone
@@ -18,9 +19,11 @@ from vm_centrale.consommation import enregistrer_consommation
 from vm_centrale.database import get_db
 from vm_centrale.garde_fous import (
     nettoyer_titre,
+    normaliser_url,
     plafonner,
     retirer_chiffres_hors_source,
     retirer_urls_inventees,
+    urls_ecrites,
 )
 from vm_centrale.inspecteur import (
     enregistrer_echange_echec,
@@ -43,9 +46,15 @@ from vm_centrale.models import (
     Message,
     PieceJointe,
     ProfilTravail,
+    QuestionCouverte,
     ResultatRechercheWeb,
 )
 from vm_centrale.moteur_recherche import MoteurRecherche, get_moteur_recherche
+from vm_centrale.questions_couvertes import (
+    AppelQuestionsPieceJointe,
+    appeler_questions_piece_jointe,
+    enregistrer_questions_piece_jointe,
+)
 from vm_centrale.outils import AppelMistralOutil, ContexteTour, executer_appel, outils_du_tour
 from vm_centrale.schemas import (
     ConversationCreeRequest,
@@ -64,8 +73,8 @@ from vm_centrale.telechargement_pages import TelechargeurPages, get_telechargeur
 
 _TAILLE_FENETRE_HISTORIQUE = 3
 # Appels de chat principaux par message, le dernier sans `tools` (spec 1.4.0,
-# décision n° 7) : évite que le modèle tourne en rond.
-_TOURS_MAX_PAR_MESSAGE = 3
+# décision n° 7 ; 3 → 5 en 1.4.1) : évite que le modèle tourne en rond.
+_TOURS_MAX_PAR_MESSAGE = 5
 # Taille de la fenêtre par défaut de GET /conversations/{id} (issue #103) :
 # un détail d'implémentation, pas une décision produit figée (spec
 # 1.2.3) — ajustable librement sans changer le contrat de pagination
@@ -74,11 +83,6 @@ _TAILLE_FENETRE_PAGINATION_PAR_DEFAUT = 20
 # Fixée en dur (comme la fenêtre de 3 messages ci-dessus), indépendante des
 # plafonds propres à Mistral (spec 1.1.2).
 _TAILLE_MAX_PIECE_JOINTE = 20 * 1024 * 1024
-# Extrait (jamais l'intégralité) de contenu_extrait passé à l'appel
-# résumé+profil pour un message sortant portant une pièce jointe — juste
-# assez pour que le résumé glissant en tire une mention pertinente, façon
-# description de skill (spec 1.1.2).
-_TAILLE_EXTRAIT_PIECE_JOINTE_RESUME = 200
 # Plafond du résumé glissant persisté, fixé en dur comme la fenêtre de 3 et
 # énoncé aussi dans le prompt résumé+profil (spec 1.3.1).
 _TAILLE_MAX_RESUME_CONTEXTE = 1500
@@ -245,30 +249,127 @@ def _message_systeme_piece_jointe(piece_jointe: PieceJointe) -> dict[str, str]:
     }
 
 
-def _mentions_recherches(db: Session, messages: list[Message]) -> dict[int, str]:
-    # Mention courte des recherches de chaque message de l'assistant (spec
-    # 1.4.0, mémoire au tour suivant) : requête et URL, jamais le contenu des
-    # pages ni les extraits du moteur.
-    lignes = (
-        db.query(ResultatRechercheWeb.message_id, ResultatRechercheWeb.requete, ResultatRechercheWeb.url)
-        .filter(ResultatRechercheWeb.message_id.in_([m.id for m in messages]))
+# Dernière ligne de la Mémoire de la conversation. Essai 1.4.1
+# (conversations 93 et 94) : le modèle lisait les questions couvertes comme
+# tout le contenu d'un élément et affirmait une absence (« ni RCS ni TVA »,
+# « aucun délai de paiement ») sans relire.
+NOTE_MEMOIRE = (
+    "Les questions couvertes ne sont qu'un aperçu de chaque élément : une "
+    "information qui n'y figure pas n'est pas absente du document ou de la "
+    "page. Avant d'affirmer qu'un élément ne contient pas une information, "
+    "relis-le (relire_pieces_jointes ou lire_pages_web), sauf s'il est déjà "
+    "marqué « non présent selon l'extraction » pour ce besoin."
+)
+
+
+def _memoire_de_la_conversation(db: Session, conversation_id: int, nouveau_message: str) -> str | None:
+    # Recalculée à chaque appel de chat principal, jamais stockée (spec
+    # 1.4.1) : hors du résumé glissant et de son plafond, elle ne perd ni une
+    # pièce jointe ni une recherche quand le résumé est réécrit. Tour = rang
+    # du message user ; un élément sans message est celui du tour en cours.
+    messages_user = (
+        db.query(Message.id, Message.contenu)
+        .filter(Message.conversation_id == conversation_id, Message.role == "user")
+        .order_by(Message.id)
+        .all()
+    )
+    ids_messages_user = [message_id for message_id, _ in messages_user]
+
+    def tour(message_id: int) -> int:
+        return bisect_right(ids_messages_user, message_id)
+
+    # (message_id, ordre d'ajout, ligne) : trié par message, donc par tour.
+    elements: list[tuple[float, int, str]] = []
+    pieces_jointes = (
+        db.query(PieceJointe.id, PieceJointe.message_id, PieceJointe.nom_fichier)
+        .filter(PieceJointe.conversation_id == conversation_id, PieceJointe.message_id.isnot(None))
+        .order_by(PieceJointe.id)
+        .all()
+    )
+    questions_par_piece_jointe, questions_par_resultat = _questions_couvertes_par_element(db, conversation_id)
+    for piece_jointe_id, message_id, nom_fichier in pieces_jointes:
+        ligne = f"- Tour {tour(message_id)} — pièce jointe id {piece_jointe_id} « {nom_fichier} »"
+        lignes_questions = questions_par_piece_jointe.get(piece_jointe_id, [])
+        elements.append((message_id, len(elements), "\n".join([ligne, *lignes_questions])))
+    resultats = (
+        db.query(
+            ResultatRechercheWeb.id,
+            ResultatRechercheWeb.message_id,
+            ResultatRechercheWeb.requete,
+            ResultatRechercheWeb.url,
+            ResultatRechercheWeb.provenance,
+            (ResultatRechercheWeb.texte_nettoye != "").label("lue"),
+        )
+        .filter(ResultatRechercheWeb.conversation_id == conversation_id)
         .order_by(ResultatRechercheWeb.id)
         .all()
     )
-    urls_par_recherche: dict[int, dict[str, list[str]]] = {}
-    for message_id, requete, url in lignes:
-        urls_par_recherche.setdefault(message_id, {}).setdefault(requete, []).append(url)
-    return {
-        message_id: "\n".join(
-            f"(Recherche web « {requete} », URL trouvées : {', '.join(urls)})"
-            for requete, urls in recherches.items()
+    # URL écrites par le compte, jamais par l'assistant (#134) : une même
+    # URL n'est listée qu'au premier tour qui l'a écrite. Le message du tour
+    # n'est pas encore en base : il passe après tous les messages. État de
+    # lecture par lire_pages_web (#140), avec les questions couvertes de sa
+    # page ; une page lue par une recherche compte comme lue.
+    textes_du_compte = [contenu for _, contenu in messages_user] + [nouveau_message]
+    for rang, url in urls_ecrites(textes_du_compte):
+        message_id = ids_messages_user[rang] if rang < len(ids_messages_user) else float("inf")
+        pages = [resultat for resultat in resultats if normaliser_url(resultat.url) == normaliser_url(url)]
+        if any(page.lue for page in pages):
+            etat = "lue"
+        elif any(page.provenance == "utilisateur" for page in pages):
+            etat = "page non lue"
+        else:
+            etat = "pas encore lue"
+        ligne = f"- Tour {rang + 1} — URL envoyée par l'utilisateur : {url} ({etat})"
+        lignes_questions = [
+            question
+            for page in pages
+            if page.provenance == "utilisateur"
+            for question in questions_par_resultat.get(page.id, [])
+        ]
+        elements.append((message_id, len(elements), "\n".join([ligne, *lignes_questions])))
+    # Requête, URL et questions couvertes, jamais le contenu des pages ni
+    # les extraits du moteur. Une page `utilisateur` n'est pas une recherche.
+    urls_par_recherche: dict[tuple[int, str], list[str]] = {}
+    questions_par_recherche: dict[tuple[int, str], list[str]] = {}
+    for resultat_id, message_id, requete, url, provenance, _ in resultats:
+        if message_id is None or provenance != "recherche":
+            continue
+        urls_par_recherche.setdefault((message_id, requete), []).append(url)
+        questions_par_recherche.setdefault((message_id, requete), []).extend(
+            questions_par_resultat.get(resultat_id, [])
         )
-        for message_id, recherches in urls_par_recherche.items()
-    }
+    for (message_id, requete), urls in urls_par_recherche.items():
+        ligne = f"- Tour {tour(message_id)} — recherche « {requete} » : {', '.join(urls)}"
+        lignes_questions = questions_par_recherche[(message_id, requete)]
+        elements.append((message_id, len(elements), "\n".join([ligne, *lignes_questions])))
+    if not elements:
+        return None
+    return "\n".join(["Mémoire de la conversation :", *(ligne for _, _, ligne in sorted(elements)), NOTE_MEMOIRE])
 
 
-def _avec_mention(contenu: str, mention: str | None) -> str:
-    return f"{contenu}\n{mention}" if mention else contenu
+def _questions_couvertes_par_element(
+    db: Session, conversation_id: int
+) -> tuple[dict[int, list[str]], dict[int, list[str]]]:
+    # Lignes « • question → réponse (source) » par pièce jointe et par
+    # résultat de recherche (spec 1.4.1, #137). Affichées au modèle
+    # seulement : jamais lues par les garde-fous, puisqu'un modèle les a
+    # écrites.
+    questions = (
+        db.query(QuestionCouverte)
+        .filter(QuestionCouverte.conversation_id == conversation_id)
+        .order_by(QuestionCouverte.id)
+        .all()
+    )
+    par_piece_jointe: dict[int, list[str]] = {}
+    par_resultat: dict[int, list[str]] = {}
+    for question in questions:
+        reponse = question.reponse if question.trouvee else "non présent selon l'extraction"
+        ligne = f"  • {question.question} → {reponse} ({question.source})"
+        if question.piece_jointe_id is not None:
+            par_piece_jointe.setdefault(question.piece_jointe_id, []).append(ligne)
+        elif question.resultat_recherche_web_id is not None:
+            par_resultat.setdefault(question.resultat_recherche_web_id, []).append(ligne)
+    return par_piece_jointe, par_resultat
 
 
 def _rattacher_recherches_au_message(db: Session, message: Message) -> None:
@@ -287,7 +388,7 @@ def _construire_messages_pour_mistral(
     nouveau_message: str,
     profil_travail: str,
     piece_jointe: PieceJointe | None = None,
-    mentions_recherches: dict[int, str] | None = None,
+    memoire: str | None = None,
 ) -> list[dict[str, str]]:
     # Historique borné (résumé glissant + fenêtre courte) plutôt que
     # l'intégralité de la conversation, pour maîtriser le coût en tokens
@@ -308,13 +409,11 @@ def _construire_messages_pour_mistral(
         messages.append(
             {"role": "system", "content": f"Profil de travail de l'utilisateur : {profil_travail}"}
         )
+    if memoire:
+        messages.append({"role": "system", "content": memoire})
     if piece_jointe is not None:
         messages.append(_message_systeme_piece_jointe(piece_jointe))
-    mentions_recherches = mentions_recherches or {}
-    messages.extend(
-        {"role": m.role, "content": _avec_mention(m.contenu, mentions_recherches.get(m.id))}
-        for m in derniers_messages
-    )
+    messages.extend({"role": m.role, "content": m.contenu} for m in derniers_messages)
     messages.append({"role": "user", "content": nouveau_message})
     return messages
 
@@ -457,37 +556,15 @@ def _identite_connue(compte: Compte | None) -> str:
     return f"{compte.prenom} {compte.nom}, pôle(s) : {poles}, agence : {compte.agence}"
 
 
-def _ligne_message_sortant(
-    message: Message, piece_jointe: PieceJointe | None, mention_recherche: str | None = None
-) -> str:
-    ligne = _avec_mention(f"{message.role} : {message.contenu}", mention_recherche)
-    if piece_jointe is None:
-        return ligne
-    # Extrait court seulement (jamais l'intégralité de contenu_extrait) : le
-    # résumé glissant n'en garde qu'une mention, pas le document complet
-    # (spec 1.1.2).
-    extrait = (piece_jointe.contenu_extrait or "")[:_TAILLE_EXTRAIT_PIECE_JOINTE_RESUME]
-    return (
-        f"{ligne}\n"
-        f"(Pièce jointe « {piece_jointe.nom_fichier} », extrait pour situer le "
-        f"sujet : {extrait})"
-    )
-
-
 def _prompt_resume_et_profil(
     resume_contexte: str,
     profil_travail: str,
     compte: Compte | None,
     messages_sortants: list[Message],
-    pieces_jointes_sortantes: dict[int, PieceJointe] | None = None,
-    mentions_recherches: dict[int, str] | None = None,
 ) -> str:
-    pieces_jointes_sortantes = pieces_jointes_sortantes or {}
-    mentions_recherches = mentions_recherches or {}
-    echange_sortant = "\n".join(
-        _ligne_message_sortant(m, pieces_jointes_sortantes.get(m.id), mentions_recherches.get(m.id))
-        for m in messages_sortants
-    )
+    # Ni mention de pièce jointe ni de recherche (spec 1.4.1) : la Mémoire
+    # de la conversation les porte, hors du plafond du résumé.
+    echange_sortant = "\n".join(f"{m.role} : {m.contenu}" for m in messages_sortants)
     return (
         "Tu maintiens deux mémoires pour cet utilisateur : un résumé glissant de la "
         "conversation en cours, et un profil de travail inter-conversationnel "
@@ -506,11 +583,6 @@ def _prompt_resume_et_profil(
         "N'inclus jamais dans profil_travail un fait d'identité "
         "(prénom, nom, pôle, agence) : ceux-ci sont déjà connus et ne "
         "doivent jamais être réinférés ni modifiés depuis une conversation. "
-        "Si un message sortant porte une pièce jointe, n'en garde dans "
-        "resume_contexte qu'une mention courte (façon description de skill : "
-        "juste assez pour situer le sujet), jamais son contenu intégral. "
-        "Si un message sortant porte une recherche web, n'en garde que la "
-        "requête et les URL trouvées. "
         "Dans resume_contexte, une affirmation de l'assistant (rapport, "
         "chiffre, URL) est notée « proposé, non vérifié » : jamais comme un "
         "fait, jamais comme quelque chose que l'utilisateur a fourni. Un sujet "
@@ -688,7 +760,12 @@ def creer_conversation(
         # ni d'historique à ce stade), l'autre chemin menant au même appel de
         # chat principal (spec 1.2.2).
         message_pour_mistral = _construire_messages_pour_mistral(
-            "", [], requete.message, "", piece_jointe
+            "",
+            [],
+            requete.message,
+            "",
+            piece_jointe,
+            _memoire_de_la_conversation(db, conversation.id, requete.message),
         )
 
         # Les deux appels Mistral (réponse, puis titrage) sont faits avant
@@ -705,17 +782,18 @@ def creer_conversation(
         # (supprimer_conversation), ce qui laisserait cette ligne sans
         # conversation pointer vers une pièce jointe disparue.
         # Outils sur l'appel principal dès le premier message (spec 1.4.0) :
-        # aucune fenêtre ni pièce jointe hors fenêtre ici, seul
-        # rechercher_web est éligible.
+        # aucune pièce jointe d'un tour précédent ici, seul rechercher_web
+        # est éligible.
         contexte_outils = ContexteTour(
             db=db,
             conversation_id=conversation.id,
-            ids_fenetre=frozenset(),
             moteur_recherche=moteur_recherche,
             telechargeur_pages=telechargeur_pages,
             client_mistral=client,
+            message_du_tour=requete.message,
         )
         tools = outils_du_tour(contexte_outils)
+        attendre_questions = _lancer_questions_piece_jointe(client, piece_jointe, requete.message)
         reponse_chat = _resoudre_reponse_chat(
             lambda: _appeler_reponse_chat(client, message_pour_mistral, tools),
             client,
@@ -764,6 +842,7 @@ def creer_conversation(
             requete_payload=reponse_titrage.payload_envoye,
             reponse_payload=reponse_titrage.reponse_brute,
         )
+        _enregistrer_questions_du_tour(db, attendre_questions, identifiant_compte, conversation.id, piece_jointe)
 
         message_utilisateur = Message(
             conversation_id=conversation.id,
@@ -892,7 +971,10 @@ def supprimer_conversation(
     # comportement identique quel que soit le moteur de base (la base de
     # test SQLite n'applique pas les contraintes FK par défaut).
     db.query(EchangeInspecteur).filter(EchangeInspecteur.conversation_id == conversation.id).delete()
-    # Même chose pour les résultats de recherche (spec 1.4.0).
+    # Même chose pour les questions couvertes (spec 1.4.1), avant les
+    # résultats de recherche et les pièces jointes qu'elles référencent, et
+    # pour les résultats de recherche (spec 1.4.0).
+    db.query(QuestionCouverte).filter(QuestionCouverte.conversation_id == conversation.id).delete()
     db.query(ResultatRechercheWeb).filter(
         ResultatRechercheWeb.conversation_id == conversation.id
     ).delete()
@@ -1079,6 +1161,45 @@ def televerser_piece_jointe_sans_conversation(
     return _creer_piece_jointe(db, client, identifiant_compte, None, fichier)
 
 
+def _lancer_questions_piece_jointe(
+    client: MistralClient, piece_jointe: PieceJointe | None, message: str
+) -> Callable[[], AppelQuestionsPieceJointe] | None:
+    # À l'envoi du message qui porte la pièce jointe, jamais au téléversement
+    # (spec 1.4.1) : en parallèle de la réponse de chat. Renvoie de quoi
+    # attendre son issue, enregistrée seulement si le tour aboutit.
+    if piece_jointe is None:
+        return None
+    executeur = ThreadPoolExecutor(max_workers=1)
+    futur = executeur.submit(
+        appeler_questions_piece_jointe,
+        client,
+        piece_jointe.nom_fichier,
+        piece_jointe.contenu_extrait or "",
+        message,
+    )
+    executeur.shutdown(wait=False)
+    return futur.result
+
+
+def _enregistrer_questions_du_tour(
+    db: Session,
+    attendre_questions: Callable[[], AppelQuestionsPieceJointe] | None,
+    identifiant_compte: str,
+    conversation_id: int,
+    piece_jointe: PieceJointe | None,
+) -> None:
+    if attendre_questions is None or piece_jointe is None:
+        return
+    enregistrer_questions_piece_jointe(
+        db,
+        attendre_questions(),
+        identifiant_compte=identifiant_compte,
+        conversation_id=conversation_id,
+        piece_jointe_id=piece_jointe.id,
+        nom_fichier=piece_jointe.nom_fichier,
+    )
+
+
 def _appeler_reponse_chat(
     client: MistralClient,
     messages_pour_mistral: list[dict[str, str]],
@@ -1251,18 +1372,9 @@ def _appeler_resume_et_profil(
     profil_actuel: str,
     compte: Compte | None,
     messages_sortants: list[Message],
-    pieces_jointes_sortantes: dict[int, PieceJointe],
-    mentions_recherches: dict[int, str],
 ) -> ReponseChat:
     return client.chat(
-        _prompt_resume_et_profil(
-            resume_contexte,
-            profil_actuel,
-            compte,
-            messages_sortants,
-            pieces_jointes_sortantes,
-            mentions_recherches,
-        ),
+        _prompt_resume_et_profil(resume_contexte, profil_actuel, compte, messages_sortants),
         response_format=_SCHEMA_RESUME_ET_PROFIL,
     )
 
@@ -1277,8 +1389,6 @@ def _generer_reponse_et_resume(
     messages_sortants: list[Message],
     profil_actuel: str,
     compte: Compte | None,
-    pieces_jointes_sortantes: dict[int, PieceJointe],
-    mentions_recherches: dict[int, str],
     piece_jointe_id: int | None,
 ) -> tuple[ReponseChat, str | None, str | None]:
     # Comme pour la création (cf. creer_conversation) : les appels Mistral
@@ -1310,8 +1420,6 @@ def _generer_reponse_et_resume(
             profil_actuel,
             compte,
             messages_sortants,
-            pieces_jointes_sortantes,
-            mentions_recherches,
         )
         reponse_chat = _resoudre_reponse_chat(
             futur_reponse.result,
@@ -1429,16 +1537,13 @@ def envoyer_message(
         # requêtes concurrentes pouvaient toutes deux lire l'ancienne valeur
         # puis écraser l'une des deux mises à jour au commit).
         profil_actuel = _contenu_profil_actuel(db, identifiant_compte)
-        # Lues ici pour toute la fenêtre, qui contient aussi les messages
-        # sortants (jamais dans le thread de l'executor, voir plus bas).
-        mentions_recherches = _mentions_recherches(db, derniers_messages)
         messages_pour_mistral = _construire_messages_pour_mistral(
             conversation.resume_contexte,
             derniers_messages,
             requete.message,
             profil_actuel,
             piece_jointe,
-            mentions_recherches,
+            _memoire_de_la_conversation(db, conversation.id, requete.message),
         )
 
         # Un message sort de la fenêtre des 3 derniers dès que ce tour (2 nouveaux
@@ -1448,37 +1553,20 @@ def envoyer_message(
         messages_sortants = derniers_messages[:-1]
 
         # Outils déclarés uniquement sur l'appel de réponse de chat principal
-        # ci-dessous, jamais sur celui de résumé+profil (spec 1.1.2) : la
-        # fenêtre ici est celle des messages déjà en base avant ce tour
-        # (`derniers_messages`), pas `messages_sortants` (qui n'en retire que
-        # le plus ancien, propre à l'absorption de CE tour dans le résumé).
+        # ci-dessous, jamais sur celui de résumé+profil (spec 1.1.2).
         contexte_outils = ContexteTour(
             db=db,
             conversation_id=conversation.id,
-            ids_fenetre=frozenset(m.id for m in derniers_messages),
             moteur_recherche=moteur_recherche,
             telechargeur_pages=telechargeur_pages,
             client_mistral=client,
+            message_du_tour=requete.message,
         )
         tools = outils_du_tour(contexte_outils)
 
-        # Résolues une seule fois, avant l'appel résumé+profil (jamais dans le
-        # thread de l'executor ci-dessous, la session SQLAlchemy n'étant pas
-        # thread-safe) : la pièce jointe déjà liée à un message sortant, si
-        # elle existe, pour n'en glisser qu'un extrait court dans le prompt
-        # (spec 1.1.2, jamais le contenu intégral de contenu_extrait).
-        pieces_jointes_sortantes: dict[int, PieceJointe] = {}
-        if messages_sortants:
-            pieces_jointes_sortantes = {
-                piece_jointe.message_id: piece_jointe
-                for piece_jointe in db.query(PieceJointe)
-                .filter(PieceJointe.message_id.in_([m.id for m in messages_sortants]))
-                .all()
-                if piece_jointe.message_id is not None
-            }
-
         compte = db.query(Compte).filter(Compte.identifiant == identifiant_compte).first()
 
+        attendre_questions = _lancer_questions_piece_jointe(client, piece_jointe, requete.message)
         reponse_chat, resume_maj, profil_travail = _generer_reponse_et_resume(
             client,
             messages_pour_mistral,
@@ -1489,14 +1577,13 @@ def envoyer_message(
             messages_sortants,
             profil_actuel,
             compte,
-            pieces_jointes_sortantes,
-            mentions_recherches,
             piece_jointe_id,
         )
 
         reponse = _reponse_visible(
             db, identifiant_compte, conversation.id, requete.message, reponse_chat.contenu, piece_jointe
         )
+        _enregistrer_questions_du_tour(db, attendre_questions, identifiant_compte, conversation.id, piece_jointe)
 
         maintenant = datetime.now(timezone.utc)
         if resume_maj is not None:

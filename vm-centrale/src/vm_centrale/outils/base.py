@@ -11,15 +11,15 @@ from vm_centrale.telechargement_pages import TelechargeurPages
 @dataclass(frozen=True)
 class ContexteTour:
     # Ce qu'un outil peut lire pour décider de son éligibilité et s'exécuter
-    # sur l'appel de chat principal de ce tour. `ids_fenetre` : les messages
-    # déjà en base envoyés tels quels au modèle (fenêtre des derniers
-    # messages, avant ce tour).
+    # sur l'appel de chat principal de ce tour.
     db: Session
     conversation_id: int
-    ids_fenetre: frozenset[int]
     moteur_recherche: MoteurRecherche
     telechargeur_pages: TelechargeurPages
     client_mistral: MistralClient
+    # Pas encore en base pendant le tour : une URL qu'il contient est déjà
+    # lisible par lire_pages_web (#140).
+    message_du_tour: str
 
 
 @dataclass(frozen=True)
