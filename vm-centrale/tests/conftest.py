@@ -21,6 +21,7 @@ from vm_centrale.mistral_client import (
 from vm_centrale.models import Compte, ComptePole
 from vm_centrale.moteur_recherche import MoteurIndisponible, ResultatRecherche, get_moteur_recherche
 from vm_centrale.security import hash_password
+from vm_centrale.telechargement_pages import PageIndisponible, PageTelechargee, get_telechargeur_pages
 from vm_centrale.jetons import JetonStore, get_jeton_store
 
 
@@ -272,6 +273,26 @@ class MoteurRechercheFactice:
         return list(self._resultats)
 
 
+class TelechargeurPagesFactice:
+    # Remplace le téléchargement des pages trouvées (spec 1.4.0) : aucun test
+    # ne sort sur le réseau. Une URL non servie est injoignable.
+    def __init__(self) -> None:
+        self.urls_recues: list[str] = []
+        self._pages: dict[str, PageTelechargee] = {}
+
+    def servir(
+        self, url: str, corps: str, statut: int = 200, type_contenu: str = "text/html; charset=utf-8"
+    ) -> None:
+        self._pages[url] = PageTelechargee(statut=statut, type_contenu=type_contenu, corps=corps)
+
+    def telecharger(self, url: str) -> PageTelechargee:
+        self.urls_recues.append(url)
+        page = self._pages.get(url)
+        if page is None:
+            raise PageIndisponible("délai dépassé")
+        return page
+
+
 @pytest.fixture
 def db_session():
     engine = create_engine(
@@ -301,18 +322,24 @@ def moteur_recherche_factice():
 
 
 @pytest.fixture
+def telechargeur_pages_factice():
+    return TelechargeurPagesFactice()
+
+
+@pytest.fixture
 def jeton_store(db_session):
     return JetonStore(db_session)
 
 
 @pytest.fixture
-def client(db_session, mistral_client_factice, moteur_recherche_factice, jeton_store):
+def client(db_session, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_store):
     def override_get_db():
         yield db_session
 
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_mistral_client] = lambda: mistral_client_factice
     app.dependency_overrides[get_moteur_recherche] = lambda: moteur_recherche_factice
+    app.dependency_overrides[get_telechargeur_pages] = lambda: telechargeur_pages_factice
     app.dependency_overrides[get_jeton_store] = lambda: jeton_store
     with TestClient(app) as test_client:
         yield test_client

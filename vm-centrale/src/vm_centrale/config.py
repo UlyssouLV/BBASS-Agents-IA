@@ -18,6 +18,9 @@ MISTRAL_HTTP_TIMEOUT = float(os.environ.get("MISTRAL_HTTP_TIMEOUT", "30"))
 # sur localhost seulement.
 SEARXNG_URL = os.environ.get("VM_CENTRALE_SEARXNG_URL", "http://localhost:8888")
 SEARXNG_HTTP_TIMEOUT = float(os.environ.get("SEARXNG_HTTP_TIMEOUT", "10"))
+# Délai par page trouvée par le moteur (spec 1.4.0, étape 2) : au-delà, la
+# page est ignorée et son extrait de moteur reste.
+PAGES_HTTP_TIMEOUT = float(os.environ.get("PAGES_HTTP_TIMEOUT", "10"))
 
 # Tags de modèle centralisés par fonction (spec V1.1.2), pas par valeur : tout
 # code appelant Mistral référence l'une de ces constantes plutôt qu'une

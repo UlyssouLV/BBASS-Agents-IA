@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from sqlalchemy.orm import Session
 
 from vm_centrale.moteur_recherche import MoteurRecherche
+from vm_centrale.telechargement_pages import TelechargeurPages
 
 
 @dataclass(frozen=True)
@@ -16,6 +17,7 @@ class ContexteTour:
     conversation_id: int
     ids_fenetre: frozenset[int]
     moteur_recherche: MoteurRecherche
+    telechargeur_pages: TelechargeurPages
 
 
 @dataclass(frozen=True)

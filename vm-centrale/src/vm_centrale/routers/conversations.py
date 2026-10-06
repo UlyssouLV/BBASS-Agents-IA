@@ -60,6 +60,7 @@ from vm_centrale.schemas import (
     PieceJointeCreeeResponse,
     PieceJointeResume,
 )
+from vm_centrale.telechargement_pages import TelechargeurPages, get_telechargeur_pages
 
 _TAILLE_FENETRE_HISTORIQUE = 3
 # Appels de chat principaux par message, le dernier sans `tools` (spec 1.4.0,
@@ -605,6 +606,7 @@ def creer_conversation(
     identifiant_compte: str = Depends(get_identifiant_compte_du_jeton),
     client: MistralClient = Depends(get_mistral_client),
     moteur_recherche: MoteurRecherche = Depends(get_moteur_recherche),
+    telechargeur_pages: TelechargeurPages = Depends(get_telechargeur_pages),
     db: Session = Depends(get_db),
 ) -> ConversationCreeResponse:
     with verrous_comptes.pour(identifiant_compte):
@@ -667,6 +669,7 @@ def creer_conversation(
             conversation_id=conversation.id,
             ids_fenetre=frozenset(),
             moteur_recherche=moteur_recherche,
+            telechargeur_pages=telechargeur_pages,
         )
         tools = outils_du_tour(contexte_outils)
         reponse_chat = _resoudre_reponse_chat(
@@ -1304,6 +1307,7 @@ def envoyer_message(
     identifiant_compte: str = Depends(get_identifiant_compte_du_jeton),
     client: MistralClient = Depends(get_mistral_client),
     moteur_recherche: MoteurRecherche = Depends(get_moteur_recherche),
+    telechargeur_pages: TelechargeurPages = Depends(get_telechargeur_pages),
     db: Session = Depends(get_db),
 ) -> MessageEnvoyeResponse:
     with verrous_comptes.pour(identifiant_compte):
@@ -1366,6 +1370,7 @@ def envoyer_message(
             conversation_id=conversation.id,
             ids_fenetre=frozenset(m.id for m in derniers_messages),
             moteur_recherche=moteur_recherche,
+            telechargeur_pages=telechargeur_pages,
         )
         tools = outils_du_tour(contexte_outils)
 
