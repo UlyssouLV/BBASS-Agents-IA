@@ -302,7 +302,7 @@ Retire `ready-for-agent` et ferme l’issue. Refuse s’il n’y a pas `Part of`
 
 **Corps :** seulement si la version n’est pas déjà dans le rôle **`roadmap`** — à quoi elle sert (un job).
 
-Grill + spec, puis **`/ob`**, écriture de la spec, **`/c -a -p`**, tickets, **`/opr -draft`**, puis propose le premier `/implement`. Skill `ouvrir-la-version`.
+Grill + spec, puis **`/ob`**, écriture de la spec, **`/c -a -p`**, tickets (chaque enfant : `Part of`, **sub-issue** GitHub pour le compteur Y/Z du parent, `blocked_by`), **`/opr -draft`**, puis propose le premier `/implement`. Skill `ouvrir-la-version`.
 
 **Exemple :**
 

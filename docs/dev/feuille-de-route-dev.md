@@ -24,6 +24,8 @@ Ce n’est **pas** une spec (ça vient après « Ouvre la version »).
 
 **Hors périmètre.** Moduléo, déploiement, n8n. Pas de changement du contrat HTTP du poste : l’outil reste interne à l’appel de chat.
 
+**Bug connu à la livraison.** Quand la recherche ne trouve rien, l’IA invente des chiffres et des sources au lieu de le dire ; les garde-fous n’en retirent qu’une partie et abîment la mise en forme ([#131](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/131)). La 1.4.0 est finalisée avec ce bug ; correction en **1.4.5**.
+
 ## Ensuite : 1.4.1 — Mémoire de la conversation (pièces jointes et recherches)
 
 **Objectif.** Le résumé glissant ne garde qu’une mention courte d’une pièce jointe sortie de la fenêtre de 3 ; depuis la 1.4.0, une recherche web n’y laisse que sa requête et ses URL. Cette version garde à part, pour la durée de la conversation, la liste des pièces jointes **et des recherches** partagées, et donne au modèle un outil (tool calling) pour se les rappeler et en relire le contenu. Piste née de l’ouverture de la 1.3.1 ([spec](../specs/v1.3.1-chat-ne-fige-plus-ses-inventions.md)), élargie aux recherches à l’ouverture de la 1.4.0 ([spec](../specs/v1.4.0-recherche-web-dans-le-chat.md)) : à confirmer par le retest de la 1.3.1 (une URL ou une pièce jointe du compte survit-elle au résumé plafonné ?).
@@ -47,6 +49,12 @@ Ce n’est **pas** une spec (ça vient après « Ouvre la version »).
 **Objectif.** Remplacer l’indicateur figé du type « Réflexion… » par un statut qui suit **en direct** ce que la VM est en train de faire (ex. une recherche web en cours, une page lue, une extraction). Formulations, canaux (streaming, polling…), granularité et libellés : **à trancher au grilling** à l’ouverture — rien n’est fixé ici.
 
 **Hors périmètre.** Changer le contenu final de la réponse ; modes Rapide / Approfondi.
+
+## Ensuite : 1.4.5 — Dire « pas trouvé » plutôt qu’inventer après une recherche
+
+**Objectif.** Corriger le bug [#131](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/131), constaté au test humain de la 1.4.0 : quand la recherche (ou la pièce jointe) ne contient pas l’information, la réponse dit qu’elle ne l’a pas trouvée, au lieu d’estimer des tarifs, des dates ou de citer une source qui n’existe pas. Jamais « sourcé » ni « confirmé par » sans résultat de l’outil qui le contient ; une source dont le lien est retiré ne reste pas affichée comme source ; le contenu de la pièce jointe prime sur une généralité du web. Les garde-fous ne cassent plus la mise en forme (indentation des listes et tableaux, parenthèses vides) ; une page quasi vide n’est pas comptée comme lue ; la date du jour est donnée en toutes lettres et seule l’année va dans la requête. À trancher au grilling : sort d’une réponse dont beaucoup de chiffres sont retirés (marqueur visible, réécriture, phrase fixe), contrôle des petits montants (« 5 € »), et traitement ici ou à part du profil de travail et du résumé qui débordent d’une conversation à l’autre.
+
+**Hors périmètre.** Pages refusées par les sites (HTTP 403) et PDF trouvés sur le web ; vérification de la fiabilité des sources ; modes Rapide / Approfondi. Pas de changement du contrat HTTP du poste.
 
 ## Ensuite : 1.5.0 — Moduléo en lecture (outil transverse) + premier branchement via l’Agent Administration
 
@@ -221,9 +229,19 @@ Pistes à trancher à l’ouverture : ne lire / extraire les pages que si les sn
 
 **Documentation livrable (même version).** Un document dans le dépôt qui décrit **très exactement et fonctionnellement** le fonctionnement du tool calling de recherche web (paramètres, déroulé VM, pannes, ce qui part vers le moteur / l’extraction / le modèle principal, ce qui est persisté, rôle des garde-fous) — langage produit / fonctionnel, pas un dump de code. Des **schémas** illustrent tous les cas et cheminements possibles (succès snippets seuls, lecture de pages, extraction, moteur indisponible, page en échec, plafond, etc.). À l’ouverture : créer une issue GitHub labellee **`documentation`** (label déjà présent dans le dépôt) qui porte le plan de ce document, les captures / images d’exemples (inspecteur, messages `tool`, réponses) et toute info complémentaire ; le doc versionné dans `docs/` reste la référence une fois rédigé.
 
+### Pages web refusées (HTTP 403) et PDF trouvés sur le web
+
+Constat (test humain 1.4.0, conversations 89 à 92) : sur 24 pages téléchargées, 9 refusées en HTTP 403 (dont Légifrance et leboncoin), 1 PDF non lu, 5 pages JavaScript sans contenu exploitable. Légifrance est la source officielle d’un cabinet : la réponse se rabat sur un site tiers. Pistes à trancher à l’ouverture : en-têtes de navigateur plus complets, API officielle (Légifrance / PISTE) pour les textes de loi, lecture des PDF, rendu JavaScript. Distinct de #131 (ce que le modèle écrit quand il n’a rien trouvé, 1.4.5).
+
+### Vérification de la fiabilité des sources web
+
+Constat (essais manuels 1.4.0) : `rechercher_web` ramène des pages et l’IA les cite ; rien ne dit encore si une source est digne de confiance (site officiel, presse, blog, forum, page commerciale). Une amélioration ultérieure de la recherche web ferait **évaluer la fiabilité des sites sourcés** avant ou avec la réponse : indiquer au collaborateur le degré de confiance, écarter ou rétrograder les sources douteuses, et garder une trace lisible (inspecteur ou mention courte).
+
+Pistes à trancher à l’ouverture : critères (domaine `.gouv.fr` / institutionnel, liste blanche cabinet, score heuristique, second passage modèle…), moment du contrôle (à la réception des résultats, après lecture des pages, à la rédaction), ce que voit le collaborateur, et le lien avec les garde-fous URL déjà en place. S’appuie sur la 1.4.0 et le registre d’outils. Distinct de l’optimisation **par défaut** (tokens / snippets) et des modes Rapide / Approfondi.
+
 ### Modes de réponse (Rapide / Approfondi) et outils de lecture plus fins
 
-Constat (ouverture 1.4.0) : plusieurs façons d’utiliser les outils sont possibles selon l’effort voulu. Un mode choisi par le collaborateur réglerait le nombre de tours d’outils, le nombre de pages lues, un outil `lire_page(url)` (le modèle choisit ses pages au lieu de prendre les premières), un appel de synthèse, ou le modèle utilisé. Change le contrat HTTP du poste (choix du mode). Le découpage de la 1.4.0 (registre d’outils, appel d’extraction isolé, [ADR-0014](../adr/0014-recherche-web-en-deux-temps-extraction-isolee.md)) est fait pour s’y brancher. Distinct de l’optimisation **par défaut** de la recherche web (rubrique précédente), qui ne demande pas de choix utilisateur.
+Constat (ouverture 1.4.0) : plusieurs façons d’utiliser les outils sont possibles selon l’effort voulu. Un mode choisi par le collaborateur réglerait le nombre de tours d’outils, le nombre de pages lues, un outil `lire_page(url)` (le modèle choisit ses pages au lieu de prendre les premières), un appel de synthèse, ou le modèle utilisé. Change le contrat HTTP du poste (choix du mode). Le découpage de la 1.4.0 (registre d’outils, appel d’extraction isolé, [ADR-0014](../adr/0014-recherche-web-en-deux-temps-extraction-isolee.md)) est fait pour s’y brancher. Distinct de l’optimisation **par défaut** de la recherche web et de la **vérification de fiabilité des sources** (rubriques précédentes), qui ne demandent pas de choix utilisateur.
 
 ### Exécution de code dans le chat (cellules Python exécutables, façon ChatGPT)
 

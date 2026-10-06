@@ -50,7 +50,7 @@ flowchart LR
 
 ### Reste à implémenter
 
-- **V1.4.0** — recherche web dans le chat (outil exécuté par la VM ; le modèle ne cite qu’une URL revenue de l’outil, et un chiffre seulement s’il est dans le texte ramené). Les function calling du modèle sont centralisés.
+- **V1.4.0** — recherche web dans le chat (outil exécuté par la VM ; le modèle ne cite qu’une URL revenue de l’outil, et un chiffre seulement s’il est dans le texte ramené). Les function calling du modèle sont centralisés. Bug connu à la livraison : quand la recherche ne trouve rien, l’IA invente encore au lieu de le dire ([#131](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/131), corrigé en 1.4.5).
 - **V1.5.0** — Moduléo en lecture (outil transverse), premier branchement via l’Agent Administration.
 - **V1.6.0** — déploiement postes : CI/CD, conteneurisation, installateur / logiciel d’accès au chat (backend local obligatoire) — **priorité**.
 - **V1.7.0** — workflows n8n, branchés sur Moduléo 1.5.0 — **proposé cette semaine** après la 1.6.0.
