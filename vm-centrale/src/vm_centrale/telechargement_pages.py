@@ -1,13 +1,27 @@
+import ssl
 from dataclasses import dataclass
 from typing import Protocol
 
 import httpx
+import truststore
 
 from vm_centrale.config import PAGES_HTTP_TIMEOUT
 
-# Suivre les redirections : une URL de résultat pointe souvent vers une page
-# déplacée (http → https, URL raccourcie).
-_http_client = httpx.Client(timeout=PAGES_HTTP_TIMEOUT, follow_redirects=True)
+
+def _creer_client_http() -> httpx.Client:
+    # Magasin de certificats du système plutôt que certifi : il complète la
+    # chaîne d'un serveur qui n'envoie pas son intermédiaire (#129). La
+    # vérification reste toujours active, jamais verify=False.
+    # Suivre les redirections : une URL de résultat pointe souvent vers une
+    # page déplacée (http → https, URL raccourcie).
+    return httpx.Client(
+        timeout=PAGES_HTTP_TIMEOUT,
+        follow_redirects=True,
+        verify=truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT),
+    )
+
+
+_http_client = _creer_client_http()
 
 
 @dataclass(frozen=True)
