@@ -1,6 +1,9 @@
 import json
+from datetime import datetime, timezone
 
 import pytest
+
+from vm_centrale.models import QuestionCouverte
 
 # Mémoire de la conversation (spec 1.4.1, #133) : message système recalculé
 # par la VM à chaque appel de chat principal, hors résumé glissant.
@@ -235,3 +238,139 @@ def test_une_meme_url_ecrite_deux_fois_napparait_quune_fois_au_premier_tour(
         f"- Tour 2 — URL envoyée par l'utilisateur : {_URL_A}",
         f"- Tour 3 — URL envoyée par l'utilisateur : {_URL_B}",
     ]
+
+
+# Questions couvertes (#137) : affichées sous leur élément, jamais une
+# source des garde-fous.
+
+
+def _page_html(texte: str) -> str:
+    # Deux paragraphes de remplissage, sans chiffre : sur une page minuscule,
+    # trafilatura garde aussi le menu.
+    return (
+        "<html><body><nav>Menu du site</nav><article><h1>Bornage</h1>"
+        "<p>Le bornage fixe la limite entre deux terrains voisins, à la demande "
+        "d'un propriétaire, par un géomètre-expert inscrit à l'Ordre.</p>"
+        "<p>Le procès-verbal signé par les voisins est ensuite publié, et la "
+        "limite devient opposable aux propriétaires suivants.</p>"
+        f"<p>{texte}</p></article></body></html>"
+    )
+
+
+def _rechercher_et_lire(
+    mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, requete, url, questions
+):
+    _rechercher(mistral_client_factice, moteur_recherche_factice, requete, url)
+    telechargeur_pages_factice.servir(url, _page_html("Texte de la page lue."))
+    mistral_client_factice.repondre_extraction("Extrait.", questions)
+
+
+def _ajouter_question(db_session, conversation_id: int, *, trouvee: bool = True, **element) -> None:
+    db_session.add(
+        QuestionCouverte(
+            conversation_id=conversation_id,
+            question="Quelle est la date de signature ?",
+            reponse="" if not trouvee else "Le 3 mars.",
+            source="devis.pdf",
+            trouvee=trouvee,
+            origine="besoin",
+            date_creation=datetime.now(timezone.utc),
+            **element,
+        )
+    )
+    db_session.commit()
+
+
+def test_les_questions_couvertes_dune_recherche_sont_sous_la_bonne_recherche(
+    client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide
+):
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide)
+    _rechercher_et_lire(
+        mistral_client_factice,
+        moteur_recherche_factice,
+        telechargeur_pages_factice,
+        "tarif bornage",
+        _URL_A,
+        [("Quel est le tarif moyen ?", "Environ mille euros.", _URL_A)],
+    )
+    _envoyer(client, mistral_client_factice, jeton_valide, conversation_id, "Cherche le tarif")
+    _rechercher_et_lire(
+        mistral_client_factice,
+        moteur_recherche_factice,
+        telechargeur_pages_factice,
+        "délai bornage",
+        _URL_B,
+        [("Quel est le délai ?", "Quelques semaines.", _URL_B)],
+    )
+    _envoyer(client, mistral_client_factice, jeton_valide, conversation_id, "Cherche le délai")
+
+    _envoyer(client, mistral_client_factice, jeton_valide, conversation_id, "Et donc ?")
+
+    assert _memoire(mistral_client_factice).splitlines() == [
+        _TITRE_MEMOIRE,
+        f"- Tour 2 — recherche « tarif bornage » : {_URL_A}",
+        f"  • Quel est le tarif moyen ? → Environ mille euros. ({_URL_A})",
+        f"- Tour 3 — recherche « délai bornage » : {_URL_B}",
+        f"  • Quel est le délai ? → Quelques semaines. ({_URL_B})",
+    ]
+
+
+def test_les_questions_couvertes_dune_piece_jointe_sont_sous_la_piece_jointe(
+    client, mistral_client_factice, jeton_valide, db_session
+):
+    piece_jointe_id = _televerser(client, mistral_client_factice, jeton_valide)
+    conversation_id = _creer_conversation(
+        client, mistral_client_factice, jeton_valide, "Voici le devis", piece_jointe_id=piece_jointe_id
+    )
+    _ajouter_question(db_session, conversation_id, piece_jointe_id=piece_jointe_id)
+
+    _envoyer(client, mistral_client_factice, jeton_valide, conversation_id, "Suite")
+
+    assert _memoire(mistral_client_factice).splitlines() == [
+        _TITRE_MEMOIRE,
+        f"- Tour 1 — pièce jointe id {piece_jointe_id} « devis.pdf »",
+        "  • Quelle est la date de signature ? → Le 3 mars. (devis.pdf)",
+    ]
+
+
+def test_une_question_non_trouvee_saffiche_non_presente_selon_lextraction(
+    client, mistral_client_factice, jeton_valide, db_session
+):
+    piece_jointe_id = _televerser(client, mistral_client_factice, jeton_valide)
+    conversation_id = _creer_conversation(
+        client, mistral_client_factice, jeton_valide, "Voici le devis", piece_jointe_id=piece_jointe_id
+    )
+    _ajouter_question(db_session, conversation_id, trouvee=False, piece_jointe_id=piece_jointe_id)
+
+    _envoyer(client, mistral_client_factice, jeton_valide, conversation_id, "Suite")
+
+    assert (
+        "  • Quelle est la date de signature ? → non présent selon l'extraction (devis.pdf)"
+        in _memoire(mistral_client_factice).splitlines()
+    )
+
+
+def test_un_chiffre_present_seulement_dans_une_question_couverte_est_retire(
+    client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide
+):
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide)
+    _rechercher_et_lire(
+        mistral_client_factice,
+        moteur_recherche_factice,
+        telechargeur_pages_factice,
+        "tarif bornage",
+        _URL_A,
+        [("Quel est le tarif moyen ?", "Environ 437 euros.", _URL_A)],
+    )
+    _envoyer(client, mistral_client_factice, jeton_valide, conversation_id, "Cherche le tarif")
+    mistral_client_factice.repondre("Le tarif moyen est de 437 euros.", resume_et_profil=_resume_et_profil())
+
+    reponse = client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Quel tarif ?"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert "437" in _memoire(mistral_client_factice)
+    assert reponse.status_code == 200
+    assert "437" not in reponse.json()["reponse"]

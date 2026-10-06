@@ -267,9 +267,11 @@ def _memoire_de_la_conversation(db: Session, conversation_id: int, nouveau_messa
         .order_by(PieceJointe.id)
         .all()
     )
+    questions_par_piece_jointe, questions_par_resultat = _questions_couvertes_par_element(db, conversation_id)
     for piece_jointe_id, message_id, nom_fichier in pieces_jointes:
         ligne = f"- Tour {tour(message_id)} — pièce jointe id {piece_jointe_id} « {nom_fichier} »"
-        elements.append((message_id, len(elements), ligne))
+        lignes_questions = questions_par_piece_jointe.get(piece_jointe_id, [])
+        elements.append((message_id, len(elements), "\n".join([ligne, *lignes_questions])))
     # URL écrites par le compte, jamais par l'assistant (#134) : une même
     # URL n'est listée qu'au premier tour qui l'a écrite. Le message du tour
     # n'est pas encore en base : il passe après tous les messages.
@@ -278,10 +280,15 @@ def _memoire_de_la_conversation(db: Session, conversation_id: int, nouveau_messa
         message_id = ids_messages_user[rang] if rang < len(ids_messages_user) else float("inf")
         ligne = f"- Tour {rang + 1} — URL envoyée par l'utilisateur : {url}"
         elements.append((message_id, len(elements), ligne))
-    # Requête et URL seulement, jamais le contenu des pages ni les extraits
-    # du moteur (comme la mention courte de la 1.4.0).
+    # Requête, URL et questions couvertes, jamais le contenu des pages ni
+    # les extraits du moteur.
     resultats = (
-        db.query(ResultatRechercheWeb.message_id, ResultatRechercheWeb.requete, ResultatRechercheWeb.url)
+        db.query(
+            ResultatRechercheWeb.id,
+            ResultatRechercheWeb.message_id,
+            ResultatRechercheWeb.requete,
+            ResultatRechercheWeb.url,
+        )
         .filter(
             ResultatRechercheWeb.conversation_id == conversation_id,
             ResultatRechercheWeb.message_id.isnot(None),
@@ -290,14 +297,44 @@ def _memoire_de_la_conversation(db: Session, conversation_id: int, nouveau_messa
         .all()
     )
     urls_par_recherche: dict[tuple[int, str], list[str]] = {}
-    for message_id, requete, url in resultats:
+    questions_par_recherche: dict[tuple[int, str], list[str]] = {}
+    for resultat_id, message_id, requete, url in resultats:
         urls_par_recherche.setdefault((message_id, requete), []).append(url)
+        questions_par_recherche.setdefault((message_id, requete), []).extend(
+            questions_par_resultat.get(resultat_id, [])
+        )
     for (message_id, requete), urls in urls_par_recherche.items():
         ligne = f"- Tour {tour(message_id)} — recherche « {requete} » : {', '.join(urls)}"
-        elements.append((message_id, len(elements), ligne))
+        lignes_questions = questions_par_recherche[(message_id, requete)]
+        elements.append((message_id, len(elements), "\n".join([ligne, *lignes_questions])))
     if not elements:
         return None
     return "\n".join(["Mémoire de la conversation :", *(ligne for _, _, ligne in sorted(elements))])
+
+
+def _questions_couvertes_par_element(
+    db: Session, conversation_id: int
+) -> tuple[dict[int, list[str]], dict[int, list[str]]]:
+    # Lignes « • question → réponse (source) » par pièce jointe et par
+    # résultat de recherche (spec 1.4.1, #137). Affichées au modèle
+    # seulement : jamais lues par les garde-fous, puisqu'un modèle les a
+    # écrites.
+    questions = (
+        db.query(QuestionCouverte)
+        .filter(QuestionCouverte.conversation_id == conversation_id)
+        .order_by(QuestionCouverte.id)
+        .all()
+    )
+    par_piece_jointe: dict[int, list[str]] = {}
+    par_resultat: dict[int, list[str]] = {}
+    for question in questions:
+        reponse = question.reponse if question.trouvee else "non présent selon l'extraction"
+        ligne = f"  • {question.question} → {reponse} ({question.source})"
+        if question.piece_jointe_id is not None:
+            par_piece_jointe.setdefault(question.piece_jointe_id, []).append(ligne)
+        elif question.resultat_recherche_web_id is not None:
+            par_resultat.setdefault(question.resultat_recherche_web_id, []).append(ligne)
+    return par_piece_jointe, par_resultat
 
 
 def _rattacher_recherches_au_message(db: Session, message: Message) -> None:
