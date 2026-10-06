@@ -213,7 +213,7 @@ def test_appel_doutil_hors_fenetre_produit_une_ligne_chat_supplementaire(
     lignes_chat_avant = len([l for l in _lignes_consommation(db_session) if l.type_appel == "chat"])
 
     mistral_client_factice.repondre_avec_appel_outil(
-        "obtenir_contenu_piece_jointe", {"piece_jointe_id": piece_jointe_id}
+        "relire_pieces_jointes", {"piece_jointe_ids": [piece_jointe_id]}
     )
     mistral_client_factice.repondre(
         "Réponse finale après relecture du plan", resume_et_profil=_reponse_resume_et_profil()
@@ -380,7 +380,7 @@ def test_get_consommation_inclut_lappel_de_chat_declenche_par_tool_calling(
     ).json()["chat"]["nombre_requetes"]
 
     mistral_client_factice.repondre_avec_appel_outil(
-        "obtenir_contenu_piece_jointe", {"piece_jointe_id": piece_jointe_id}
+        "relire_pieces_jointes", {"piece_jointe_ids": [piece_jointe_id]}
     )
     mistral_client_factice.repondre(
         "Réponse finale après relecture du plan", resume_et_profil=_reponse_resume_et_profil()

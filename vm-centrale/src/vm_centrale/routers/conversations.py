@@ -66,8 +66,8 @@ from vm_centrale.telechargement_pages import TelechargeurPages, get_telechargeur
 
 _TAILLE_FENETRE_HISTORIQUE = 3
 # Appels de chat principaux par message, le dernier sans `tools` (spec 1.4.0,
-# décision n° 7) : évite que le modèle tourne en rond.
-_TOURS_MAX_PAR_MESSAGE = 3
+# décision n° 7 ; 3 → 5 en 1.4.1) : évite que le modèle tourne en rond.
+_TOURS_MAX_PAR_MESSAGE = 5
 # Taille de la fenêtre par défaut de GET /conversations/{id} (issue #103) :
 # un détail d'implémentation, pas une décision produit figée (spec
 # 1.2.3) — ajustable librement sans changer le contrat de pagination
@@ -709,12 +709,11 @@ def creer_conversation(
         # (supprimer_conversation), ce qui laisserait cette ligne sans
         # conversation pointer vers une pièce jointe disparue.
         # Outils sur l'appel principal dès le premier message (spec 1.4.0) :
-        # aucune fenêtre ni pièce jointe hors fenêtre ici, seul
-        # rechercher_web est éligible.
+        # aucune pièce jointe d'un tour précédent ici, seul rechercher_web
+        # est éligible.
         contexte_outils = ContexteTour(
             db=db,
             conversation_id=conversation.id,
-            ids_fenetre=frozenset(),
             moteur_recherche=moteur_recherche,
             telechargeur_pages=telechargeur_pages,
             client_mistral=client,
@@ -1436,14 +1435,10 @@ def envoyer_message(
         messages_sortants = derniers_messages[:-1]
 
         # Outils déclarés uniquement sur l'appel de réponse de chat principal
-        # ci-dessous, jamais sur celui de résumé+profil (spec 1.1.2) : la
-        # fenêtre ici est celle des messages déjà en base avant ce tour
-        # (`derniers_messages`), pas `messages_sortants` (qui n'en retire que
-        # le plus ancien, propre à l'absorption de CE tour dans le résumé).
+        # ci-dessous, jamais sur celui de résumé+profil (spec 1.1.2).
         contexte_outils = ContexteTour(
             db=db,
             conversation_id=conversation.id,
-            ids_fenetre=frozenset(m.id for m in derniers_messages),
             moteur_recherche=moteur_recherche,
             telechargeur_pages=telechargeur_pages,
             client_mistral=client,

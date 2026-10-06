@@ -7,7 +7,7 @@ from vm_centrale.models import EchangeInspecteur
 _PDF = ("document.pdf", b"%PDF-1.4 contenu factice", "application/pdf")
 _PDF_PLAN = ("plan.pdf", b"%PDF-1.4 plan factice", "application/pdf")
 _PDF_DEVIS = ("devis.pdf", b"%PDF-1.4 devis factice", "application/pdf")
-_OUTIL_PJ = "obtenir_contenu_piece_jointe"
+_OUTIL_PJ = "relire_pieces_jointes"
 
 
 def _reponse_resume_et_profil(resume_contexte: str = "Résumé") -> str:
@@ -116,7 +116,7 @@ def test_appel_doutil_relance_un_second_appel_avec_le_contenu_injecte_et_en_renv
     )
 
     mistral_client_factice.repondre_avec_appel_outil(
-        "obtenir_contenu_piece_jointe", {"piece_jointe_id": piece_jointe_id}
+        "relire_pieces_jointes", {"piece_jointe_ids": [piece_jointe_id]}
     )
     mistral_client_factice.repondre(
         "Réponse finale après relecture du plan", resume_et_profil=_reponse_resume_et_profil()
@@ -137,7 +137,7 @@ def test_appel_doutil_relance_un_second_appel_avec_le_contenu_injecte_et_en_renv
     messages_second_appel = mistral_client_factice.appels_reponse[-1]
     messages_outils = [m for m in messages_second_appel if m["role"] == "tool"]
     assert len(messages_outils) == 1
-    assert messages_outils[0]["content"] == "Plan de masse détaillé"
+    assert messages_outils[0]["content"] == f"Pièce jointe id {piece_jointe_id} « document.pdf » :\nPlan de masse détaillé"
 
 
 def test_avec_deux_pieces_jointes_hors_fenetre_le_tool_mentionne_chaque_nom_de_fichier(
@@ -262,7 +262,7 @@ def test_url_inventee_retiree_de_la_reponse_finale_apres_un_appel_doutil(
     )
 
     mistral_client_factice.repondre_avec_appel_outil(
-        "obtenir_contenu_piece_jointe", {"piece_jointe_id": piece_jointe_id}
+        "relire_pieces_jointes", {"piece_jointe_ids": [piece_jointe_id]}
     )
     mistral_client_factice.repondre(
         "Le plan est [téléchargeable ici](https://plans.example/plan.pdf).",
@@ -305,3 +305,84 @@ def test_apres_rechercher_web_lappel_principal_suivant_garde_la_piece_jointe_du_
         .all()
     )
     assert [echange.piece_jointe_id for echange in appels_chat] == [piece_jointe_id, piece_jointe_id]
+
+
+def _creer_conversation_avec_piece_jointe(
+    client, mistral_client_factice, jeton: str, contenu_extrait: str, fichier=_PDF
+) -> tuple[int, int]:
+    mistral_client_factice.repondre_ocr(contenu_extrait)
+    piece_jointe_id = _televerser_sans_conversation(client, jeton, fichier=fichier)
+    mistral_client_factice.repondre("Première réponse", "Titre")
+    conversation_id = client.post(
+        "/conversations",
+        json={"message": "Regarde ce document", "piece_jointe_id": piece_jointe_id},
+        headers=_autorisation(jeton),
+    ).json()["conversation"]["id"]
+    return conversation_id, piece_jointe_id
+
+
+def test_loutil_nest_pas_declare_au_tour_de_lenvoi_de_la_seule_piece_jointe_mais_lest_au_suivant(
+    client, mistral_client_factice, jeton_valide
+):
+    # Spec 1.4.1 : éligible dès qu'une pièce jointe de la conversation n'est
+    # pas celle du tour en cours, que son message soit dans la fenêtre ou non.
+    conversation_id, piece_jointe_id = _creer_conversation_avec_piece_jointe(
+        client, mistral_client_factice, jeton_valide, "Plan de masse détaillé"
+    )
+    assert _outil(mistral_client_factice.tools_appels_reponse[-1], _OUTIL_PJ) is None
+
+    mistral_client_factice.repondre("Deuxième réponse", resume_et_profil=_reponse_resume_et_profil())
+    reponse = client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Et le plan, il dit quoi ?"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert reponse.status_code == 200
+    outil = _outil(mistral_client_factice.tools_appels_reponse[-1], _OUTIL_PJ)
+    assert outil
+    assert f"id {piece_jointe_id}" in outil["function"]["description"]
+    assert "document.pdf" in outil["function"]["description"]
+
+
+def test_deux_ids_renvoient_deux_contenus_et_un_id_etranger_est_introuvable_pour_lui_seul(
+    client, mistral_client_factice, jeton_valide
+):
+    conversation_id, piece_jointe_plan = _creer_conversation_avec_piece_jointe(
+        client, mistral_client_factice, jeton_valide, "Contenu du plan", fichier=_PDF_PLAN
+    )
+    mistral_client_factice.repondre_ocr("Contenu du devis")
+    piece_jointe_devis = client.post(
+        f"/conversations/{conversation_id}/pieces-jointes",
+        files={"fichier": _PDF_DEVIS},
+        headers=_autorisation(jeton_valide),
+    ).json()["piece_jointe"]["id"]
+    mistral_client_factice.repondre("Deuxième réponse", resume_et_profil=_reponse_resume_et_profil())
+    client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Et voilà le devis", "piece_jointe_id": piece_jointe_devis},
+        headers=_autorisation(jeton_valide),
+    )
+    _, piece_jointe_etrangere = _creer_conversation_avec_piece_jointe(
+        client, mistral_client_factice, jeton_valide, "Contenu confidentiel"
+    )
+
+    mistral_client_factice.repondre_avec_appel_outil(
+        _OUTIL_PJ, {"piece_jointe_ids": [piece_jointe_plan, piece_jointe_etrangere, piece_jointe_devis]}
+    )
+    mistral_client_factice.repondre("Comparaison faite", resume_et_profil=_reponse_resume_et_profil())
+    reponse = client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Compare le plan et le devis"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert reponse.status_code == 200
+    assert reponse.json()["reponse"] == "Comparaison faite"
+    messages_outils = [m for m in mistral_client_factice.appels_reponse[-1] if m["role"] == "tool"]
+    assert len(messages_outils) == 1
+    assert messages_outils[0]["content"] == (
+        f"Pièce jointe id {piece_jointe_plan} « plan.pdf » :\nContenu du plan\n\n"
+        f"Pièce jointe id {piece_jointe_etrangere} : Pièce jointe introuvable.\n\n"
+        f"Pièce jointe id {piece_jointe_devis} « devis.pdf » :\nContenu du devis"
+    )

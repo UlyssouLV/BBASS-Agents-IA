@@ -201,7 +201,7 @@ def test_appel_doutil_produit_deux_echanges_chat_distincts(
 
     echanges_avant = len(_echanges(db_session))
     mistral_client_factice.repondre_avec_appel_outil(
-        "obtenir_contenu_piece_jointe", {"piece_jointe_id": piece_jointe_id}
+        "relire_pieces_jointes", {"piece_jointe_ids": [piece_jointe_id]}
     )
     mistral_client_factice.repondre(
         "Réponse finale après relecture du plan", resume_et_profil=_reponse_resume_et_profil()
@@ -231,7 +231,7 @@ def test_appel_doutil_produit_deux_echanges_chat_distincts(
         m for m in second_appel.requete_payload["messages"] if m["role"] == "tool"
     ]
     assert len(messages_outils) == 1
-    assert messages_outils[0]["content"] == "Plan de masse détaillé"
+    assert messages_outils[0]["content"].endswith("Plan de masse détaillé")
 
 
 def test_echec_appel_mistral_principal_produit_un_echange_echec_malgre_le_rollback(
@@ -516,7 +516,7 @@ def test_echec_second_appel_outil_ne_persiste_pas_la_demande_doutil(
     consommations_avant = db_session.query(Consommation).count()
 
     mistral_client_factice.repondre_avec_appel_outil(
-        "obtenir_contenu_piece_jointe", {"piece_jointe_id": piece_jointe_id}
+        "relire_pieces_jointes", {"piece_jointe_ids": [piece_jointe_id]}
     )
     mistral_client_factice.echouer_apres_demandes_outils(RuntimeError("second appel indisponible"))
     mistral_client_factice.repondre("Inutilisée", resume_et_profil=_reponse_resume_et_profil())
