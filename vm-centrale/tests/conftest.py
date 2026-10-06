@@ -21,6 +21,7 @@ from vm_centrale.mistral_client import (
 from vm_centrale.models import Compte, ComptePole
 from vm_centrale.moteur_recherche import MoteurIndisponible, ResultatRecherche, get_moteur_recherche
 from vm_centrale.outils.lire_pages_web import CONSIGNE_LECTURE_PAGE
+from vm_centrale.outils.piece_jointe import CONSIGNE_RELECTURE_PIECES_JOINTES
 from vm_centrale.outils.recherche_web import CONSIGNE_EXTRACTION
 from vm_centrale.questions_couvertes import CONSIGNE_QUESTIONS_PIECE_JOINTE
 from vm_centrale.security import hash_password
@@ -117,6 +118,11 @@ class ClientMistralFactice:
         self.appels_lecture_page: list = []
         self._reponse_lecture_page = _LECTURE_PAGE_FACTICE
         self._exception_lecture_page: Exception | None = None
+        # Appels d'extraction de relire_pieces_jointes avec un besoin (spec
+        # 1.4.1, #141), reconnus à leur consigne fixe.
+        self.appels_relecture_pieces_jointes: list = []
+        self._reponse_relecture_pieces_jointes = _LECTURE_PAGE_FACTICE
+        self._exception_relecture_pieces_jointes: Exception | None = None
 
     def repondre_ocr(self, texte: str) -> None:
         self._reponse_ocr = texte
@@ -238,6 +244,18 @@ class ClientMistralFactice:
     def echouer_lecture_page(self, exception: Exception) -> None:
         self._exception_lecture_page = exception
 
+    def repondre_relecture_pieces_jointes(self, trouvee: bool, reponse: str = "", source: str = "") -> None:
+        self.repondre_relecture_pieces_jointes_brute(
+            json.dumps({"trouvee": trouvee, "reponse": reponse, "source": source}, ensure_ascii=False)
+        )
+
+    def repondre_relecture_pieces_jointes_brute(self, texte: str) -> None:
+        self._reponse_relecture_pieces_jointes = texte
+        self._exception_relecture_pieces_jointes = None
+
+    def echouer_relecture_pieces_jointes(self, exception: Exception) -> None:
+        self._exception_relecture_pieces_jointes = exception
+
     def echouer_extraction(self, exception: Exception) -> None:
         self._exception_extraction = exception
 
@@ -267,6 +285,15 @@ class ClientMistralFactice:
             messages, response_format, self._reponse_lecture_page, self._exception_lecture_page
         )
 
+    def _relire_pieces_jointes(self, messages, response_format) -> ReponseChat:
+        self.appels_relecture_pieces_jointes.append(messages)
+        return self._repondre_canal(
+            messages,
+            response_format,
+            self._reponse_relecture_pieces_jointes,
+            self._exception_relecture_pieces_jointes,
+        )
+
     @staticmethod
     def _repondre_canal(messages, response_format, contenu: str, exception: Exception | None) -> ReponseChat:
         payload = {"model": "mistral-factice", "messages": messages, "response_format": response_format}
@@ -291,6 +318,12 @@ class ClientMistralFactice:
                 return self._questions_piece_jointe(messages, response_format)
             if not isinstance(messages, str) and messages and messages[0]["content"] == CONSIGNE_LECTURE_PAGE:
                 return self._lire_page(messages, response_format)
+            if (
+                not isinstance(messages, str)
+                and messages
+                and messages[0]["content"] == CONSIGNE_RELECTURE_PIECES_JOINTES
+            ):
+                return self._relire_pieces_jointes(messages, response_format)
             self.messages_recus.append(messages)
             self.response_formats_recus.append(response_format)
             if response_format is not None:
