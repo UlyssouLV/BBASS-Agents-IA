@@ -739,6 +739,16 @@ export function OngletChat({ conversationOuverteId, onConversationCreee }: Reado
     () => (pagesConversation ? [...pagesConversation].reverse().flatMap((page) => page.messages) : []),
     [pagesConversation]
   );
+  // Issue #127 : keepPreviousData (issue #101) laisse les pages de la
+  // conversation quittée dans `data` tant que celle qui est ouverte n'est pas
+  // chargée. Ces données ne sont « celles de la conversation ouverte » que
+  // hors placeholder et si leur id est bien conversationOuverteId — sans quoi
+  // un envoi en cours (nouvelle conversation créée depuis une autre) les
+  // prendrait pour son propre tour.
+  const donneesConversationOuverte =
+    !conversationQuery.isPlaceholderData &&
+    conversationOuverteId !== null &&
+    pagesConversation?.[0]?.id === conversationOuverteId;
 
   // Issue #102 : temps entre une ouverture/bascule de conversation
   // (changement de conversationOuverteId, porté par EcranCompte.tsx) et
@@ -748,14 +758,16 @@ export function OngletChat({ conversationOuverteId, onConversationCreee }: Reado
   // Une fois la frappe terminée, rebascule sur les données live dès qu'elles
   // contiennent bien ce tour (message + réponse), sans attendre davantage :
   // évite qu'une conversation déjà à jour reste figée sur l'état optimiste.
+  // Jamais sur un placeholder (issue #127) : les messages d'une autre
+  // conversation suffiraient sinon à passer le test de longueur.
   useEffect(() => {
-    if (envoiEnCours?.phase !== "termine") {
+    if (envoiEnCours?.phase !== "termine" || !donneesConversationOuverte) {
       return;
     }
     if (messagesConversation.length >= messagesAvantEnvoiRef.current.length + 2) {
       setEnvoiEnCours(null);
     }
-  }, [envoiEnCours, messagesConversation]);
+  }, [envoiEnCours, donneesConversationOuverte, messagesConversation]);
 
   // Préserve la position de lecture quand une page plus ancienne vient
   // d'être insérée au-dessus du contenu déjà affiché (issue #103) : la
@@ -859,6 +871,13 @@ export function OngletChat({ conversationOuverteId, onConversationCreee }: Reado
   const brouillonActif = conversationOuverteId === null && envoiEnCours === null;
   const messagesAffiches: Message[] =
     envoiEnCours !== null ? messagesAvantEnvoiRef.current : messagesConversation;
+  // Pendant un envoi, le titre d'un placeholder serait celui de la
+  // conversation quittée (issue #127) : on lui préfère celui que la création
+  // vient de renvoyer, ou rien tant qu'il n'est pas connu.
+  const titreAffiche =
+    envoiEnCours !== null && !donneesConversationOuverte
+      ? creerConversationMutation.data?.conversation.titre
+      : titreConversation;
 
   const erreurConversationOuverte = messageErreur(
     conversationQuery.error,
@@ -905,7 +924,7 @@ export function OngletChat({ conversationOuverteId, onConversationCreee }: Reado
       ) : (
         <div className="flex min-h-0 flex-1 flex-col">
           <h2 className="mb-2 text-sm font-semibold">
-            {titreConversation ?? (conversationQuery.isLoading ? "Chargement…" : "")}
+            {titreAffiche ?? (conversationQuery.isLoading ? "Chargement…" : "")}
           </h2>
           {erreurConversationOuverte && (
             <p role="alert" className="mb-2 text-sm text-destructive">
