@@ -409,11 +409,11 @@ def test_au_dela_du_plafond_global_la_derniere_page_entiere_est_retiree_et_linsp
     db_session,
     monkeypatch,
 ):
-    # Trois pages d'environ 140 000 caractères : leur total dépasse 80 % de
+    # Trois pages d'environ 250 000 caractères : leur total dépasse 80 % de
     # la fenêtre du modèle d'extraction, deux d'entre elles tiennent.
     moteur_recherche_factice.repondre(*_RESULTATS[:3])
     for numero, (_, url, _) in enumerate(_RESULTATS[:3]):
-        telechargeur_pages_factice.servir(url, _page_longue(f"FIN DE LA PAGE {numero}", 1900))
+        telechargeur_pages_factice.servir(url, _page_longue(f"FIN DE LA PAGE {numero}", 3400))
     _demander_recherche(mistral_client_factice)
     mistral_client_factice.repondre("Voici la loi.", "Titre")
 
@@ -429,6 +429,31 @@ def test_au_dela_du_plafond_global_la_derniere_page_entiere_est_retiree_et_linsp
     pages = _echange_outil(client, conversation_id, jeton_valide, monkeypatch)["reponse_payload"]["pages"]
     assert [page["retiree_par_plafond"] for page in pages] == [False, False, True]
     assert all(page["statut"] == 200 and page["taille"] > 100_000 for page in pages)
+
+
+def test_trois_pages_sous_le_plafond_de_la_fenetre_du_modele_ne_sont_pas_retirees(
+    client,
+    mistral_client_factice,
+    moteur_recherche_factice,
+    telechargeur_pages_factice,
+    jeton_valide,
+    monkeypatch,
+):
+    # Trois pages d'environ 140 000 caractères : au-dessus de 80 % d'une
+    # fenêtre de 131 072 tokens, sous 80 % de 262 144 (fiche MODELE_CHAT).
+    moteur_recherche_factice.repondre(*_RESULTATS[:3])
+    for numero, (_, url, _) in enumerate(_RESULTATS[:3]):
+        telechargeur_pages_factice.servir(url, _page_longue(f"FIN DE LA PAGE {numero}", 1900))
+    _demander_recherche(mistral_client_factice)
+    mistral_client_factice.repondre("Voici la loi.", "Titre")
+
+    conversation_id = _creer_conversation(client, jeton_valide)
+
+    contenu = _pages_envoyees_a_lextraction(mistral_client_factice)
+    assert all(f"FIN DE LA PAGE {numero}" in contenu for numero in range(3))
+    pages = _echange_outil(client, conversation_id, jeton_valide, monkeypatch)["reponse_payload"]["pages"]
+    assert [page["retiree_par_plafond"] for page in pages] == [False, False, False]
+    assert sum(page["taille"] for page in pages) > int(131_072 * 0.8 * 3)
 
 
 def test_un_chiffre_present_seulement_dans_le_texte_dune_page_reste_dans_la_reponse(

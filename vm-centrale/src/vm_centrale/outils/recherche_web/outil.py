@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 import trafilatura
 
-from vm_centrale.config import MODELE_CHAT
+from vm_centrale.config import FICHES_MODELES, MODELE_CHAT
 from vm_centrale.inspecteur import payload_depuis_erreur, reponse_depuis_erreur
 from vm_centrale.models import QuestionCouverte, ResultatRechercheWeb
 from vm_centrale.moteur_recherche import MoteurIndisponible, ResultatRecherche
@@ -19,11 +19,10 @@ _NOM = "rechercher_web"
 _NOMBRE_RESULTATS = 5
 _NOMBRE_PAGES_TELECHARGEES = 3
 # Plafond global des pages nettoyées (spec 1.4.0, étape 4) : environ 80 % de
-# la fenêtre du modèle d'extraction (MODELE_CHAT). Fenêtre de
-# `mistral-small-latest` relevée le 2026-10-06 : 128k tokens (Small 3.x) ou
-# 256k (Small 4) selon les sources, la plus petite est retenue. Pas de
-# tokenizer Mistral en local : estimation prudente à 3 caractères par token.
-_FENETRE_EXTRACTION_TOKENS = 131_072
+# la fenêtre du modèle d'extraction (fiche MODELE_CHAT). Pas de tokenizer
+# Mistral en local : estimation prudente à 3 caractères par token.
+_FENETRE_EXTRACTION_TOKENS = FICHES_MODELES[MODELE_CHAT].fenetre_tokens
+assert _FENETRE_EXTRACTION_TOKENS is not None
 _CARACTERES_PAR_TOKEN = 3
 _PLAFOND_CARACTERES_PAGES = int(_FENETRE_EXTRACTION_TOKENS * 0.8 * _CARACTERES_PAR_TOKEN)
 _RECHERCHE_INDISPONIBLE = (

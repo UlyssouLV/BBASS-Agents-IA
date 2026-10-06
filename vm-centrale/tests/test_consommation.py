@@ -45,7 +45,7 @@ def test_premier_message_enregistre_une_ligne_chat_et_une_ligne_titrage(
     for ligne in lignes:
         assert ligne.identifiant_compte == "j.dupont"
         assert ligne.conversation_id == conversation_id
-        assert ligne.modele == "mistral-small-latest"
+        assert ligne.modele == "mistral-small-2603"
         # Usage factice du double de test (conftest.py) : tokens_entree=10,
         # tokens_sortie=5, tokens_total=15.
         assert ligne.tokens_entree == 10
@@ -125,7 +125,7 @@ def test_upload_image_enregistre_une_ligne_vision_avec_tokens(
     assert len(nouvelles_lignes) == 1
     ligne = nouvelles_lignes[0]
     assert ligne.type_appel == "vision"
-    assert ligne.modele == "mistral-small-latest"
+    assert ligne.modele == "mistral-small-2603"
     assert ligne.conversation_id == conversation_id
     assert ligne.pages_traitees is None
     assert ligne.tokens_entree == 10
@@ -278,6 +278,15 @@ def test_calculer_cout_chat_est_token_based(db_session):
     cout = calculer_cout("chat", MODELE_CHAT, 1_000_000, 1_000_000, None)
     cout_attendu = Decimal("0.15") + Decimal("0.60")
     assert abs(cout - cout_attendu) < _TAUX_TOLERANCE
+
+
+def test_chaque_modele_utilise_a_une_fiche_complete(db_session):
+    from vm_centrale.config import FICHES_MODELES, MODELE_CHAT, MODELE_OCR
+
+    fiche_chat = FICHES_MODELES[MODELE_CHAT]
+    assert fiche_chat.fenetre_tokens == 262_144
+    assert fiche_chat.prix_usd_par_token_entree > 0 and fiche_chat.prix_usd_par_token_sortie > 0
+    assert FICHES_MODELES[MODELE_OCR].prix_usd_par_page > 0
 
 
 def test_get_consommation_apres_premier_message_puis_message_suivant(

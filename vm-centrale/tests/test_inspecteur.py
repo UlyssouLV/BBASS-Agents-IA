@@ -59,7 +59,7 @@ def test_premier_message_enregistre_les_echanges_chat_et_titrage_avec_le_bon_pay
         assert echange.piece_jointe_id is None
         assert echange.statut == "succes"
         assert echange.erreur is None
-        assert echange.modele == "mistral-small-latest"
+        assert echange.modele == "mistral-small-2603"
 
     echange_chat = echanges[0]
     assert echange_chat.requete_payload["messages"][-1] == {"role": "user", "content": "Bonjour"}
