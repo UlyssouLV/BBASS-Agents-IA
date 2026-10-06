@@ -134,13 +134,15 @@ _SCHEMA_RESUME_ET_PROFIL = {
 # (#110, conversation 76) : sans accès à Internet, la « certitude » qu'exigeait
 # l'ancienne ligne des liens n'existe pas — le modèle inventait des liens
 # puis affirmait les avoir vérifiés. Garanti en plus dans le code par
-# garde_fous.retirer_urls_inventees.
+# garde_fous.retirer_urls_inventees. Depuis la 1.4.0, la capacité réelle
+# est la recherche web (outil rechercher_web) : seuls les liens trouvés par
+# l'outil ou donnés par l'utilisateur peuvent être cités.
 _PROMPT_STYLE = (
-    "Capacité réelle, avant toute autre consigne : tu n'as aucun accès à "
-    "Internet, donc tu ne proposes jamais de lien, de PDF ou d'image à "
-    "télécharger, et tu n'affirmes jamais qu'un lien a été vérifié ; si le "
-    "utilisateur te demande un lien ou un fichier à télécharger, dis-lui d'emblée "
-    "que tu n'as pas accès à Internet. Tu n'inventes jamais un fait, un "
+    "Capacité réelle, avant toute autre consigne : tu peux chercher sur "
+    "Internet avec l'outil rechercher_web ; tu cites les pages trouvées par "
+    "cet outil, autant que nécessaire, mais jamais un lien qui n'en vient pas "
+    "ou que l'utilisateur n'a pas donné, et tu n'affirmes jamais avoir "
+    "vérifié une page que l'outil n'a pas lue. Tu n'inventes jamais un fait, un "
     "rapport, une source ou un chiffre, sauf si l'utilisateur te demande "
     "explicitement d'inventer, d'imaginer ou de faire une hypothèse. Si tu "
     "n'es pas sûr qu'il faille inventer, pose la question de confirmation "
@@ -175,8 +177,8 @@ _PROMPT_STYLE = (
     "ou numérotées, paragraphes, tableaux (uniquement quand l'information "
     "s'y prête vraiment, jamais par réflexe), blocs de code pour du code "
     "ou une formule, et liens uniquement vers une URL que l'utilisateur a "
-    "lui-même écrite dans cette conversation (jamais une autre URL, même "
-    "une que tu crois connaître). "
+    "lui-même écrite dans cette conversation ou que l'outil rechercher_web "
+    "a trouvée (jamais une autre URL, même une que tu crois connaître). "
     "Déconseillés : titres, séparateurs `---`, citations, images."
 )
 
@@ -259,11 +261,10 @@ def _construire_messages_pour_mistral(
 # Phrase écrite par la VM, pas par le modèle (conversation 78 : la consigne
 # était dans l'appel, le modèle a quand même rédigé le rapport, puis s'est
 # couvert en bas). Affichée quand la réponse avance une donnée chiffrée que
-# ni le message du tour, ni une pièce jointe, ne contiennent — sauf demande
-# explicite d'inventer, d'imaginer ou de faire une hypothèse.
-_REPONSE_SANS_DONNEES = (
-    "Je n'ai pas accès à Internet et je n'ai pas de document pour appuyer une réponse."
-)
+# ni le message du tour, ni une pièce jointe, ni une recherche web ne
+# contiennent — sauf demande explicite d'inventer, d'imaginer ou de faire
+# une hypothèse. Plus de « pas accès à Internet » depuis la 1.4.0.
+_REPONSE_SANS_DONNEES = "Je n'ai trouvé ni page ni document pour appuyer une réponse chiffrée."
 _MOTIF_INVENTION = re.compile(
     r"\b(inventer|invente|inventes|inventé|inventée|invention|imaginer|imagine|imagines|"
     r"imaginé|imaginée|hypothèse|hypothese|hypothèses|hypotheses)\b",
@@ -318,6 +319,17 @@ def _extraits_pieces_jointes(
     return extraits
 
 
+def _textes_recherche_web(db: Session, conversation_id: int) -> list[str]:
+    # Extraits du moteur et texte nettoyé des pages (spec 1.4.0), jamais
+    # l'extrait produit par l'appel d'extraction, qui pourrait inventer.
+    lignes = (
+        db.query(ResultatRechercheWeb.extrait_moteur, ResultatRechercheWeb.texte_nettoye)
+        .filter(ResultatRechercheWeb.conversation_id == conversation_id)
+        .all()
+    )
+    return [texte for ligne in lignes for texte in ligne if texte and texte.strip()]
+
+
 def _reponse_visible(
     db: Session,
     conversation_id: int,
@@ -336,6 +348,8 @@ def _reponse_visible(
         .all()
     )
     extraits = _extraits_pieces_jointes(db, conversation_id, piece_jointe)
+    # Un texte de recherche non vide compte comme un document.
+    extraits += _textes_recherche_web(db, conversation_id)
     textes_source = [contenu for (contenu,) in messages_du_compte] + [nouveau_message, *extraits]
     sans_chiffre_invente = retirer_chiffres_hors_source(reponse, textes_source)
     if sans_chiffre_invente == reponse:

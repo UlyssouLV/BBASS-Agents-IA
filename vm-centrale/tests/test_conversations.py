@@ -1137,9 +1137,7 @@ def test_url_du_compte_sortie_de_la_fenetre_passe_et_url_inventee_est_retiree(
     assert detail.json()["messages"][-1]["contenu"] == contenu
 
 
-_REPONSE_SANS_DONNEES = (
-    "Je n'ai pas accès à Internet et je n'ai pas de document pour appuyer une réponse."
-)
+_REPONSE_SANS_DONNEES = "Je n'ai trouvé ni page ni document pour appuyer une réponse chiffrée."
 
 
 def test_chiffre_absent_sans_document_est_remplace_par_la_phrase_fixe(
@@ -1158,6 +1156,7 @@ def test_chiffre_absent_sans_document_est_remplace_par_la_phrase_fixe(
 
     assert reponse.status_code == 200
     assert reponse.json()["reponse"] == _REPONSE_SANS_DONNEES
+    assert "accès à Internet" not in reponse.json()["reponse"]
     detail = client.get(
         f"/conversations/{reponse.json()['conversation']['id']}",
         headers=_autorisation(jeton_valide),
@@ -1237,7 +1236,8 @@ def test_consigne_de_style_commence_par_la_capacite_reelle(
     consigne = mistral_client_factice.appels_reponse[0][0]
     assert consigne["role"] == "system"
     premiere_ligne = consigne["content"].splitlines()[0]
-    assert "aucun accès à Internet" in premiere_ligne
+    assert "rechercher_web" in premiere_ligne
+    assert "aucun accès à Internet" not in consigne["content"]
     assert "lien" in premiere_ligne
     assert "vérifié" in premiere_ligne
     assert "n'inventes jamais" in premiere_ligne

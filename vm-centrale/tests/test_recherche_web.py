@@ -204,3 +204,23 @@ def test_inspecteur_trace_la_requete_les_resultats_bruts_et_le_texte_renvoye(
         {"titre": titre, "url": url, "extrait": extrait} for titre, url, extrait in _RESULTATS[:2]
     ]
     assert _URL_TROUVEE in detail["reponse_payload"]["contenu"]
+
+
+def test_un_chiffre_dun_extrait_du_moteur_reste_un_chiffre_absent_part_sans_phrase_fixe(
+    client, mistral_client_factice, moteur_recherche_factice, jeton_valide
+):
+    moteur_recherche_factice.repondre(
+        ("Loi Climat et résilience", _URL_TROUVEE, "Promulguée le 22 août 2021, 305 articles."),
+    )
+    _demander_recherche(mistral_client_factice)
+    mistral_client_factice.repondre("La loi compte 305 articles et 48 décrets.", "Titre")
+
+    reponse = client.post(
+        "/conversations", json={"message": "Trouve la loi Climat"}, headers=_autorisation(jeton_valide)
+    )
+
+    assert reponse.status_code == 200
+    contenu = reponse.json()["reponse"]
+    assert "305" in contenu
+    assert "48" not in contenu
+    assert "page ni document" not in contenu
