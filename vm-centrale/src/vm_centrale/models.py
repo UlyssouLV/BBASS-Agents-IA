@@ -194,7 +194,8 @@ class ResultatRechercheWeb(Base):
         ForeignKey(_FK_CONVERSATIONS_ID, ondelete="CASCADE"), index=True
     )
     # Nullable : renseigné à la persistance de la réponse du tour, pour la
-    # mention courte de la recherche au tour suivant (spec 1.4.0).
+    # numéro de tour de la recherche dans la Mémoire de la conversation
+    # (spec 1.4.1).
     message_id: Mapped[int | None] = mapped_column(
         ForeignKey("messages.id"), nullable=True, index=True
     )
