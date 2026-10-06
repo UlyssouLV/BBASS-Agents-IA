@@ -18,21 +18,23 @@ Ce n’est **pas** une spec (ça vient après « Ouvre la version »).
 - **1.3.0** — Inspecteur des échanges avec le modèle (outil de développement) : Mode développeur ouvert par `Ctrl+Maj+D` depuis n'importe quel compte, dans un nouvel onglet `/inspecteur`, débloqué par la Clé d'administration VM (saisie en mémoire de l'onglet, jamais stockée) ; accès à toutes les conversations de tous les comptes ([ADR-0012](../adr/0012-mode-developpeur-cle-admin-vm-tous-comptes.md)) — comptes → conversations → fil chronologique des échanges. Chaque appel Mistral réel (chat, titrage, résumé+profil, OCR, vision, chaque aller-retour de tool calling) est capturé dans une table `echanges_inspecteur` séparée de `Consommation` (payload exact envoyé, réponse brute, statut succès/échec), supprimée en cascade avec la conversation ; un échange en échec survit au rollback du tour ; pièce jointe affichée comme référence cliquable plutôt qu'en texte brut ; jamais la clé API Mistral dans un échange. Historique seulement, lecture seule.
 - **1.3.1** — Le chat ne fige plus ses inventions ([#110](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/110), [spec](../specs/v1.3.1-chat-ne-fige-plus-ses-inventions.md)) : consigne de chat sans lien proposé (seule une URL écrite par le compte peut ressortir), refus d’un fait inventé sans demande explicite ; pièce jointe traitée comme déjà jointe et décrite par son seul extrait ; résumé glissant qui note « proposé, non vérifié » ce que l’assistant a affirmé, plafonné à 1 500 caractères ; profil de travail réécrit en entier sous 800 caractères au lieu d’empiler des deltas, profils existants vidés. Garde-fous centralisés dans `vm_centrale/garde_fous/` : URL absente des messages du compte retirée ; sans document ni chiffre fourni, une réponse chiffrée est remplacée par une phrase fixe de la VM ; avec une source, seuls les chiffres présents restent. Pas de changement du contrat HTTP du poste.
 
-## Prochaine : 1.4.0 — Recherche web dans le chat
+## En cours : 1.4.0 — Recherche web dans le chat
 
-**Objectif.** Un outil de recherche internet, exécuté par la VM et branché sur le chat comme l’outil pièce jointe, pour que le modèle trouve une page réelle au lieu d’en inventer l’adresse. On reste sur `chat/completions` : pas l’outil `web_search` de l’API Conversations Mistral (écartée en 1.1.1, pas de Zero Data Retention, clé unique du cabinet). Le collaborateur demande de trouver quelque chose ; le modèle appelle l’outil ; un moteur renvoie des pages ; la réponse ne cite qu’une URL revenue de cet outil. Le texte ramené est une source, comme l’extrait d’une pièce jointe : la réponse ne garde un chiffre que s’il est écrit dans ce texte. Sans texte ramené, la phrase fixe de la 1.3.1 s’applique.
-
-**Outils centralisés.** Pour plus de praticité, les function calling proposés au modèle sont regroupés en un seul endroit, de façon optimisée et logique.
-
-**Optimisation (piste, à confirmer à l’ouverture).** Télécharger le texte intégral de toutes les pages trouvées coûte trop cher en tokens et en délai, et noie la réponse. Le flux le plus économe : le moteur renvoie une liste courte (titre, URL, extrait) ; la VM ne télécharge ensuite que quelques pages, avec un plafond de texte par page ; ce texte seul repart au modèle pour la réponse. Le moteur concret (et le fait que la requête quitte le cabinet) se tranche à l’ouverture.
+**Objectif.** Un outil de recherche internet, exécuté par la VM et branché sur le chat comme l’outil pièce jointe, pour que le modèle trouve une page réelle au lieu d’en inventer l’adresse. Ouverte le 2026-10-06 ([#117](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/117), [spec](../specs/v1.4.0-recherche-web-dans-le-chat.md)) : SearXNG auto-hébergé ([ADR-0013](../adr/0013-recherche-web-searxng-auto-heberge.md)), pages entières nettoyées puis appel d’extraction isolé du contexte ([ADR-0014](../adr/0014-recherche-web-en-deux-temps-extraction-isolee.md)), outils du modèle centralisés dans `vm_centrale/outils/`, boucle d’outils sur 3 tours, inspecteur chronologique Mistral / local.
 
 **Hors périmètre.** Moduléo, déploiement, n8n. Pas de changement du contrat HTTP du poste : l’outil reste interne à l’appel de chat.
 
-## Ensuite : 1.4.1 — Mémoire des pièces jointes de la conversation
+## Ensuite : 1.4.1 — Mémoire de la conversation (pièces jointes et recherches)
 
-**Objectif.** Le résumé glissant ne garde qu’une mention courte d’une pièce jointe sortie de la fenêtre de 3. Cette version garde à part, pour la durée de la conversation, la liste des pièces jointes partagées, et donne au modèle un outil (tool calling) pour se rappeler lesquelles ont été partagées dans cette conversation. Piste née de l’ouverture de la 1.3.1 ([spec](../specs/v1.3.1-chat-ne-fige-plus-ses-inventions.md)) : à confirmer par le retest de la 1.3.1 (une URL ou une pièce jointe du compte survit-elle au résumé plafonné ?).
+**Objectif.** Le résumé glissant ne garde qu’une mention courte d’une pièce jointe sortie de la fenêtre de 3 ; depuis la 1.4.0, une recherche web n’y laisse que sa requête et ses URL. Cette version garde à part, pour la durée de la conversation, la liste des pièces jointes **et des recherches** partagées, et donne au modèle un outil (tool calling) pour se les rappeler et en relire le contenu. Piste née de l’ouverture de la 1.3.1 ([spec](../specs/v1.3.1-chat-ne-fige-plus-ses-inventions.md)), élargie aux recherches à l’ouverture de la 1.4.0 ([spec](../specs/v1.4.0-recherche-web-dans-le-chat.md)) : à confirmer par le retest de la 1.3.1 (une URL ou une pièce jointe du compte survit-elle au résumé plafonné ?).
 
 **Hors périmètre.** Moduléo, déploiement, n8n. Pas de changement du contrat HTTP du poste : l’outil reste interne à l’appel de chat.
+
+- Conservation d’une pièce jointe au-delà de sa conversation d’origine (usage multi-conversationnel, matière pour entraîner les futurs Agents) : piste évoquée dès le grilling 1.1.2, pas tranchée.
+
+## Ensuite : 1.4.x — Cache des pages web entre conversations
+
+**Objectif.** En 1.4.0, les pages téléchargées par une recherche ne vivent que le temps de leur conversation. Garder un cache commun (clé : l’URL) éviterait de retélécharger une page déjà lue. À trancher à l’ouverture : durée de validité au-delà de laquelle on retélécharge (une page change), règle de partage entre comptes (pages publiques seulement), taille et purge du cache. Piste née de l’ouverture de la 1.4.0.
 
 ## Ensuite : 1.5.0 — Moduléo en lecture (outil transverse) + premier branchement via l’Agent Administration
 
@@ -188,6 +190,10 @@ Ce n’est **pas** le même objet que la 1.1.1 (résumé glissant de conversatio
 Constat (grilling 1.2.2) : au-delà du Markdown borné (gras, listes) posé en 1.2.2, le cabinet a exprimé l'envie qu'une réponse de l'IA puisse à terme intégrer des éléments plus riches — graphiques, voire génération de documents (façon Word/Excel, à la manière de ce que proposent certains assistants IA) — plutôt que de la prose seule.
 
 Pas de travail dédié avant que le besoin se confirme. Le rendu posé en 1.2.2 (`react-markdown` + mapping de composants React par élément Markdown) est délibérément choisi pour rendre cette extension simple le moment venu : ajouter un nouveau type de bloc revient à enregistrer un composant supplémentaire dans ce mapping, sans reprendre l'architecture du rendu.
+
+### Modes de réponse (Rapide / Approfondi) et outils de lecture plus fins
+
+Constat (ouverture 1.4.0) : plusieurs façons d’utiliser les outils sont possibles selon l’effort voulu. Un mode choisi par le collaborateur réglerait le nombre de tours d’outils, le nombre de pages lues, un outil `lire_page(url)` (le modèle choisit ses pages au lieu de prendre les premières), un appel de synthèse, ou le modèle utilisé. Change le contrat HTTP du poste (choix du mode). Le découpage de la 1.4.0 (registre d’outils, appel d’extraction isolé, [ADR-0014](../adr/0014-recherche-web-en-deux-temps-extraction-isolee.md)) est fait pour s’y brancher. Même rubrique : optimiser la consigne fixe de l’appel d’extraction après les essais de la 1.4.0.
 
 ### Exécution de code dans le chat (cellules Python exécutables, façon ChatGPT)
 
