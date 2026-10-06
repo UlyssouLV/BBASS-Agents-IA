@@ -76,7 +76,7 @@ Une correction appliquée par la VM centrale à ce que le modèle produit malgr�
 _Avoid_: filtre, sanitizer
 
 **Outil**:
-Une capacité que le modèle de chat **décide lui-même** d'appeler (tool calling), et que la VM centrale exécute pour lui avant de lui renvoyer le résultat (ex. relire une Pièce jointe sortie de la fenêtre, lancer une Recherche web) ([spec 1.4.0](docs/specs/v1.4.0-recherche-web-dans-le-chat.md)). Tous regroupés dans `vm-centrale/src/vm_centrale/outils/`, listés dans son `README.md`. Proposés seulement sur l'appel de chat principal.
+Une capacité que le modèle de chat **décide lui-même** d'appeler (tool calling), et que la VM centrale exécute pour lui avant de lui renvoyer le résultat (ex. relire des Pièces jointes, lancer une Recherche web, lire une page déjà trouvée ou envoyée par le compte) ([spec 1.4.0](docs/specs/v1.4.0-recherche-web-dans-le-chat.md), [spec 1.4.1](docs/specs/v1.4.1-memoire-de-la-conversation.md)). Tous regroupés dans `vm-centrale/src/vm_centrale/outils/`, listés dans son `README.md`. Proposés seulement sur l'appel de chat principal.
 _Avoid_: calling tool, fonction (ambigu avec le code), outil pour une Étape de traitement
 
 **Étape de traitement**:
@@ -84,9 +84,17 @@ Un traitement que la VM centrale impose à chaque tour, sans que le modèle le d
 _Avoid_: outil, tool
 
 **Recherche web**:
-L'Outil `rechercher_web` : la VM interroge un moteur de recherche auto-hébergé (SearXNG, [ADR-0013](docs/adr/0013-recherche-web-searxng-auto-heberge.md)), télécharge et nettoie les pages trouvées, puis les fait passer par un Appel d'extraction avant de renvoyer le résultat au modèle ([spec 1.4.0](docs/specs/v1.4.0-recherche-web-dans-le-chat.md)). Seule la requête sort vers les moteurs ; les résultats (URL, titre, extrait du moteur, texte nettoyé) sont enregistrés pour la Conversation et supprimés avec elle. Ils servent de source aux Garde-fous.
+L'Outil `rechercher_web` : la VM interroge un moteur de recherche auto-hébergé (SearXNG, [ADR-0013](docs/adr/0013-recherche-web-searxng-auto-heberge.md)), télécharge et nettoie les pages trouvées, puis les fait passer par un Appel d'extraction avant de renvoyer le résultat au modèle ([spec 1.4.0](docs/specs/v1.4.0-recherche-web-dans-le-chat.md)). Seule la requête sort vers les moteurs ; les résultats (URL, titre, extrait du moteur, texte nettoyé) sont enregistrés pour la Conversation et supprimés avec elle. Ils servent de source aux Garde-fous. Depuis la [spec 1.4.1](docs/specs/v1.4.1-memoire-de-la-conversation.md), une page dont le compte a écrit l'URL, lue par l'Outil `lire_pages_web`, est enregistrée de la même façon (provenance « utilisateur ») et sert aussi de source.
 _Avoid_: web search (outil intégré de l'API Conversations Mistral, écartée), scraping
 
 **Appel d'extraction**:
 L'appel Mistral interne à une Recherche web qui reçoit seulement le besoin exprimé par le modèle et les pages nettoyées, jamais le contexte de la Conversation, et en extrait ce qui répond, avec l'URL de chaque information ([ADR-0014](docs/adr/0014-recherche-web-en-deux-temps-extraction-isolee.md)). Compté en Consommation (`extraction_web`). Son texte n'est jamais une source des Garde-fous : il peut lui-même inventer.
 _Avoid_: résumé (ambigu avec le résumé glissant), synthèse
+
+**Mémoire de la conversation**:
+La liste, recalculée par la VM centrale et envoyée au modèle à chaque appel de chat principal, de tout ce qui a été partagé dans une [Conversation](#language) : Pièces jointes, Recherches web, URL écrites par le compte (marquées comme telles), chacune avec ses Questions couvertes ([spec 1.4.1](docs/specs/v1.4.1-memoire-de-la-conversation.md)). Distincte du résumé glissant : jamais réécrite par un modèle, jamais plafonnée par lui. Propre à sa Conversation et supprimée avec elle.
+_Avoid_: mémoire (seul, ambigu avec le résumé glissant et le Profil de travail), historique
+
+**Question couverte**:
+Une question à laquelle une Pièce jointe ou une page lue répond, enregistrée avec sa réponse courte et sa source (nom de fichier ou URL) ([spec 1.4.1](docs/specs/v1.4.1-memoire-de-la-conversation.md)). Jusqu'à 8 générées d'emblée (par l'Appel d'extraction pour une page, par un appel dédié à l'envoi pour une Pièce jointe), puis une de plus à chaque relecture avec un besoin ; un besoin sans réponse est noté « non présent selon l'extraction ». Écrite par un modèle : jamais une source des Garde-fous.
+_Avoid_: FAQ, index, résumé
