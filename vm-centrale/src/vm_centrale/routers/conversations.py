@@ -225,12 +225,49 @@ def _message_systeme_piece_jointe(piece_jointe: PieceJointe) -> dict[str, str]:
     }
 
 
+def _mentions_recherches(db: Session, messages: list[Message]) -> dict[int, str]:
+    # Mention courte des recherches de chaque message de l'assistant (spec
+    # 1.4.0, mémoire au tour suivant) : requête et URL, jamais le contenu des
+    # pages ni les extraits du moteur.
+    lignes = (
+        db.query(ResultatRechercheWeb.message_id, ResultatRechercheWeb.requete, ResultatRechercheWeb.url)
+        .filter(ResultatRechercheWeb.message_id.in_([m.id for m in messages]))
+        .order_by(ResultatRechercheWeb.id)
+        .all()
+    )
+    urls_par_recherche: dict[int, dict[str, list[str]]] = {}
+    for message_id, requete, url in lignes:
+        urls_par_recherche.setdefault(message_id, {}).setdefault(requete, []).append(url)
+    return {
+        message_id: "\n".join(
+            f"(Recherche web « {requete} », URL trouvées : {', '.join(urls)})"
+            for requete, urls in recherches.items()
+        )
+        for message_id, recherches in urls_par_recherche.items()
+    }
+
+
+def _avec_mention(contenu: str, mention: str | None) -> str:
+    return f"{contenu}\n{mention}" if mention else contenu
+
+
+def _rattacher_recherches_au_message(db: Session, message: Message) -> None:
+    # Les résultats sans message sont ceux de ce tour : ceux d'un tour en
+    # échec sont annulés par son rollback (flush, jamais commit).
+    db.flush()
+    db.query(ResultatRechercheWeb).filter(
+        ResultatRechercheWeb.conversation_id == message.conversation_id,
+        ResultatRechercheWeb.message_id.is_(None),
+    ).update({ResultatRechercheWeb.message_id: message.id})
+
+
 def _construire_messages_pour_mistral(
     resume_contexte: str,
     derniers_messages: list[Message],
     nouveau_message: str,
     profil_travail: str,
     piece_jointe: PieceJointe | None = None,
+    mentions_recherches: dict[int, str] | None = None,
 ) -> list[dict[str, str]]:
     # Historique borné (résumé glissant + fenêtre courte) plutôt que
     # l'intégralité de la conversation, pour maîtriser le coût en tokens
@@ -253,7 +290,11 @@ def _construire_messages_pour_mistral(
         )
     if piece_jointe is not None:
         messages.append(_message_systeme_piece_jointe(piece_jointe))
-    messages.extend({"role": m.role, "content": m.contenu} for m in derniers_messages)
+    mentions_recherches = mentions_recherches or {}
+    messages.extend(
+        {"role": m.role, "content": _avec_mention(m.contenu, mentions_recherches.get(m.id))}
+        for m in derniers_messages
+    )
     messages.append({"role": "user", "content": nouveau_message})
     return messages
 
@@ -372,8 +413,10 @@ def _identite_connue(compte: Compte | None) -> str:
     return f"{compte.prenom} {compte.nom}, pôle(s) : {poles}, agence : {compte.agence}"
 
 
-def _ligne_message_sortant(message: Message, piece_jointe: PieceJointe | None) -> str:
-    ligne = f"{message.role} : {message.contenu}"
+def _ligne_message_sortant(
+    message: Message, piece_jointe: PieceJointe | None, mention_recherche: str | None = None
+) -> str:
+    ligne = _avec_mention(f"{message.role} : {message.contenu}", mention_recherche)
     if piece_jointe is None:
         return ligne
     # Extrait court seulement (jamais l'intégralité de contenu_extrait) : le
@@ -393,10 +436,13 @@ def _prompt_resume_et_profil(
     compte: Compte | None,
     messages_sortants: list[Message],
     pieces_jointes_sortantes: dict[int, PieceJointe] | None = None,
+    mentions_recherches: dict[int, str] | None = None,
 ) -> str:
     pieces_jointes_sortantes = pieces_jointes_sortantes or {}
+    mentions_recherches = mentions_recherches or {}
     echange_sortant = "\n".join(
-        _ligne_message_sortant(m, pieces_jointes_sortantes.get(m.id)) for m in messages_sortants
+        _ligne_message_sortant(m, pieces_jointes_sortantes.get(m.id), mentions_recherches.get(m.id))
+        for m in messages_sortants
     )
     return (
         "Tu maintiens deux mémoires pour cet utilisateur : un résumé glissant de la "
@@ -419,6 +465,8 @@ def _prompt_resume_et_profil(
         "Si un message sortant porte une pièce jointe, n'en garde dans "
         "resume_contexte qu'une mention courte (façon description de skill : "
         "juste assez pour situer le sujet), jamais son contenu intégral. "
+        "Si un message sortant porte une recherche web, n'en garde que la "
+        "requête et les URL trouvées. "
         "Dans resume_contexte, une affirmation de l'assistant (rapport, "
         "chiffre, URL) est notée « proposé, non vérifié » : jamais comme un "
         "fait, jamais comme quelque chose que l'utilisateur a fourni. Un sujet "
@@ -676,19 +724,15 @@ def creer_conversation(
             contenu=requete.message,
             date_creation=maintenant,
         )
-        db.add_all(
-            [
-                message_utilisateur,
-                Message(
-                    conversation_id=conversation.id,
-                    role="assistant",
-                    contenu=reponse,
-                    date_creation=maintenant,
-                ),
-            ]
+        message_assistant = Message(
+            conversation_id=conversation.id,
+            role="assistant",
+            contenu=reponse,
+            date_creation=maintenant,
         )
+        db.add_all([message_utilisateur, message_assistant])
+        _rattacher_recherches_au_message(db, message_assistant)
         if piece_jointe is not None:
-            db.flush()
             _lier_piece_jointe_a_la_conversation(piece_jointe, conversation)
             piece_jointe.message_id = message_utilisateur.id
         db.commit()
@@ -1118,10 +1162,16 @@ def _appeler_resume_et_profil(
     compte: Compte | None,
     messages_sortants: list[Message],
     pieces_jointes_sortantes: dict[int, PieceJointe],
+    mentions_recherches: dict[int, str],
 ) -> ReponseChat:
     return client.chat(
         _prompt_resume_et_profil(
-            resume_contexte, profil_actuel, compte, messages_sortants, pieces_jointes_sortantes
+            resume_contexte,
+            profil_actuel,
+            compte,
+            messages_sortants,
+            pieces_jointes_sortantes,
+            mentions_recherches,
         ),
         response_format=_SCHEMA_RESUME_ET_PROFIL,
     )
@@ -1138,6 +1188,7 @@ def _generer_reponse_et_resume(
     profil_actuel: str,
     compte: Compte | None,
     pieces_jointes_sortantes: dict[int, PieceJointe],
+    mentions_recherches: dict[int, str],
     piece_jointe_id: int | None,
 ) -> tuple[ReponseChat, str | None, str | None]:
     # Comme pour la création (cf. creer_conversation) : les appels Mistral
@@ -1170,6 +1221,7 @@ def _generer_reponse_et_resume(
             compte,
             messages_sortants,
             pieces_jointes_sortantes,
+            mentions_recherches,
         )
         reponse_chat = _resoudre_reponse_chat(
             futur_reponse.result,
@@ -1286,8 +1338,16 @@ def envoyer_message(
         # requêtes concurrentes pouvaient toutes deux lire l'ancienne valeur
         # puis écraser l'une des deux mises à jour au commit).
         profil_actuel = _contenu_profil_actuel(db, identifiant_compte)
+        # Lues ici pour toute la fenêtre, qui contient aussi les messages
+        # sortants (jamais dans le thread de l'executor, voir plus bas).
+        mentions_recherches = _mentions_recherches(db, derniers_messages)
         messages_pour_mistral = _construire_messages_pour_mistral(
-            conversation.resume_contexte, derniers_messages, requete.message, profil_actuel, piece_jointe
+            conversation.resume_contexte,
+            derniers_messages,
+            requete.message,
+            profil_actuel,
+            piece_jointe,
+            mentions_recherches,
         )
 
         # Un message sort de la fenêtre des 3 derniers dès que ce tour (2 nouveaux
@@ -1337,6 +1397,7 @@ def envoyer_message(
             profil_actuel,
             compte,
             pieces_jointes_sortantes,
+            mentions_recherches,
             piece_jointe_id,
         )
 
@@ -1360,19 +1421,15 @@ def envoyer_message(
             contenu=requete.message,
             date_creation=maintenant,
         )
-        db.add_all(
-            [
-                message_utilisateur,
-                Message(
-                    conversation_id=conversation.id,
-                    role="assistant",
-                    contenu=reponse,
-                    date_creation=maintenant,
-                ),
-            ]
+        message_assistant = Message(
+            conversation_id=conversation.id,
+            role="assistant",
+            contenu=reponse,
+            date_creation=maintenant,
         )
+        db.add_all([message_utilisateur, message_assistant])
+        _rattacher_recherches_au_message(db, message_assistant)
         if piece_jointe is not None:
-            db.flush()
             _lier_piece_jointe_a_la_conversation(piece_jointe, conversation)
             piece_jointe.message_id = message_utilisateur.id
         conversation.date_derniere_activite = maintenant

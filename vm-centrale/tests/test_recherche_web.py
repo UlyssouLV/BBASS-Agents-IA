@@ -224,3 +224,51 @@ def test_un_chiffre_dun_extrait_du_moteur_reste_un_chiffre_absent_part_sans_phra
     assert "305" in contenu
     assert "48" not in contenu
     assert "page ni document" not in contenu
+
+
+def _conversation_avec_recherche(client, mistral_client_factice, moteur_recherche_factice, jeton) -> int:
+    moteur_recherche_factice.repondre(*_RESULTATS)
+    _demander_recherche(mistral_client_factice)
+    mistral_client_factice.repondre("Voici la loi.", "Titre")
+    return _creer_conversation(client, jeton)
+
+
+def _assert_mention_courte(texte: str) -> None:
+    assert "loi climat résilience" in texte
+    for titre, url, extrait in _RESULTATS[:5]:
+        assert url in texte
+        assert titre not in texte and extrait not in texte
+
+
+def test_au_tour_suivant_la_fenetre_mentionne_la_requete_et_les_url_jamais_les_extraits(
+    client, mistral_client_factice, moteur_recherche_factice, jeton_valide
+):
+    conversation_id = _conversation_avec_recherche(
+        client, mistral_client_factice, moteur_recherche_factice, jeton_valide
+    )
+
+    mistral_client_factice.repondre("Suite", resume_et_profil=_reponse_resume_et_profil())
+    assert _envoyer(client, jeton_valide, conversation_id, "Et ensuite ?").status_code == 200
+
+    messages = mistral_client_factice.appels_reponse[-1]
+    (assistant,) = [m for m in messages if m["role"] == "assistant"]
+    assert assistant["content"].startswith("Voici la loi.")
+    _assert_mention_courte(assistant["content"])
+    assert not _messages_tool(messages)
+
+
+def test_la_ligne_envoyee_au_resume_mentionne_la_requete_et_les_url_jamais_les_extraits(
+    client, mistral_client_factice, moteur_recherche_factice, jeton_valide
+):
+    conversation_id = _conversation_avec_recherche(
+        client, mistral_client_factice, moteur_recherche_factice, jeton_valide
+    )
+
+    mistral_client_factice.repondre("Suite", resume_et_profil=_reponse_resume_et_profil())
+    for message in ("Deux", "Trois"):
+        assert _envoyer(client, jeton_valide, conversation_id, message).status_code == 200
+
+    prompt = mistral_client_factice.appels_structures[-1]
+    ligne = prompt[prompt.index("assistant : Voici la loi.") :]
+    ligne = ligne[: ligne.index("user : Deux")]
+    _assert_mention_courte(ligne)

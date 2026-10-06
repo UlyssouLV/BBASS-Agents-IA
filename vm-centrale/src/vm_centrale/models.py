@@ -193,6 +193,11 @@ class ResultatRechercheWeb(Base):
     conversation_id: Mapped[int] = mapped_column(
         ForeignKey(_FK_CONVERSATIONS_ID, ondelete="CASCADE"), index=True
     )
+    # Nullable : renseigné à la persistance de la réponse du tour, pour la
+    # mention courte de la recherche au tour suivant (spec 1.4.0).
+    message_id: Mapped[int | None] = mapped_column(
+        ForeignKey("messages.id"), nullable=True, index=True
+    )
     requete: Mapped[str] = mapped_column(String)
     url: Mapped[str] = mapped_column(String)
     titre: Mapped[str] = mapped_column(String)
