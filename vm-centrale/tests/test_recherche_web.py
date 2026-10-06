@@ -655,3 +655,63 @@ def test_inspecteur_place_lextraction_entre_loutil_et_lappel_principal_suivant(
     assert detail["statut"] == "succes" and detail["modele"] == MODELE_CHAT
     assert "Texte de la loi lue." in detail["requete_payload"]["messages"][-1]["content"]
     assert "Extrait de la loi." in json.dumps(detail["reponse_payload"], ensure_ascii=False)
+
+
+# Le garde-fou des chiffres ne touche jamais une URL (#128, conversation 87).
+
+_URL_DATEE = "https://www.anah.gouv.fr/sites/default/files/2025-03/202503-guide-aides-financieres.pdf"
+
+
+def _repondre_apres_recherche_datee(client, mistral_client_factice, moteur_recherche_factice, jeton, reponse: str) -> str:
+    moteur_recherche_factice.repondre(("Guide des aides", _URL_DATEE, "Les aides de l'Anah."))
+    _demander_recherche(mistral_client_factice, "maprimerenov guide")
+    mistral_client_factice.repondre(reponse, "Titre")
+    resultat = client.post(
+        "/conversations", json={"message": "Trouve le guide MaPrimeRénov'"}, headers=_autorisation(jeton)
+    )
+    assert resultat.status_code == 200
+    return resultat.json()["reponse"]
+
+
+def test_un_lien_markdown_vers_un_resultat_garde_ses_nombres_un_chiffre_hors_source_part(
+    client, mistral_client_factice, moteur_recherche_factice, jeton_valide
+):
+    contenu = _repondre_apres_recherche_datee(
+        client,
+        mistral_client_factice,
+        moteur_recherche_factice,
+        jeton_valide,
+        f"Voir le [guide]({_URL_DATEE}) : 48 aides.",
+    )
+
+    assert f"[guide]({_URL_DATEE})" in contenu
+    assert "48" not in contenu
+
+
+def test_une_url_nue_dun_resultat_garde_ses_nombres(
+    client, mistral_client_factice, moteur_recherche_factice, jeton_valide
+):
+    contenu = _repondre_apres_recherche_datee(
+        client,
+        mistral_client_factice,
+        moteur_recherche_factice,
+        jeton_valide,
+        f"Le guide est ici : {_URL_DATEE}.",
+    )
+
+    assert f"{_URL_DATEE}." in contenu
+
+
+def test_un_chiffre_hors_source_dans_le_texte_dun_lien_markdown_est_retire(
+    client, mistral_client_factice, moteur_recherche_factice, jeton_valide
+):
+    contenu = _repondre_apres_recherche_datee(
+        client,
+        mistral_client_factice,
+        moteur_recherche_factice,
+        jeton_valide,
+        f"Voir le [Guide 2031]({_URL_DATEE}).",
+    )
+
+    assert "2031" not in contenu
+    assert f"({_URL_DATEE})" in contenu
