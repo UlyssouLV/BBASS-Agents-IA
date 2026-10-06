@@ -61,12 +61,16 @@ Tickets (`Fixes`) : #… #…
 
 <what is not in this version if it could be confused>
 
+Spec : https://github.com/<owner>/<repo>/blob/vX.Y.Z/<spec-path>
+
 ADRs de cette version (liens **sur ce tag**, pas `main`) :
 
 - https://github.com/<owner>/<repo>/blob/vX.Y.Z/<adr-path>
 
 Issues laissées de côté (PR / spec hors périmètre) : #…
 ```
+
+`<spec-path>` = parent spec under role **`spec`** (usually `docs/specs/…`). Link **on this tag**, not `main`. Always this one-line shape: `Spec : <url>`.
 
 `<adr-path>` = files under role **`adr`**.
 
