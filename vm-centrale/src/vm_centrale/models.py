@@ -162,9 +162,14 @@ class EchangeInspecteur(Base):
     piece_jointe_id: Mapped[int | None] = mapped_column(
         ForeignKey("pieces_jointes.id"), nullable=True
     )
-    # Même vocabulaire que Consommation.type_appel : "chat" / "titrage" /
-    # "resume_et_profil" / "ocr" / "vision".
+    # "mistral" : un appel Mistral réel ; "local" : du travail de la VM elle-
+    # même, comme l'exécution d'un outil (spec 1.4.0).
+    origine: Mapped[str] = mapped_column(String)
+    # Mistral : même vocabulaire que Consommation.type_appel ("chat" /
+    # "titrage" / "resume_et_profil" / "ocr" / "vision"). Local :
+    # "outil:<nom de l'outil>".
     type_appel: Mapped[str] = mapped_column(String)
+    # Vide pour un échange local (aucun modèle appelé).
     modele: Mapped[str] = mapped_column(String)
     # Payload exact tel que construit juste avant l'appel HTTP à Mistral :
     # jamais la clé API ni l'en-tête Authorization, ajoutés séparément du

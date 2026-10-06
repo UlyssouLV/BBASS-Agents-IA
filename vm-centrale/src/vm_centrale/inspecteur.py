@@ -42,6 +42,7 @@ def enregistrer_echange_succes(
             identifiant_compte=identifiant_compte,
             conversation_id=conversation_id,
             piece_jointe_id=piece_jointe_id,
+            origine="mistral",
             type_appel=type_appel,
             modele=modele,
             requete_payload=requete_payload,
@@ -75,6 +76,7 @@ def enregistrer_echange_echec(
             identifiant_compte=identifiant_compte,
             conversation_id=conversation_id,
             piece_jointe_id=piece_jointe_id,
+            origine="mistral",
             type_appel=type_appel,
             modele=modele,
             requete_payload=requete_payload,
@@ -85,3 +87,33 @@ def enregistrer_echange_echec(
         )
     )
     db.commit()
+
+
+def enregistrer_echange_local(
+    db: Session,
+    *,
+    identifiant_compte: str,
+    conversation_id: int,
+    piece_jointe_id: int | None,
+    type_appel: str,
+    requete_payload: dict,
+    reponse_payload: dict,
+) -> None:
+    # Travail de la VM elle-même (spec 1.4.0), ex. l'exécution d'un outil :
+    # sans commit, comme enregistrer_echange_succes, pour disparaître avec le
+    # reste d'un tour qui échoue.
+    db.add(
+        EchangeInspecteur(
+            identifiant_compte=identifiant_compte,
+            conversation_id=conversation_id,
+            piece_jointe_id=piece_jointe_id,
+            origine="local",
+            type_appel=type_appel,
+            modele="",
+            requete_payload=requete_payload,
+            reponse_payload=reponse_payload,
+            statut="succes",
+            erreur=None,
+            date_creation=datetime.now(timezone.utc),
+        )
+    )

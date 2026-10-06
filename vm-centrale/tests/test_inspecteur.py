@@ -495,7 +495,7 @@ def test_echec_resume_apres_chat_reussi_ne_persiste_ni_consommation_ni_echange_s
 
 
 def test_echec_second_appel_outil_ne_persiste_pas_la_demande_doutil(
-    client, mistral_client_factice, jeton_valide, db_session, monkeypatch
+    client, mistral_client_factice, jeton_valide, db_session
 ):
     mistral_client_factice.repondre_ocr("Plan de masse détaillé")
     piece_jointe_id = _televerser_sans_conversation(client, jeton_valide)
@@ -515,15 +515,10 @@ def test_echec_second_appel_outil_ne_persiste_pas_la_demande_doutil(
     echanges_avant = len(_echanges(db_session))
     consommations_avant = db_session.query(Consommation).count()
 
-    def _second_appel_en_echec(*args, **kwargs):
-        raise RuntimeError("second appel indisponible")
-
-    monkeypatch.setattr(
-        "vm_centrale.routers.conversations._traiter_appel_outil", _second_appel_en_echec
-    )
     mistral_client_factice.repondre_avec_appel_outil(
         "obtenir_contenu_piece_jointe", {"piece_jointe_id": piece_jointe_id}
     )
+    mistral_client_factice.echouer_apres_demandes_outils(RuntimeError("second appel indisponible"))
     mistral_client_factice.repondre("Inutilisée", resume_et_profil=_reponse_resume_et_profil())
     reponse = client.post(
         f"/conversations/{conversation_id}/messages",

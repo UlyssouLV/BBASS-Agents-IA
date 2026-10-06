@@ -227,6 +227,7 @@ class InspecteurEchangeResumeResponse(BaseModel):
     # complet (payload/réponse) n'étant chargé qu'au dépliage (GET
     # /inspecteur/echanges/{id}).
     id: int
+    origine: str
     type_appel: str
     statut: str
     date_creation: datetime
@@ -237,6 +238,7 @@ class InspecteurEchangeDetailResponse(BaseModel):
     identifiant_compte: str
     conversation_id: int | None
     piece_jointe_id: int | None
+    origine: str
     type_appel: str
     modele: str
     requete_payload: dict

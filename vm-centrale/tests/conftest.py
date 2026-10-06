@@ -87,7 +87,11 @@ class ClientMistralFactice:
         self.appels_ocr: list[tuple[bytes, str]] = []
         self._reponse_ocr = ""
         self._exception_ocr: Exception | None = None
-        self._appel_outil_a_renvoyer: AppelOutil | None = None
+        # File des demandes d'outils (spec 1.4.0) : chaque entrée est la
+        # liste des appels d'une réponse, consommée par le prochain appel
+        # .chat() portant `tools`.
+        self._demandes_outils: list[list[AppelOutil]] = []
+        self._echec_apres_demandes_outils: Exception | None = None
 
     def repondre_ocr(self, texte: str) -> None:
         self._reponse_ocr = texte
@@ -148,10 +152,23 @@ class ClientMistralFactice:
         self, nom_outil: str, arguments: dict, tool_call_id: str = "call_1"
     ) -> None:
         # Consommé une seule fois par le prochain appel .chat() portant
-        # `tools` (spec 1.1.2) : le second appel (celui qui relance avec le
-        # contenu de la pièce jointe) retombe sur la file `_reponses`
-        # normale, configurée via repondre() comme d'habitude.
-        self._appel_outil_a_renvoyer = AppelOutil(id=tool_call_id, nom=nom_outil, arguments=arguments)
+        # `tools` (spec 1.1.2) : l'appel suivant retombe sur la file
+        # `_reponses` normale, configurée via repondre() comme d'habitude.
+        self.repondre_avec_appels_outils([(nom_outil, arguments, tool_call_id)])
+
+    def repondre_avec_appels_outils(self, *demandes: list[tuple[str, dict, str]]) -> None:
+        # Spec 1.4.0 : chaque argument est une réponse du modèle qui demande
+        # un ou plusieurs outils à la fois ((nom, arguments, tool_call_id)),
+        # consommée dans l'ordre par les appels .chat() portant `tools`.
+        self._demandes_outils.extend(
+            [AppelOutil(id=id_appel, nom=nom, arguments=arguments) for nom, arguments, id_appel in demande]
+            for demande in demandes
+        )
+
+    def echouer_apres_demandes_outils(self, exception: Exception) -> None:
+        # L'appel de réponse qui suit la dernière demande d'outil en file
+        # échoue (rollback d'un tour, spec 1.4.0).
+        self._echec_apres_demandes_outils = exception
 
     def chat(self, messages, response_format=None, tools=None) -> ReponseChat:
         with self._verrou:
@@ -195,9 +212,8 @@ class ClientMistralFactice:
                     reponse_brute={"choices": [{"message": {"content": self._reponse_structuree}}]},
                 )
 
-            if tools and self._appel_outil_a_renvoyer is not None:
-                appel = self._appel_outil_a_renvoyer
-                self._appel_outil_a_renvoyer = None
+            if tools and self._demandes_outils:
+                appels = self._demandes_outils.pop(0)
                 message_assistant = {
                     "role": "assistant",
                     "content": None,
@@ -206,15 +222,21 @@ class ClientMistralFactice:
                             "id": appel.id,
                             "function": {"name": appel.nom, "arguments": json.dumps(appel.arguments)},
                         }
+                        for appel in appels
                     ],
                 }
                 raise AppelOutilDemande(
-                    [appel],
+                    appels,
                     message_assistant,
                     _USAGE_FACTICE,
                     payload_envoye=payload,
                     reponse_brute={"choices": [{"message": message_assistant}]},
                 )
+
+            if self._echec_apres_demandes_outils is not None:
+                erreur = self._echec_apres_demandes_outils
+                self._echec_apres_demandes_outils = None
+                raise ErreurAppelMistral(str(erreur), payload_envoye=payload) from erreur
 
             assert self._reponses, "Aucune réponse configurée : appeler repondre() d'abord"
             contenu = self._reponses.pop(0) if len(self._reponses) > 1 else self._reponses[0]

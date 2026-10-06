@@ -24,6 +24,7 @@ from vm_centrale.garde_fous import (
 )
 from vm_centrale.inspecteur import (
     enregistrer_echange_echec,
+    enregistrer_echange_local,
     enregistrer_echange_succes,
     payload_depuis_erreur,
     reponse_depuis_erreur,
@@ -59,6 +60,9 @@ from vm_centrale.schemas import (
 )
 
 _TAILLE_FENETRE_HISTORIQUE = 3
+# Appels de chat principaux par message, le dernier sans `tools` (spec 1.4.0,
+# décision n° 7) : évite que le modèle tourne en rond.
+_TOURS_MAX_PAR_MESSAGE = 3
 # Taille de la fenêtre par défaut de GET /conversations/{id} (issue #103) :
 # un détail d'implémentation, pas une décision produit figée (spec
 # 1.2.3) — ajustable librement sans changer le contrat de pagination
@@ -974,99 +978,107 @@ def _appeler_reponse_chat(
     return client.chat(messages_pour_mistral, tools=tools)
 
 
-def _traiter_appel_outil(
-    client: MistralClient,
-    messages_pour_mistral: list[dict[str, str]],
+def _executer_appels_outils(
     demande: AppelOutilDemande,
     contexte_outils: ContexteTour,
-) -> tuple[ReponseChat, int | None]:
-    # Boucle inchangée depuis la spec 1.1.2 : seul le premier appel demandé
-    # est traité, et le second appel part sans `tools`.
-    appel = demande.appels[0]
-    resultat = executer_appel(appel, contexte_outils)
+    identifiant_compte: str,
+) -> tuple[list[dict], int | None]:
+    # Tous les appels de la réponse (spec 1.4.0), dans l'ordre : un message
+    # `tool` et un échange local d'inspecteur par appel. piece_jointe_id
+    # renvoyé à part (spec 1.3.0) : celui de la pièce jointe relue par un
+    # outil, pour l'échange de l'appel principal suivant.
+    messages_outils: list[dict] = []
+    piece_jointe_relue: int | None = None
+    for appel in demande.appels:
+        resultat = executer_appel(appel, contexte_outils)
+        enregistrer_echange_local(
+            contexte_outils.db,
+            identifiant_compte=identifiant_compte,
+            conversation_id=contexte_outils.conversation_id,
+            piece_jointe_id=resultat.piece_jointe_id,
+            type_appel=f"outil:{appel.nom}",
+            requete_payload={"arguments": appel.arguments},
+            reponse_payload={"contenu": resultat.contenu},
+        )
+        messages_outils.append(
+            {"role": "tool", "tool_call_id": appel.id, "name": appel.nom, "content": resultat.contenu}
+        )
+        piece_jointe_relue = piece_jointe_relue or resultat.piece_jointe_id
+    return messages_outils, piece_jointe_relue
 
-    messages_second_appel = [
-        *messages_pour_mistral,
-        demande.message_assistant,
-        {"role": "tool", "tool_call_id": appel.id, "name": appel.nom, "content": resultat.contenu},
-    ]
-    # piece_jointe_id renvoyé à part (spec 1.3.0) : c'est celui de la pièce
-    # jointe relue par l'outil, distinct de celle éventuellement jointe au
-    # nouveau message de ce tour (voir _resoudre_reponse_chat ci-dessous).
-    return client.chat(messages_second_appel), resultat.piece_jointe_id
+
+def _enregistrer_appel_principal(
+    contexte_outils: ContexteTour,
+    identifiant_compte: str,
+    piece_jointe_id: int | None,
+    reponse: ReponseChat | AppelOutilDemande,
+) -> None:
+    # Chaque appel principal, même s'il ne fait que demander des outils :
+    # une ligne Consommation "chat" (spec 1.1.3) et un échange succès
+    # (spec 1.3.0).
+    db = contexte_outils.db
+    enregistrer_consommation(
+        db, identifiant_compte, contexte_outils.conversation_id, "chat", MODELE_CHAT, usage=reponse.usage
+    )
+    enregistrer_echange_succes(
+        db,
+        identifiant_compte=identifiant_compte,
+        conversation_id=contexte_outils.conversation_id,
+        piece_jointe_id=piece_jointe_id,
+        type_appel="chat",
+        modele=MODELE_CHAT,
+        requete_payload=reponse.payload_envoye,
+        reponse_payload=reponse.reponse_brute,
+    )
 
 
 def _resoudre_reponse_chat(
     obtenir_reponse: Callable[[], ReponseChat],
     client: MistralClient,
     messages_pour_mistral: list[dict[str, str]],
+    tools: list[dict] | None,
     contexte_outils: ContexteTour,
     identifiant_compte: str,
     piece_jointe_id: int | None,
 ) -> ReponseChat:
-    # Centralise la gestion de AppelOutilDemande (et son propre échec
-    # éventuel) pour les deux façons d'obtenir la réponse de chat principale
-    # ci-dessous (directe, ou via un ThreadPoolExecutor) : `obtenir_reponse`
-    # est soit `futur_reponse.result`, soit un appel direct à
-    # _appeler_reponse_chat. `piece_jointe_id` : celle éventuellement jointe
-    # au nouveau message de ce tour (spec 1.3.0), pas celle que l'outil
-    # relirait le cas échéant (voir _traiter_appel_outil, qui porte la
-    # sienne séparément).
+    # Boucle de tool calling (spec 1.4.0). Un tour = un appel de chat
+    # principal : au plus _TOURS_MAX_PAR_MESSAGE, le dernier sans `tools`
+    # pour forcer une réponse. Le premier est obtenu par `obtenir_reponse`
+    # (`futur_reponse.result` ou appel direct à _appeler_reponse_chat, voir
+    # _generer_reponse_et_resume). `piece_jointe_id` : celle éventuellement
+    # jointe au nouveau message (spec 1.3.0) ; les appels suivants portent
+    # celle relue par un outil, s'il y en a une.
     db = contexte_outils.db
-    conversation_id = contexte_outils.conversation_id
+    messages = list(messages_pour_mistral)
     try:
-        reponse = obtenir_reponse()
-    except AppelOutilDemande as demande:
-        # L'appel qui a décidé d'invoquer l'outil a déjà consommé des tokens
-        # (spec V1.1.3), même si sa réponse n'est pas la réponse finale de ce
-        # tour : une ligne "chat" à part entière, en plus de celle du second
-        # appel ci-dessous.
-        enregistrer_consommation(
-            db, identifiant_compte, conversation_id, "chat", MODELE_CHAT, usage=demande.usage
-        )
-        # Demande d'outil = un échange à part entière, succès (Mistral a
-        # bien répondu), distinct du second appel ci-dessous (spec 1.3.0).
-        enregistrer_echange_succes(
-            db,
-            identifiant_compte=identifiant_compte,
-            conversation_id=conversation_id,
-            piece_jointe_id=piece_jointe_id,
-            type_appel="chat",
-            modele=MODELE_CHAT,
-            requete_payload=demande.payload_envoye,
-            reponse_payload=demande.reponse_brute,
-        )
-        try:
-            reponse, piece_jointe_id = _traiter_appel_outil(
-                client, messages_pour_mistral, demande, contexte_outils
-            )
-        except Exception as erreur:
-            # piece_jointe_id de la pièce rechargée par l'outil non connu ici
-            # (l'exception interrompt _traiter_appel_outil avant son retour) :
-            # champ optionnel, laissé vide plutôt que doubler la résolution.
-            # Rollback d'abord : enregistrer_echange_echec commite, et la
-            # Consommation + l'échange succès de la demande d'outil ci-dessus
-            # ne doivent pas survivre à un tour qui échoue (jamais de coût
-            # compté deux fois si l'utilisateur relance).
-            db.rollback()
-            enregistrer_echange_echec(
-                db,
-                identifiant_compte=identifiant_compte,
-                conversation_id=conversation_id,
-                piece_jointe_id=None,
-                type_appel="chat",
-                modele=MODELE_CHAT,
-                requete_payload=payload_depuis_erreur(erreur),
-                erreur=str(erreur),
-            )
-            logger.exception(_MSG_ECHEC_RELAIS_LOG)
-            raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
+        for tour in range(1, _TOURS_MAX_PAR_MESSAGE + 1):
+            try:
+                if tour == 1:
+                    reponse = obtenir_reponse()
+                else:
+                    dernier_tour = tour == _TOURS_MAX_PAR_MESSAGE
+                    reponse = client.chat(messages, tools=None if dernier_tour else tools)
+            except AppelOutilDemande as demande:
+                _enregistrer_appel_principal(contexte_outils, identifiant_compte, piece_jointe_id, demande)
+                messages_outils, piece_jointe_id = _executer_appels_outils(
+                    demande, contexte_outils, identifiant_compte
+                )
+                messages = [*messages, demande.message_assistant, *messages_outils]
+                continue
+            _enregistrer_appel_principal(contexte_outils, identifiant_compte, piece_jointe_id, reponse)
+            return reponse
+        # Ne devrait pas arriver : le dernier tour part sans `tools`.
+        raise RuntimeError("Demande d'outil sur le dernier tour, parti sans outils")
     except Exception as erreur:
+        # Rollback d'abord : enregistrer_echange_echec commite, et les
+        # Consommation + échanges succès des appels déjà faits pour ce
+        # message ne doivent pas survivre à un tour qui échoue (jamais de
+        # coût compté deux fois si l'utilisateur relance).
         db.rollback()
         enregistrer_echange_echec(
             db,
             identifiant_compte=identifiant_compte,
-            conversation_id=conversation_id,
+            conversation_id=contexte_outils.conversation_id,
             piece_jointe_id=piece_jointe_id,
             type_appel="chat",
             modele=MODELE_CHAT,
@@ -1075,21 +1087,6 @@ def _resoudre_reponse_chat(
         )
         logger.exception(_MSG_ECHEC_RELAIS_LOG)
         raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
-
-    enregistrer_consommation(
-        db, identifiant_compte, conversation_id, "chat", MODELE_CHAT, usage=reponse.usage
-    )
-    enregistrer_echange_succes(
-        db,
-        identifiant_compte=identifiant_compte,
-        conversation_id=conversation_id,
-        piece_jointe_id=piece_jointe_id,
-        type_appel="chat",
-        modele=MODELE_CHAT,
-        requete_payload=reponse.payload_envoye,
-        reponse_payload=reponse.reponse_brute,
-    )
-    return reponse
 
 
 def _appeler_resume_et_profil(
@@ -1134,6 +1131,7 @@ def _generer_reponse_et_resume(
             lambda: _appeler_reponse_chat(client, messages_pour_mistral, tools),
             client,
             messages_pour_mistral,
+            tools,
             contexte_outils,
             identifiant_compte,
             piece_jointe_id,
@@ -1155,6 +1153,7 @@ def _generer_reponse_et_resume(
             futur_reponse.result,
             client,
             messages_pour_mistral,
+            tools,
             contexte_outils,
             identifiant_compte,
             piece_jointe_id,
