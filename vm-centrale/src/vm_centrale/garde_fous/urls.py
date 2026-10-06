@@ -11,17 +11,20 @@ from collections.abc import Iterable
 
 # Lien Markdown `[texte](url)`, image `![texte](url)` comprise, avec un
 # éventuel titre `"..."` après l'URL. Une paire de parenthèses fermée dans
-# l'URL en fait partie (`…/wiki/Loi_(France)`, résultat de moteur courant).
+# l'URL en fait partie (`…/wiki/Loi_(France)`, résultat de moteur courant) ;
+# une seule, pas une répétition, pour éviter tout retour arrière coûteux.
 _MOTIF_LIEN_MARKDOWN = re.compile(
-    r'(!?)\[([^\]\n]*)\]\(\s*<?((?:[^\s<>()]|\([^\s<>()]*\))+)>?(?:\s+"[^"\n]*")?\s*\)'
+    r'(!?)\[([^\]\n]*)\]\(\s*<?([^\s<>()]+(?:\([^\s<>()]*\)[^\s<>()]*)?)>?(?:\s+"[^"\n]*")?\s*\)'
 )
 # URL nue, éventuellement entre chevrons (autolien Markdown). L'espace
 # horizontal qui la précède est capturé pour ne pas laisser de double
-# espace une fois l'URL retirée. Même règle de parenthèses : une paire
-# fermée en fait partie, une parenthèse seule (URL citée entre parenthèses)
-# appartient à la phrase.
+# espace une fois l'URL retirée ; le lookbehind ne le fait capturer qu'au
+# début d'une suite d'espaces (sinon une longue suite sans URL est relue
+# depuis chaque espace : 39 s pour 50 000). Même règle de parenthèses : une
+# paire fermée en fait partie, une parenthèse seule (URL citée entre
+# parenthèses) appartient à la phrase.
 _MOTIF_URL_NUE = re.compile(
-    r"([ \t]*)<?((?:https?://|www\.)(?:[^\s<>()\[\]\"']|\([^\s<>()\[\]\"']*\))+)>?",
+    r"(?<![ \t])([ \t]*)<?((?:https?://|www\.)[^\s<>()\[\]\"']+(?:\([^\s<>()\[\]\"']*\)[^\s<>()\[\]\"']*)?)>?",
     re.IGNORECASE,
 )
 # Ponctuation de fin de phrase collée à une URL nue : appartient à la
