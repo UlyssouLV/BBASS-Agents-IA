@@ -513,3 +513,77 @@ def test_une_url_du_compte_en_pdf_est_marquee_page_non_lue_dans_la_memoire(
     assert _lignes_url_du_compte(mistral_client_factice, _URL_COMPTE_PDF) == [
         f"- Tour 1 — URL envoyée par l'utilisateur : {_URL_COMPTE_PDF} (page non lue)"
     ]
+
+
+# Sans besoin (essai 1.4.1, conversation 95) : avec une URL seule, le modèle
+# devinait un besoin (« EPF » lu comme établissement public foncier, page
+# d'une école d'ingénieurs) et ne recevait que « non trouvé ». Sans besoin,
+# il reçoit le texte nettoyé de la page pour découvrir de quoi elle parle.
+
+
+def _lire_sans_besoin(client, mistral_client_factice, jeton: str, conversation_id: int, urls: list[str]) -> None:
+    mistral_client_factice.repondre_avec_appel_outil(_OUTIL, {"urls": urls})
+    mistral_client_factice.repondre("Réponse.", resume_et_profil=_resume_et_profil())
+    reponse = client.post(
+        f"/conversations/{conversation_id}/messages", json={"message": "De quoi parle-t-elle ?"},
+        headers=_autorisation(jeton),
+    )
+    assert reponse.status_code == 200
+
+
+def test_le_besoin_est_un_parametre_facultatif(client, mistral_client_factice, jeton_valide):
+    _conversation_avec_url_du_compte(client, mistral_client_factice, jeton_valide)
+
+    (outil,) = [o for o in mistral_client_factice.tools_appels_reponse[0] if o["function"]["name"] == _OUTIL]
+    parametres = outil["function"]["parameters"]
+    assert "besoin" in parametres["properties"]
+    assert parametres["required"] == ["urls"]
+
+
+def test_sans_besoin_une_url_du_compte_renvoie_le_texte_nettoye_sans_appel_dextraction(
+    client, mistral_client_factice, telechargeur_pages_factice, jeton_valide, db_session
+):
+    conversation_id = _conversation_avec_url_du_compte(client, mistral_client_factice, jeton_valide)
+    telechargeur_pages_factice.servir(_URL_COMPTE, _page_html(_TEXTE_COMPTE))
+
+    _lire_sans_besoin(client, mistral_client_factice, jeton_valide, conversation_id, [_URL_COMPTE])
+
+    assert telechargeur_pages_factice.urls_recues == [_URL_COMPTE]
+    assert mistral_client_factice.appels_lecture_page == []
+    contenu = _message_tool(mistral_client_factice)
+    assert _URL_COMPTE in contenu and _TEXTE_COMPTE in contenu and "Menu" not in contenu
+    assert _questions_besoin(db_session, conversation_id) == []
+
+    _lire_sans_besoin(client, mistral_client_factice, jeton_valide, conversation_id, [_URL_COMPTE])
+    assert telechargeur_pages_factice.urls_recues == [_URL_COMPTE]
+
+
+def test_sans_besoin_une_page_de_recherche_est_relue_depuis_la_base(
+    client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide
+):
+    conversation_id = _conversation_avec_recherche(
+        client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide
+    )
+
+    _lire_sans_besoin(client, mistral_client_factice, jeton_valide, conversation_id, [_URL_LUE, _URL_NON_LUE])
+
+    assert telechargeur_pages_factice.urls_recues == []
+    assert mistral_client_factice.appels_lecture_page == []
+    contenu = _message_tool(mistral_client_factice)
+    assert "Le délai moyen est de trois mois." in contenu
+    assert "Extrait moteur B" in contenu
+
+
+def test_sans_besoin_un_long_texte_est_coupe_et_signale(
+    client, mistral_client_factice, telechargeur_pages_factice, jeton_valide
+):
+    conversation_id = _conversation_avec_url_du_compte(client, mistral_client_factice, jeton_valide)
+    long_paragraphe = "Paragraphe de remplissage sur le bornage des terrains. " * 600
+    telechargeur_pages_factice.servir(_URL_COMPTE, _page_html(long_paragraphe, "FIN-DE-PAGE-UNIQUE"))
+
+    _lire_sans_besoin(client, mistral_client_factice, jeton_valide, conversation_id, [_URL_COMPTE])
+
+    contenu = _message_tool(mistral_client_factice)
+    assert "FIN-DE-PAGE-UNIQUE" not in contenu
+    assert "texte coupé" in contenu
+    assert len(contenu) < 12_000

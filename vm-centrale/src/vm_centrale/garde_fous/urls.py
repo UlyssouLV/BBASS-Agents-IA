@@ -27,9 +27,10 @@ _MOTIF_URL_NUE = re.compile(
     r"(?<![ \t])([ \t]*)<?((?:https?://|www\.)[^\s<>()\[\]\"']+(?:\([^\s<>()\[\]\"']*\)[^\s<>()\[\]\"']*)?)>?",
     re.IGNORECASE,
 )
-# Ponctuation de fin de phrase collée à une URL nue : appartient à la
-# phrase, pas à l'URL.
-_PONCTUATION_FINALE = ".,;:!?»"
+# Ponctuation de fin de phrase et mise en forme Markdown (`**`, `_`, `` ` ``)
+# collées à une URL nue : appartiennent à la phrase, pas à l'URL (essai
+# 1.4.1, conversation 95 : « **https://bbass.fr/** » était retirée).
+_PONCTUATION_FINALE = ".,;:!?»*_`"
 
 
 def normaliser_url(url: str) -> str:

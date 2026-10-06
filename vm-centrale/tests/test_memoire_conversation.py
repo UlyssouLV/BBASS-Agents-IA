@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 import pytest
 
 from vm_centrale.models import QuestionCouverte
+from vm_centrale.routers.conversations import NOTE_MEMOIRE
 
 # Mémoire de la conversation (spec 1.4.1, #133) : message système recalculé
 # par la VM à chaque appel de chat principal, hors résumé glissant.
@@ -122,7 +123,24 @@ def test_les_elements_suivent_lordre_des_tours(
         f"- Tour 2 — recherche « première recherche » : {_URL_A}",
         f"- Tour 3 — pièce jointe id {piece_jointe_id} « devis.pdf »",
         f"- Tour 4 — recherche « seconde recherche » : {_URL_B}",
+        NOTE_MEMOIRE,
     ]
+
+
+def test_la_memoire_dit_que_les_questions_couvertes_ne_sont_quun_apercu(
+    client, mistral_client_factice, jeton_valide
+):
+    # Essai 1.4.1 (conversations 93 et 94) : une information absente des
+    # questions couvertes était affirmée absente du document, sans relecture.
+    piece_jointe_id = _televerser(client, mistral_client_factice, jeton_valide)
+    conversation_id = _creer_conversation(
+        client, mistral_client_factice, jeton_valide, "Voici le devis", piece_jointe_id=piece_jointe_id
+    )
+
+    _envoyer(client, mistral_client_factice, jeton_valide, conversation_id, "Le devis cite-t-il un RCS ?")
+
+    assert _memoire(mistral_client_factice).splitlines()[-1] == NOTE_MEMOIRE
+    assert "aperçu" in NOTE_MEMOIRE and "relis-le" in NOTE_MEMOIRE
 
 
 def test_pas_de_memoire_sans_element(client, mistral_client_factice, jeton_valide):
@@ -201,6 +219,7 @@ def test_une_url_du_message_du_tour_est_dans_la_memoire_des_le_premier_message(
     assert memoire.splitlines() == [
         _TITRE_MEMOIRE,
         f"- Tour 1 — URL envoyée par l'utilisateur : {_URL_A} (pas encore lue)",
+        NOTE_MEMOIRE,
     ]
 
 
@@ -238,6 +257,7 @@ def test_une_meme_url_ecrite_deux_fois_napparait_quune_fois_au_premier_tour(
         _TITRE_MEMOIRE,
         f"- Tour 2 — URL envoyée par l'utilisateur : {_URL_A} (pas encore lue)",
         f"- Tour 3 — URL envoyée par l'utilisateur : {_URL_B} (pas encore lue)",
+        NOTE_MEMOIRE,
     ]
 
 
@@ -313,6 +333,7 @@ def test_les_questions_couvertes_dune_recherche_sont_sous_la_bonne_recherche(
         f"  • Quel est le tarif moyen ? → Environ mille euros. ({_URL_A})",
         f"- Tour 3 — recherche « délai bornage » : {_URL_B}",
         f"  • Quel est le délai ? → Quelques semaines. ({_URL_B})",
+        NOTE_MEMOIRE,
     ]
 
 
@@ -331,6 +352,7 @@ def test_les_questions_couvertes_dune_piece_jointe_sont_sous_la_piece_jointe(
         _TITRE_MEMOIRE,
         f"- Tour 1 — pièce jointe id {piece_jointe_id} « devis.pdf »",
         "  • Quelle est la date de signature ? → Le 3 mars. (devis.pdf)",
+        NOTE_MEMOIRE,
     ]
 
 

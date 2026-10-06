@@ -249,6 +249,19 @@ def _message_systeme_piece_jointe(piece_jointe: PieceJointe) -> dict[str, str]:
     }
 
 
+# Dernière ligne de la Mémoire de la conversation. Essai 1.4.1
+# (conversations 93 et 94) : le modèle lisait les questions couvertes comme
+# tout le contenu d'un élément et affirmait une absence (« ni RCS ni TVA »,
+# « aucun délai de paiement ») sans relire.
+NOTE_MEMOIRE = (
+    "Les questions couvertes ne sont qu'un aperçu de chaque élément : une "
+    "information qui n'y figure pas n'est pas absente du document ou de la "
+    "page. Avant d'affirmer qu'un élément ne contient pas une information, "
+    "relis-le (relire_pieces_jointes ou lire_pages_web), sauf s'il est déjà "
+    "marqué « non présent selon l'extraction » pour ce besoin."
+)
+
+
 def _memoire_de_la_conversation(db: Session, conversation_id: int, nouveau_message: str) -> str | None:
     # Recalculée à chaque appel de chat principal, jamais stockée (spec
     # 1.4.1) : hors du résumé glissant et de son plafond, elle ne perd ni une
@@ -331,7 +344,7 @@ def _memoire_de_la_conversation(db: Session, conversation_id: int, nouveau_messa
         elements.append((message_id, len(elements), "\n".join([ligne, *lignes_questions])))
     if not elements:
         return None
-    return "\n".join(["Mémoire de la conversation :", *(ligne for _, _, ligne in sorted(elements))])
+    return "\n".join(["Mémoire de la conversation :", *(ligne for _, _, ligne in sorted(elements)), NOTE_MEMOIRE])
 
 
 def _questions_couvertes_par_element(

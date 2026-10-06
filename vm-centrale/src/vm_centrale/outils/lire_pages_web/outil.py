@@ -16,7 +16,10 @@ _NOM = "lire_pages_web"
 _PAGE_INTROUVABLE = "Page introuvable."
 _EXTRACTION_INDISPONIBLE = "Extraction indisponible : la page n'a pas pu être relue."
 _NON_TROUVE = "Non trouvé dans cette page pour ce besoin."
-_BESOIN_MANQUANT = "Besoin manquant : indique ce que tu cherches dans ces pages."
+# Sans besoin, le texte nettoyé de chaque page part au modèle, coupé à ce
+# plafond : de quoi découvrir de quoi parle une page, pas la relire entière.
+_TEXTE_SANS_BESOIN_MAX = 8_000
+_TEXTE_COUPE = "[… texte coupé : relis avec un besoin pour une information précise]"
 _PAGE_DU_COMPTE_NON_LUE = "page non lue (PDF, page refusée ou délai dépassé)."
 # Consigne fixe de la relecture d'une page avec un besoin (spec 1.4.1) : elle
 # ne reçoit que le besoin et le texte nettoyé de la page, jamais le contexte
@@ -91,8 +94,10 @@ def _declarer(contexte: ContexteTour) -> dict | None:
             "description": (
                 "Lit une ou plusieurs pages de cette conversation (URL listées "
                 "dans la Mémoire de la conversation : trouvées par une "
-                "recherche, ou envoyées par l'utilisateur), pour un besoin "
-                "précis, sans relancer de recherche. Renvoie, pour chaque "
+                "recherche, ou envoyées par l'utilisateur), sans relancer de "
+                "recherche. Sans `besoin` : le texte de chaque page (coupé "
+                "s'il est long), pour découvrir de quoi elle parle, par "
+                "exemple une URL envoyée seule. Avec `besoin` : pour chaque "
                 "page, ce qu'elle dit du besoin, ou « non trouvé »."
             ),
             "parameters": {
@@ -105,10 +110,14 @@ def _declarer(contexte: ContexteTour) -> dict | None:
                     },
                     "besoin": {
                         "type": "string",
-                        "description": "Ce qu'on cherche dans ces pages, en une ou deux phrases.",
+                        "description": (
+                            "Facultatif : ce qu'on cherche dans ces pages, en "
+                            "une ou deux phrases. À omettre si on ne sait pas "
+                            "encore de quoi parle la page : ne jamais deviner."
+                        ),
                     },
                 },
-                "required": ["urls", "besoin"],
+                "required": ["urls"],
             },
         },
     }
@@ -221,13 +230,17 @@ def _telecharger_pages_du_compte(
     return [page.trace() for page in pages]
 
 
+def _texte_sans_besoin(texte: str) -> str:
+    if len(texte) <= _TEXTE_SANS_BESOIN_MAX:
+        return texte
+    return f"{texte[:_TEXTE_SANS_BESOIN_MAX]}\n{_TEXTE_COUPE}"
+
+
 def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
     urls = arguments.get("urls")
     if not isinstance(urls, list) or not urls:
         return ResultatOutil(_PAGE_INTROUVABLE)
     besoin = str(arguments.get("besoin") or "").strip()
-    if not besoin:
-        return ResultatOutil(_BESOIN_MANQUANT)
     resultats = _resultats_de_la_conversation(contexte)
     urls_du_compte = _urls_du_compte(contexte)
     cibles = [_url_de_la_conversation(url, resultats, urls_du_compte) for url in urls]
@@ -235,8 +248,12 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
     pages = [_page_de_la_conversation(url, resultats) if url is not None else None for url in cibles]
     # Jamais de retéléchargement : seules les pages déjà lues (texte nettoyé
     # en base) passent à l'appel d'extraction, une fois chacune, en
-    # parallèle.
-    a_lire = {page.id: (page.url, page.texte_nettoye) for page in pages if page is not None and page.texte_nettoye}
+    # parallèle. Sans besoin, aucun appel : le texte part tel quel.
+    a_lire = {
+        page.id: (page.url, page.texte_nettoye)
+        for page in pages
+        if besoin and page is not None and page.texte_nettoye
+    }
     with ThreadPoolExecutor(max_workers=max(len(a_lire), 1)) as executeur:
         extractions = dict(
             zip(a_lire, executeur.map(lambda page: _extraire(besoin, *page, contexte), a_lire.values()))
@@ -256,6 +273,9 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
             # Page non lue à la recherche (PDF, refus, délai) : jamais
             # retéléchargée, le modèle garde l'extrait du moteur.
             blocs.append(f"Page {page.url} : non lue, seul l'extrait du moteur est disponible.\n{page.extrait_moteur}")
+            continue
+        if not besoin:
+            blocs.append(f"Page {page.url} :\n{_texte_sans_besoin(page.texte_nettoye)}")
             continue
         lecture, _ = extractions[page.id]
         if lecture is None:

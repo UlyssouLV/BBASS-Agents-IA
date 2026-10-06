@@ -3,6 +3,7 @@ import json
 import pytest
 
 from vm_centrale.models import Consommation, EchangeInspecteur, Message, QuestionCouverte
+from vm_centrale.questions_couvertes import CONSIGNE_QUESTIONS_PIECE_JOINTE
 
 # Questions couvertes d'une pièce jointe (spec 1.4.1, #138) : un appel
 # Mistral à l'envoi du message qui porte la pièce jointe, en parallèle de la
@@ -215,3 +216,9 @@ def test_un_envoi_sans_piece_jointe_ne_fait_aucun_appel(client, mistral_client_f
     _envoyer(client, mistral_client_factice, jeton_valide, conversation_id, "Bonjour encore")
 
     assert mistral_client_factice.appels_questions_piece_jointe == []
+
+
+def test_la_consigne_interdit_une_question_sur_le_message_lui_meme():
+    # Essai 1.4.1, conversation 93 : « Quel est le besoin exprimé dans le
+    # message ? → Comparer cette facture à la facture LBC ».
+    assert "jamais une question sur le message" in CONSIGNE_QUESTIONS_PIECE_JOINTE

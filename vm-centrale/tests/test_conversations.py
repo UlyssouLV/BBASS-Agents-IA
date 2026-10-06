@@ -1227,6 +1227,41 @@ def test_piece_jointe_conserve_le_chiffre_de_lextrait(
     assert contenu != _REPONSE_SANS_DONNEES
 
 
+
+def test_url_du_compte_en_gras_est_conservee(client, mistral_client_factice, jeton_valide):
+    # Essai 1.4.1, conversation 95 : « **https://bbass.fr/** » devenait
+    # « ** », les `**` du gras étaient lus comme la fin de l'URL.
+    mistral_client_factice.repondre("La page **https://bbass.fr/** présente le cabinet.", "Titre")
+
+    reponse = client.post("/conversations", json={"message": "https://bbass.fr/"}, headers=_autorisation(jeton_valide))
+
+    assert reponse.json()["reponse"] == "La page **https://bbass.fr/** présente le cabinet."
+
+
+def test_un_numero_de_la_piece_jointe_regroupe_par_espaces_reste_entier(
+    client, mistral_client_factice, jeton_valide, _repertoire_pieces_jointes
+):
+    # Essai 1.4.1, conversation 93 : « Siret: 83119345300022 » écrit
+    # « 831 193 453 00022 » par le modèle devenait « 22 ».
+    mistral_client_factice.repondre_ocr("Siret: 83119345300022 - TVA N°: FR13831193453")
+    upload = client.post(
+        "/pieces-jointes",
+        files={"fichier": ("facture.pdf", b"%PDF-1.4 contenu factice", "application/pdf")},
+        headers=_autorisation(jeton_valide),
+    )
+    mistral_client_factice.repondre("SIRET : 831 193 453 00022 ; autre : 831 119 3453.", "Titre")
+
+    reponse = client.post(
+        "/conversations",
+        json={"message": "Le SIRET ?", "piece_jointe_id": upload.json()["piece_jointe"]["id"]},
+        headers=_autorisation(jeton_valide),
+    )
+
+    contenu = reponse.json()["reponse"]
+    assert "831 193 453 00022" in contenu
+    # Un numéro absent des sources part en entier, sans fragment.
+    assert "119" not in contenu and "3453" not in contenu
+
 def test_consigne_de_style_commence_par_la_capacite_reelle(
     client, mistral_client_factice, jeton_valide
 ):
