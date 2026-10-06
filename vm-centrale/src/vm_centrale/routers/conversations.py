@@ -374,6 +374,30 @@ def _textes_recherche_web(db: Session, conversation_id: int) -> list[str]:
 
 def _reponse_visible(
     db: Session,
+    identifiant_compte: str,
+    conversation_id: int,
+    nouveau_message: str,
+    reponse: str,
+    piece_jointe: PieceJointe | None,
+) -> str:
+    # Ligne garde_fous de l'inspecteur à chaque réponse de chat (spec 1.4.0,
+    # décision 15), même sans retrait : sans elle, on ne voit pas pourquoi la
+    # réponse affichée diffère de celle du modèle.
+    visible = _appliquer_garde_fous(db, conversation_id, nouveau_message, reponse, piece_jointe)
+    enregistrer_echange_local(
+        db,
+        identifiant_compte=identifiant_compte,
+        conversation_id=conversation_id,
+        piece_jointe_id=piece_jointe.id if piece_jointe is not None else None,
+        type_appel="garde_fous",
+        requete_payload={"reponse_brute": reponse},
+        reponse_payload={"reponse_visible": visible},
+    )
+    return visible
+
+
+def _appliquer_garde_fous(
+    db: Session,
     conversation_id: int,
     nouveau_message: str,
     reponse: str,
@@ -685,7 +709,7 @@ def creer_conversation(
         )
 
         reponse = _reponse_visible(
-            db, conversation.id, requete.message, reponse_chat.contenu, piece_jointe
+            db, identifiant_compte, conversation.id, requete.message, reponse_chat.contenu, piece_jointe
         )
 
         try:
@@ -1449,7 +1473,7 @@ def envoyer_message(
         )
 
         reponse = _reponse_visible(
-            db, conversation.id, requete.message, reponse_chat.contenu, piece_jointe
+            db, identifiant_compte, conversation.id, requete.message, reponse_chat.contenu, piece_jointe
         )
 
         maintenant = datetime.now(timezone.utc)

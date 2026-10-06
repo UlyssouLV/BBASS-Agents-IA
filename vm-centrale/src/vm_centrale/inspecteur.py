@@ -103,7 +103,8 @@ def enregistrer_echange_local(
     requete_payload: dict,
     reponse_payload: dict,
 ) -> None:
-    # Travail de la VM elle-même (spec 1.4.0), ex. l'exécution d'un outil :
+    # Travail de la VM elle-même (spec 1.4.0), ex. l'exécution d'un outil ou
+    # les garde-fous appliqués à la réponse de chat :
     # sans commit, comme enregistrer_echange_succes, pour disparaître avec le
     # reste d'un tour qui échoue.
     db.add(

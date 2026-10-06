@@ -17,6 +17,9 @@ export interface InspecteurConversation {
 
 export interface InspecteurEchangeResume {
   id: number;
+  // "mistral" : un appel Mistral réel ; "local" : du travail de la VM elle-même
+  // (exécution d'un outil, garde-fous), spec 1.4.0.
+  origine: string;
   type_appel: string;
   statut: string;
   date_creation: string;

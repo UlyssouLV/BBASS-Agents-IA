@@ -196,6 +196,7 @@ def test_inspecteur_trace_la_requete_les_resultats_bruts_et_le_texte_renvoye(
         ("mistral", "chat"),
         ("local", f"outil:{_OUTIL}"),
         ("mistral", "chat"),
+        ("local", "garde_fous"),
         ("mistral", "titrage"),
     ]
 
@@ -647,6 +648,7 @@ def test_inspecteur_place_lextraction_entre_loutil_et_lappel_principal_suivant(
         ("local", f"outil:{_OUTIL}"),
         ("mistral", "extraction_web"),
         ("mistral", "chat"),
+        ("local", "garde_fous"),
         ("mistral", "titrage"),
     ]
     detail = client.get(f"/inspecteur/echanges/{echanges[2]['id']}", headers=entetes_admin).json()

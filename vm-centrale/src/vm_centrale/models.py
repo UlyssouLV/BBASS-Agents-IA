@@ -167,7 +167,7 @@ class EchangeInspecteur(Base):
     origine: Mapped[str] = mapped_column(String)
     # Mistral : même vocabulaire que Consommation.type_appel ("chat" /
     # "titrage" / "resume_et_profil" / "ocr" / "vision"). Local :
-    # "outil:<nom de l'outil>".
+    # "outil:<nom de l'outil>" ou "garde_fous".
     type_appel: Mapped[str] = mapped_column(String)
     # Vide pour un échange local (aucun modèle appelé).
     modele: Mapped[str] = mapped_column(String)

@@ -4,6 +4,8 @@ Corrections que le code applique à ce que le modèle produit **malgré sa consi
 
 Chaque garde-fou est une fonction pure (texte en entrée, texte en sortie), appelée à un seul endroit. Ajouter, déplacer ou retirer un garde-fou met à jour ce fichier dans le même commit (`agents/domain.md`, « Centralised packages »).
 
+Depuis la 1.4.0, `routers/conversations._reponse_visible` enregistre à chaque réponse de chat un échange `local` de type `garde_fous` dans l'inspecteur : la réponse brute du modèle et la réponse visible.
+
 | Garde-fou | Ce qu'il corrige | Où il est appelé | Depuis | Origine |
 | --- | --- | --- | --- | --- |
 | `longueur.plafonner` | Plafonne un texte à la dernière fin de phrase (`.`, `!`, `?`, `…`) sous un maximum ; coupe brute seulement s'il n'y a aucune fin de phrase sous le maximum. | `routers/conversations.py`, `envoyer_message`, sur `resume_contexte` (1 500 caractères) et sur `profil_travail` (800 caractères), en dur, avant persistance. Les résumés déjà en base ne sont pas touchés ; les profils hérités sont vidés une fois par `scripts/vider_profils_travail.py`. | 1.3.1 | #110, conversation 76 : le résumé glissant gardait le rapport inventé et le sujet abandonné (« oublie Citrix ») ; le profil empilait onze deltas, doublons et traits de l'assistant. |

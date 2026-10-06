@@ -50,7 +50,7 @@ def test_premier_message_enregistre_les_echanges_chat_et_titrage_avec_le_bon_pay
 ):
     conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide, "Bonjour")
 
-    echanges = _echanges(db_session)
+    echanges = [e for e in _echanges(db_session) if e.origine == "mistral"]
 
     assert [e.type_appel for e in echanges] == ["chat", "titrage"]
     for echange in echanges:
@@ -89,7 +89,7 @@ def test_message_suivant_avec_messages_sortants_enregistre_un_echange_resume_et_
     assert reponse.status_code == 200
 
     nouveaux_echanges = _echanges(db_session)[echanges_avant:]
-    assert sorted(e.type_appel for e in nouveaux_echanges) == ["chat", "resume_et_profil"]
+    assert sorted(e.type_appel for e in nouveaux_echanges) == ["chat", "garde_fous", "resume_et_profil"]
     for echange in nouveaux_echanges:
         assert echange.conversation_id == conversation_id
         assert echange.statut == "succes"
@@ -388,8 +388,8 @@ def test_navigation_comptes_conversations_echanges_dans_lordre_chronologique(
     )
     assert reponse_echanges.status_code == 200
     echanges = reponse_echanges.json()
-    assert [e["type_appel"] for e in echanges] == ["chat", "titrage"]
-    assert [e["statut"] for e in echanges] == ["succes", "succes"]
+    assert [e["type_appel"] for e in echanges] == ["chat", "garde_fous", "titrage"]
+    assert [e["statut"] for e in echanges] == ["succes", "succes", "succes"]
 
 
 def test_comptes_sans_aucune_conversation_nest_jamais_liste(
@@ -577,3 +577,66 @@ def test_echec_premier_message_avec_piece_jointe_ne_la_reference_pas(
     assert echanges[0].statut == "echec"
     assert echanges[0].conversation_id is None
     assert echanges[0].piece_jointe_id is None
+
+
+def test_un_garde_fou_qui_retire_une_url_produit_une_ligne_garde_fous_brute_et_visible(
+    client, mistral_client_factice, jeton_valide, monkeypatch
+):
+    # Spec 1.4.0, décision 15 : sans cette ligne, on ne voit pas pourquoi la
+    # réponse affichée diffère de celle du modèle.
+    monkeypatch.setenv("VM_ADMIN_KEY", "cle-admin-de-test")
+    entetes = _autorisation_admin(jeton_valide)
+    reponse_brute = "Le rapport est ici : https://inventee.example.org/rapport"
+    mistral_client_factice.repondre(reponse_brute, "Titre")
+    reponse = client.post(
+        "/conversations", json={"message": "Trouve le rapport"}, headers=_autorisation(jeton_valide)
+    )
+    assert reponse.status_code == 200
+    conversation_id = reponse.json()["conversation"]["id"]
+    reponse_visible = reponse.json()["reponse"]
+    assert "inventee.example.org" not in reponse_visible
+
+    echanges = client.get(
+        f"/inspecteur/conversations/{conversation_id}/echanges", headers=entetes
+    ).json()
+    assert [(e["origine"], e["type_appel"]) for e in echanges] == [
+        ("mistral", "chat"),
+        ("local", "garde_fous"),
+        ("mistral", "titrage"),
+    ]
+
+    detail = client.get(f"/inspecteur/echanges/{echanges[1]['id']}", headers=entetes).json()
+    assert detail["origine"] == "local"
+    assert detail["statut"] == "succes"
+    assert detail["requete_payload"] == {"reponse_brute": reponse_brute}
+    assert detail["reponse_payload"] == {"reponse_visible": reponse_visible}
+
+
+def test_message_suivant_place_la_ligne_garde_fous_apres_les_appels_mistral_du_tour(
+    client, mistral_client_factice, jeton_valide, monkeypatch
+):
+    monkeypatch.setenv("VM_ADMIN_KEY", "cle-admin-de-test")
+    entetes = _autorisation_admin(jeton_valide)
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide, "Bonjour")
+    mistral_client_factice.repondre(
+        "Réponse sans rien à retirer", resume_et_profil=_reponse_resume_et_profil()
+    )
+
+    reponse = client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Merci"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert reponse.status_code == 200
+    echanges = client.get(
+        f"/inspecteur/conversations/{conversation_id}/echanges", headers=entetes
+    ).json()
+    assert [(e["origine"], e["type_appel"]) for e in echanges][-3:] == [
+        ("mistral", "chat"),
+        ("mistral", "resume_et_profil"),
+        ("local", "garde_fous"),
+    ]
+    detail = client.get(f"/inspecteur/echanges/{echanges[-1]['id']}", headers=entetes).json()
+    assert detail["requete_payload"] == {"reponse_brute": "Réponse sans rien à retirer"}
+    assert detail["reponse_payload"] == {"reponse_visible": "Réponse sans rien à retirer"}

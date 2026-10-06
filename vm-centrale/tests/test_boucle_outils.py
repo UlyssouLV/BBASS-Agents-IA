@@ -179,6 +179,7 @@ def test_inspecteur_place_les_echanges_locaux_des_outils_entre_les_appels_mistra
         ("local", outil),
         ("mistral", "chat"),
         ("mistral", "resume_et_profil"),
+        ("local", "garde_fous"),
     ]
 
     detail_outil = client.get(
