@@ -22,6 +22,7 @@ from vm_centrale.garde_fous import (
     plafonner,
     retirer_chiffres_hors_source,
     retirer_urls_inventees,
+    urls_ecrites,
 )
 from vm_centrale.inspecteur import (
     enregistrer_echange_echec,
@@ -241,24 +242,24 @@ def _message_systeme_piece_jointe(piece_jointe: PieceJointe) -> dict[str, str]:
     }
 
 
-def _memoire_de_la_conversation(db: Session, conversation_id: int) -> str | None:
+def _memoire_de_la_conversation(db: Session, conversation_id: int, nouveau_message: str) -> str | None:
     # Recalculée à chaque appel de chat principal, jamais stockée (spec
     # 1.4.1) : hors du résumé glissant et de son plafond, elle ne perd ni une
     # pièce jointe ni une recherche quand le résumé est réécrit. Tour = rang
     # du message user ; un élément sans message est celui du tour en cours.
-    ids_messages_user = [
-        message_id
-        for (message_id,) in db.query(Message.id)
+    messages_user = (
+        db.query(Message.id, Message.contenu)
         .filter(Message.conversation_id == conversation_id, Message.role == "user")
         .order_by(Message.id)
         .all()
-    ]
+    )
+    ids_messages_user = [message_id for message_id, _ in messages_user]
 
     def tour(message_id: int) -> int:
         return bisect_right(ids_messages_user, message_id)
 
     # (message_id, ordre d'ajout, ligne) : trié par message, donc par tour.
-    elements: list[tuple[int, int, str]] = []
+    elements: list[tuple[float, int, str]] = []
     pieces_jointes = (
         db.query(PieceJointe.id, PieceJointe.message_id, PieceJointe.nom_fichier)
         .filter(PieceJointe.conversation_id == conversation_id, PieceJointe.message_id.isnot(None))
@@ -267,6 +268,14 @@ def _memoire_de_la_conversation(db: Session, conversation_id: int) -> str | None
     )
     for piece_jointe_id, message_id, nom_fichier in pieces_jointes:
         ligne = f"- Tour {tour(message_id)} — pièce jointe id {piece_jointe_id} « {nom_fichier} »"
+        elements.append((message_id, len(elements), ligne))
+    # URL écrites par le compte, jamais par l'assistant (#134) : une même
+    # URL n'est listée qu'au premier tour qui l'a écrite. Le message du tour
+    # n'est pas encore en base : il passe après tous les messages.
+    textes_du_compte = [contenu for _, contenu in messages_user] + [nouveau_message]
+    for rang, url in urls_ecrites(textes_du_compte):
+        message_id = ids_messages_user[rang] if rang < len(ids_messages_user) else float("inf")
+        ligne = f"- Tour {rang + 1} — URL envoyée par l'utilisateur : {url}"
         elements.append((message_id, len(elements), ligne))
     # Requête et URL seulement, jamais le contenu des pages ni les extraits
     # du moteur (comme la mention courte de la 1.4.0).
@@ -678,7 +687,12 @@ def creer_conversation(
         # ni d'historique à ce stade), l'autre chemin menant au même appel de
         # chat principal (spec 1.2.2).
         message_pour_mistral = _construire_messages_pour_mistral(
-            "", [], requete.message, "", piece_jointe
+            "",
+            [],
+            requete.message,
+            "",
+            piece_jointe,
+            _memoire_de_la_conversation(db, conversation.id, requete.message),
         )
 
         # Les deux appels Mistral (réponse, puis titrage) sont faits avant
@@ -1412,7 +1426,7 @@ def envoyer_message(
             requete.message,
             profil_actuel,
             piece_jointe,
-            _memoire_de_la_conversation(db, conversation.id),
+            _memoire_de_la_conversation(db, conversation.id, requete.message),
         )
 
         # Un message sort de la fenêtre des 3 derniers dès que ce tour (2 nouveaux

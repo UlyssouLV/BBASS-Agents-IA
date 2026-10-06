@@ -41,12 +41,24 @@ def _normaliser(url: str) -> str:
     return url.rstrip("/")
 
 
+def urls_ecrites(textes: Iterable[str]) -> list[tuple[int, str]]:
+    # (rang du texte, URL) à la première occurrence de chaque URL, dans
+    # l'ordre, ponctuation finale retirée. Même règle que le garde-fou :
+    # partagée avec la Mémoire de la conversation (spec 1.4.1, #134), pour
+    # qu'une URL qui y figure soit une URL que le garde-fou laisse passer.
+    vues: set[str] = set()
+    urls: list[tuple[int, str]] = []
+    for rang, texte in enumerate(textes):
+        for correspondance in _MOTIF_URL_NUE.finditer(texte):
+            url = correspondance.group(2).rstrip(_PONCTUATION_FINALE)
+            if _normaliser(url) not in vues:
+                vues.add(_normaliser(url))
+                urls.append((rang, url))
+    return urls
+
+
 def _urls_du_compte(textes_du_compte: Iterable[str]) -> set[str]:
-    return {
-        _normaliser(correspondance.group(2))
-        for texte in textes_du_compte
-        for correspondance in _MOTIF_URL_NUE.finditer(texte)
-    }
+    return {_normaliser(url) for _, url in urls_ecrites(textes_du_compte)}
 
 
 def retirer_urls_inventees(

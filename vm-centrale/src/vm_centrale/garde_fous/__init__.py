@@ -3,11 +3,12 @@
 from vm_centrale.garde_fous.chiffres import retirer_chiffres_hors_source
 from vm_centrale.garde_fous.longueur import plafonner
 from vm_centrale.garde_fous.titre import nettoyer_titre
-from vm_centrale.garde_fous.urls import retirer_urls_inventees
+from vm_centrale.garde_fous.urls import retirer_urls_inventees, urls_ecrites
 
 __all__ = [
     "nettoyer_titre",
     "plafonner",
     "retirer_chiffres_hors_source",
     "retirer_urls_inventees",
+    "urls_ecrites",
 ]
