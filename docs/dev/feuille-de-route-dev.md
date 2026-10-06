@@ -17,22 +17,37 @@ Ce n’est **pas** une spec (ça vient après « Ouvre la version »).
 - **1.2.3** — Amélioration des délais de chargement (pages et conversations) : cache TanStack Query revu par requête (liste des conversations, détail de conversation, Profil, Panel d'administration), `placeholderData` sur le détail de conversation pour garder l'ancien contenu affiché pendant le rafraîchissement ; pagination par curseur de `GET /conversations/{id}` (vm-centrale), fenêtre de messages la plus récente par défaut, historique plus ancien chargé au défilement façon ChatGPT (pas de pagination par page) ; instrumentation de temps légère (`performance.mark`/`performance.measure`) sur l'ouverture/bascule de conversation, Profil et Panel d'administration, désactivée par défaut, posée pour être réutilisée par la 1.3.0.
 - **1.3.0** — Inspecteur des échanges avec le modèle (outil de développement) : Mode développeur ouvert par `Ctrl+Maj+D` depuis n'importe quel compte, dans un nouvel onglet `/inspecteur`, débloqué par la Clé d'administration VM (saisie en mémoire de l'onglet, jamais stockée) ; accès à toutes les conversations de tous les comptes ([ADR-0012](../adr/0012-mode-developpeur-cle-admin-vm-tous-comptes.md)) — comptes → conversations → fil chronologique des échanges. Chaque appel Mistral réel (chat, titrage, résumé+profil, OCR, vision, chaque aller-retour de tool calling) est capturé dans une table `echanges_inspecteur` séparée de `Consommation` (payload exact envoyé, réponse brute, statut succès/échec), supprimée en cascade avec la conversation ; un échange en échec survit au rollback du tour ; pièce jointe affichée comme référence cliquable plutôt qu'en texte brut ; jamais la clé API Mistral dans un échange. Historique seulement, lecture seule.
 - **1.3.1** — Le chat ne fige plus ses inventions ([#110](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/110), [spec](../specs/v1.3.1-chat-ne-fige-plus-ses-inventions.md)) : consigne de chat sans lien proposé (seule une URL écrite par le compte peut ressortir), refus d’un fait inventé sans demande explicite ; pièce jointe traitée comme déjà jointe et décrite par son seul extrait ; résumé glissant qui note « proposé, non vérifié » ce que l’assistant a affirmé, plafonné à 1 500 caractères ; profil de travail réécrit en entier sous 800 caractères au lieu d’empiler des deltas, profils existants vidés. Garde-fous centralisés dans `vm_centrale/garde_fous/` : URL absente des messages du compte retirée ; sans document ni chiffre fourni, une réponse chiffrée est remplacée par une phrase fixe de la VM ; avec une source, seuls les chiffres présents restent. Pas de changement du contrat HTTP du poste.
+- **1.4.0** — Recherche web dans le chat ([#117](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/117), [spec](../specs/v1.4.0-recherche-web-dans-le-chat.md)) : outil `rechercher_web` exécuté par la VM sur un SearXNG auto-hébergé ([ADR-0013](../adr/0013-recherche-web-searxng-auto-heberge.md)) ; pages entières nettoyées puis appel d’extraction isolé du contexte de la conversation ([ADR-0014](../adr/0014-recherche-web-en-deux-temps-extraction-isolee.md)) ; outils du modèle centralisés dans `vm_centrale/outils/`, tous les appels d’outils traités sur 3 tours au plus ; seules les URL revenues de l’outil et les chiffres écrits dans les pages lues restent ; date du jour donnée au modèle pour les recherches d’actualité ; inspecteur chronologique Mistral / local avec ligne garde-fous. Pas de changement du contrat HTTP du poste. Bug connu à la livraison : quand la recherche ne trouve rien, l’IA invente encore au lieu de le dire ([#131](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/131), correction en **1.4.5**).
 
-## Prochaine : 1.4.0 — Recherche web dans le chat
+## Prochaine : 1.4.1 — Mémoire de la conversation (pièces jointes et recherches)
 
-**Objectif.** Un outil de recherche internet, exécuté par la VM et branché sur le chat comme l’outil pièce jointe, pour que le modèle trouve une page réelle au lieu d’en inventer l’adresse. On reste sur `chat/completions` : pas l’outil `web_search` de l’API Conversations Mistral (écartée en 1.1.1, pas de Zero Data Retention, clé unique du cabinet). Le collaborateur demande de trouver quelque chose ; le modèle appelle l’outil ; un moteur renvoie des pages ; la réponse ne cite qu’une URL revenue de cet outil. Le texte ramené est une source, comme l’extrait d’une pièce jointe : la réponse ne garde un chiffre que s’il est écrit dans ce texte. Sans texte ramené, la phrase fixe de la 1.3.1 s’applique.
-
-**Outils centralisés.** Pour plus de praticité, les function calling proposés au modèle sont regroupés en un seul endroit, de façon optimisée et logique.
-
-**Optimisation (piste, à confirmer à l’ouverture).** Télécharger le texte intégral de toutes les pages trouvées coûte trop cher en tokens et en délai, et noie la réponse. Le flux le plus économe : le moteur renvoie une liste courte (titre, URL, extrait) ; la VM ne télécharge ensuite que quelques pages, avec un plafond de texte par page ; ce texte seul repart au modèle pour la réponse. Le moteur concret (et le fait que la requête quitte le cabinet) se tranche à l’ouverture.
+**Objectif.** Le résumé glissant ne garde qu’une mention courte d’une pièce jointe sortie de la fenêtre de 3 ; depuis la 1.4.0, une recherche web n’y laisse que sa requête et ses URL. Cette version garde à part, pour la durée de la conversation, la liste des pièces jointes **et des recherches** partagées, et donne au modèle un outil (tool calling) pour se les rappeler et en relire le contenu. Piste née de l’ouverture de la 1.3.1 ([spec](../specs/v1.3.1-chat-ne-fige-plus-ses-inventions.md)), élargie aux recherches à l’ouverture de la 1.4.0 ([spec](../specs/v1.4.0-recherche-web-dans-le-chat.md)) : à confirmer par le retest de la 1.3.1 (une URL ou une pièce jointe du compte survit-elle au résumé plafonné ?).
 
 **Hors périmètre.** Moduléo, déploiement, n8n. Pas de changement du contrat HTTP du poste : l’outil reste interne à l’appel de chat.
 
-## Ensuite : 1.4.1 — Mémoire des pièces jointes de la conversation
+- Conservation d’une pièce jointe au-delà de sa conversation d’origine (usage multi-conversationnel, matière pour entraîner les futurs Agents) : piste évoquée dès le grilling 1.1.2, pas tranchée.
 
-**Objectif.** Le résumé glissant ne garde qu’une mention courte d’une pièce jointe sortie de la fenêtre de 3. Cette version garde à part, pour la durée de la conversation, la liste des pièces jointes partagées, et donne au modèle un outil (tool calling) pour se rappeler lesquelles ont été partagées dans cette conversation. Piste née de l’ouverture de la 1.3.1 ([spec](../specs/v1.3.1-chat-ne-fige-plus-ses-inventions.md)) : à confirmer par le retest de la 1.3.1 (une URL ou une pièce jointe du compte survit-elle au résumé plafonné ?).
+## Ensuite : 1.4.2 — Tokenizer Mistral pour le plafond des pages web
 
-**Hors périmètre.** Moduléo, déploiement, n8n. Pas de changement du contrat HTTP du poste : l’outil reste interne à l’appel de chat.
+**Objectif.** En 1.4.0, le plafond global des pages nettoyées (~80 % de la fenêtre du modèle d’extraction) est une estimation en caractères (3 caractères ≈ 1 token), faute de tokenizer Mistral en local. Cette version ajoute le tokenizer officiel (`mistral-common` / Tekken) pour compter les tokens réels des pages avant de retirer une page entière, et ainsi caler le seuil sur le modèle d’extraction plutôt que sur une approximation. À trancher à l’ouverture : quel artefact tokenizer coller à `mistral-small-latest` (fichier `tekken.json` versionné ou téléchargé), et si le compte sert seulement au plafond ou aussi à une prévision affichée avant l’appel.
+
+**Hors périmètre.** Suivi de consommation facturée (reste basé sur l’`usage` renvoyé par l’API Mistral). Moduléo, déploiement, n8n. Pas de changement du contrat HTTP du poste.
+
+## Ensuite : 1.4.3 — Cache des pages web entre conversations
+
+**Objectif.** En 1.4.0, les pages téléchargées par une recherche ne vivent que le temps de leur conversation. Garder un cache commun (clé : l’URL) éviterait de retélécharger une page déjà lue. À trancher à l’ouverture : durée de validité au-delà de laquelle on retélécharge (une page change), règle de partage entre comptes (pages publiques seulement), taille et purge du cache. Piste née de l’ouverture de la 1.4.0.
+
+## Ensuite : 1.4.4 — Statut d’attente dynamique pendant une réponse
+
+**Objectif.** Remplacer l’indicateur figé du type « Réflexion… » par un statut qui suit **en direct** ce que la VM est en train de faire (ex. une recherche web en cours, une page lue, une extraction). Formulations, canaux (streaming, polling…), granularité et libellés : **à trancher au grilling** à l’ouverture — rien n’est fixé ici.
+
+**Hors périmètre.** Changer le contenu final de la réponse ; modes Rapide / Approfondi.
+
+## Ensuite : 1.4.5 — Dire « pas trouvé » plutôt qu’inventer après une recherche
+
+**Objectif.** Corriger le bug [#131](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/131), constaté au test humain de la 1.4.0 : quand la recherche (ou la pièce jointe) ne contient pas l’information, la réponse dit qu’elle ne l’a pas trouvée, au lieu d’estimer des tarifs, des dates ou de citer une source qui n’existe pas. Jamais « sourcé » ni « confirmé par » sans résultat de l’outil qui le contient ; une source dont le lien est retiré ne reste pas affichée comme source ; le contenu de la pièce jointe prime sur une généralité du web. Les garde-fous ne cassent plus la mise en forme (indentation des listes et tableaux, parenthèses vides) ; une page quasi vide n’est pas comptée comme lue ; la date du jour est donnée en toutes lettres et seule l’année va dans la requête. À trancher au grilling : sort d’une réponse dont beaucoup de chiffres sont retirés (marqueur visible, réécriture, phrase fixe), contrôle des petits montants (« 5 € »), et traitement ici ou à part du profil de travail et du résumé qui débordent d’une conversation à l’autre.
+
+**Hors périmètre.** Pages refusées par les sites (HTTP 403) et PDF trouvés sur le web ; vérification de la fiabilité des sources ; modes Rapide / Approfondi. Pas de changement du contrat HTTP du poste.
 
 ## Ensuite : 1.5.0 — Moduléo en lecture (outil transverse) + premier branchement via l’Agent Administration
 
@@ -40,7 +55,7 @@ Ce n’est **pas** une spec (ça vient après « Ouvre la version »).
 
 **Objectif.** Depuis un prompt dans le chat (d’abord via l’Agent **Administration**), demander des **éléments issus de Moduléo** (API, **lecture seule**) et obtenir une **réponse utile** (ex. affaire, intervenants, … selon allowlist **du pôle appelant**). Pas d’écriture Moduléo. Pas de n8n dans ce livrable : les appels passent par des **outils** (tool calling) + client HTTP **dans la VM** (Python), pas un workflow par route API.
 
-**Hors périmètre 1.5.0.** Orchestration / workflows **n8n** (→ **1.7.0**), automatismes multi-étapes, écriture Moduléo. Déploiement / CI/CD / installateur poste (→ **1.6.0**). Allowlists Moduléo pour les **autres** pôles (Foncier, etc.) : plus tard, en réutilisant la même intégration.
+**Hors périmètre 1.5.0.** Orchestration / workflows **n8n** (→ **1.8.0**), automatismes multi-étapes, écriture Moduléo. Documentation mémoire / souveraineté (→ **1.6.0**). Déploiement / CI/CD / installateur poste (→ **1.7.0**). Allowlists Moduléo pour les **autres** pôles (Foncier, etc.) : plus tard, en réutilisant la même intégration.
 
 **Auth Moduléo (tranché pour 1.5.0).** Pour ce premier livrable on **force un périmètre minimal** : **une seule clé API** Moduléo (config VM, ex. `.env`) et les essais / l’usage ciblé sur **un seul utilisateur** Moduléo (un SecurityCode lié à ce compte de test). Pas de multi-clés, pas d’affectation de codes depuis le panel d’administration, pas de « rôles de clés » dans BBASS. Objectif : valider le Q&A lecture (chat → outils → API) et, sur serveur de test, le comportement auth (identité, droits, historique) avant d’industrialiser.
 
@@ -73,11 +88,21 @@ Ce n’est **pas** une spec (ça vient après « Ouvre la version »).
 - Valider sur test : identité (`utilisateurencours`), refus si mauvais code, comportement des droits / historique ; décider ensuite si une **1.5.x** multi-clés / multi-collabs est nécessaire.
 - Trancher / amender la proposition d’organisation ci-dessus à l’ouverture (ou documenter une alternative retenue).
 
-## Ensuite : 1.6.0 — Déploiement postes (CI/CD, conteneurisation, installateur)
+## Ensuite : 1.6.0 — Documentation : mémoire conversationnelle et souveraineté des données
+
+**Objectif.** Deux documents produit / fonctionnels (même format que la doc recherche web prévue ailleurs dans cette feuille), rédigés dans `docs/features/` **et** portés chacun par une issue GitHub labellee **`documentation`** (plan, schémas, captures, exemples). Pas de changement de code produit hors ajustements de doc / schémas / exemples de tests cités. Placée après Moduléo lecture (**1.5.0**) pour documenter aussi l’état mémoire / hébergement une fois ce socle métier posé, avant le déploiement postes.
+
+1. **Persistance de la mémoire** (`docs/features/memoire-conversationnelle.md` ou équivalent). Schéma complet (tables / relations : conversations, messages, résumé glissant, profil de travail, pièces jointes, résultats de recherche web, etc.), flux tour par tour (ce qui entre, ce qui sort de la fenêtre de 3, ce qui est plafonné, ce que le modèle relit via outils), choix et décisions déjà prises et **pourquoi** (persistance VM vs API Conversations Mistral, séparation identité / profil, etc.). Exemples concrets (inspecteur, états en base) et références aux tests HTTP-boundary qui verrouillent ces comportements. À l’ouverture : si la **1.4.1** (mémoire pièces jointes + recherches) n’est pas encore livrée, documenter l’existant et prévoir une section « prévu / à mettre à jour » pour l’outil de rappel.
+
+2. **Souveraineté des données** (`docs/features/souverainete-des-donnees.md` ou équivalent). Cartographie de tous les choix qui font que **seul le cabinet** détient les données persistées : Postgres et fichiers sur la VM Castries, SearXNG auto-hébergé, pas de Files API / Conversations Mistral, ZDR / `chat/completions` sans rétention côté modèle, clé API unique derrière la VM, LAN uniquement, etc. Expliquer **pourquoi** chaque décision rend le cabinet souverain (Mistral ne stocke pas nos fils ni nos fichiers ; aucun service externe n’héberge notre mémoire métier ; tout ce qui persiste est hébergé par nous). Relier ADR et specs déjà actées ; schémas « où vit la donnée » (poste / VM / Mistral / SearXNG) pour les chemins critiques.
+
+**Hors périmètre.** Implémentation de nouvelles capacités mémoire ou cache (→ **1.4.1**, **1.4.3**). Déploiement postes (→ **1.7.0**), n8n (→ **1.8.0**). Doc tool calling recherche web (déjà prévue dans « Optimisation de la recherche web » / livrable doc associé).
+
+## Ensuite : 1.7.0 — Déploiement postes (CI/CD, conteneurisation, installateur)
 
 **Contexte.** Après la semaine en cours, l’alternant repart à l’école (~2 semaines). Les collaborateurs peuvent déjà vouloir **utiliser Moduléo en lecture** via le chat (livré en 1.5.0) sans attendre le retour. Il faut donc pouvoir **déployer / mettre à jour** le logiciel sur les postes du cabinet de façon reproductible — pas seulement via les scripts de dev actuels.
 
-**Objectif.** Une chaîne de **déploiement** : CI/CD (ex. GitHub Actions), **conteneurisation Docker** là où ça aide (au minimum ce qui est déjà Dockerisé + ce qui doit l’être pour un rollout propre), et un **installateur / logiciel poste** qui démarre le **backend local obligatoire** (ADR-0001) et donne accès au chat. Priorité produit de fin de semaine : **livrer cette 1.6.0** pour que le cabinet puisse installer et utiliser ce qui est déjà là (dont Moduléo lecture si 1.5.0 est passée), même en absence de l’alternant.
+**Objectif.** Une chaîne de **déploiement** : CI/CD (ex. GitHub Actions), **conteneurisation Docker** là où ça aide (au minimum ce qui est déjà Dockerisé + ce qui doit l’être pour un rollout propre), et un **installateur / logiciel poste** qui démarre le **backend local obligatoire** (ADR-0001) et donne accès au chat. Priorité produit de fin de semaine : **livrer cette 1.7.0** pour que le cabinet puisse installer et utiliser ce qui est déjà là (dont Moduléo lecture si 1.5.0 est passée), même en absence de l’alternant.
 
 **Périmètre envisagé.**
 - CI : build front Vite (fin du commit systématique du seul `dist/` à la main — voir aussi les notes « Plus tard » historiques), tests, artefacts versionnés / release.
@@ -92,11 +117,11 @@ Ce n’est **pas** une spec (ça vient après « Ouvre la version »).
 - Canal de mise à jour (GitHub Releases, partage interne Castries, etc.).
 - Périmètre « pilote » : une machine / quelques postes Admin avant rollout large.
 
-**Note semaine en cours.** On peut encore **viser** d’avancer n8n en parallèle si le temps le permet, mais le **livrable prioritaire** reste **1.6.0 déploiement** (n8n est **1.7.0**).
+**Note semaine en cours.** On peut encore **viser** d’avancer n8n en parallèle si le temps le permet, mais le **livrable prioritaire** reste **1.7.0 déploiement** (n8n est **1.8.0** ; la doc mémoire / souveraineté est **1.6.0**).
 
-## Ensuite : 1.7.0 — Workflows n8n (socle d’automatisation), branchés sur Moduléo 1.5.0
+## Ensuite : 1.8.0 — Workflows n8n (socle d’automatisation), branchés sur Moduléo 1.5.0
 
-*(Anciennement 1.6.0, elle-même décalée depuis 1.5.0 pour prioriser le déploiement — passe en 1.7.0 avec la recherche web en 1.4.0.)*
+*(Anciennement 1.6.0, puis 1.7.0 — passe en 1.8.0 pour laisser 1.6.0 à la documentation mémoire / souveraineté.)*
 
 S’appuie sur les **outils / client Moduléo lecture** livrés en 1.5.0. n8n devient le **runtime d’automatisation** (scénarios multi-étapes, plus tard d’autres logiciels), pas un miroir 1:1 de chaque route API.
 
@@ -114,9 +139,9 @@ S’appuie sur les **outils / client Moduléo lecture** livrés en 1.5.0. n8n de
 - Gouvernance : qui active un workflow ; audit des exécutions.
 - Comment réexposer ou appeler la stack Moduléo 1.5.0 depuis n8n (HTTP Request vers Moduléo vs rappel d’un service VM).
 
-## Ensuite : 1.8.0 — Analyse et traitement des pièces jointes, approfondis
+## Ensuite : 1.9.0 — Analyse et traitement des pièces jointes, approfondis
 
-*(Anciennement 1.5.0, puis 1.6.0, puis 1.7.0 — passe en 1.8.0 avec la recherche web en 1.4.0.)*
+*(Anciennement 1.5.0, puis 1.6.0, puis 1.7.0, puis 1.8.0 — passe en 1.9.0 pour laisser 1.6.0 à la documentation mémoire / souveraineté.)*
 
 S’appuie sur la [1.1.2](../specs/v1.1.2-pieces-jointes.md) (pipeline d’extraction, une pièce jointe par message) et sur le premier **Agent** métier / Moduléo livré en 1.5.0. Deux limites actées volontairement en 1.1.2 sont à lever ici, pas avant : **plusieurs pièces jointes par message**, et un **traitement spécifique par pôle** (un agent Foncier ne traite pas un document comme un agent Urbanisme) — demande explicite du cabinet dès le grilling de 1.1.2, remise à plus tard faute d’Agent réel pour la justifier.
 
@@ -150,15 +175,15 @@ Constat (grilling 1.2.0) : à terme, plus aucune personne qualifiée ne sera sur
 Implications déjà identifiées à creuser plus tard :
 - Cette contrainte pèse sur les choix techniques pris dès 1.2.0 (ex. TypeScript plutôt que JS nu, pour donner un filet de sécurité à la compilation en l'absence de relecture humaine technique).
 - Reste à définir : à quoi ressemble concrètement le flux de validation (où/comment un compte administrateur voit et approuve un changement), le périmètre de ce que l'agent peut faire seul vs ce qui nécessite une validation, et les garde-fous (rollback, tests obligatoires avant validation, etc.).
-- Tests front (grilling 1.2.0) : pas de tests dédiés côté UI React en 1.2.0 (on reste sur les tests pytest HTTP-boundary existants + validation visuelle par l'admin). À une version pas encore numérotée : ajouter un filet de sécurité automatisé côté UI (ex. Playwright) puisque seul un agent IA maintient ce code sans relecture humaine technique — pertinent surtout quand le volume d'écrans aura grossi (1.3.0, 1.4.0, 1.5.0, 1.6.0, 1.7.0, 1.8.0 et au-delà).
+- Tests front (grilling 1.2.0) : pas de tests dédiés côté UI React en 1.2.0 (on reste sur les tests pytest HTTP-boundary existants + validation visuelle par l'admin). À une version pas encore numérotée : ajouter un filet de sécurité automatisé côté UI (ex. Playwright) puisque seul un agent IA maintient ce code sans relecture humaine technique — pertinent surtout quand le volume d'écrans aura grossi (1.3.0, 1.4.0, 1.5.0, 1.6.0, 1.7.0, 1.8.0, 1.9.0 et au-delà).
 
 ### Lanceur poste (exécutable, pywebview)
 
-→ **Repris et numéroté en 1.6.0** (déploiement postes : installateur + accès UI, pywebview vs navigateur à trancher). Cette entrée « Plus tard » ne fait plus office de file d’attente séparée.
+→ **Repris et numéroté en 1.7.0** (déploiement postes : installateur + accès UI, pywebview vs navigateur à trancher). Cette entrée « Plus tard » ne fait plus office de file d’attente séparée.
 
 ### Déploiement, CI/CD, retours utilisateurs
 
-→ **Repris et numéroté en 1.6.0**. Contraintes déjà vues à réintégrer dans la spec à l’ouverture : pas forcément de VM centrale physique pour un CD du relais ; LAN Castries vs Internet ; Actions pour pytest + build front ; pilote sur quelques machines. Depuis 1.2.0 le `dist/` front est committé — la CI 1.6.0 doit prendre en charge le build Vite.
+→ **Repris et numéroté en 1.7.0**. Contraintes déjà vues à réintégrer dans la spec à l’ouverture : pas forcément de VM centrale physique pour un CD du relais ; LAN Castries vs Internet ; Actions pour pytest + build front ; pilote sur quelques machines. Depuis 1.2.0 le `dist/` front est committé — la CI 1.7.0 doit prendre en charge le build Vite.
 
 ### Mémoire / RAG / plateforme LLM tierce (Open WebUI, Mem0…) — en réserve, pas prioritaire
 
@@ -180,7 +205,7 @@ Ce n’est **pas** le même objet que la 1.1.1 (résumé glissant de conversatio
 
 À creuser seulement si le besoin métier le justifie (doc Moduléo / Agents, corpus par pôle, multi-providers, etc.) :
 - Mémoire inter-conversationnelle plus fine que le seul profil de travail synthétique.
-- RAG sur un corpus cabinet, distinct des pièces jointes du fil courant (1.1.2 / 1.8.0).
+- RAG sur un corpus cabinet, distinct des pièces jointes du fil courant (1.1.2 / 1.9.0).
 - **Optimisation du résumé+profil actuel (1.1.1)** — **dans la même version** que le reste de ce chantier mémoire, pas une version à part. Distinct de la **1.3.1**, qui corrige le contenu figé (inventions reprises comme des faits, [#110](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/110)), pas la fréquence des appels ni un RAG. Aujourd’hui, dès qu’il y a des messages sortants, chaque tour fait **1 chat + 1 appel résumé/profil** (agrégés tous les deux en « Chat » côté conso) : fiable, mais ~2× les requêtes après le premier message. Pistes à trancher alors : résumé moins fréquent (tous les N tours / seuil de tokens), résumé en arrière-plan après la réponse affichée (façon *Dreaming*), ou mémoire à la demande (outil / notes) — en gardant éventuellement le combo résumé léger + embeddings pour le long terme.
 
 ### Éléments de réponse visuels plus riches dans le chat (graphiques, documents générés)
@@ -188,6 +213,28 @@ Ce n’est **pas** le même objet que la 1.1.1 (résumé glissant de conversatio
 Constat (grilling 1.2.2) : au-delà du Markdown borné (gras, listes) posé en 1.2.2, le cabinet a exprimé l'envie qu'une réponse de l'IA puisse à terme intégrer des éléments plus riches — graphiques, voire génération de documents (façon Word/Excel, à la manière de ce que proposent certains assistants IA) — plutôt que de la prose seule.
 
 Pas de travail dédié avant que le besoin se confirme. Le rendu posé en 1.2.2 (`react-markdown` + mapping de composants React par élément Markdown) est délibérément choisi pour rendre cette extension simple le moment venu : ajouter un nouveau type de bloc revient à enregistrer un composant supplémentaire dans ce mapping, sans reprendre l'architecture du rendu.
+
+### Optimisation de la recherche web par défaut (tokens, contexte, outils)
+
+Constat (essais manuels 1.4.0) : les extraits du moteur suffisent parfois à répondre, alors que télécharger et extraire les pages à chaque recherche coûte des tokens et du délai. Ce n’est **pas** un choix de mode Rapide / Approfondi côté collaborateur : c’est améliorer le **comportement par défaut** de `rechercher_web` après la 1.4.0, pour diminuer au maximum les tokens par conversation tout en gardant un contexte propre et des réponses efficaces (messages `tool` denses, infos pertinentes seulement).
+
+Pistes à trancher à l’ouverture : ne lire / extraire les pages que si les snippets ne suffisent pas ; outil `lire_page(url)` pour cibler les pages utiles sans tout télécharger ; plafonds et format des résultats renvoyés au modèle ; affiner la consigne d’extraction ; éventuel lien avec le cache 1.4.3. S’appuie sur le registre d’outils et [ADR-0014](../adr/0014-recherche-web-en-deux-temps-extraction-isolee.md). Hors périmètre tant que la 1.4.0 n’a pas été retestée. Distinct des modes Rapide / Approfondi ci-dessous (ceux-là changent le contrat HTTP du poste).
+
+**Documentation livrable (même version).** Un document dans le dépôt qui décrit **très exactement et fonctionnellement** le fonctionnement du tool calling de recherche web (paramètres, déroulé VM, pannes, ce qui part vers le moteur / l’extraction / le modèle principal, ce qui est persisté, rôle des garde-fous) — langage produit / fonctionnel, pas un dump de code. Des **schémas** illustrent tous les cas et cheminements possibles (succès snippets seuls, lecture de pages, extraction, moteur indisponible, page en échec, plafond, etc.). À l’ouverture : créer une issue GitHub labellee **`documentation`** (label déjà présent dans le dépôt) qui porte le plan de ce document, les captures / images d’exemples (inspecteur, messages `tool`, réponses) et toute info complémentaire ; le doc versionné dans `docs/` reste la référence une fois rédigé.
+
+### Pages web refusées (HTTP 403) et PDF trouvés sur le web
+
+Constat (test humain 1.4.0, conversations 89 à 92) : sur 24 pages téléchargées, 9 refusées en HTTP 403 (dont Légifrance et leboncoin), 1 PDF non lu, 5 pages JavaScript sans contenu exploitable. Légifrance est la source officielle d’un cabinet : la réponse se rabat sur un site tiers. Pistes à trancher à l’ouverture : en-têtes de navigateur plus complets, API officielle (Légifrance / PISTE) pour les textes de loi, lecture des PDF, rendu JavaScript. Distinct de #131 (ce que le modèle écrit quand il n’a rien trouvé, 1.4.5).
+
+### Vérification de la fiabilité des sources web
+
+Constat (essais manuels 1.4.0) : `rechercher_web` ramène des pages et l’IA les cite ; rien ne dit encore si une source est digne de confiance (site officiel, presse, blog, forum, page commerciale). Une amélioration ultérieure de la recherche web ferait **évaluer la fiabilité des sites sourcés** avant ou avec la réponse : indiquer au collaborateur le degré de confiance, écarter ou rétrograder les sources douteuses, et garder une trace lisible (inspecteur ou mention courte).
+
+Pistes à trancher à l’ouverture : critères (domaine `.gouv.fr` / institutionnel, liste blanche cabinet, score heuristique, second passage modèle…), moment du contrôle (à la réception des résultats, après lecture des pages, à la rédaction), ce que voit le collaborateur, et le lien avec les garde-fous URL déjà en place. S’appuie sur la 1.4.0 et le registre d’outils. Distinct de l’optimisation **par défaut** (tokens / snippets) et des modes Rapide / Approfondi.
+
+### Modes de réponse (Rapide / Approfondi) et outils de lecture plus fins
+
+Constat (ouverture 1.4.0) : plusieurs façons d’utiliser les outils sont possibles selon l’effort voulu. Un mode choisi par le collaborateur réglerait le nombre de tours d’outils, le nombre de pages lues, un outil `lire_page(url)` (le modèle choisit ses pages au lieu de prendre les premières), un appel de synthèse, ou le modèle utilisé. Change le contrat HTTP du poste (choix du mode). Le découpage de la 1.4.0 (registre d’outils, appel d’extraction isolé, [ADR-0014](../adr/0014-recherche-web-en-deux-temps-extraction-isolee.md)) est fait pour s’y brancher. Distinct de l’optimisation **par défaut** de la recherche web et de la **vérification de fiabilité des sources** (rubriques précédentes), qui ne demandent pas de choix utilisateur.
 
 ### Exécution de code dans le chat (cellules Python exécutables, façon ChatGPT)
 

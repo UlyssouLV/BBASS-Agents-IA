@@ -5,14 +5,27 @@ import { Badge } from "@/components/ui/badge";
 import { useInspecteurEchangeQuery, type InspecteurEchangeResume } from "@/hooks/useInspecteur";
 import { messageErreur } from "@/lib/api";
 
-// Même vocabulaire que Consommation.type_appel côté VM centrale (spec 1.3.0).
+// Même vocabulaire que Consommation.type_appel côté VM centrale (spec 1.3.0),
+// plus les échanges locaux de la VM (spec 1.4.0) : "outil:<nom>" et
+// "garde_fous".
 const LIBELLES_TYPE_APPEL: Record<string, string> = {
   chat: "Chat",
   titrage: "Titrage",
   resume_et_profil: "Résumé + profil",
   ocr: "OCR",
   vision: "Vision",
+  extraction_web: "Extraction web",
+  garde_fous: "Garde-fous",
 };
+
+const _PREFIXE_OUTIL = "outil:";
+
+function libelleTypeAppel(typeAppel: string): string {
+  if (typeAppel.startsWith(_PREFIXE_OUTIL)) {
+    return `Outil : ${typeAppel.slice(_PREFIXE_OUTIL.length)}`;
+  }
+  return LIBELLES_TYPE_APPEL[typeAppel] ?? typeAppel;
+}
 
 // Début exact du message système construit par
 // vm_centrale.routers.conversations._message_systeme_piece_jointe : seul
@@ -27,13 +40,14 @@ interface CarteEchangeInspecteurProps {
   echange: InspecteurEchangeResume;
 }
 
-// Carte d'un échange technique (un appel Mistral, succès ou échec) dans le
-// fil chronologique de l'inspecteur : remplace la bulle d'OngletChat, et se
-// déplie pour montrer le payload envoyé et la réponse brute reçue.
+// Carte d'un échange technique (un appel Mistral, ou du travail local de la
+// VM depuis la 1.4.0) dans le fil chronologique de l'inspecteur : remplace la
+// bulle d'OngletChat, et se déplie pour montrer ce qui est entré et sorti.
 export function CarteEchangeInspecteur({ cleAdminVm, echange }: Readonly<CarteEchangeInspecteurProps>) {
   const [deplie, setDeplie] = useState(false);
   const detailQuery = useInspecteurEchangeQuery(cleAdminVm, echange.id, deplie);
   const enEchec = echange.statut === "echec";
+  const local = echange.origine === "local";
   const Chevron = deplie ? ChevronDown : ChevronRight;
 
   const erreurDetail = messageErreur(detailQuery.error, "Le chargement de l'échange a échoué. Réessayez plus tard.");
@@ -47,7 +61,8 @@ export function CarteEchangeInspecteur({ cleAdminVm, echange }: Readonly<CarteEc
         className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-muted/50"
       >
         <Chevron className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-        <span className="font-medium">{LIBELLES_TYPE_APPEL[echange.type_appel] ?? echange.type_appel}</span>
+        <span className="font-medium">{libelleTypeAppel(echange.type_appel)}</span>
+        <Badge variant="outline">{local ? "Local" : "Mistral"}</Badge>
         <Badge variant={enEchec ? "destructive" : "secondary"}>{enEchec ? "Échec" : "Succès"}</Badge>
         <span className="ml-auto text-xs text-muted-foreground">
           <time dateTime={echange.date_creation}>{new Date(echange.date_creation).toLocaleString()}</time>
@@ -62,23 +77,32 @@ export function CarteEchangeInspecteur({ cleAdminVm, echange }: Readonly<CarteEc
               {erreurDetail}
             </p>
           )}
-          {detailQuery.data && (
+          {detailQuery.data && echange.type_appel === "garde_fous" && (
+            <DetailGardeFous
+              requetePayload={detailQuery.data.requete_payload}
+              reponsePayload={detailQuery.data.reponse_payload}
+            />
+          )}
+          {detailQuery.data && echange.type_appel !== "garde_fous" && (
             <>
-              <p className="text-xs text-muted-foreground">Modèle : {detailQuery.data.modele}</p>
+              {!local && <p className="text-xs text-muted-foreground">Modèle : {detailQuery.data.modele}</p>}
               {detailQuery.data.erreur && (
                 <Section titre="Erreur">
                   <BlocTexte className="text-destructive">{detailQuery.data.erreur}</BlocTexte>
                 </Section>
               )}
-              <Section titre="Payload envoyé">
+              <Section titre={local ? "Entrée" : "Payload envoyé"}>
                 <ContenuPayload
                   payload={detailQuery.data.requete_payload}
                   pieceJointeId={detailQuery.data.piece_jointe_id}
                 />
               </Section>
-              <Section titre="Réponse brute reçue">
+              <Section titre={local ? "Sortie" : "Réponse brute reçue"}>
                 {detailQuery.data.reponse_payload ? (
-                  <BlocTexte>{JSON.stringify(detailQuery.data.reponse_payload, null, 2)}</BlocTexte>
+                  <ContenuReponse
+                    reponse={detailQuery.data.reponse_payload}
+                    pieceJointeId={local ? detailQuery.data.piece_jointe_id : null}
+                  />
                 ) : (
                   <p className="text-xs text-muted-foreground">Aucune réponse reçue.</p>
                 )}
@@ -88,6 +112,29 @@ export function CarteEchangeInspecteur({ cleAdminVm, echange }: Readonly<CarteEc
         </div>
       )}
     </article>
+  );
+}
+
+// Ligne garde_fous (spec 1.4.0, décision 15) : les deux textes côte à côte
+// plutôt qu'en JSON, pour voir d'un coup d'œil ce que la VM a retiré.
+function DetailGardeFous({
+  requetePayload,
+  reponsePayload,
+}: Readonly<{ requetePayload: Record<string, unknown>; reponsePayload: Record<string, unknown> | null }>) {
+  const brute = String(requetePayload.reponse_brute ?? "");
+  const visible = String(reponsePayload?.reponse_visible ?? "");
+  return (
+    <>
+      <p className="text-xs text-muted-foreground">
+        {brute === visible ? "Aucun retrait : réponse affichée telle quelle." : "Les garde-fous ont modifié la réponse."}
+      </p>
+      <Section titre="Réponse brute du modèle">
+        <BlocTexte>{brute}</BlocTexte>
+      </Section>
+      <Section titre="Réponse visible">
+        <BlocTexte>{visible}</BlocTexte>
+      </Section>
+    </>
   );
 }
 
@@ -137,6 +184,28 @@ function ContenuPayload({ payload, pieceJointeId }: Readonly<ContenuPayloadProps
         />
       )}
       {Object.keys(resteAffiche).length > 0 && <BlocTexte>{JSON.stringify(resteAffiche, null, 2)}</BlocTexte>}
+    </div>
+  );
+}
+
+// Sortie d'un outil local qui a relu une pièce jointe (piece_jointe_id
+// renseigné) : son `contenu` est le texte extrait, affiché comme référence
+// cliquable comme dans le payload (spec 1.4.0).
+function ContenuReponse({
+  reponse,
+  pieceJointeId,
+}: Readonly<{ reponse: Record<string, unknown>; pieceJointeId: number | null }>) {
+  const { contenu, ...reste } = reponse;
+  if (pieceJointeId === null || typeof contenu !== "string") {
+    return <BlocTexte>{JSON.stringify(reponse, null, 2)}</BlocTexte>;
+  }
+  return (
+    <div className="flex flex-col gap-2">
+      <ReferencePieceJointe
+        libelle={libellePieceJointe(null, pieceJointeId)}
+        contenu={{ type: "texte", texte: contenu }}
+      />
+      {Object.keys(reste).length > 0 && <BlocTexte>{JSON.stringify(reste, null, 2)}</BlocTexte>}
     </div>
   );
 }

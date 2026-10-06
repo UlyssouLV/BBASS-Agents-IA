@@ -38,7 +38,7 @@ if ! scripts/preparer-package.sh "$ROOT_DIR/poste"; then
     exit 1
 fi
 
-echo "[4/7] Verification / demarrage de PostgreSQL (Docker)..."
+echo "[4/7] Verification / demarrage de PostgreSQL et SearXNG (Docker)..."
 if ! scripts/verifier-docker.sh; then
     echo
     read -n 1 -s -r -p "Appuie sur une touche pour fermer..."
@@ -52,6 +52,13 @@ if ! scripts/demarrer-postgres.sh; then
     exit 1
 fi
 echo "      PostgreSQL est demarre et pret (conteneur bbass-vm-centrale-postgres, port 5432)."
+if ! scripts/demarrer-searxng.sh; then
+    echo
+    read -n 1 -s -r -p "Appuie sur une touche pour fermer..."
+    echo
+    exit 1
+fi
+echo "      SearXNG est demarre (conteneur bbass-vm-centrale-searxng, http://localhost:8888)."
 echo
 
 echo "[5/7] Verification / creation du compte de test..."

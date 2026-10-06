@@ -1,11 +1,12 @@
 import json
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
 from vm_centrale.database import get_db
+from vm_centrale.routers import conversations
 from vm_centrale.jetons import JetonStore, get_jeton_store
 from vm_centrale.main import app
 from vm_centrale.models import Conversation, PieceJointe, ProfilTravail
@@ -1137,9 +1138,7 @@ def test_url_du_compte_sortie_de_la_fenetre_passe_et_url_inventee_est_retiree(
     assert detail.json()["messages"][-1]["contenu"] == contenu
 
 
-_REPONSE_SANS_DONNEES = (
-    "Je n'ai pas accès à Internet et je n'ai pas de document pour appuyer une réponse."
-)
+_REPONSE_SANS_DONNEES = "Je n'ai trouvé ni page ni document pour appuyer une réponse chiffrée."
 
 
 def test_chiffre_absent_sans_document_est_remplace_par_la_phrase_fixe(
@@ -1158,6 +1157,7 @@ def test_chiffre_absent_sans_document_est_remplace_par_la_phrase_fixe(
 
     assert reponse.status_code == 200
     assert reponse.json()["reponse"] == _REPONSE_SANS_DONNEES
+    assert "accès à Internet" not in reponse.json()["reponse"]
     detail = client.get(
         f"/conversations/{reponse.json()['conversation']['id']}",
         headers=_autorisation(jeton_valide),
@@ -1237,13 +1237,27 @@ def test_consigne_de_style_commence_par_la_capacite_reelle(
     consigne = mistral_client_factice.appels_reponse[0][0]
     assert consigne["role"] == "system"
     premiere_ligne = consigne["content"].splitlines()[0]
-    assert "aucun accès à Internet" in premiere_ligne
+    assert "rechercher_web" in premiere_ligne
+    assert "aucun accès à Internet" not in consigne["content"]
     assert "lien" in premiere_ligne
     assert "vérifié" in premiere_ligne
     assert "n'inventes jamais" in premiere_ligne
     assert "question de confirmation" in premiere_ligne
     assert "que l'utilisateur a lui-même écrite dans cette conversation" in consigne["content"]
     assert "que tu connais avec certitude" not in consigne["content"]
+
+
+def test_consigne_de_style_donne_la_date_du_jour_de_lappel(
+    client, mistral_client_factice, jeton_valide, monkeypatch
+):
+    monkeypatch.setattr(conversations, "_date_du_jour", lambda: date(2031, 2, 3))
+    mistral_client_factice.repondre("Réponse", "Titre")
+
+    client.post("/conversations", json={"message": "Bonjour"}, headers=_autorisation(jeton_valide))
+
+    consigne = mistral_client_factice.appels_reponse[0][0]["content"]
+    assert "2031-02-03" in consigne
+    assert "l'année 2031" in consigne
 
 
 def test_titre_genere_est_nettoye_de_sa_mise_en_forme_markdown(

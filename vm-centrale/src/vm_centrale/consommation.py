@@ -11,7 +11,7 @@ from vm_centrale.schemas import DetailConsommationCategorie
 # Catégorisation à l'affichage (spec 1.1.3), calculée côté lecture — jamais
 # stockée comme colonne dérivée sur Consommation. Partagée par les deux
 # endpoints de lecture (vue collaborateur et vue administrateur).
-TYPES_CHAT = frozenset({"chat", "titrage", "resume_et_profil"})
+TYPES_CHAT = frozenset({"chat", "titrage", "resume_et_profil", "extraction_web"})
 
 
 def detail_vide() -> DetailConsommationCategorie:

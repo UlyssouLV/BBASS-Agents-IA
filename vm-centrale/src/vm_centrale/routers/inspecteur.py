@@ -35,6 +35,7 @@ def _vers_conversation(conversation: Conversation) -> InspecteurConversationResp
 def _vers_echange_resume(echange: EchangeInspecteur) -> InspecteurEchangeResumeResponse:
     return InspecteurEchangeResumeResponse(
         id=echange.id,
+        origine=echange.origine,
         type_appel=echange.type_appel,
         statut=echange.statut,
         date_creation=echange.date_creation,
@@ -76,7 +77,8 @@ def lister_conversations(
 def lister_echanges(
     conversation_id: int, db: Session = Depends(get_db)
 ) -> list[InspecteurEchangeResumeResponse]:
-    # Ordre chronologique réel des appels Mistral (spec 1.3.0) : par id
+    # Ordre chronologique réel des appels Mistral et des échanges locaux
+    # (spec 1.3.0, 1.4.0) : par id
     # d'insertion, jamais par date_creation seule (plusieurs échanges d'un
     # même tour peuvent partager le même instant applicatif, cf.
     # ThreadPoolExecutor de routers/conversations._generer_reponse_et_resume).
@@ -103,6 +105,7 @@ def consulter_echange(echange_id: int, db: Session = Depends(get_db)) -> Inspect
         identifiant_compte=echange.identifiant_compte,
         conversation_id=echange.conversation_id,
         piece_jointe_id=echange.piece_jointe_id,
+        origine=echange.origine,
         type_appel=echange.type_appel,
         modele=echange.modele,
         requete_payload=echange.requete_payload,

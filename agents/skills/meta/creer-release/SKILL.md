@@ -37,7 +37,7 @@ Purpose = the rest of the user / caller message after the tag, else the PR title
 
 ## 4. Notes (body)
 
-`--notes` are for a human who did **not** watch the PR. **French** (unless this repo’s user-facing docs are English). Not a dump of `git log` subjects.
+`--notes` are for a human who did **not** watch the PR. **French** (unless this repo’s user-facing docs are English). Not a dump of `git log` subjects. **Keep this layout** — never invent new top-level headings for a commit sweep.
 
 Always this layout (omit a section only if it would be empty **and** you said so in **Hors périmètre**):
 
@@ -61,6 +61,8 @@ Tickets (`Fixes`) : #… #…
 
 <what is not in this version if it could be confused>
 
+Spec : https://github.com/<owner>/<repo>/blob/vX.Y.Z/<spec-path>
+
 ADRs de cette version (liens **sur ce tag**, pas `main`) :
 
 - https://github.com/<owner>/<repo>/blob/vX.Y.Z/<adr-path>
@@ -68,9 +70,14 @@ ADRs de cette version (liens **sur ce tag**, pas `main`) :
 Issues laissées de côté (PR / spec hors périmètre) : #…
 ```
 
+`<spec-path>` = parent spec under role **`spec`** (usually `docs/specs/…`). Link **on this tag**, not `main`. Always this one-line shape: `Spec : <url>`.
+
 `<adr-path>` = files under role **`adr`**.
 
-Fill from the PR body (`Fixes`, summary), parent spec, and role **`adr`** files added on this branch. If the caller already passed notes, **fit them into these headings** — do not replace the layout with a free-form blob.
+### Fill order
+
+1. Draft from the PR body (`Fixes`, summary), parent spec, and role **`adr`** files added on this branch. If the caller already passed notes, **fit them into these headings** — do not replace the layout with a free-form blob.
+2. **Gap pass (commits only to complete, not to rewrite).** Read `git log origin/main..HEAD --oneline` (or the PR commits). Compare to the draft. Add only what is **missing** from the notes and useful to a human: a real capability the spec/PR omitted, or a bugfix beyond the parent `Fixes`. Fold each gap into the existing headings — usually **Ce qu’on peut faire maintenant** (product wording) or **Historique des tickets** (extra `#n` if a ticket exists). Do **not** paste commit subjects, hashes, or a « changelog commits » section. Do **not** duplicate points already covered by the spec/PR. Skip chore / noise (typos, lockfile-only, WIP) unless they change what a user can do.
 
 Owner/repo from `git remote`. PR number from `gh pr view` for this branch.
 

@@ -1,0 +1,22 @@
+# SearXNG auto-hébergé de la VM centrale (spec 1.4.0, ADR-0013). Seul
+# client : la VM, via l'outil rechercher_web. Tout ce qui n'est pas listé
+# ici garde la valeur par défaut de l'image épinglée (docker-compose.yml).
+use_default_settings: true
+
+general:
+  instance_name: "BBASS VM centrale"
+
+server:
+  # Le service n'est publié que sur localhost (docker-compose.yml, ports
+  # 127.0.0.1:8888) : cette clé ne protège aucun accès extérieur. Elle doit
+  # seulement différer de la valeur par défaut, refusée au démarrage.
+  secret_key: "bbass-vm-centrale-searxng-localhost-uniquement"
+  # Limiteur coupé : la VM est le seul client, il la bloquerait.
+  limiter: false
+  image_proxy: false
+
+search:
+  # json : le format que lit MoteurSearxng (vm_centrale/moteur_recherche.py).
+  formats:
+    - html
+    - json

@@ -2,9 +2,12 @@ import json
 
 import pytest
 
+from vm_centrale.models import EchangeInspecteur
+
 _PDF = ("document.pdf", b"%PDF-1.4 contenu factice", "application/pdf")
 _PDF_PLAN = ("plan.pdf", b"%PDF-1.4 plan factice", "application/pdf")
 _PDF_DEVIS = ("devis.pdf", b"%PDF-1.4 devis factice", "application/pdf")
+_OUTIL_PJ = "obtenir_contenu_piece_jointe"
 
 
 def _reponse_resume_et_profil(resume_contexte: str = "Résumé") -> str:
@@ -21,6 +24,12 @@ def _repertoire_pieces_jointes(tmp_path, monkeypatch):
 
 def _autorisation(jeton: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {jeton}"}
+
+
+def _outil(tools, nom: str) -> dict | None:
+    # rechercher_web est toujours déclaré (spec 1.4.0) : on cherche l'outil
+    # pièce jointe par son nom, pas par sa position.
+    return next((outil for outil in tools or [] if outil["function"]["name"] == nom), None)
 
 
 def _televerser_sans_conversation(client, jeton: str, fichier=_PDF) -> int:
@@ -75,10 +84,10 @@ def test_avec_piece_jointe_hors_fenetre_lappel_recoit_un_parametre_tools_non_vid
     )
 
     assert reponse.status_code == 200
-    assert mistral_client_factice.tools_appels_reponse[-1]
+    assert _outil(mistral_client_factice.tools_appels_reponse[-1], _OUTIL_PJ)
 
 
-def test_sans_piece_jointe_hors_fenetre_aucun_tools_nest_passe(
+def test_sans_piece_jointe_hors_fenetre_loutil_piece_jointe_nest_pas_declare(
     client, mistral_client_factice, jeton_valide
 ):
     mistral_client_factice.repondre("Réponse", "Titre")
@@ -96,7 +105,7 @@ def test_sans_piece_jointe_hors_fenetre_aucun_tools_nest_passe(
     )
 
     assert reponse.status_code == 200
-    assert mistral_client_factice.tools_appels_reponse[-1] is None
+    assert _outil(mistral_client_factice.tools_appels_reponse[-1], _OUTIL_PJ) is None
 
 
 def test_appel_doutil_relance_un_second_appel_avec_le_contenu_injecte_et_en_renvoie_la_reponse(
@@ -182,9 +191,9 @@ def test_avec_deux_pieces_jointes_hors_fenetre_le_tool_mentionne_chaque_nom_de_f
         )
         assert reponse.status_code == 200
 
-    tools = mistral_client_factice.tools_appels_reponse[-1]
-    assert tools
-    description = tools[0]["function"]["description"]
+    outil = _outil(mistral_client_factice.tools_appels_reponse[-1], _OUTIL_PJ)
+    assert outil
+    description = outil["function"]["description"]
     assert "plan.pdf" in description
     assert "devis.pdf" in description
     assert f"id {piece_jointe_plan}" in description
@@ -267,3 +276,32 @@ def test_url_inventee_retiree_de_la_reponse_finale_apres_un_appel_doutil(
 
     assert reponse.status_code == 200
     assert reponse.json()["reponse"] == "Le plan est téléchargeable ici."
+
+
+def test_apres_rechercher_web_lappel_principal_suivant_garde_la_piece_jointe_du_message(
+    client, mistral_client_factice, moteur_recherche_factice, jeton_valide, db_session
+):
+    # Seul un outil qui relit une pièce jointe change la référence de
+    # l'appel suivant (spec 1.3.0) : rechercher_web la laisse.
+    mistral_client_factice.repondre_ocr("Devis du client")
+    piece_jointe_id = _televerser_sans_conversation(client, jeton_valide)
+    moteur_recherche_factice.repondre(("Résultat", "https://www.exemple.fr/page", "Extrait."))
+    mistral_client_factice.repondre_avec_appel_outil(
+        "rechercher_web", {"requete": "prix du marché", "besoin": "Comparer le devis"}
+    )
+    mistral_client_factice.repondre("Réponse finale", "Titre")
+
+    reponse = client.post(
+        "/conversations",
+        json={"message": "Compare ce devis", "piece_jointe_id": piece_jointe_id},
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert reponse.status_code == 200
+    appels_chat = (
+        db_session.query(EchangeInspecteur)
+        .filter_by(conversation_id=reponse.json()["conversation"]["id"], type_appel="chat")
+        .order_by(EchangeInspecteur.id)
+        .all()
+    )
+    assert [echange.piece_jointe_id for echange in appels_chat] == [piece_jointe_id, piece_jointe_id]

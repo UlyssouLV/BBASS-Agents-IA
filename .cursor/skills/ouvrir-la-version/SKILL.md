@@ -52,12 +52,17 @@ You are not wrong: next is **`/to-tickets`**. Follow its quiz: numbered tickets,
 
 Show the **implementation order**: tickets with no open blockers first (lowest number among that set).
 
-**Wait for an explicit yes** on that list. Then `gh issue create` each child (`Part of #<parent>`, `ready-for-agent`). Set **GitHub native** blocked-by per `agents/issue-tracker.md` (POST `issues/<n>/dependencies/blocked_by`, JSON integer `issue_id` = the blocker’s **database id`):
+**Wait for an explicit yes** on that list. Then for **each** child, in order:
 
-- **Between children**, as the quiz said.
-- **Parent blocked by every child**, once per child. Then `gh issue edit <parent> --remove-label "ready-for-agent"`. The parent is never an `/implement` ticket.
+1. `gh issue create` (`Part of #<parent>` at the top of the body, `ready-for-agent`).
+2. Attach it as a **GitHub sub-issue** of the parent (POST `issues/<parent>/sub_issues`, JSON integer `sub_issue_id` = the child’s **database id**) — this is what shows **Y/Z** on the parent. See `agents/issue-tracker.md` (*Version parent and children*).
+3. Set **GitHub native** blocked-by (POST `issues/<n>/dependencies/blocked_by`, JSON integer `issue_id` = the blocker’s **database id`):
+   - **Between children**, as the quiz said.
+   - **Parent blocked by every child**, once per child.
 
-A body `Blocked by: #n` line is only a fallback. Do not create tickets before that yes. Do not `/implement`.
+Then `gh issue edit <parent> --remove-label "ready-for-agent"`. Confirm the parent’s `sub_issues_summary.total` equals the number of children just created. The parent is never an `/implement` ticket.
+
+A body `Part of` line alone does **not** create the sub-issue link. A body `Blocked by: #n` line is only a fallback for dependencies. Do not create tickets before that yes. Do not `/implement`.
 
 ## 6. Pull request
 

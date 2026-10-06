@@ -162,9 +162,14 @@ class EchangeInspecteur(Base):
     piece_jointe_id: Mapped[int | None] = mapped_column(
         ForeignKey("pieces_jointes.id"), nullable=True
     )
-    # Même vocabulaire que Consommation.type_appel : "chat" / "titrage" /
-    # "resume_et_profil" / "ocr" / "vision".
+    # "mistral" : un appel Mistral réel ; "local" : du travail de la VM elle-
+    # même, comme l'exécution d'un outil (spec 1.4.0).
+    origine: Mapped[str] = mapped_column(String)
+    # Mistral : même vocabulaire que Consommation.type_appel ("chat" /
+    # "titrage" / "resume_et_profil" / "ocr" / "vision"). Local :
+    # "outil:<nom de l'outil>" ou "garde_fous".
     type_appel: Mapped[str] = mapped_column(String)
+    # Vide pour un échange local (aucun modèle appelé).
     modele: Mapped[str] = mapped_column(String)
     # Payload exact tel que construit juste avant l'appel HTTP à Mistral :
     # jamais la clé API ni l'en-tête Authorization, ajoutés séparément du
@@ -175,6 +180,31 @@ class EchangeInspecteur(Base):
     # "succes" / "echec".
     statut: Mapped[str] = mapped_column(String)
     erreur: Mapped[str | None] = mapped_column(String, nullable=True)
+    date_creation: Mapped[datetime] = mapped_column(DateTime)
+
+
+class ResultatRechercheWeb(Base):
+    # Une ligne par résultat de l'outil rechercher_web (spec 1.4.0) : les
+    # garde-fous lisent ces sources sur toute la conversation (une URL
+    # trouvée à un tour reste citable au tour suivant).
+    __tablename__ = "resultats_recherche_web"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    conversation_id: Mapped[int] = mapped_column(
+        ForeignKey(_FK_CONVERSATIONS_ID, ondelete="CASCADE"), index=True
+    )
+    # Nullable : renseigné à la persistance de la réponse du tour, pour la
+    # mention courte de la recherche au tour suivant (spec 1.4.0).
+    message_id: Mapped[int | None] = mapped_column(
+        ForeignKey("messages.id"), nullable=True, index=True
+    )
+    requete: Mapped[str] = mapped_column(String)
+    url: Mapped[str] = mapped_column(String)
+    titre: Mapped[str] = mapped_column(String)
+    extrait_moteur: Mapped[str] = mapped_column(String)
+    # Texte principal de la page téléchargée et nettoyée ; vide si la page
+    # n'a pas été téléchargée.
+    texte_nettoye: Mapped[str] = mapped_column(String, default="")
     date_creation: Mapped[datetime] = mapped_column(DateTime)
 
 

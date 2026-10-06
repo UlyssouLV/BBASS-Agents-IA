@@ -42,6 +42,7 @@ def enregistrer_echange_succes(
             identifiant_compte=identifiant_compte,
             conversation_id=conversation_id,
             piece_jointe_id=piece_jointe_id,
+            origine="mistral",
             type_appel=type_appel,
             modele=modele,
             requete_payload=requete_payload,
@@ -64,17 +65,21 @@ def enregistrer_echange_echec(
     requete_payload: dict,
     erreur: str,
     reponse_payload: dict | None = None,
+    commit: bool = True,
 ) -> None:
     # Commité indépendamment (spec 1.3.0), contrairement à un échange réussi
     # ci-dessus : l'appelant a déjà fait (ou n'a rien à faire) son propre
     # db.rollback() juste avant, et cette ligne doit malgré tout survivre —
     # sinon l'échange qu'on veut le plus pouvoir déboguer disparaîtrait avec
-    # le reste du tour applicatif annulé.
+    # le reste du tour applicatif annulé. `commit=False` : un échec qui
+    # n'interrompt pas le tour (ex. l'appel d'extraction de rechercher_web,
+    # spec 1.4.0) suit le tour, sans commiter ce qui est en cours.
     db.add(
         EchangeInspecteur(
             identifiant_compte=identifiant_compte,
             conversation_id=conversation_id,
             piece_jointe_id=piece_jointe_id,
+            origine="mistral",
             type_appel=type_appel,
             modele=modele,
             requete_payload=requete_payload,
@@ -84,4 +89,36 @@ def enregistrer_echange_echec(
             date_creation=datetime.now(timezone.utc),
         )
     )
-    db.commit()
+    if commit:
+        db.commit()
+
+
+def enregistrer_echange_local(
+    db: Session,
+    *,
+    identifiant_compte: str,
+    conversation_id: int,
+    piece_jointe_id: int | None,
+    type_appel: str,
+    requete_payload: dict,
+    reponse_payload: dict,
+) -> None:
+    # Travail de la VM elle-même (spec 1.4.0), ex. l'exécution d'un outil ou
+    # les garde-fous appliqués à la réponse de chat :
+    # sans commit, comme enregistrer_echange_succes, pour disparaître avec le
+    # reste d'un tour qui échoue.
+    db.add(
+        EchangeInspecteur(
+            identifiant_compte=identifiant_compte,
+            conversation_id=conversation_id,
+            piece_jointe_id=piece_jointe_id,
+            origine="local",
+            type_appel=type_appel,
+            modele="",
+            requete_payload=requete_payload,
+            reponse_payload=reponse_payload,
+            statut="succes",
+            erreur=None,
+            date_creation=datetime.now(timezone.utc),
+        )
+    )

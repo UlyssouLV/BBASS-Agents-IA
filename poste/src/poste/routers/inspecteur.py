@@ -111,6 +111,7 @@ def lister_echanges(
     return [
         InspecteurEchangeResumeResponse(
             id=echange.id,
+            origine=echange.origine,
             type_appel=echange.type_appel,
             statut=echange.statut,
             date_creation=echange.date_creation,
@@ -140,6 +141,7 @@ def consulter_echange(
         identifiant_compte=echange.identifiant_compte,
         conversation_id=echange.conversation_id,
         piece_jointe_id=echange.piece_jointe_id,
+        origine=echange.origine,
         type_appel=echange.type_appel,
         modele=echange.modele,
         requete_payload=echange.requete_payload,

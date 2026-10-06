@@ -19,7 +19,10 @@ from vm_centrale.mistral_client import (
     get_mistral_client,
 )
 from vm_centrale.models import Compte, ComptePole
+from vm_centrale.moteur_recherche import MoteurIndisponible, ResultatRecherche, get_moteur_recherche
+from vm_centrale.outils.recherche_web import CONSIGNE_EXTRACTION
 from vm_centrale.security import hash_password
+from vm_centrale.telechargement_pages import PageIndisponible, PageTelechargee, get_telechargeur_pages
 from vm_centrale.jetons import JetonStore, get_jeton_store
 
 
@@ -55,6 +58,7 @@ def _sans_init_db_reel(monkeypatch):
 # viendra avec le ticket suivant).
 _USAGE_FACTICE = Usage(tokens_entree=10, tokens_sortie=5, tokens_total=15)
 _PAGES_PROCESSED_FACTICE = 1
+_EXTRAIT_FACTICE = "Extrait factice des pages lues."
 
 
 class ClientMistralFactice:
@@ -87,7 +91,17 @@ class ClientMistralFactice:
         self.appels_ocr: list[tuple[bytes, str]] = []
         self._reponse_ocr = ""
         self._exception_ocr: Exception | None = None
-        self._appel_outil_a_renvoyer: AppelOutil | None = None
+        # File des demandes d'outils (spec 1.4.0) : chaque entrée est la
+        # liste des appels d'une réponse, consommée par le prochain appel
+        # .chat() portant `tools`.
+        self._demandes_outils: list[list[AppelOutil]] = []
+        self._echec_apres_demandes_outils: Exception | None = None
+        # Appels d'extraction de rechercher_web (spec 1.4.0, ADR-0014),
+        # reconnus à leur consigne fixe : leur propre canal, pour ne pas
+        # consommer la file `_reponses` du chat principal.
+        self.appels_extraction: list = []
+        self._reponse_extraction = _EXTRAIT_FACTICE
+        self._exception_extraction: Exception | None = None
 
     def repondre_ocr(self, texte: str) -> None:
         self._reponse_ocr = texte
@@ -148,13 +162,49 @@ class ClientMistralFactice:
         self, nom_outil: str, arguments: dict, tool_call_id: str = "call_1"
     ) -> None:
         # Consommé une seule fois par le prochain appel .chat() portant
-        # `tools` (spec 1.1.2) : le second appel (celui qui relance avec le
-        # contenu de la pièce jointe) retombe sur la file `_reponses`
-        # normale, configurée via repondre() comme d'habitude.
-        self._appel_outil_a_renvoyer = AppelOutil(id=tool_call_id, nom=nom_outil, arguments=arguments)
+        # `tools` (spec 1.1.2) : l'appel suivant retombe sur la file
+        # `_reponses` normale, configurée via repondre() comme d'habitude.
+        self.repondre_avec_appels_outils([(nom_outil, arguments, tool_call_id)])
+
+    def repondre_avec_appels_outils(self, *demandes: list[tuple[str, dict, str]]) -> None:
+        # Spec 1.4.0 : chaque argument est une réponse du modèle qui demande
+        # un ou plusieurs outils à la fois ((nom, arguments, tool_call_id)),
+        # consommée dans l'ordre par les appels .chat() portant `tools`.
+        self._demandes_outils.extend(
+            [AppelOutil(id=id_appel, nom=nom, arguments=arguments) for nom, arguments, id_appel in demande]
+            for demande in demandes
+        )
+
+    def repondre_extraction(self, texte: str) -> None:
+        self._reponse_extraction = texte
+        self._exception_extraction = None
+
+    def echouer_extraction(self, exception: Exception) -> None:
+        self._exception_extraction = exception
+
+    def echouer_apres_demandes_outils(self, exception: Exception) -> None:
+        # L'appel de réponse qui suit la dernière demande d'outil en file
+        # échoue (rollback d'un tour, spec 1.4.0).
+        self._echec_apres_demandes_outils = exception
+
+    def _extraire(self, messages) -> ReponseChat:
+        self.appels_extraction.append(messages)
+        payload = {"model": "mistral-factice", "messages": messages}
+        if self._exception_extraction is not None:
+            raise ErreurAppelMistral(
+                str(self._exception_extraction), payload_envoye=payload
+            ) from self._exception_extraction
+        return ReponseChat(
+            contenu=self._reponse_extraction,
+            usage=_USAGE_FACTICE,
+            payload_envoye=payload,
+            reponse_brute={"choices": [{"message": {"content": self._reponse_extraction}}]},
+        )
 
     def chat(self, messages, response_format=None, tools=None) -> ReponseChat:
         with self._verrou:
+            if not isinstance(messages, str) and messages and messages[0]["content"] == CONSIGNE_EXTRACTION:
+                return self._extraire(messages)
             self.messages_recus.append(messages)
             self.response_formats_recus.append(response_format)
             if response_format is not None:
@@ -195,9 +245,8 @@ class ClientMistralFactice:
                     reponse_brute={"choices": [{"message": {"content": self._reponse_structuree}}]},
                 )
 
-            if tools and self._appel_outil_a_renvoyer is not None:
-                appel = self._appel_outil_a_renvoyer
-                self._appel_outil_a_renvoyer = None
+            if tools and self._demandes_outils:
+                appels = self._demandes_outils.pop(0)
                 message_assistant = {
                     "role": "assistant",
                     "content": None,
@@ -206,15 +255,21 @@ class ClientMistralFactice:
                             "id": appel.id,
                             "function": {"name": appel.nom, "arguments": json.dumps(appel.arguments)},
                         }
+                        for appel in appels
                     ],
                 }
                 raise AppelOutilDemande(
-                    [appel],
+                    appels,
                     message_assistant,
                     _USAGE_FACTICE,
                     payload_envoye=payload,
                     reponse_brute={"choices": [{"message": message_assistant}]},
                 )
+
+            if self._echec_apres_demandes_outils is not None:
+                erreur = self._echec_apres_demandes_outils
+                self._echec_apres_demandes_outils = None
+                raise ErreurAppelMistral(str(erreur), payload_envoye=payload) from erreur
 
             assert self._reponses, "Aucune réponse configurée : appeler repondre() d'abord"
             contenu = self._reponses.pop(0) if len(self._reponses) > 1 else self._reponses[0]
@@ -224,6 +279,49 @@ class ClientMistralFactice:
                 payload_envoye=payload,
                 reponse_brute={"choices": [{"message": {"content": contenu}}]},
             )
+
+
+class MoteurRechercheFactice:
+    # Remplace SearXNG (spec 1.4.0) : aucun test ne sort sur le réseau. Sans
+    # configuration, aucun résultat.
+    def __init__(self) -> None:
+        self.requetes_recues: list = []
+        self._resultats: list[ResultatRecherche] = []
+        self._indisponible = False
+
+    def repondre(self, *resultats: tuple[str, str, str]) -> None:
+        # (titre, url, extrait) par résultat, dans l'ordre du moteur.
+        self._resultats = [ResultatRecherche(titre, url, extrait) for titre, url, extrait in resultats]
+        self._indisponible = False
+
+    def echouer(self) -> None:
+        self._indisponible = True
+
+    def rechercher(self, *args, **kwargs) -> list[ResultatRecherche]:
+        self.requetes_recues.append((args, kwargs))
+        if self._indisponible:
+            raise MoteurIndisponible("moteur injoignable")
+        return list(self._resultats)
+
+
+class TelechargeurPagesFactice:
+    # Remplace le téléchargement des pages trouvées (spec 1.4.0) : aucun test
+    # ne sort sur le réseau. Une URL non servie est injoignable.
+    def __init__(self) -> None:
+        self.urls_recues: list[str] = []
+        self._pages: dict[str, PageTelechargee] = {}
+
+    def servir(
+        self, url: str, corps: str, statut: int = 200, type_contenu: str = "text/html; charset=utf-8"
+    ) -> None:
+        self._pages[url] = PageTelechargee(statut=statut, type_contenu=type_contenu, corps=corps)
+
+    def telecharger(self, url: str) -> PageTelechargee:
+        self.urls_recues.append(url)
+        page = self._pages.get(url)
+        if page is None:
+            raise PageIndisponible("délai dépassé")
+        return page
 
 
 @pytest.fixture
@@ -250,17 +348,29 @@ def mistral_client_factice():
 
 
 @pytest.fixture
+def moteur_recherche_factice():
+    return MoteurRechercheFactice()
+
+
+@pytest.fixture
+def telechargeur_pages_factice():
+    return TelechargeurPagesFactice()
+
+
+@pytest.fixture
 def jeton_store(db_session):
     return JetonStore(db_session)
 
 
 @pytest.fixture
-def client(db_session, mistral_client_factice, jeton_store):
+def client(db_session, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_store):
     def override_get_db():
         yield db_session
 
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_mistral_client] = lambda: mistral_client_factice
+    app.dependency_overrides[get_moteur_recherche] = lambda: moteur_recherche_factice
+    app.dependency_overrides[get_telechargeur_pages] = lambda: telechargeur_pages_factice
     app.dependency_overrides[get_jeton_store] = lambda: jeton_store
     with TestClient(app) as test_client:
         yield test_client

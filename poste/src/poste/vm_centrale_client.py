@@ -224,6 +224,7 @@ class InspecteurConversation:
 @dataclass
 class InspecteurEchangeResume:
     id: int
+    origine: str
     type_appel: str
     statut: str
     date_creation: datetime
@@ -235,6 +236,7 @@ class InspecteurEchangeDetail:
     identifiant_compte: str
     conversation_id: int | None
     piece_jointe_id: int | None
+    origine: str
     type_appel: str
     modele: str
     requete_payload: dict
@@ -423,6 +425,7 @@ def _vers_inspecteur_conversation(corps: dict) -> InspecteurConversation:
 def _vers_inspecteur_echange_resume(corps: dict) -> InspecteurEchangeResume:
     return InspecteurEchangeResume(
         id=corps["id"],
+        origine=corps["origine"],
         type_appel=corps["type_appel"],
         statut=corps["statut"],
         date_creation=datetime.fromisoformat(corps["date_creation"]),
@@ -435,6 +438,7 @@ def _vers_inspecteur_echange_detail(corps: dict) -> InspecteurEchangeDetail:
         identifiant_compte=corps["identifiant_compte"],
         conversation_id=corps["conversation_id"],
         piece_jointe_id=corps["piece_jointe_id"],
+        origine=corps["origine"],
         type_appel=corps["type_appel"],
         modele=corps["modele"],
         requete_payload=corps["requete_payload"],

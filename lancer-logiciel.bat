@@ -24,12 +24,15 @@ echo [3/8] Preparation de l'environnement poste ^(venv + dependances^)...
 call "%~dp0scripts\preparer-package.bat" "%~dp0poste"
 if errorlevel 1 goto :erreur
 
-echo [4/8] Verification / demarrage de PostgreSQL (Docker)...
+echo [4/8] Verification / demarrage de PostgreSQL et SearXNG (Docker)...
 call "%~dp0scripts\verifier-docker.bat"
 if errorlevel 1 goto :erreur
 call "%~dp0scripts\demarrer-postgres.bat"
 if errorlevel 1 goto :erreur
 echo       PostgreSQL est demarre et pret ^(conteneur bbass-vm-centrale-postgres, port 5432^).
+call "%~dp0scripts\demarrer-searxng.bat"
+if errorlevel 1 goto :erreur
+echo       SearXNG est demarre ^(conteneur bbass-vm-centrale-searxng, http://localhost:8888^).
 echo.
 
 echo [5/8] Verification / creation du compte de test...

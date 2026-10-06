@@ -68,9 +68,25 @@ Un mode d'accès technique du poste, déclenché par un raccourci clavier depuis
 _Avoid_: mode admin, mode debug (le terme retenu dans le produit est « Mode développeur »)
 
 **Échange**:
-Un appel Mistral réel capturé pour le Mode développeur — le payload exact envoyé et la réponse brute reçue (ou le statut d'échec), pour un type d'appel donné (chat, titrage, résumé+profil, OCR, vision) ([spec 1.3.0](docs/specs/v1.3.0-inspecteur-echanges-modele.md)). Distinct d'un Message (le contenu visible dans le chat) et d'une ligne de Consommation (ses métadonnées de facturation) : les trois coexistent pour un même tour sans se dupliquer entre eux.
+Une étape d'un tour capturée pour le Mode développeur ([spec 1.3.0](docs/specs/v1.3.0-inspecteur-echanges-modele.md)). D'origine **Mistral** : un appel Mistral réel, avec le payload exact envoyé et la réponse brute reçue (ou le statut d'échec), pour un type d'appel donné (chat, titrage, résumé+profil, OCR, vision, extraction web). D'origine **locale** depuis la [spec 1.4.0](docs/specs/v1.4.0-recherche-web-dans-le-chat.md) : l'exécution d'un Outil par la VM (entrée, résultats, texte renvoyé au modèle) ou le passage des garde-fous (réponse brute du modèle et réponse visible). Les échanges d'un tour se lisent dans l'ordre chronologique. Distinct d'un Message (le contenu visible dans le chat) et d'une ligne de Consommation (ses métadonnées de facturation) : les trois coexistent pour un même tour sans se dupliquer entre eux.
 _Avoid_: appel (seul, trop vague), tour (un tour de chat peut produire plusieurs échanges, ex. tool calling)
 
 **Garde-fou**:
-Une correction appliquée par la VM centrale à ce que le modèle produit malgré sa consigne (ex. retirer une URL ou un chiffre que le compte n'a pas écrit, remplacer par une phrase fixe une réponse chiffrée sans document, plafonner le résumé glissant ou le profil de travail, nettoyer le Markdown d'un titre) ([spec 1.3.1](docs/specs/v1.3.1-chat-ne-fige-plus-ses-inventions.md)). Tous regroupés dans `vm-centrale/src/vm_centrale/garde_fous/`, listés dans son `README.md`. Ne remplace pas la consigne : il garantit ce qu'elle seule ne garantit pas.
+Une correction appliquée par la VM centrale à ce que le modèle produit malgré sa consigne (ex. retirer une URL ni écrite par le compte ni renvoyée par une Recherche web, ou un chiffre absent des messages du compte, des pièces jointes et des pages lues, remplacer par une phrase fixe une réponse chiffrée sans document, plafonner le résumé glissant ou le profil de travail, nettoyer le Markdown d'un titre) ([spec 1.3.1](docs/specs/v1.3.1-chat-ne-fige-plus-ses-inventions.md)). Tous regroupés dans `vm-centrale/src/vm_centrale/garde_fous/`, listés dans son `README.md`. Ne remplace pas la consigne : il garantit ce qu'elle seule ne garantit pas.
 _Avoid_: filtre, sanitizer
+
+**Outil**:
+Une capacité que le modèle de chat **décide lui-même** d'appeler (tool calling), et que la VM centrale exécute pour lui avant de lui renvoyer le résultat (ex. relire une Pièce jointe sortie de la fenêtre, lancer une Recherche web) ([spec 1.4.0](docs/specs/v1.4.0-recherche-web-dans-le-chat.md)). Tous regroupés dans `vm-centrale/src/vm_centrale/outils/`, listés dans son `README.md`. Proposés seulement sur l'appel de chat principal.
+_Avoid_: calling tool, fonction (ambigu avec le code), outil pour une Étape de traitement
+
+**Étape de traitement**:
+Un traitement que la VM centrale impose à chaque tour, sans que le modèle le demande (ex. extraction du contenu d'une Pièce jointe à l'envoi, Garde-fou sur la réponse). Ce n'est pas un Outil.
+_Avoid_: outil, tool
+
+**Recherche web**:
+L'Outil `rechercher_web` : la VM interroge un moteur de recherche auto-hébergé (SearXNG, [ADR-0013](docs/adr/0013-recherche-web-searxng-auto-heberge.md)), télécharge et nettoie les pages trouvées, puis les fait passer par un Appel d'extraction avant de renvoyer le résultat au modèle ([spec 1.4.0](docs/specs/v1.4.0-recherche-web-dans-le-chat.md)). Seule la requête sort vers les moteurs ; les résultats (URL, titre, extrait du moteur, texte nettoyé) sont enregistrés pour la Conversation et supprimés avec elle. Ils servent de source aux Garde-fous.
+_Avoid_: web search (outil intégré de l'API Conversations Mistral, écartée), scraping
+
+**Appel d'extraction**:
+L'appel Mistral interne à une Recherche web qui reçoit seulement le besoin exprimé par le modèle et les pages nettoyées, jamais le contexte de la Conversation, et en extrait ce qui répond, avec l'URL de chaque information ([ADR-0014](docs/adr/0014-recherche-web-en-deux-temps-extraction-isolee.md)). Compté en Consommation (`extraction_web`). Son texte n'est jamais une source des Garde-fous : il peut lui-même inventer.
+_Avoid_: résumé (ambigu avec le résumé glissant), synthèse

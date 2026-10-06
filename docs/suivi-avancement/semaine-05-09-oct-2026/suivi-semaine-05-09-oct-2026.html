@@ -324,6 +324,17 @@
       padding: 3pt 8pt;
       white-space: nowrap;
     }
+    .versions .prevu {
+      flex-shrink: 0;
+      font-size: 8pt;
+      font-weight: 650;
+      letter-spacing: 0.03em;
+      color: #1e3a5f;
+      background: #fff;
+      border: 1pt solid #1e3a5f;
+      padding: 3pt 8pt;
+      white-space: nowrap;
+    }
     .versions .version-body {
       padding: 8pt 12pt 10pt;
     }
@@ -385,7 +396,7 @@
             <div class="toc-row">
               <a href="#reste-a-implementer">Reste à implémenter</a>
               <span class="toc-dots" aria-hidden="true"></span>
-              <span class="toc-ref">à partir de V1.3.1</span>
+              <span class="toc-ref">à partir de V1.4.0</span>
             </div>
           </li>
           <li>
@@ -405,6 +416,11 @@
               <li><a href="#version-1-2-2">V1.2.2 — Style de réponse de l’IA</a></li>
               <li><a href="#version-1-2-3">V1.2.3 — Délais de chargement</a></li>
               <li><a href="#version-1-3-0">V1.3.0 — Inspecteur des échanges</a></li>
+              <li><a href="#version-1-3-1">V1.3.1 — Le chat ne fige plus ses inventions</a></li>
+              <li><a href="#version-1-4-0">V1.4.0 — Recherche web</a></li>
+              <li><a href="#version-1-5-0">V1.5.0 — Moduléo lecture</a></li>
+              <li><a href="#version-1-6-0">V1.6.0 — Déploiement postes</a></li>
+              <li><a href="#version-1-7-0">V1.7.0 — Workflows n8n</a></li>
             </ol>
           </li>
           <li>
@@ -428,29 +444,31 @@
         <li>Livraison de la <strong>V1.2.2</strong> (13:27) : ton professionnel des réponses de l’IA ; affichage enrichi dans le chat (mise en forme, blocs de code colorés, liens vers les sources).</li>
         <li>Livraison de la <strong>V1.2.3</strong> (14:52) : conversations et écrans plus fluides (cache, historique chargé au défilement, mesures de temps pour le suivi).</li>
         <li>Livraison de la <strong>V1.3.0</strong> (17:04) : Mode développeur et inspecteur des échanges avec le modèle (voir exactement ce qui est envoyé à Mistral et ce qui revient, y compris en cas d’échec).</li>
-        <li>Essai manuel après livraison : le chat invente encore un rapport, des chiffres et des liens, puis les réinjecte dans sa mémoire — ouverture de la <strong>V1.3.1</strong> pour corriger ça ; premier chantier déjà avancé (garde-fous centralisés, retrait des URL inventées dans la réponse).</li>
-        <li>Planification de la suite : finir la V1.3.1, puis recherche web (V1.4.0), Moduléo en lecture (V1.5.0) et déploiement postes (V1.6.0, priorité avant le retour à l’école).</li>
+        <li>Essai manuel après livraison : le chat invente encore un rapport, des chiffres et des liens, puis les réinjecte dans sa mémoire — ouverture puis livraison de la <strong>V1.3.1</strong> (18:48) : consignes resserrées, résumé et profil fiables, garde-fous URL et chiffres.</li>
+        <li>Planification de la suite : recherche web (V1.4.0, livraison prévue le 06/10), Moduléo en lecture (V1.5.0, 07/10), déploiement postes (V1.6.0, 07/10, priorité) et n8n (V1.7.0, 08/10).</li>
       </ul>
     </div>
 
     <div class="jour">
       <h3>Mardi 6 octobre</h3>
       <ul>
-        <li>À compléter. <span class="echeance">Suite prévue : poursuivre / livrer la V1.3.1.</span></li>
+        <li>Ouverture et avancement de la <strong>V1.4.0</strong> (recherche web dans le chat) : SearXNG auto-hébergé, outil <code>rechercher_web</code>, lecture des pages, appel d’extraction isolé, registre d’outils, boucle sur 3 tours, inspecteur Mistral / local.</li>
+        <li>Feuille de route mise à jour (tokenizer, cache pages, statut d’attente dynamique, documentation mémoire / souveraineté, décalage déploiement / n8n) ; outils du modèle rangés en paquets documentés.</li>
+        <li><span class="echeance">Livraison prévue V1.4.0 : 06/10.</span></li>
       </ul>
     </div>
 
     <div class="jour">
       <h3>Mercredi 7 octobre</h3>
       <ul>
-        <li>À compléter.</li>
+        <li>À compléter. <span class="echeance">Livraison prévue : V1.5.0 (Moduléo lecture) et V1.6.0 (déploiement postes).</span></li>
       </ul>
     </div>
 
     <div class="jour">
       <h3>Jeudi 8 octobre</h3>
       <ul>
-        <li>À compléter. <span class="echeance">Horizon semaine : avancer vers Moduléo lecture (V1.5.0) et déploiement postes (V1.6.0).</span></li>
+        <li>À compléter. <span class="echeance">Livraison prévue : V1.7.0 (workflows n8n), si le temps le permet après la V1.6.0.</span></li>
       </ul>
     </div>
 
@@ -466,19 +484,18 @@
     <section class="bloc" id="reste-a-implementer">
     <h2>Reste à implémenter</h2>
     <ul>
-      <li><strong>V1.3.1</strong> — le chat ne fige plus ses inventions (consignes resserrées, résumé et profil de travail fiables, garde-fous). <em>Ouverte lundi 5 ; en cours.</em></li>
-      <li><strong>V1.4.0</strong> — recherche web dans le chat (outil exécuté par la VM, pour citer une vraie page plutôt qu’une adresse inventée).</li>
-      <li><strong>V1.4.1</strong> — mémoire des pièces jointes de la conversation (rappel de ce qui a déjà été joint hors de la fenêtre récente).</li>
-      <li><strong>V1.5.0</strong> — Moduléo en lecture seule depuis le chat, via le premier Agent métier (pôle Administration).</li>
-      <li><strong>V1.6.0</strong> — déploiement postes (CI/CD, conteneurisation, installateur) — priorité avant l’absence à l’école.</li>
-      <li><strong>V1.7.0</strong> — workflows n8n (automatisations), branchés sur Moduléo.</li>
+      <li><strong>V1.4.0</strong> — recherche web dans le chat (outil exécuté par la VM, pour citer une vraie page plutôt qu’une adresse inventée). <em>En cours ; livraison prévue le 06/10.</em></li>
+      <li><strong>V1.4.1</strong> — mémoire de la conversation (pièces jointes et recherches hors fenêtre).</li>
+      <li><strong>V1.5.0</strong> — Moduléo en lecture seule depuis le chat, via le premier Agent métier (pôle Administration). <em>Livraison prévue le 07/10.</em></li>
+      <li><strong>V1.6.0</strong> — déploiement postes (CI/CD, conteneurisation, installateur) — priorité avant l’absence à l’école. <em>Livraison prévue le 07/10.</em></li>
+      <li><strong>V1.7.0</strong> — workflows n8n (automatisations), branchés sur Moduléo. <em>Livraison prévue le 08/10.</em></li>
     </ul>
     </section>
 
     <section class="bloc" id="livre-pour">
     <h2>Livré pour le 05/10/2026</h2>
     <div class="recap">
-      <p><strong>Point lundi 5 octobre — livré : V1.2.2, V1.2.3 et V1.3.0</strong> (V1.3.1 ouverte en fin de journée)</p>
+      <p><strong>Point lundi 5 octobre — livré : V1.2.2, V1.2.3, V1.3.0 et V1.3.1</strong></p>
       <h3>Style et lecture du chat (V1.2.2)</h3>
       <ul>
         <li>Réponses de l’IA au ton professionnel : vouvoiement, sans remplissage ni relance systématique en fin de message ; emojis seulement quand ils portent un vrai signal.</li>
@@ -494,12 +511,17 @@
         <li>Raccourci <code>Ctrl+Maj+D</code> : nouvel onglet inspecteur, débloqué par la Clé d’administration VM (jamais stockée).</li>
         <li>Lecture de toutes les conversations de tous les comptes : chaque appel Mistral réel (chat, titrage, résumé, OCR, vision, outils) avec payload, réponse et statut succès/échec.</li>
       </ul>
+      <h3>Chat sans inventions figées (V1.3.1)</h3>
+      <ul>
+        <li>Plus de liens inventés (seule une URL écrite par le compte peut ressortir) ; faits inventés refusés sans demande explicite.</li>
+        <li>Résumé glissant plafonné qui note « proposé, non vérifié » ; profil de travail réécrit en entier ; garde-fous URL et chiffres côté VM.</li>
+      </ul>
     </div>
     </section>
 
     <section class="bloc versions" id="descriptif-versions">
       <h2>Descriptif des versions</h2>
-      <p class="lead">Versions livrées depuis le bilan précédent.</p>
+      <p class="lead">Versions livrées depuis le bilan précédent, puis prévisionnel de la semaine (dates de livraison prévue).</p>
 
       <div class="version" id="version-1-2-2">
         <div class="version-head">
@@ -531,6 +553,56 @@
         <div class="version-body">
         <p>Jusqu’ici, on ne voyait dans l’interface que le message du collaborateur et la réponse affichée. Impossible de comprendre après coup pourquoi l’IA avait répondu ainsi : le prompt réel, le résumé, le profil de travail ou un appel en échec restaient invisibles.</p>
         <p>Le Mode développeur (<code>Ctrl+Maj+D</code>) ouvre un onglet inspecteur, débloqué par la Clé d’administration VM. On peut parcourir les conversations de tous les comptes et déplier chaque appel Mistral (chat, titrage, résumé, OCR, vision, outils) : ce qui a été envoyé, ce qui est revenu, succès ou échec. Lecture seule, historique seulement — un outil de développement et de contrôle qualité, pas un écran métier du quotidien.</p>
+        </div>
+      </div>
+
+      <div class="version" id="version-1-3-1">
+        <div class="version-head">
+          <h3>V1.3.1 — Le chat ne fige plus ses inventions</h3>
+          <span class="deploye">Déployé le 05/10/2026 à 18:48</span>
+        </div>
+        <div class="version-body">
+        <p>Après la V1.3.0, un essai manuel montrait encore des rapports, chiffres et liens inventés, puis repris comme faits dans le résumé et le profil. Cette version resserre les consignes du chat, plafonne le résumé glissant, réécrit le profil en entier, et ajoute des garde-fous côté VM : retrait des URL non écrites par le compte, et contrôle des chiffres hors source.</p>
+        </div>
+      </div>
+
+      <div class="version" id="version-1-4-0">
+        <div class="version-head">
+          <h3>V1.4.0 — Recherche web dans le chat</h3>
+          <span class="prevu">Livraison prévue le 06/10/2026</span>
+        </div>
+        <div class="version-body">
+        <p>Outil de recherche internet exécuté par la VM : le modèle trouve une page réelle au lieu d’en inventer l’adresse. SearXNG auto-hébergé, lecture des pages, extraction isolée, outils centralisés, boucle sur trois tours. En cours d’implémentation.</p>
+        </div>
+      </div>
+
+      <div class="version" id="version-1-5-0">
+        <div class="version-head">
+          <h3>V1.5.0 — Moduléo en lecture</h3>
+          <span class="prevu">Livraison prévue le 07/10/2026</span>
+        </div>
+        <div class="version-body">
+        <p>Premier branchement Moduléo (API lecture seule) via l’Agent Administration : demander depuis le chat des éléments issus de Moduléo (ex. affaire, intervenants) selon l’allowlist du pôle.</p>
+        </div>
+      </div>
+
+      <div class="version" id="version-1-6-0">
+        <div class="version-head">
+          <h3>V1.6.0 — Déploiement postes</h3>
+          <span class="prevu">Livraison prévue le 07/10/2026</span>
+        </div>
+        <div class="version-body">
+        <p>Chaîne de déploiement pour installer et mettre à jour le logiciel sur les postes : CI/CD, conteneurisation si retenue, installateur / accès UI (backend local obligatoire). Priorité de fin de semaine avant l’absence à l’école.</p>
+        </div>
+      </div>
+
+      <div class="version" id="version-1-7-0">
+        <div class="version-head">
+          <h3>V1.7.0 — Workflows n8n</h3>
+          <span class="prevu">Livraison prévue le 08/10/2026</span>
+        </div>
+        <div class="version-body">
+        <p>Socle d’automatisation n8n, branché sur Moduléo 1.5.0 : déclencher / composer des workflows sans god-mode. Visé jeudi si la V1.6.0 est passée.</p>
         </div>
       </div>
     </section>

@@ -36,10 +36,10 @@ Point visé jeudi 8 octobre : enchaînement jusqu’à **V1.7.0** (n8n) — **pr
 
 ```mermaid
 flowchart LR
-  L05["Lundi 5<br/>V1.2.3, V1.3.0 et V1.3.1 livrées"] --> V140["V1.4.0<br/>recherche web"]
-  V140 --> V150["V1.5.0<br/>Moduléo lecture"]
-  V150 --> V160["V1.6.0<br/>déploiement · priorité"]
-  V160 --> V08["Jeudi 8<br/>visé aussi V1.7.0 n8n"]
+  L05["Lundi 5<br/>V1.2.3, V1.3.0 et V1.3.1 livrées"] --> V140["V1.4.0<br/>recherche web<br/>livraison prévue le 06/10"]
+  V140 --> V150["V1.5.0<br/>Moduléo lecture<br/>livraison prévue le 07/10"]
+  V150 --> V160["V1.6.0<br/>déploiement · priorité<br/>livraison prévue le 07/10"]
+  V160 --> V170["V1.7.0<br/>n8n<br/>livraison prévue le 08/10"]
 ```
 
 ### Travail réalisé
@@ -50,7 +50,7 @@ flowchart LR
 
 ### Reste à implémenter
 
-- **V1.4.0** — recherche web dans le chat (outil exécuté par la VM ; le modèle ne cite qu’une URL revenue de l’outil, et un chiffre seulement s’il est dans le texte ramené). Les function calling du modèle sont centralisés.
+- **V1.4.0** — recherche web dans le chat (outil exécuté par la VM ; le modèle ne cite qu’une URL revenue de l’outil, et un chiffre seulement s’il est dans le texte ramené). Les function calling du modèle sont centralisés. Bug connu à la livraison : quand la recherche ne trouve rien, l’IA invente encore au lieu de le dire ([#131](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/131), corrigé en 1.4.5).
 - **V1.5.0** — Moduléo en lecture (outil transverse), premier branchement via l’Agent Administration.
 - **V1.6.0** — déploiement postes : CI/CD, conteneurisation, installateur / logiciel d’accès au chat (backend local obligatoire) — **priorité**.
 - **V1.7.0** — workflows n8n, branchés sur Moduléo 1.5.0 — **proposé cette semaine** après la 1.6.0.
@@ -68,7 +68,7 @@ flowchart LR
 - **Python 3.11** (série figée : pas 3.12 / 3.13 / 3.14).
   - Windows : dernier installeur officiel [Python 3.11.9](https://www.python.org/downloads/release/python-3119/) — prendre *Windows installer (64-bit)*. Cocher **Add python.exe to PATH**. Les correctifs 3.11.x plus récents n'ont plus d'installeur (source only).
   - macOS : `brew install python@3.11` (Homebrew), ou l'installeur officiel [Python 3.11.9](https://www.python.org/downloads/release/python-3119/) (*macOS 64-bit universal2 installer*).
-- **Docker Desktop** pour le PostgreSQL local de la VM centrale ([ADR-0008](docs/adr/0008-postgresql-vm-centrale.md)). Les lanceurs le démarrent tout seuls s’il est installé mais pas lancé (attendre une à deux minutes le premier gel du moteur). Ils ne l’installent pas : Docker Desktop reste à installer une fois à la main.
+- **Docker Desktop** pour le PostgreSQL local de la VM centrale ([ADR-0008](docs/adr/0008-postgresql-vm-centrale.md)) et le moteur de recherche SearXNG de l’outil `rechercher_web` ([ADR-0013](docs/adr/0013-recherche-web-searxng-auto-heberge.md) : image épinglée, `searxng/settings.yml` versionné, publié sur `http://localhost:8888` seulement). Les lanceurs le démarrent tout seuls s’il est installé mais pas lancé (attendre une à deux minutes le premier gel du moteur). Ils ne l’installent pas : Docker Desktop reste à installer une fois à la main.
 - Une clé API Mistral (console [La Plateforme](https://console.mistral.ai)) pour un vrai chat
 
 ## Démarrer
@@ -77,13 +77,13 @@ Après avoir installé les prérequis ci-dessus (Python 3.11, Docker Desktop ins
 
 **Windows** (`.bat`) :
 
-- `lancer-vm.bat` : démarre PostgreSQL puis la VM centrale seule (2 fenêtres : logs Postgres, VM centrale) — utile pour développer/tester la VM seule.
-- `lancer-logiciel.bat` : démarre PostgreSQL, la VM centrale et le poste (2 fenêtres : VM centrale, poste), puis ouvre le navigateur sur l'interface.
+- `lancer-vm.bat` : démarre PostgreSQL et SearXNG puis la VM centrale seule (2 fenêtres : logs Postgres, VM centrale) — utile pour développer/tester la VM seule.
+- `lancer-logiciel.bat` : démarre PostgreSQL, SearXNG, la VM centrale et le poste (2 fenêtres : VM centrale, poste), puis ouvre le navigateur sur l'interface.
 
 **macOS** (`.command`, équivalents des `.bat` ci-dessus) :
 
-- `lancer-vm.command` : démarre PostgreSQL puis la VM centrale seule (2 fenêtres Terminal : logs Postgres, VM centrale).
-- `lancer-logiciel.command` : démarre PostgreSQL, la VM centrale et le poste (2 fenêtres Terminal : VM centrale, poste), puis ouvre le navigateur sur l'interface.
+- `lancer-vm.command` : démarre PostgreSQL et SearXNG puis la VM centrale seule (2 fenêtres Terminal : logs Postgres, VM centrale).
+- `lancer-logiciel.command` : démarre PostgreSQL, SearXNG, la VM centrale et le poste (2 fenêtres Terminal : VM centrale, poste), puis ouvre le navigateur sur l'interface.
 
   Premier lancement : si un clic droit → *Ouvrir* est nécessaire (Gatekeeper, seulement si le dépôt a été téléchargé en `.zip` plutôt que cloné avec `git clone`), ou si le double-clic ne fait rien, exécute une fois dans un Terminal (à la racine du dépôt) `chmod +x lancer-vm.command lancer-logiciel.command` puis retente le double-clic.
 
@@ -91,4 +91,4 @@ Les deux jeux de scripts sont autonomes : au besoin, ils installent [uv](https:/
 
 Pour un vrai chat (pas seulement le compte de test), colle ta clé API Mistral dans `MISTRAL_API_KEY` du fichier `vm-centrale/.env` — jamais dans Git.
 
-Fermer les fenêtres arrête les processus correspondants (PostgreSQL continue de tourner en arrière-plan tant que `docker compose down` n'a pas été lancé). Les `.env` (racine, `vm-centrale/`, `poste/`) portent des identifiants/secrets locaux — ne jamais les commiter (déjà dans `.gitignore`).
+Fermer les fenêtres arrête les processus correspondants (PostgreSQL et SearXNG continuent de tourner en arrière-plan tant que `docker compose down` n'a pas été lancé). La VM trouve SearXNG via `VM_CENTRALE_SEARXNG_URL` (`vm-centrale/.env`, `http://localhost:8888` par défaut) ; s'il ne répond pas, le chat fonctionne et l'IA indique que la recherche est indisponible. Les `.env` (racine, `vm-centrale/`, `poste/`) portent des identifiants/secrets locaux — ne jamais les commiter (déjà dans `.gitignore`).

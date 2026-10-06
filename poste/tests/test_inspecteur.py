@@ -189,10 +189,25 @@ def test_liste_echanges_avec_session_et_cle_admin_retourne_les_echanges_dans_lor
     vm_centrale_client_factice.inspecteur_echanges_retournes(
         [
             InspecteurEchangeResume(
-                id=1, type_appel="chat", statut="succes", date_creation="2026-10-05T10:00:00+00:00"
+                id=1,
+                origine="mistral",
+                type_appel="chat",
+                statut="succes",
+                date_creation="2026-10-05T10:00:00+00:00",
             ),
             InspecteurEchangeResume(
-                id=2, type_appel="titrage", statut="succes", date_creation="2026-10-05T10:00:01+00:00"
+                id=2,
+                origine="local",
+                type_appel="garde_fous",
+                statut="succes",
+                date_creation="2026-10-05T10:00:01+00:00",
+            ),
+            InspecteurEchangeResume(
+                id=3,
+                origine="mistral",
+                type_appel="titrage",
+                statut="succes",
+                date_creation="2026-10-05T10:00:02+00:00",
             ),
         ]
     )
@@ -200,7 +215,11 @@ def test_liste_echanges_avec_session_et_cle_admin_retourne_les_echanges_dans_lor
     reponse = client.get("/inspecteur/conversations/42/echanges", headers=_entetes_admin())
 
     assert reponse.status_code == 200
-    assert [e["type_appel"] for e in reponse.json()] == ["chat", "titrage"]
+    assert [(e["origine"], e["type_appel"]) for e in reponse.json()] == [
+        ("mistral", "chat"),
+        ("local", "garde_fous"),
+        ("mistral", "titrage"),
+    ]
 
 
 def test_liste_echanges_transmet_lid_de_conversation_le_jeton_et_la_cle_admin(
@@ -233,6 +252,7 @@ def test_detail_echange_avec_session_et_cle_admin_retourne_le_detail(client, vm_
             identifiant_compte="j.dupont",
             conversation_id=42,
             piece_jointe_id=None,
+            origine="mistral",
             type_appel="chat",
             modele="mistral-small-latest",
             requete_payload={"messages": [{"role": "user", "content": "Bonjour"}]},
@@ -248,6 +268,7 @@ def test_detail_echange_avec_session_et_cle_admin_retourne_le_detail(client, vm_
     assert reponse.status_code == 200
     corps = reponse.json()
     assert corps["statut"] == "succes"
+    assert corps["origine"] == "mistral"
     assert corps["requete_payload"]["messages"][0]["content"] == "Bonjour"
     assert corps["reponse_payload"]["choices"][0]["message"]["content"] == "Réponse"
 
@@ -260,6 +281,7 @@ def test_detail_echange_transmet_lid_dechange_le_jeton_et_la_cle_admin(client, v
             identifiant_compte="j.dupont",
             conversation_id=None,
             piece_jointe_id=None,
+            origine="mistral",
             type_appel="chat",
             modele="mistral-small-latest",
             requete_payload={},
