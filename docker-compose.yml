@@ -17,5 +17,16 @@ services:
       timeout: 5s
       retries: 5
 
+  # Moteur de recherche de l'outil rechercher_web (spec 1.4.0, ADR-0013).
+  # Image épinglée (jamais latest) ; publié sur localhost seulement.
+  searxng:
+    image: searxng/searxng:2026.10.4-d48c4b555
+    container_name: bbass-vm-centrale-searxng
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8888:8080"
+    volumes:
+      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+
 volumes:
   vm_centrale_postgres_data:

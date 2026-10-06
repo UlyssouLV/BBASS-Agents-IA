@@ -1,7 +1,9 @@
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from sqlalchemy.orm import Session
+
+from vm_centrale.moteur_recherche import MoteurRecherche
 
 
 @dataclass(frozen=True)
@@ -13,15 +15,19 @@ class ContexteTour:
     db: Session
     conversation_id: int
     ids_fenetre: frozenset[int]
+    moteur_recherche: MoteurRecherche
 
 
 @dataclass(frozen=True)
 class ResultatOutil:
     # `contenu` part au modèle dans le message `tool`. `piece_jointe_id` :
     # la pièce jointe relue par l'outil, s'il y en a une, pour l'échange
-    # d'inspecteur de l'appel suivant (spec 1.3.0).
+    # d'inspecteur de l'appel suivant (spec 1.3.0). `trace` : ce que l'outil
+    # a fait en plus (ex. résultats bruts du moteur), ajouté à la réponse de
+    # son échange local d'inspecteur, jamais envoyé au modèle.
     contenu: str
     piece_jointe_id: int | None = None
+    trace: dict = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

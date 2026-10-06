@@ -68,7 +68,7 @@ flowchart LR
 - **Python 3.11** (série figée : pas 3.12 / 3.13 / 3.14).
   - Windows : dernier installeur officiel [Python 3.11.9](https://www.python.org/downloads/release/python-3119/) — prendre *Windows installer (64-bit)*. Cocher **Add python.exe to PATH**. Les correctifs 3.11.x plus récents n'ont plus d'installeur (source only).
   - macOS : `brew install python@3.11` (Homebrew), ou l'installeur officiel [Python 3.11.9](https://www.python.org/downloads/release/python-3119/) (*macOS 64-bit universal2 installer*).
-- **Docker Desktop** pour le PostgreSQL local de la VM centrale ([ADR-0008](docs/adr/0008-postgresql-vm-centrale.md)). Les lanceurs le démarrent tout seuls s’il est installé mais pas lancé (attendre une à deux minutes le premier gel du moteur). Ils ne l’installent pas : Docker Desktop reste à installer une fois à la main.
+- **Docker Desktop** pour le PostgreSQL local de la VM centrale ([ADR-0008](docs/adr/0008-postgresql-vm-centrale.md)) et le moteur de recherche SearXNG de l’outil `rechercher_web` ([ADR-0013](docs/adr/0013-recherche-web-searxng-auto-heberge.md) : image épinglée, `searxng/settings.yml` versionné, publié sur `http://localhost:8888` seulement). Les lanceurs le démarrent tout seuls s’il est installé mais pas lancé (attendre une à deux minutes le premier gel du moteur). Ils ne l’installent pas : Docker Desktop reste à installer une fois à la main.
 - Une clé API Mistral (console [La Plateforme](https://console.mistral.ai)) pour un vrai chat
 
 ## Démarrer
@@ -77,13 +77,13 @@ Après avoir installé les prérequis ci-dessus (Python 3.11, Docker Desktop ins
 
 **Windows** (`.bat`) :
 
-- `lancer-vm.bat` : démarre PostgreSQL puis la VM centrale seule (2 fenêtres : logs Postgres, VM centrale) — utile pour développer/tester la VM seule.
-- `lancer-logiciel.bat` : démarre PostgreSQL, la VM centrale et le poste (2 fenêtres : VM centrale, poste), puis ouvre le navigateur sur l'interface.
+- `lancer-vm.bat` : démarre PostgreSQL et SearXNG puis la VM centrale seule (2 fenêtres : logs Postgres, VM centrale) — utile pour développer/tester la VM seule.
+- `lancer-logiciel.bat` : démarre PostgreSQL, SearXNG, la VM centrale et le poste (2 fenêtres : VM centrale, poste), puis ouvre le navigateur sur l'interface.
 
 **macOS** (`.command`, équivalents des `.bat` ci-dessus) :
 
-- `lancer-vm.command` : démarre PostgreSQL puis la VM centrale seule (2 fenêtres Terminal : logs Postgres, VM centrale).
-- `lancer-logiciel.command` : démarre PostgreSQL, la VM centrale et le poste (2 fenêtres Terminal : VM centrale, poste), puis ouvre le navigateur sur l'interface.
+- `lancer-vm.command` : démarre PostgreSQL et SearXNG puis la VM centrale seule (2 fenêtres Terminal : logs Postgres, VM centrale).
+- `lancer-logiciel.command` : démarre PostgreSQL, SearXNG, la VM centrale et le poste (2 fenêtres Terminal : VM centrale, poste), puis ouvre le navigateur sur l'interface.
 
   Premier lancement : si un clic droit → *Ouvrir* est nécessaire (Gatekeeper, seulement si le dépôt a été téléchargé en `.zip` plutôt que cloné avec `git clone`), ou si le double-clic ne fait rien, exécute une fois dans un Terminal (à la racine du dépôt) `chmod +x lancer-vm.command lancer-logiciel.command` puis retente le double-clic.
 
@@ -91,4 +91,4 @@ Les deux jeux de scripts sont autonomes : au besoin, ils installent [uv](https:/
 
 Pour un vrai chat (pas seulement le compte de test), colle ta clé API Mistral dans `MISTRAL_API_KEY` du fichier `vm-centrale/.env` — jamais dans Git.
 
-Fermer les fenêtres arrête les processus correspondants (PostgreSQL continue de tourner en arrière-plan tant que `docker compose down` n'a pas été lancé). Les `.env` (racine, `vm-centrale/`, `poste/`) portent des identifiants/secrets locaux — ne jamais les commiter (déjà dans `.gitignore`).
+Fermer les fenêtres arrête les processus correspondants (PostgreSQL et SearXNG continuent de tourner en arrière-plan tant que `docker compose down` n'a pas été lancé). La VM trouve SearXNG via `VM_CENTRALE_SEARXNG_URL` (`vm-centrale/.env`, `http://localhost:8888` par défaut) ; s'il ne répond pas, le chat fonctionne et l'IA indique que la recherche est indisponible. Les `.env` (racine, `vm-centrale/`, `poste/`) portent des identifiants/secrets locaux — ne jamais les commiter (déjà dans `.gitignore`).

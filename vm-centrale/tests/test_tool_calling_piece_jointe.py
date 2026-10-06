@@ -5,6 +5,7 @@ import pytest
 _PDF = ("document.pdf", b"%PDF-1.4 contenu factice", "application/pdf")
 _PDF_PLAN = ("plan.pdf", b"%PDF-1.4 plan factice", "application/pdf")
 _PDF_DEVIS = ("devis.pdf", b"%PDF-1.4 devis factice", "application/pdf")
+_OUTIL_PJ = "obtenir_contenu_piece_jointe"
 
 
 def _reponse_resume_et_profil(resume_contexte: str = "Résumé") -> str:
@@ -21,6 +22,12 @@ def _repertoire_pieces_jointes(tmp_path, monkeypatch):
 
 def _autorisation(jeton: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {jeton}"}
+
+
+def _outil(tools, nom: str) -> dict | None:
+    # rechercher_web est toujours déclaré (spec 1.4.0) : on cherche l'outil
+    # pièce jointe par son nom, pas par sa position.
+    return next((outil for outil in tools or [] if outil["function"]["name"] == nom), None)
 
 
 def _televerser_sans_conversation(client, jeton: str, fichier=_PDF) -> int:
@@ -75,10 +82,10 @@ def test_avec_piece_jointe_hors_fenetre_lappel_recoit_un_parametre_tools_non_vid
     )
 
     assert reponse.status_code == 200
-    assert mistral_client_factice.tools_appels_reponse[-1]
+    assert _outil(mistral_client_factice.tools_appels_reponse[-1], _OUTIL_PJ)
 
 
-def test_sans_piece_jointe_hors_fenetre_aucun_tools_nest_passe(
+def test_sans_piece_jointe_hors_fenetre_loutil_piece_jointe_nest_pas_declare(
     client, mistral_client_factice, jeton_valide
 ):
     mistral_client_factice.repondre("Réponse", "Titre")
@@ -96,7 +103,7 @@ def test_sans_piece_jointe_hors_fenetre_aucun_tools_nest_passe(
     )
 
     assert reponse.status_code == 200
-    assert mistral_client_factice.tools_appels_reponse[-1] is None
+    assert _outil(mistral_client_factice.tools_appels_reponse[-1], _OUTIL_PJ) is None
 
 
 def test_appel_doutil_relance_un_second_appel_avec_le_contenu_injecte_et_en_renvoie_la_reponse(
@@ -182,9 +189,9 @@ def test_avec_deux_pieces_jointes_hors_fenetre_le_tool_mentionne_chaque_nom_de_f
         )
         assert reponse.status_code == 200
 
-    tools = mistral_client_factice.tools_appels_reponse[-1]
-    assert tools
-    description = tools[0]["function"]["description"]
+    outil = _outil(mistral_client_factice.tools_appels_reponse[-1], _OUTIL_PJ)
+    assert outil
+    description = outil["function"]["description"]
     assert "plan.pdf" in description
     assert "devis.pdf" in description
     assert f"id {piece_jointe_plan}" in description

@@ -1,10 +1,10 @@
 from vm_centrale.mistral_client import AppelOutil
-from vm_centrale.outils import piece_jointe
+from vm_centrale.outils import piece_jointe, recherche_web
 from vm_centrale.outils.base import ContexteTour, Outil, ResultatOutil
 
 _OUTIL_INCONNU = "Outil inconnu."
 
-_OUTILS: dict[str, Outil] = {outil.nom: outil for outil in (piece_jointe.OUTIL,)}
+_OUTILS: dict[str, Outil] = {outil.nom: outil for outil in (piece_jointe.OUTIL, recherche_web.OUTIL)}
 
 
 def outils_du_tour(contexte: ContexteTour) -> list[dict] | None:

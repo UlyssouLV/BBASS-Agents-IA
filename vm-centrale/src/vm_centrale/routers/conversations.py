@@ -43,7 +43,9 @@ from vm_centrale.models import (
     Message,
     PieceJointe,
     ProfilTravail,
+    ResultatRechercheWeb,
 )
+from vm_centrale.moteur_recherche import MoteurRecherche, get_moteur_recherche
 from vm_centrale.outils import ContexteTour, executer_appel, outils_du_tour
 from vm_centrale.schemas import (
     ConversationCreeRequest,
@@ -283,16 +285,22 @@ def _reponse_sans_url_inventee(
 ) -> str:
     # Textes du compte lus en base, pas seulement dans la fenêtre des
     # derniers messages (spec 1.3.1) : une URL que le compte a donnée il y a
-    # longtemps reste légitime à redonner. Point d'appel unique du garde-fou,
-    # pour le premier message comme pour les suivants (voir
-    # garde_fous/README.md).
+    # longtemps reste légitime à redonner. De même pour les URL des résultats
+    # de recherche de la conversation (spec 1.4.0), ce tour compris. Point
+    # d'appel unique du garde-fou, pour le premier message comme pour les
+    # suivants (voir garde_fous/README.md).
     messages_du_compte = (
         db.query(Message.contenu)
         .filter(Message.conversation_id == conversation_id, Message.role == "user")
         .all()
     )
     textes_du_compte = [contenu for (contenu,) in messages_du_compte] + [nouveau_message]
-    return retirer_urls_inventees(reponse, textes_du_compte)
+    urls_trouvees = (
+        db.query(ResultatRechercheWeb.url)
+        .filter(ResultatRechercheWeb.conversation_id == conversation_id)
+        .all()
+    )
+    return retirer_urls_inventees(reponse, textes_du_compte, [url for (url,) in urls_trouvees])
 
 
 def _extraits_pieces_jointes(
@@ -534,6 +542,7 @@ def creer_conversation(
     requete: ConversationCreeRequest,
     identifiant_compte: str = Depends(get_identifiant_compte_du_jeton),
     client: MistralClient = Depends(get_mistral_client),
+    moteur_recherche: MoteurRecherche = Depends(get_moteur_recherche),
     db: Session = Depends(get_db),
 ) -> ConversationCreeResponse:
     with verrous_comptes.pour(identifiant_compte):
@@ -588,22 +597,26 @@ def creer_conversation(
         # plus tard à une autre conversation puis supprimée avec elle
         # (supprimer_conversation), ce qui laisserait cette ligne sans
         # conversation pointer vers une pièce jointe disparue.
-        try:
-            reponse_chat = client.chat(message_pour_mistral)
-        except Exception as erreur:
-            db.rollback()
-            enregistrer_echange_echec(
-                db,
-                identifiant_compte=identifiant_compte,
-                conversation_id=None,
-                piece_jointe_id=None,
-                type_appel="chat",
-                modele=MODELE_CHAT,
-                requete_payload=payload_depuis_erreur(erreur),
-                erreur=str(erreur),
-            )
-            logger.exception(_MSG_ECHEC_RELAIS_LOG)
-            raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
+        # Outils sur l'appel principal dès le premier message (spec 1.4.0) :
+        # aucune fenêtre ni pièce jointe hors fenêtre ici, seul
+        # rechercher_web est éligible.
+        contexte_outils = ContexteTour(
+            db=db,
+            conversation_id=conversation.id,
+            ids_fenetre=frozenset(),
+            moteur_recherche=moteur_recherche,
+        )
+        tools = outils_du_tour(contexte_outils)
+        reponse_chat = _resoudre_reponse_chat(
+            lambda: _appeler_reponse_chat(client, message_pour_mistral, tools),
+            client,
+            message_pour_mistral,
+            tools,
+            contexte_outils,
+            identifiant_compte,
+            piece_jointe_id,
+            conversation_persistee=False,
+        )
 
         reponse = _reponse_visible(
             db, conversation.id, requete.message, reponse_chat.contenu, piece_jointe
@@ -629,19 +642,6 @@ def creer_conversation(
         titre = nettoyer_titre(reponse_titrage.contenu)
 
         conversation.titre = titre
-        enregistrer_consommation(
-            db, identifiant_compte, conversation.id, "chat", MODELE_CHAT, usage=reponse_chat.usage
-        )
-        enregistrer_echange_succes(
-            db,
-            identifiant_compte=identifiant_compte,
-            conversation_id=conversation.id,
-            piece_jointe_id=piece_jointe_id,
-            type_appel="chat",
-            modele=MODELE_CHAT,
-            requete_payload=reponse_chat.payload_envoye,
-            reponse_payload=reponse_chat.reponse_brute,
-        )
         enregistrer_consommation(
             db, identifiant_compte, conversation.id, "titrage", MODELE_CHAT, usage=reponse_titrage.usage
         )
@@ -787,6 +787,10 @@ def supprimer_conversation(
     # comportement identique quel que soit le moteur de base (la base de
     # test SQLite n'applique pas les contraintes FK par défaut).
     db.query(EchangeInspecteur).filter(EchangeInspecteur.conversation_id == conversation.id).delete()
+    # Même chose pour les résultats de recherche (spec 1.4.0).
+    db.query(ResultatRechercheWeb).filter(
+        ResultatRechercheWeb.conversation_id == conversation.id
+    ).delete()
 
     # Consommation n'a pas de cascade ORM déclarée sur Conversation (spec
     # 1.1.3) : la ligne survit à la conversation qui l'a produite, seul le
@@ -998,7 +1002,7 @@ def _executer_appels_outils(
             piece_jointe_id=resultat.piece_jointe_id,
             type_appel=f"outil:{appel.nom}",
             requete_payload={"arguments": appel.arguments},
-            reponse_payload={"contenu": resultat.contenu},
+            reponse_payload={"contenu": resultat.contenu, **resultat.trace},
         )
         messages_outils.append(
             {"role": "tool", "tool_call_id": appel.id, "name": appel.nom, "content": resultat.contenu}
@@ -1040,6 +1044,7 @@ def _resoudre_reponse_chat(
     contexte_outils: ContexteTour,
     identifiant_compte: str,
     piece_jointe_id: int | None,
+    conversation_persistee: bool = True,
 ) -> ReponseChat:
     # Boucle de tool calling (spec 1.4.0). Un tour = un appel de chat
     # principal : au plus _TOURS_MAX_PAR_MESSAGE, le dernier sans `tools`
@@ -1047,7 +1052,10 @@ def _resoudre_reponse_chat(
     # (`futur_reponse.result` ou appel direct à _appeler_reponse_chat, voir
     # _generer_reponse_et_resume). `piece_jointe_id` : celle éventuellement
     # jointe au nouveau message (spec 1.3.0) ; les appels suivants portent
-    # celle relue par un outil, s'il y en a une.
+    # celle relue par un outil, s'il y en a une. `conversation_persistee` à
+    # False (creer_conversation) : le rollback d'un échec annule aussi la
+    # conversation flushée, l'échange d'échec ne peut ni la référencer ni
+    # référencer la pièce jointe (voir creer_conversation).
     db = contexte_outils.db
     messages = list(messages_pour_mistral)
     try:
@@ -1078,8 +1086,8 @@ def _resoudre_reponse_chat(
         enregistrer_echange_echec(
             db,
             identifiant_compte=identifiant_compte,
-            conversation_id=contexte_outils.conversation_id,
-            piece_jointe_id=piece_jointe_id,
+            conversation_id=contexte_outils.conversation_id if conversation_persistee else None,
+            piece_jointe_id=piece_jointe_id if conversation_persistee else None,
             type_appel="chat",
             modele=MODELE_CHAT,
             requete_payload=payload_depuis_erreur(erreur),
@@ -1229,6 +1237,7 @@ def envoyer_message(
     requete: MessageEnvoyeRequest,
     identifiant_compte: str = Depends(get_identifiant_compte_du_jeton),
     client: MistralClient = Depends(get_mistral_client),
+    moteur_recherche: MoteurRecherche = Depends(get_moteur_recherche),
     db: Session = Depends(get_db),
 ) -> MessageEnvoyeResponse:
     with verrous_comptes.pour(identifiant_compte):
@@ -1282,6 +1291,7 @@ def envoyer_message(
             db=db,
             conversation_id=conversation.id,
             ids_fenetre=frozenset(m.id for m in derniers_messages),
+            moteur_recherche=moteur_recherche,
         )
         tools = outils_du_tour(contexte_outils)
 

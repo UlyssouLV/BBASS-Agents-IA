@@ -19,6 +19,7 @@ from vm_centrale.mistral_client import (
     get_mistral_client,
 )
 from vm_centrale.models import Compte, ComptePole
+from vm_centrale.moteur_recherche import MoteurIndisponible, ResultatRecherche, get_moteur_recherche
 from vm_centrale.security import hash_password
 from vm_centrale.jetons import JetonStore, get_jeton_store
 
@@ -248,6 +249,29 @@ class ClientMistralFactice:
             )
 
 
+class MoteurRechercheFactice:
+    # Remplace SearXNG (spec 1.4.0) : aucun test ne sort sur le réseau. Sans
+    # configuration, aucun résultat.
+    def __init__(self) -> None:
+        self.requetes_recues: list = []
+        self._resultats: list[ResultatRecherche] = []
+        self._indisponible = False
+
+    def repondre(self, *resultats: tuple[str, str, str]) -> None:
+        # (titre, url, extrait) par résultat, dans l'ordre du moteur.
+        self._resultats = [ResultatRecherche(titre, url, extrait) for titre, url, extrait in resultats]
+        self._indisponible = False
+
+    def echouer(self) -> None:
+        self._indisponible = True
+
+    def rechercher(self, *args, **kwargs) -> list[ResultatRecherche]:
+        self.requetes_recues.append((args, kwargs))
+        if self._indisponible:
+            raise MoteurIndisponible("moteur injoignable")
+        return list(self._resultats)
+
+
 @pytest.fixture
 def db_session():
     engine = create_engine(
@@ -272,17 +296,23 @@ def mistral_client_factice():
 
 
 @pytest.fixture
+def moteur_recherche_factice():
+    return MoteurRechercheFactice()
+
+
+@pytest.fixture
 def jeton_store(db_session):
     return JetonStore(db_session)
 
 
 @pytest.fixture
-def client(db_session, mistral_client_factice, jeton_store):
+def client(db_session, mistral_client_factice, moteur_recherche_factice, jeton_store):
     def override_get_db():
         yield db_session
 
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_mistral_client] = lambda: mistral_client_factice
+    app.dependency_overrides[get_moteur_recherche] = lambda: moteur_recherche_factice
     app.dependency_overrides[get_jeton_store] = lambda: jeton_store
     with TestClient(app) as test_client:
         yield test_client

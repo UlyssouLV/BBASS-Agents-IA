@@ -14,6 +14,10 @@ PIECES_JOINTES_DIR = os.environ.get("VM_CENTRALE_PIECES_JOINTES_DIR", "./pieces_
 # Doit rester <= au timeout HTTP du poste (POSTE_HTTP_TIMEOUT, 35s par
 # défaut) : voir poste/src/poste/config.py.
 MISTRAL_HTTP_TIMEOUT = float(os.environ.get("MISTRAL_HTTP_TIMEOUT", "30"))
+# SearXNG auto-hébergé du docker-compose.yml (spec 1.4.0, ADR-0013), publié
+# sur localhost seulement.
+SEARXNG_URL = os.environ.get("VM_CENTRALE_SEARXNG_URL", "http://localhost:8888")
+SEARXNG_HTTP_TIMEOUT = float(os.environ.get("SEARXNG_HTTP_TIMEOUT", "10"))
 
 # Tags de modèle centralisés par fonction (spec V1.1.2), pas par valeur : tout
 # code appelant Mistral référence l'une de ces constantes plutôt qu'une

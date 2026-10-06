@@ -30,9 +30,8 @@ def _autorisation_admin(jeton: str) -> dict[str, str]:
 
 
 def _amener_piece_jointe_hors_fenetre(client, mistral_client_factice, jeton: str) -> tuple[int, int]:
-    # Voir tests/test_tool_calling_piece_jointe.py : seul outil éligible tant
-    # que rechercher_web n'existe pas, il faut une pièce jointe sortie de la
-    # fenêtre pour que l'appel principal porte `tools`.
+    # Voir tests/test_tool_calling_piece_jointe.py : l'outil pièce jointe
+    # n'est éligible qu'avec une pièce jointe sortie de la fenêtre.
     mistral_client_factice.repondre_ocr("Plan de masse détaillé")
     piece_jointe_id = client.post(
         "/pieces-jointes", files={"fichier": _PDF}, headers=_autorisation(jeton)

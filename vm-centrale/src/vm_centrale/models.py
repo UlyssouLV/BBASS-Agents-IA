@@ -183,6 +183,26 @@ class EchangeInspecteur(Base):
     date_creation: Mapped[datetime] = mapped_column(DateTime)
 
 
+class ResultatRechercheWeb(Base):
+    # Une ligne par résultat de l'outil rechercher_web (spec 1.4.0) : les
+    # garde-fous lisent ces sources sur toute la conversation (une URL
+    # trouvée à un tour reste citable au tour suivant).
+    __tablename__ = "resultats_recherche_web"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    conversation_id: Mapped[int] = mapped_column(
+        ForeignKey(_FK_CONVERSATIONS_ID, ondelete="CASCADE"), index=True
+    )
+    requete: Mapped[str] = mapped_column(String)
+    url: Mapped[str] = mapped_column(String)
+    titre: Mapped[str] = mapped_column(String)
+    extrait_moteur: Mapped[str] = mapped_column(String)
+    # Texte principal de la page téléchargée et nettoyée ; vide si la page
+    # n'a pas été téléchargée.
+    texte_nettoye: Mapped[str] = mapped_column(String, default="")
+    date_creation: Mapped[datetime] = mapped_column(DateTime)
+
+
 class ProfilTravail(Base):
     __tablename__ = "profils_travail"
 
