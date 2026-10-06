@@ -54,7 +54,16 @@ jobs:
             --cov-branch \
             --cov-config=.coveragerc
 
+      # Nouveau code de main = depuis la dernière version livrée : le tag vX.Y.Z
+      # est créé sur la branche avant le squash, donc déjà là au push sur main.
+      - name: Version
+        id: version
+        run: echo "value=$(git tag --list 'v*' --sort=-v:refname | head -n 1)" >> "$GITHUB_OUTPUT"
+
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@c7ee0f9df90b7aa20e8dcf9695dcfe2e7da5b4f2 # v7
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.projectVersion=${{ steps.version.outputs.value || 'non-versionne' }}
