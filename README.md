@@ -21,7 +21,7 @@ Une application composée d'un backend Python et d'une interface web (HTML/CSS/J
 
 ## Architecture
 
-Le poste n’appelle jamais Mistral directement : tout passe par la VM centrale (réseau interne), qui détient aussi PostgreSQL, la clé API et le moteur de recherche SearXNG.
+Le poste n’appelle jamais Mistral directement : tout passe par la VM centrale (réseau interne), qui détient aussi PostgreSQL, la clé API et le moteur de recherche SearXNG. Vue détaillée (fichiers et flux) : [docs/architecture/vue-systeme.md](docs/architecture/vue-systeme.md).
 
 ```mermaid
 flowchart LR
