@@ -65,12 +65,15 @@ def enregistrer_echange_echec(
     requete_payload: dict,
     erreur: str,
     reponse_payload: dict | None = None,
+    commit: bool = True,
 ) -> None:
     # Commité indépendamment (spec 1.3.0), contrairement à un échange réussi
     # ci-dessus : l'appelant a déjà fait (ou n'a rien à faire) son propre
     # db.rollback() juste avant, et cette ligne doit malgré tout survivre —
     # sinon l'échange qu'on veut le plus pouvoir déboguer disparaîtrait avec
-    # le reste du tour applicatif annulé.
+    # le reste du tour applicatif annulé. `commit=False` : un échec qui
+    # n'interrompt pas le tour (ex. l'appel d'extraction de rechercher_web,
+    # spec 1.4.0) suit le tour, sans commiter ce qui est en cours.
     db.add(
         EchangeInspecteur(
             identifiant_compte=identifiant_compte,
@@ -86,7 +89,8 @@ def enregistrer_echange_echec(
             date_creation=datetime.now(timezone.utc),
         )
     )
-    db.commit()
+    if commit:
+        db.commit()
 
 
 def enregistrer_echange_local(

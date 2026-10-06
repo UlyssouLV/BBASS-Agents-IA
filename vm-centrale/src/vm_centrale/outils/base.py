@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 
 from sqlalchemy.orm import Session
 
+from vm_centrale.mistral_client import MistralClient, Usage
 from vm_centrale.moteur_recherche import MoteurRecherche
 from vm_centrale.telechargement_pages import TelechargeurPages
 
@@ -18,6 +19,22 @@ class ContexteTour:
     ids_fenetre: frozenset[int]
     moteur_recherche: MoteurRecherche
     telechargeur_pages: TelechargeurPages
+    client_mistral: MistralClient
+
+
+@dataclass(frozen=True)
+class AppelMistralOutil:
+    # Un appel Mistral fait par l'outil lui-même (ex. l'appel d'extraction de
+    # rechercher_web, spec 1.4.0). La boucle l'enregistre (Consommation et
+    # inspecteur) après l'échange local de l'outil, pour l'ordre
+    # chronologique. `usage` à None : l'appel a échoué, `erreur` dit
+    # pourquoi.
+    type_appel: str
+    modele: str
+    requete_payload: dict
+    reponse_payload: dict | None
+    usage: Usage | None
+    erreur: str | None = None
 
 
 @dataclass(frozen=True)
@@ -30,6 +47,7 @@ class ResultatOutil:
     contenu: str
     piece_jointe_id: int | None = None
     trace: dict = field(default_factory=dict)
+    appels_mistral: tuple[AppelMistralOutil, ...] = ()
 
 
 @dataclass(frozen=True)

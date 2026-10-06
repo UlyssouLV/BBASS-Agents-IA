@@ -1,6 +1,7 @@
 import json
 
-from vm_centrale.models import EchangeInspecteur, ResultatRechercheWeb
+from vm_centrale.config import MODELE_CHAT
+from vm_centrale.models import Consommation, EchangeInspecteur, ResultatRechercheWeb
 
 # Outil rechercher_web (spec 1.4.0) : SearXNG remplacé par
 # MoteurRechercheFactice (conftest), aucun accès réseau.
@@ -319,6 +320,11 @@ def _echange_outil(client, conversation_id: int, jeton: str, monkeypatch) -> dic
     return client.get(f"/inspecteur/echanges/{outil['id']}", headers=entetes_admin).json()
 
 
+def _pages_envoyees_a_lextraction(mistral_client_factice) -> str:
+    (appel,) = mistral_client_factice.appels_extraction
+    return appel[-1]["content"]
+
+
 def _textes_nettoyes(db_session, conversation_id: int) -> list[str]:
     lignes = (
         db_session.query(ResultatRechercheWeb)
@@ -341,11 +347,9 @@ def test_seules_les_trois_premieres_pages_sont_telechargees_et_leur_texte_nettoy
     conversation_id = _creer_conversation(client, jeton_valide)
 
     assert sorted(telechargeur_pages_factice.urls_recues) == sorted(url for _, url, _ in _RESULTATS[:3])
-    (message_tool,) = _messages_tool(mistral_client_factice.appels_reponse[-2])
-    contenu = message_tool["content"]
-    for _, url, extrait in _RESULTATS[:5]:
-        assert url in contenu and extrait in contenu
-    for titre, _, _ in _RESULTATS[:3]:
+    contenu = _pages_envoyees_a_lextraction(mistral_client_factice)
+    for titre, url, _ in _RESULTATS[:3]:
+        assert f"--- Page : {url} ---" in contenu
         assert f"Texte complet de la page {titre}." in contenu
     assert "Texte complet de la page Fiche pratique." not in contenu
     assert "var suivi" not in contenu and "Menu du site" not in contenu
@@ -380,12 +384,12 @@ def test_une_page_en_echec_est_ignoree_et_son_extrait_de_moteur_reste(
 
     assert reponse.status_code == 200
     conversation_id = reponse.json()["conversation"]["id"]
-    (message_tool,) = _messages_tool(mistral_client_factice.appels_reponse[-2])
-    contenu = message_tool["content"]
+    contenu = _pages_envoyees_a_lextraction(mistral_client_factice)
     assert "Texte de la loi lue." in contenu
     assert "Introuvable" not in contenu and "%PDF" not in contenu
-    for _, url, extrait in _RESULTATS[:4]:
-        assert url in contenu and extrait in contenu
+    (message_tool,) = _messages_tool(mistral_client_factice.appels_reponse[-2])
+    for _, url, _ in _RESULTATS[:4]:
+        assert url in message_tool["content"]
     assert _textes_nettoyes(db_session, conversation_id)[1:] == ["", "", ""]
 
     pages = _echange_outil(client, conversation_id, jeton_valide, monkeypatch)["reponse_payload"]["pages"]
@@ -422,10 +426,10 @@ def test_une_page_longue_nest_jamais_tronquee(
 
     conversation_id = _creer_conversation(client, jeton_valide)
 
-    (message_tool,) = _messages_tool(mistral_client_factice.appels_reponse[-2])
-    assert "Article 0 de la loi" in message_tool["content"]
-    assert "Article 1499 de la loi" in message_tool["content"]
-    assert "FIN DE LA PAGE LONGUE" in message_tool["content"]
+    contenu = _pages_envoyees_a_lextraction(mistral_client_factice)
+    assert "Article 0 de la loi" in contenu
+    assert "Article 1499 de la loi" in contenu
+    assert "FIN DE LA PAGE LONGUE" in contenu
     (texte,) = _textes_nettoyes(db_session, conversation_id)
     assert len(texte) > 100_000 and texte.endswith("FIN DE LA PAGE LONGUE")
 
@@ -449,11 +453,9 @@ def test_au_dela_du_plafond_global_la_derniere_page_entiere_est_retiree_et_linsp
 
     conversation_id = _creer_conversation(client, jeton_valide)
 
-    (message_tool,) = _messages_tool(mistral_client_factice.appels_reponse[-2])
-    contenu = message_tool["content"]
+    contenu = _pages_envoyees_a_lextraction(mistral_client_factice)
     assert "FIN DE LA PAGE 0" in contenu and "FIN DE LA PAGE 1" in contenu
     assert "FIN DE LA PAGE 2" not in contenu
-    assert _RESULTATS[2][2] in contenu
     textes = _textes_nettoyes(db_session, conversation_id)
     assert textes[0].endswith("FIN DE LA PAGE 0") and textes[1].endswith("FIN DE LA PAGE 1")
     assert textes[2] == ""
@@ -481,3 +483,173 @@ def test_un_chiffre_present_seulement_dans_le_texte_dune_page_reste_dans_la_repo
     contenu = reponse.json()["reponse"]
     assert "305" in contenu
     assert "48" not in contenu
+
+
+# Appel d'extraction isolé (spec 1.4.0, étapes 5 et 6 ; ADR-0014).
+
+_BESOIN = "Trouver le texte officiel de la loi pour le client Dupont"
+
+
+def _recherche_avec_page(moteur_recherche_factice, telechargeur_pages_factice, mistral_client_factice, texte: str):
+    moteur_recherche_factice.repondre(*_RESULTATS)
+    telechargeur_pages_factice.servir(_URL_TROUVEE, _page_html(texte))
+    _demander_recherche(mistral_client_factice)
+
+
+def test_lappel_dextraction_recoit_le_besoin_et_les_pages_jamais_la_conversation(
+    client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide
+):
+    mistral_client_factice.repondre("Première réponse", "Titre")
+    conversation_id = _creer_conversation(client, jeton_valide, "Message confidentiel du premier tour")
+
+    _recherche_avec_page(
+        moteur_recherche_factice, telechargeur_pages_factice, mistral_client_factice, "Texte de la loi lue."
+    )
+    mistral_client_factice.repondre("Voici la loi.", resume_et_profil=_reponse_resume_et_profil())
+    assert _envoyer(client, jeton_valide, conversation_id, "Cherche la loi Climat").status_code == 200
+
+    (appel,) = mistral_client_factice.appels_extraction
+    assert [message["role"] for message in appel] == ["system", "user"]
+    contenu = appel[-1]["content"]
+    assert _BESOIN in contenu
+    assert f"--- Page : {_URL_TROUVEE} ---" in contenu and "Texte de la loi lue." in contenu
+    tout = json.dumps(appel, ensure_ascii=False)
+    for absent in ("Message confidentiel", "Première réponse", "Cherche la loi Climat", "Résumé"):
+        assert absent not in tout
+
+
+def test_le_message_tool_porte_lextrait_et_la_liste_jamais_les_pages(
+    client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide
+):
+    _recherche_avec_page(
+        moteur_recherche_factice, telechargeur_pages_factice, mistral_client_factice, "Texte de la loi lue."
+    )
+    mistral_client_factice.repondre_extraction(f"La loi est publiée sur Légifrance ({_URL_TROUVEE}).")
+    mistral_client_factice.repondre("Voici la loi.", "Titre")
+
+    _creer_conversation(client, jeton_valide)
+
+    (message_tool,) = _messages_tool(mistral_client_factice.appels_reponse[-2])
+    contenu = message_tool["content"]
+    assert "La loi est publiée sur Légifrance" in contenu
+    for titre, url, extrait in _RESULTATS[:5]:
+        assert titre in contenu and url in contenu
+        assert extrait not in contenu
+    assert "Texte de la loi lue." not in contenu
+
+
+def test_un_chiffre_present_seulement_dans_lextrait_est_retire_de_la_reponse(
+    client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide
+):
+    _recherche_avec_page(
+        moteur_recherche_factice,
+        telechargeur_pages_factice,
+        mistral_client_factice,
+        "La loi a été promulguée en 2021 et compte 305 articles.",
+    )
+    mistral_client_factice.repondre_extraction("La loi compte 305 articles et 48 décrets.")
+    mistral_client_factice.repondre("La loi compte 305 articles et 48 décrets.", "Titre")
+
+    reponse = client.post(
+        "/conversations", json={"message": "Trouve la loi Climat"}, headers=_autorisation(jeton_valide)
+    )
+
+    assert reponse.status_code == 200
+    contenu = reponse.json()["reponse"]
+    assert "305" in contenu
+    assert "48" not in contenu
+
+
+def test_une_ligne_extraction_web_par_appel_dextraction_et_aucune_pour_le_moteur(
+    client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide, db_session
+):
+    _recherche_avec_page(
+        moteur_recherche_factice, telechargeur_pages_factice, mistral_client_factice, "Texte de la loi lue."
+    )
+    mistral_client_factice.repondre("Voici la loi.", "Titre")
+    conversation_id = _creer_conversation(client, jeton_valide)
+
+    lignes = db_session.query(Consommation).filter_by(conversation_id=conversation_id).all()
+    assert sorted(ligne.type_appel for ligne in lignes) == ["chat", "chat", "extraction_web", "titrage"]
+    (extraction,) = [ligne for ligne in lignes if ligne.type_appel == "extraction_web"]
+    assert extraction.modele == MODELE_CHAT and extraction.identifiant_compte == "j.dupont"
+    assert extraction.cout_usd > 0
+
+    total = client.get("/consommation", headers=_autorisation(jeton_valide)).json()
+    assert total["chat"]["nombre_requetes"] == 4
+
+
+def test_sans_page_lue_aucun_appel_dextraction_et_les_extraits_du_moteur_vont_au_modele(
+    client, mistral_client_factice, moteur_recherche_factice, jeton_valide, db_session
+):
+    moteur_recherche_factice.repondre(*_RESULTATS)
+    _demander_recherche(mistral_client_factice)
+    mistral_client_factice.repondre("Voici la loi.", "Titre")
+
+    conversation_id = _creer_conversation(client, jeton_valide)
+
+    assert mistral_client_factice.appels_extraction == []
+    assert not db_session.query(Consommation).filter_by(type_appel="extraction_web").count()
+    (message_tool,) = _messages_tool(mistral_client_factice.appels_reponse[-2])
+    for _, url, extrait in _RESULTATS[:5]:
+        assert url in message_tool["content"] and extrait in message_tool["content"]
+
+
+def test_extraction_en_erreur_reponse_200_et_liste_des_resultats_avec_extraction_indisponible(
+    client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide, monkeypatch
+):
+    _recherche_avec_page(
+        moteur_recherche_factice, telechargeur_pages_factice, mistral_client_factice, "Texte de la loi lue."
+    )
+    mistral_client_factice.echouer_extraction(RuntimeError("Mistral injoignable"))
+    mistral_client_factice.repondre("Voici les résultats.", "Titre")
+
+    reponse = client.post(
+        "/conversations", json={"message": "Trouve la loi Climat"}, headers=_autorisation(jeton_valide)
+    )
+
+    assert reponse.status_code == 200
+    assert reponse.json()["reponse"] == "Voici les résultats."
+    (message_tool,) = _messages_tool(mistral_client_factice.appels_reponse[-2])
+    contenu = message_tool["content"]
+    assert "extraction indisponible" in contenu.lower()
+    for titre, url, extrait in _RESULTATS[:5]:
+        assert titre in contenu and url in contenu and extrait in contenu
+    assert "Texte de la loi lue." not in contenu
+
+    monkeypatch.setenv("VM_ADMIN_KEY", "cle-admin-de-test")
+    entetes_admin = {**_autorisation(jeton_valide), "X-Admin-Key": "cle-admin-de-test"}
+    conversation_id = reponse.json()["conversation"]["id"]
+    echanges = client.get(
+        f"/inspecteur/conversations/{conversation_id}/echanges", headers=entetes_admin
+    ).json()
+    (extraction,) = [e for e in echanges if e["type_appel"] == "extraction_web"]
+    assert extraction["origine"] == "mistral" and extraction["statut"] == "echec"
+
+
+def test_inspecteur_place_lextraction_entre_loutil_et_lappel_principal_suivant(
+    client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide, monkeypatch
+):
+    monkeypatch.setenv("VM_ADMIN_KEY", "cle-admin-de-test")
+    entetes_admin = {**_autorisation(jeton_valide), "X-Admin-Key": "cle-admin-de-test"}
+    _recherche_avec_page(
+        moteur_recherche_factice, telechargeur_pages_factice, mistral_client_factice, "Texte de la loi lue."
+    )
+    mistral_client_factice.repondre_extraction("Extrait de la loi.")
+    mistral_client_factice.repondre("Voici la loi.", "Titre")
+    conversation_id = _creer_conversation(client, jeton_valide)
+
+    echanges = client.get(
+        f"/inspecteur/conversations/{conversation_id}/echanges", headers=entetes_admin
+    ).json()
+    assert [(e["origine"], e["type_appel"]) for e in echanges] == [
+        ("mistral", "chat"),
+        ("local", f"outil:{_OUTIL}"),
+        ("mistral", "extraction_web"),
+        ("mistral", "chat"),
+        ("mistral", "titrage"),
+    ]
+    detail = client.get(f"/inspecteur/echanges/{echanges[2]['id']}", headers=entetes_admin).json()
+    assert detail["statut"] == "succes" and detail["modele"] == MODELE_CHAT
+    assert "Texte de la loi lue." in detail["requete_payload"]["messages"][-1]["content"]
+    assert "Extrait de la loi." in json.dumps(detail["reponse_payload"], ensure_ascii=False)

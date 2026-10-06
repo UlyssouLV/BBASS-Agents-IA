@@ -46,7 +46,7 @@ from vm_centrale.models import (
     ResultatRechercheWeb,
 )
 from vm_centrale.moteur_recherche import MoteurRecherche, get_moteur_recherche
-from vm_centrale.outils import ContexteTour, executer_appel, outils_du_tour
+from vm_centrale.outils import AppelMistralOutil, ContexteTour, executer_appel, outils_du_tour
 from vm_centrale.schemas import (
     ConversationCreeRequest,
     ConversationCreeResponse,
@@ -670,6 +670,7 @@ def creer_conversation(
             ids_fenetre=frozenset(),
             moteur_recherche=moteur_recherche,
             telechargeur_pages=telechargeur_pages,
+            client_mistral=client,
         )
         tools = outils_du_tour(contexte_outils)
         reponse_chat = _resoudre_reponse_chat(
@@ -1065,11 +1066,51 @@ def _executer_appels_outils(
             requete_payload={"arguments": appel.arguments},
             reponse_payload={"contenu": resultat.contenu, **resultat.trace},
         )
+        for appel_mistral in resultat.appels_mistral:
+            _enregistrer_appel_mistral_outil(contexte_outils, identifiant_compte, appel_mistral)
         messages_outils.append(
             {"role": "tool", "tool_call_id": appel.id, "name": appel.nom, "content": resultat.contenu}
         )
         piece_jointe_relue = piece_jointe_relue or resultat.piece_jointe_id
     return messages_outils, piece_jointe_relue
+
+
+def _enregistrer_appel_mistral_outil(
+    contexte_outils: ContexteTour,
+    identifiant_compte: str,
+    appel: AppelMistralOutil,
+) -> None:
+    # Appel Mistral interne à un outil (ex. extraction_web, spec 1.4.0) :
+    # compté dans la conversation et le compte s'il a abouti. En échec, le
+    # tour continue : l'échange n'est pas commité seul, il suit le tour.
+    db = contexte_outils.db
+    if appel.usage is None:
+        enregistrer_echange_echec(
+            db,
+            identifiant_compte=identifiant_compte,
+            conversation_id=contexte_outils.conversation_id,
+            piece_jointe_id=None,
+            type_appel=appel.type_appel,
+            modele=appel.modele,
+            requete_payload=appel.requete_payload,
+            reponse_payload=appel.reponse_payload,
+            erreur=appel.erreur or "",
+            commit=False,
+        )
+        return
+    enregistrer_consommation(
+        db, identifiant_compte, contexte_outils.conversation_id, appel.type_appel, appel.modele, usage=appel.usage
+    )
+    enregistrer_echange_succes(
+        db,
+        identifiant_compte=identifiant_compte,
+        conversation_id=contexte_outils.conversation_id,
+        piece_jointe_id=None,
+        type_appel=appel.type_appel,
+        modele=appel.modele,
+        requete_payload=appel.requete_payload,
+        reponse_payload=appel.reponse_payload,
+    )
 
 
 def _enregistrer_appel_principal(
@@ -1371,6 +1412,7 @@ def envoyer_message(
             ids_fenetre=frozenset(m.id for m in derniers_messages),
             moteur_recherche=moteur_recherche,
             telechargeur_pages=telechargeur_pages,
+            client_mistral=client,
         )
         tools = outils_du_tour(contexte_outils)
 

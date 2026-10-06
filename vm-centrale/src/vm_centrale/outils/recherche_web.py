@@ -5,9 +5,11 @@ from datetime import datetime, timezone
 
 import trafilatura
 
+from vm_centrale.config import MODELE_CHAT
+from vm_centrale.inspecteur import payload_depuis_erreur, reponse_depuis_erreur
 from vm_centrale.models import ResultatRechercheWeb
 from vm_centrale.moteur_recherche import MoteurIndisponible, ResultatRecherche
-from vm_centrale.outils.base import ContexteTour, Outil, ResultatOutil
+from vm_centrale.outils.base import AppelMistralOutil, ContexteTour, Outil, ResultatOutil
 from vm_centrale.telechargement_pages import PageIndisponible, TelechargeurPages
 
 _NOM = "rechercher_web"
@@ -29,6 +31,22 @@ _AUCUN_RESULTAT = (
     "Aucun résultat pour cette recherche. Reformule la requête, ou réponds sans "
     "résultat de recherche et sans lien."
 )
+# Consigne fixe de l'appel d'extraction (spec 1.4.0, étape 5, décision
+# n° 18), sans consigne de style : il ne reçoit que le besoin et les pages,
+# jamais le contexte de la conversation (ADR-0014).
+CONSIGNE_EXTRACTION = (
+    "À partir de ces pages, extrais seulement ce qui répond au besoin. Indique "
+    "l'URL de chaque information. N'ajoute rien qui ne soit pas écrit dans les "
+    "pages. Si rien ne répond au besoin, dis-le."
+)
+_EXTRACTION_INDISPONIBLE = (
+    "Extraction indisponible : le texte des pages n'a pas pu être lu. Seuls le "
+    "titre, l'URL et l'extrait du moteur de chaque résultat sont disponibles."
+)
+_AUCUNE_PAGE_LUE = (
+    "Aucune page n'a pu être lue. Seuls le titre, l'URL et l'extrait du moteur "
+    "de chaque résultat sont disponibles."
+)
 
 logger = logging.getLogger(__name__)
 
@@ -42,8 +60,9 @@ _SCHEMA = {
             "Cherche sur Internet. À utiliser quand la réponse demande une "
             "information à trouver : une page ou un texte officiel, un texte "
             "réglementaire, une actualité, un classement, une donnée récente. "
-            "Renvoie les résultats trouvés (titre, URL, extrait) : seules ces "
-            "URL peuvent être citées."
+            "Renvoie la liste des résultats trouvés (titre, URL) et ce que les "
+            "pages lues disent du besoin, avec l'URL de chaque information : "
+            "seules ces URL peuvent être citées."
         ),
         "parameters": {
             "type": "object",
@@ -76,7 +95,7 @@ def _declarer(contexte: ContexteTour) -> dict:
 
 @dataclass
 class _Page:
-    # Une page téléchargée, pour le message `tool` et l'échange local
+    # Une page téléchargée, pour l'appel d'extraction et l'échange local
     # d'inspecteur. `texte` : texte principal nettoyé, vide si la page est
     # ignorée.
     url: str
@@ -87,8 +106,8 @@ class _Page:
 
     @property
     def texte_lu(self) -> str:
-        # Ce que le modèle lit, et donc la source du garde-fou chiffres :
-        # jamais une page retirée par le plafond.
+        # Ce que l'appel d'extraction lit, et donc la source du garde-fou
+        # chiffres : jamais une page retirée par le plafond.
         return "" if self.retiree_par_plafond else self.texte
 
     def trace(self) -> dict:
@@ -133,21 +152,49 @@ def _lire_pages(resultats: list[ResultatRecherche], telechargeur: TelechargeurPa
     return pages
 
 
-def _contenu_pour_le_modele(requete: str, resultats: list[ResultatRecherche], pages: list[_Page]) -> str:
-    # En attendant l'appel d'extraction, le modèle reçoit la liste des
-    # résultats et le texte nettoyé des pages lues.
+def _liste_resultats(requete: str, resultats: list[ResultatRecherche], avec_extraits: bool) -> str:
     lignes = [f"Résultats de la recherche « {requete} » :"]
     for numero, resultat in enumerate(resultats, start=1):
-        lignes.append(f"{numero}. {resultat.titre}\n   URL : {resultat.url}\n   Extrait : {resultat.extrait}")
-    lues = [page for page in pages if page.texte_lu]
-    if lues:
-        lignes.append("\nTexte des pages lues :")
-        lignes.extend(f"\n--- Page : {page.url} ---\n{page.texte_lu}" for page in lues)
+        ligne = f"{numero}. {resultat.titre}\n   URL : {resultat.url}"
+        if avec_extraits:
+            ligne += f"\n   Extrait : {resultat.extrait}"
+        lignes.append(ligne)
     return "\n".join(lignes)
 
 
+def _extraire(besoin: str, lues: list[_Page], contexte: ContexteTour) -> tuple[str | None, AppelMistralOutil]:
+    # Appel d'extraction (ADR-0014) : le besoin et les pages lues, rien
+    # d'autre. Son texte va au modèle principal mais n'est jamais enregistré
+    # comme source des garde-fous (décision n° 12) : il peut inventer.
+    # Renvoie None si l'appel échoue (décision n° 17), jamais d'exception.
+    pages = "\n".join(f"\n--- Page : {page.url} ---\n{page.texte_lu}" for page in lues)
+    messages = [
+        {"role": "system", "content": CONSIGNE_EXTRACTION},
+        {"role": "user", "content": f"Besoin : {besoin}\n\nPages :\n{pages}"},
+    ]
+    try:
+        reponse = contexte.client_mistral.chat(messages)
+    except Exception as erreur:
+        logger.warning("Appel d'extraction en échec : %s", erreur)
+        return None, AppelMistralOutil(
+            type_appel="extraction_web",
+            modele=MODELE_CHAT,
+            requete_payload=payload_depuis_erreur(erreur),
+            reponse_payload=reponse_depuis_erreur(erreur),
+            usage=None,
+            erreur=str(erreur),
+        )
+    return reponse.contenu, AppelMistralOutil(
+        type_appel="extraction_web",
+        modele=MODELE_CHAT,
+        requete_payload=reponse.payload_envoye,
+        reponse_payload=reponse.reponse_brute,
+        usage=reponse.usage,
+    )
+
+
 def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
-    # `besoin` ne part jamais vers le moteur (ADR-0013) : il servira à
+    # `besoin` ne part jamais vers le moteur (ADR-0013) : il ne va qu'à
     # l'appel d'extraction.
     requete = str(arguments.get("requete") or "").strip()
     if not requete:
@@ -173,7 +220,7 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
             titre=resultat.titre,
             extrait_moteur=resultat.extrait,
             # Source du garde-fou chiffres : jamais une page retirée par le
-            # plafond, que le modèle n'a pas lue.
+            # plafond, que l'appel d'extraction n'a pas lue.
             texte_nettoye=textes.get(resultat.url, ""),
             date_creation=maintenant,
         )
@@ -182,13 +229,29 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
     # Flush (jamais commit) : les garde-fous du même tour relisent ces URL en
     # base, et un tour qui échoue plus loin les annule avec le reste.
     contexte.db.flush()
-    return ResultatOutil(
-        _contenu_pour_le_modele(requete, resultats, pages),
-        trace={
-            "resultats": [asdict(resultat) for resultat in resultats],
-            "pages": [page.trace() for page in pages],
-        },
-    )
+
+    trace = {
+        "resultats": [asdict(resultat) for resultat in resultats],
+        "pages": [page.trace() for page in pages],
+    }
+    lues = [page for page in pages if page.texte_lu]
+    if not lues:
+        # Rien à extraire : pas d'appel payé pour rien, le modèle garde les
+        # extraits du moteur.
+        contenu = f"{_liste_resultats(requete, resultats, avec_extraits=True)}\n\n{_AUCUNE_PAGE_LUE}"
+        return ResultatOutil(contenu, trace=trace)
+
+    extrait, appel = _extraire(str(arguments.get("besoin") or "").strip(), lues, contexte)
+    if extrait is None:
+        contenu = f"{_liste_resultats(requete, resultats, avec_extraits=True)}\n\n{_EXTRACTION_INDISPONIBLE}"
+    else:
+        # L'extrait et la liste (titre, URL), jamais le texte des pages
+        # (spec 1.4.0, étape 6).
+        contenu = (
+            f"{_liste_resultats(requete, resultats, avec_extraits=False)}\n\n"
+            f"Extrait des pages lues, pour ce besoin :\n{extrait}"
+        )
+    return ResultatOutil(contenu, trace=trace, appels_mistral=(appel,))
 
 
 OUTIL = Outil(nom=_NOM, declarer=_declarer, executer=_executer)
