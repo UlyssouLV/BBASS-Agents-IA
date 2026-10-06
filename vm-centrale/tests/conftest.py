@@ -58,7 +58,7 @@ def _sans_init_db_reel(monkeypatch):
 # viendra avec le ticket suivant).
 _USAGE_FACTICE = Usage(tokens_entree=10, tokens_sortie=5, tokens_total=15)
 _PAGES_PROCESSED_FACTICE = 1
-_EXTRAIT_FACTICE = "Extrait factice des pages lues."
+_EXTRAIT_FACTICE = json.dumps({"extrait": "Extrait factice des pages lues.", "questions_couvertes": []})
 
 
 class ClientMistralFactice:
@@ -175,7 +175,23 @@ class ClientMistralFactice:
             for demande in demandes
         )
 
-    def repondre_extraction(self, texte: str) -> None:
+    def repondre_extraction(self, extrait: str, questions: list[tuple[str, str, str]] = ()) -> None:
+        # Sortie JSON de l'appel d'extraction (spec 1.4.1) : l'extrait et
+        # les questions couvertes (question, réponse, source).
+        self.repondre_extraction_brute(
+            json.dumps(
+                {
+                    "extrait": extrait,
+                    "questions_couvertes": [
+                        {"question": question, "reponse": reponse, "source": source}
+                        for question, reponse, source in questions
+                    ],
+                },
+                ensure_ascii=False,
+            )
+        )
+
+    def repondre_extraction_brute(self, texte: str) -> None:
         self._reponse_extraction = texte
         self._exception_extraction = None
 
@@ -187,9 +203,9 @@ class ClientMistralFactice:
         # échoue (rollback d'un tour, spec 1.4.0).
         self._echec_apres_demandes_outils = exception
 
-    def _extraire(self, messages) -> ReponseChat:
+    def _extraire(self, messages, response_format) -> ReponseChat:
         self.appels_extraction.append(messages)
-        payload = {"model": "mistral-factice", "messages": messages}
+        payload = {"model": "mistral-factice", "messages": messages, "response_format": response_format}
         if self._exception_extraction is not None:
             raise ErreurAppelMistral(
                 str(self._exception_extraction), payload_envoye=payload
@@ -204,7 +220,7 @@ class ClientMistralFactice:
     def chat(self, messages, response_format=None, tools=None) -> ReponseChat:
         with self._verrou:
             if not isinstance(messages, str) and messages and messages[0]["content"] == CONSIGNE_EXTRACTION:
-                return self._extraire(messages)
+                return self._extraire(messages, response_format)
             self.messages_recus.append(messages)
             self.response_formats_recus.append(response_format)
             if response_format is not None:

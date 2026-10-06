@@ -209,6 +209,35 @@ class ResultatRechercheWeb(Base):
     date_creation: Mapped[datetime] = mapped_column(DateTime)
 
 
+class QuestionCouverte(Base):
+    # Une question à laquelle le contenu d'un élément de la conversation
+    # répond (spec 1.4.1) : une pièce jointe ou un résultat de recherche web,
+    # jamais les deux. Écrite par un modèle : jamais une source des
+    # garde-fous.
+    __tablename__ = "questions_couvertes"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    conversation_id: Mapped[int] = mapped_column(
+        ForeignKey(_FK_CONVERSATIONS_ID, ondelete="CASCADE"), index=True
+    )
+    piece_jointe_id: Mapped[int | None] = mapped_column(
+        ForeignKey("pieces_jointes.id"), nullable=True, index=True
+    )
+    resultat_recherche_web_id: Mapped[int | None] = mapped_column(
+        ForeignKey("resultats_recherche_web.id"), nullable=True, index=True
+    )
+    question: Mapped[str] = mapped_column(String)
+    reponse: Mapped[str] = mapped_column(String)
+    # Nom de fichier ou URL de l'élément.
+    source: Mapped[str] = mapped_column(String)
+    # Faux : « non présent selon l'extraction » pour ce besoin.
+    trouvee: Mapped[bool] = mapped_column(Boolean, default=True)
+    # "initiale" (générée à la lecture de l'élément) / "besoin" (relecture
+    # avec un besoin).
+    origine: Mapped[str] = mapped_column(String)
+    date_creation: Mapped[datetime] = mapped_column(DateTime)
+
+
 class ProfilTravail(Base):
     __tablename__ = "profils_travail"
 

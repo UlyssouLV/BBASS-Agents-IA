@@ -45,6 +45,7 @@ from vm_centrale.models import (
     Message,
     PieceJointe,
     ProfilTravail,
+    QuestionCouverte,
     ResultatRechercheWeb,
 )
 from vm_centrale.moteur_recherche import MoteurRecherche, get_moteur_recherche
@@ -895,7 +896,10 @@ def supprimer_conversation(
     # comportement identique quel que soit le moteur de base (la base de
     # test SQLite n'applique pas les contraintes FK par défaut).
     db.query(EchangeInspecteur).filter(EchangeInspecteur.conversation_id == conversation.id).delete()
-    # Même chose pour les résultats de recherche (spec 1.4.0).
+    # Même chose pour les questions couvertes (spec 1.4.1), avant les
+    # résultats de recherche et les pièces jointes qu'elles référencent, et
+    # pour les résultats de recherche (spec 1.4.0).
+    db.query(QuestionCouverte).filter(QuestionCouverte.conversation_id == conversation.id).delete()
     db.query(ResultatRechercheWeb).filter(
         ResultatRechercheWeb.conversation_id == conversation.id
     ).delete()

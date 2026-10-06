@@ -2,7 +2,7 @@ import json
 import re
 
 from vm_centrale.config import MODELE_CHAT
-from vm_centrale.models import Consommation, EchangeInspecteur, ResultatRechercheWeb
+from vm_centrale.models import Consommation, EchangeInspecteur, QuestionCouverte, ResultatRechercheWeb
 
 # Outil rechercher_web (spec 1.4.0) : SearXNG remplacé par
 # MoteurRechercheFactice (conftest), aucun accès réseau.
@@ -701,3 +701,153 @@ def test_une_url_de_resultat_avec_parentheses_reste_entiere_une_url_inventee_ave
 
     assert reponse.status_code == 200
     assert reponse.json()["reponse"] == f"Voir [Loi]({url}) et {url}. (Source : {url}) Faux : fin"
+
+
+# Questions couvertes de l'appel d'extraction (spec 1.4.1, #136) : JSON
+# strict, enregistrées sur le résultat de la page source.
+
+_URL_JAMAIS_LUE = _RESULTATS[3][1]
+
+
+def _questions_couvertes(db_session, conversation_id: int) -> list[QuestionCouverte]:
+    return (
+        db_session.query(QuestionCouverte)
+        .filter_by(conversation_id=conversation_id)
+        .order_by(QuestionCouverte.id)
+        .all()
+    )
+
+
+def _resultat(db_session, conversation_id: int, url: str) -> ResultatRechercheWeb:
+    return db_session.query(ResultatRechercheWeb).filter_by(conversation_id=conversation_id, url=url).one()
+
+
+def _recherche_avec_deux_pages(moteur_recherche_factice, telechargeur_pages_factice, mistral_client_factice):
+    moteur_recherche_factice.repondre(*_RESULTATS)
+    telechargeur_pages_factice.servir(_URL_TROUVEE, _page_html("Texte de la loi lue."))
+    telechargeur_pages_factice.servir(_URL_DECRET, _page_html("Texte du décret lu."))
+    _demander_recherche(mistral_client_factice)
+
+
+def test_les_questions_de_lextraction_sont_enregistrees_sur_la_page_source(
+    client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide, db_session
+):
+    _recherche_avec_deux_pages(moteur_recherche_factice, telechargeur_pages_factice, mistral_client_factice)
+    mistral_client_factice.repondre_extraction(
+        f"La loi est sur Légifrance ({_URL_TROUVEE}).",
+        [
+            ("Où lire la loi ?", "Sur Légifrance.", _URL_TROUVEE),
+            ("Quel décret l'applique ?", "Le décret d'application.", _URL_DECRET),
+        ],
+    )
+    mistral_client_factice.repondre("Voici la loi.", "Titre")
+
+    conversation_id = _creer_conversation(client, jeton_valide)
+
+    questions = _questions_couvertes(db_session, conversation_id)
+    assert [(q.question, q.reponse, q.source) for q in questions] == [
+        ("Où lire la loi ?", "Sur Légifrance.", _URL_TROUVEE),
+        ("Quel décret l'applique ?", "Le décret d'application.", _URL_DECRET),
+    ]
+    assert questions[0].resultat_recherche_web_id == _resultat(db_session, conversation_id, _URL_TROUVEE).id
+    assert questions[1].resultat_recherche_web_id == _resultat(db_session, conversation_id, _URL_DECRET).id
+    assert all(
+        q.piece_jointe_id is None and q.trouvee and q.origine == "initiale" and q.date_creation for q in questions
+    )
+
+    # L'extrait part au modèle comme en 1.4.0, jamais le JSON brut.
+    (message_tool,) = _messages_tool(mistral_client_factice.appels_reponse[-2])
+    assert f"La loi est sur Légifrance ({_URL_TROUVEE})." in message_tool["content"]
+    assert "questions_couvertes" not in message_tool["content"]
+
+
+def test_lappel_dextraction_demande_un_json_strict(
+    client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide, monkeypatch
+):
+    monkeypatch.setenv("VM_ADMIN_KEY", "cle-admin-de-test")
+    entetes_admin = {**_autorisation(jeton_valide), "X-Admin-Key": "cle-admin-de-test"}
+    _recherche_avec_deux_pages(moteur_recherche_factice, telechargeur_pages_factice, mistral_client_factice)
+    mistral_client_factice.repondre("Voici la loi.", "Titre")
+    conversation_id = _creer_conversation(client, jeton_valide)
+
+    echanges = client.get(
+        f"/inspecteur/conversations/{conversation_id}/echanges", headers=entetes_admin
+    ).json()
+    (extraction,) = [e for e in echanges if e["type_appel"] == "extraction_web"]
+    detail = client.get(f"/inspecteur/echanges/{extraction['id']}", headers=entetes_admin).json()
+    format_demande = detail["requete_payload"]["response_format"]
+    assert format_demande["type"] == "json_schema" and format_demande["json_schema"]["strict"] is True
+    consigne = detail["requete_payload"]["messages"][0]["content"]
+    assert "8" in consigne and "300" in consigne and "non trouvé" in consigne
+
+
+def test_au_dela_de_huit_questions_seules_les_huit_premieres_et_reponse_tronquee_a_300(
+    client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide, db_session
+):
+    _recherche_avec_deux_pages(moteur_recherche_factice, telechargeur_pages_factice, mistral_client_factice)
+    longue = "x" * 450
+    mistral_client_factice.repondre_extraction(
+        "Extrait.", [(f"Question {n} ?", longue if n == 1 else f"Réponse {n}", _URL_TROUVEE) for n in range(1, 11)]
+    )
+    mistral_client_factice.repondre("Voici la loi.", "Titre")
+
+    conversation_id = _creer_conversation(client, jeton_valide)
+
+    questions = _questions_couvertes(db_session, conversation_id)
+    assert [q.question for q in questions] == [f"Question {n} ?" for n in range(1, 9)]
+    assert questions[0].reponse == "x" * 300
+
+
+def test_une_question_dont_la_source_nest_pas_une_page_lue_est_ignoree(
+    client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide, db_session
+):
+    _recherche_avec_deux_pages(moteur_recherche_factice, telechargeur_pages_factice, mistral_client_factice)
+    mistral_client_factice.repondre_extraction(
+        "Extrait.",
+        [
+            ("Inventée ?", "Oui.", _URL_INVENTEE),
+            ("Jamais lue ?", "Oui.", _URL_JAMAIS_LUE),
+            ("Où lire la loi ?", "Sur Légifrance.", _URL_TROUVEE),
+        ],
+    )
+    mistral_client_factice.repondre("Voici la loi.", "Titre")
+
+    conversation_id = _creer_conversation(client, jeton_valide)
+
+    assert [q.question for q in _questions_couvertes(db_session, conversation_id)] == ["Où lire la loi ?"]
+
+
+def test_un_json_invalide_rend_lextraction_indisponible_comme_en_1_4_0(
+    client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide, db_session
+):
+    _recherche_avec_deux_pages(moteur_recherche_factice, telechargeur_pages_factice, mistral_client_factice)
+    mistral_client_factice.repondre_extraction_brute("La loi est sur Légifrance, pas de JSON.")
+    mistral_client_factice.repondre("Voici les résultats.", "Titre")
+
+    reponse = client.post(
+        "/conversations", json={"message": "Trouve la loi Climat"}, headers=_autorisation(jeton_valide)
+    )
+
+    assert reponse.status_code == 200
+    (message_tool,) = _messages_tool(mistral_client_factice.appels_reponse[-2])
+    contenu = message_tool["content"]
+    assert "extraction indisponible" in contenu.lower()
+    assert "pas de JSON" not in contenu
+    for _, url, extrait in _RESULTATS[:5]:
+        assert url in contenu and extrait in contenu
+    assert _questions_couvertes(db_session, reponse.json()["conversation"]["id"]) == []
+
+
+def test_supprimer_la_conversation_supprime_ses_questions_couvertes(
+    client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide, db_session
+):
+    _recherche_avec_deux_pages(moteur_recherche_factice, telechargeur_pages_factice, mistral_client_factice)
+    mistral_client_factice.repondre_extraction("Extrait.", [("Où lire la loi ?", "Sur Légifrance.", _URL_TROUVEE)])
+    mistral_client_factice.repondre("Voici la loi.", "Titre")
+    conversation_id = _creer_conversation(client, jeton_valide)
+    assert _questions_couvertes(db_session, conversation_id)
+
+    suppression = client.delete(f"/conversations/{conversation_id}", headers=_autorisation(jeton_valide))
+
+    assert suppression.status_code == 204
+    assert db_session.query(QuestionCouverte).count() == 0
