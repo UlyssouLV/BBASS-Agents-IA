@@ -72,7 +72,8 @@ _SCHEMA = {
                     "description": (
                         "La recherche, formulée comme dans un moteur de "
                         "recherche : mots-clés précis, sans phrase de politesse. "
-                        "Seule cette chaîne part vers le moteur."
+                        "Pour une actualité, l'année de la date du jour donnée "
+                        "dans la consigne. Seule cette chaîne part vers le moteur."
                     ),
                 },
                 "besoin": {

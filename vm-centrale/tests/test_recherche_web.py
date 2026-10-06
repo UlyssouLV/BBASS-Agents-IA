@@ -1,4 +1,5 @@
 import json
+import re
 
 from vm_centrale.config import MODELE_CHAT
 from vm_centrale.models import Consommation, EchangeInspecteur, ResultatRechercheWeb
@@ -73,6 +74,18 @@ def test_rechercher_web_est_declare_sur_lappel_principal_jamais_sur_titrage_ni_r
     assert par_type["titrage"] and par_type["resume_et_profil"]
     for payload in par_type["titrage"] + par_type["resume_et_profil"]:
         assert "tools" not in payload
+
+
+def test_la_description_de_requete_renvoie_a_la_date_du_jour_sans_annee_en_dur(
+    client, mistral_client_factice, jeton_valide
+):
+    mistral_client_factice.repondre("Réponse", "Titre")
+    _creer_conversation(client, jeton_valide, "Bonjour")
+
+    outil = next(t for t in mistral_client_factice.tools_appels_reponse[0] if t["function"]["name"] == _OUTIL)
+    description = outil["function"]["parameters"]["properties"]["requete"]["description"]
+    assert "date du jour" in description
+    assert not re.search(r"\b(19|20)\d{2}\b", description)
 
 
 def test_le_moteur_recoit_la_requete_seule_et_le_modele_les_cinq_premiers_resultats(

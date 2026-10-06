@@ -1,11 +1,12 @@
 import json
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
 from vm_centrale.database import get_db
+from vm_centrale.routers import conversations
 from vm_centrale.jetons import JetonStore, get_jeton_store
 from vm_centrale.main import app
 from vm_centrale.models import Conversation, PieceJointe, ProfilTravail
@@ -1244,6 +1245,19 @@ def test_consigne_de_style_commence_par_la_capacite_reelle(
     assert "question de confirmation" in premiere_ligne
     assert "que l'utilisateur a lui-même écrite dans cette conversation" in consigne["content"]
     assert "que tu connais avec certitude" not in consigne["content"]
+
+
+def test_consigne_de_style_donne_la_date_du_jour_de_lappel(
+    client, mistral_client_factice, jeton_valide, monkeypatch
+):
+    monkeypatch.setattr(conversations, "_date_du_jour", lambda: date(2031, 2, 3))
+    mistral_client_factice.repondre("Réponse", "Titre")
+
+    client.post("/conversations", json={"message": "Bonjour"}, headers=_autorisation(jeton_valide))
+
+    consigne = mistral_client_factice.appels_reponse[0][0]["content"]
+    assert "2031-02-03" in consigne
+    assert "l'année 2031" in consigne
 
 
 def test_titre_genere_est_nettoye_de_sa_mise_en_forme_markdown(

@@ -4,7 +4,7 @@ import os
 import re
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
@@ -184,8 +184,27 @@ _PROMPT_STYLE = (
 )
 
 
+def _date_du_jour() -> date:
+    return datetime.now(timezone.utc).date()
+
+
+def _consigne_date_du_jour() -> str:
+    # Calculée à chaque appel, jamais figée dans _PROMPT_STYLE (issue #130,
+    # conversation 87) : sans elle, mistral-small-latest traduisait
+    # « dernières annonces » par les années de sa mémoire (« 2024 2025 »)
+    # dans la requête de rechercher_web.
+    aujourdhui = _date_du_jour()
+    return (
+        f"Date du jour : {aujourdhui.isoformat()}. Pour une actualité ou une "
+        "information récente, mets l'année "
+        f"{aujourdhui.year} dans la requête de rechercher_web, jamais une année "
+        "plus ancienne de ta mémoire ; pour un texte déjà nommé (article de "
+        "loi, document daté par l'utilisateur), ne l'ajoute pas d'office."
+    )
+
+
 def _message_systeme_style() -> dict[str, str]:
-    return {"role": "system", "content": _PROMPT_STYLE}
+    return {"role": "system", "content": f"{_PROMPT_STYLE}\n{_consigne_date_du_jour()}"}
 
 
 def _prompt_titrage(message_utilisateur: str, reponse_assistant: str) -> str:
