@@ -11,8 +11,9 @@ DATABASE_URL = os.environ.get("VM_CENTRALE_DATABASE_URL", "sqlite:///./vm_centra
 # Racine du stockage fichier des pièces jointes (spec V1.1.2), même
 # convention que DATABASE_URL ci-dessus.
 PIECES_JOINTES_DIR = os.environ.get("VM_CENTRALE_PIECES_JOINTES_DIR", "./pieces_jointes")
-# Doit rester <= au timeout HTTP du poste (POSTE_HTTP_TIMEOUT, 35s par
-# défaut) : voir poste/src/poste/config.py.
+# Le timeout HTTP du poste (POSTE_HTTP_TIMEOUT, 200 s par défaut) couvre
+# le pire tour qui en découle, recherche web comprise : voir
+# poste/src/poste/config.py.
 MISTRAL_HTTP_TIMEOUT = float(os.environ.get("MISTRAL_HTTP_TIMEOUT", "30"))
 # SearXNG auto-hébergé du docker-compose.yml (spec 1.4.0, ADR-0013), publié
 # sur localhost seulement.

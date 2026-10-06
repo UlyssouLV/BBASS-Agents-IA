@@ -1213,9 +1213,12 @@ def _resoudre_reponse_chat(
                     reponse = client.chat(messages, tools=None if dernier_tour else tools)
             except AppelOutilDemande as demande:
                 _enregistrer_appel_principal(contexte_outils, identifiant_compte, piece_jointe_id, demande)
-                messages_outils, piece_jointe_id = _executer_appels_outils(
+                messages_outils, piece_jointe_relue = _executer_appels_outils(
                     demande, contexte_outils, identifiant_compte
                 )
+                # Celle du message reste si aucun outil n'a relu de pièce
+                # jointe (rechercher_web, par exemple).
+                piece_jointe_id = piece_jointe_relue or piece_jointe_id
                 messages = [*messages, demande.message_assistant, *messages_outils]
                 continue
             _enregistrer_appel_principal(contexte_outils, identifiant_compte, piece_jointe_id, reponse)

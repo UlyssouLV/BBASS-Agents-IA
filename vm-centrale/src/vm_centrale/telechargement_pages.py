@@ -1,4 +1,5 @@
 import ssl
+import time
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -7,6 +8,9 @@ import truststore
 
 from vm_centrale.config import PAGES_HTTP_TIMEOUT
 
+# Au-delà, la page est ignorée sans être lue en entier : une page HTML
+# dépasse rarement quelques centaines de kilo-octets.
+_TAILLE_MAX_PAGE = 5 * 1024 * 1024
 
 def _creer_client_http() -> httpx.Client:
     # Magasin de certificats du système plutôt que certifi : il complète la
@@ -47,13 +51,31 @@ class TelechargeurPages(Protocol):
 
 class TelechargeurHttpx:
     def telecharger(self, url: str) -> PageTelechargee:
+        # Le timeout du client vaut par opération (connexion, chaque lecture),
+        # pas pour la page entière : un serveur qui envoie un octet à la fois
+        # tiendrait la requête ouverte. L'échéance globale est donc vérifiée
+        # à chaque morceau reçu (dépassement d'une lecture au plus).
+        echeance = time.monotonic() + PAGES_HTTP_TIMEOUT
         try:
-            reponse = _http_client.get(url)
-            return PageTelechargee(
-                statut=reponse.status_code,
-                type_contenu=reponse.headers.get("content-type", ""),
-                corps=reponse.text,
-            )
+            with _http_client.stream("GET", url) as reponse:
+                type_contenu = reponse.headers.get("content-type", "")
+                if reponse.status_code != 200 or "html" not in type_contenu.lower():
+                    # Page refusée par l'outil de toute façon : le corps
+                    # (PDF, vidéo…) n'est jamais lu.
+                    return PageTelechargee(statut=reponse.status_code, type_contenu=type_contenu, corps="")
+                morceaux: list[bytes] = []
+                taille = 0
+                for morceau in reponse.iter_bytes():
+                    taille += len(morceau)
+                    if taille > _TAILLE_MAX_PAGE:
+                        raise PageIndisponible(f"page de plus de {_TAILLE_MAX_PAGE} octets")
+                    if time.monotonic() > echeance:
+                        raise PageIndisponible(f"délai de {PAGES_HTTP_TIMEOUT:g} s dépassé")
+                    morceaux.append(morceau)
+                # Même décodage que `reponse.text` : charset de l'en-tête,
+                # sinon UTF-8.
+                corps = b"".join(morceaux).decode(reponse.encoding or "utf-8", errors="replace")
+                return PageTelechargee(statut=reponse.status_code, type_contenu=type_contenu, corps=corps)
         except httpx.HTTPError as erreur:
             raise PageIndisponible(str(erreur) or type(erreur).__name__) from erreur
 

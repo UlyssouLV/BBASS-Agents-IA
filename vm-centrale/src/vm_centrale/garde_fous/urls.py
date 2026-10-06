@@ -10,15 +10,19 @@ from collections.abc import Iterable
 # sont une vraie trace de la page.
 
 # Lien Markdown `[texte](url)`, image `![texte](url)` comprise, avec un
-# éventuel titre `"..."` après l'URL.
+# éventuel titre `"..."` après l'URL. Une paire de parenthèses fermée dans
+# l'URL en fait partie (`…/wiki/Loi_(France)`, résultat de moteur courant).
 _MOTIF_LIEN_MARKDOWN = re.compile(
-    r'(!?)\[([^\]\n]*)\]\(\s*<?([^\s<>()]+)>?(?:\s+"[^"\n]*")?\s*\)'
+    r'(!?)\[([^\]\n]*)\]\(\s*<?((?:[^\s<>()]|\([^\s<>()]*\))+)>?(?:\s+"[^"\n]*")?\s*\)'
 )
 # URL nue, éventuellement entre chevrons (autolien Markdown). L'espace
 # horizontal qui la précède est capturé pour ne pas laisser de double
-# espace une fois l'URL retirée.
+# espace une fois l'URL retirée. Même règle de parenthèses : une paire
+# fermée en fait partie, une parenthèse seule (URL citée entre parenthèses)
+# appartient à la phrase.
 _MOTIF_URL_NUE = re.compile(
-    r"([ \t]*)<?((?:https?://|www\.)[^\s<>()\[\]\"']+)>?", re.IGNORECASE
+    r"([ \t]*)<?((?:https?://|www\.)(?:[^\s<>()\[\]\"']|\([^\s<>()\[\]\"']*\))+)>?",
+    re.IGNORECASE,
 )
 # Ponctuation de fin de phrase collée à une URL nue : appartient à la
 # phrase, pas à l'URL.

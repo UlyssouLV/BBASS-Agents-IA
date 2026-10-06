@@ -728,3 +728,24 @@ def test_un_chiffre_hors_source_dans_le_texte_dun_lien_markdown_est_retire(
 
     assert "2031" not in contenu
     assert f"({_URL_DATEE})" in contenu
+
+
+def test_une_url_de_resultat_avec_parentheses_reste_entiere_une_url_inventee_avec_parentheses_part(
+    client, mistral_client_factice, moteur_recherche_factice, jeton_valide
+):
+    # Wikipédia met souvent des parenthèses dans ses URL ; une URL citée
+    # entre parenthèses garde sa parenthèse fermante dans la phrase.
+    url = "https://fr.wikipedia.org/wiki/Loi_(France)"
+    moteur_recherche_factice.repondre(("Loi (France)", url, "Article sur la loi."))
+    _demander_recherche(mistral_client_factice)
+    mistral_client_factice.repondre(
+        f"Voir [Loi]({url}) et {url}. (Source : {url}) Faux : https://inventee.example.org/a_(b) fin",
+        "Titre",
+    )
+
+    reponse = client.post(
+        "/conversations", json={"message": "Trouve la loi"}, headers=_autorisation(jeton_valide)
+    )
+
+    assert reponse.status_code == 200
+    assert reponse.json()["reponse"] == f"Voir [Loi]({url}) et {url}. (Source : {url}) Faux : fin"

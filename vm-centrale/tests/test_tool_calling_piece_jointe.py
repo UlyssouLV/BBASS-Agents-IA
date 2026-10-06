@@ -2,6 +2,8 @@ import json
 
 import pytest
 
+from vm_centrale.models import EchangeInspecteur
+
 _PDF = ("document.pdf", b"%PDF-1.4 contenu factice", "application/pdf")
 _PDF_PLAN = ("plan.pdf", b"%PDF-1.4 plan factice", "application/pdf")
 _PDF_DEVIS = ("devis.pdf", b"%PDF-1.4 devis factice", "application/pdf")
@@ -274,3 +276,32 @@ def test_url_inventee_retiree_de_la_reponse_finale_apres_un_appel_doutil(
 
     assert reponse.status_code == 200
     assert reponse.json()["reponse"] == "Le plan est téléchargeable ici."
+
+
+def test_apres_rechercher_web_lappel_principal_suivant_garde_la_piece_jointe_du_message(
+    client, mistral_client_factice, moteur_recherche_factice, jeton_valide, db_session
+):
+    # Seul un outil qui relit une pièce jointe change la référence de
+    # l'appel suivant (spec 1.3.0) : rechercher_web la laisse.
+    mistral_client_factice.repondre_ocr("Devis du client")
+    piece_jointe_id = _televerser_sans_conversation(client, jeton_valide)
+    moteur_recherche_factice.repondre(("Résultat", "https://www.exemple.fr/page", "Extrait."))
+    mistral_client_factice.repondre_avec_appel_outil(
+        "rechercher_web", {"requete": "prix du marché", "besoin": "Comparer le devis"}
+    )
+    mistral_client_factice.repondre("Réponse finale", "Titre")
+
+    reponse = client.post(
+        "/conversations",
+        json={"message": "Compare ce devis", "piece_jointe_id": piece_jointe_id},
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert reponse.status_code == 200
+    appels_chat = (
+        db_session.query(EchangeInspecteur)
+        .filter_by(conversation_id=reponse.json()["conversation"]["id"], type_appel="chat")
+        .order_by(EchangeInspecteur.id)
+        .all()
+    )
+    assert [echange.piece_jointe_id for echange in appels_chat] == [piece_jointe_id, piece_jointe_id]
