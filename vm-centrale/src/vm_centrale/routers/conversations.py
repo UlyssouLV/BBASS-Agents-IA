@@ -43,6 +43,7 @@ from vm_centrale.models import (
     PieceJointe,
     ProfilTravail,
 )
+from vm_centrale.outils import ContexteTour, executer_appel, outils_du_tour
 from vm_centrale.schemas import (
     ConversationCreeRequest,
     ConversationCreeResponse,
@@ -87,54 +88,7 @@ _TYPE_NON_SUPPORTE = "Type de fichier non supporté"
 _FICHIER_TROP_VOLUMINEUX = "Fichier trop volumineux (max 20 Mo)"
 _PIECE_JOINTE_INTROUVABLE = "Pièce jointe introuvable"
 _PIECE_JOINTE_DEJA_LIEE = "Pièce jointe déjà liée à un message"
-_PIECE_JOINTE_OUTIL_INTROUVABLE = "Pièce jointe introuvable."
 _CHEMIN_PIECE_JOINTE_INVALIDE = "Nom de fichier invalide"
-
-_OUTIL_CONTENU_PIECE_JOINTE = "obtenir_contenu_piece_jointe"
-
-# Déclaré uniquement sur l'appel de réponse de chat principal (jamais
-# titrage ni résumé+profil), et seulement si la conversation a une pièce
-# jointe déjà liée à un message sorti de la fenêtre des derniers messages
-# (spec 1.1.2) : l'IA peut alors le redemander explicitement plutôt que de
-# répondre sans son contenu complet.
-def _outils_piece_jointe(pieces_jointes_hors_fenetre: list[PieceJointe]) -> list[dict]:
-    # La description est générée à chaque appel à partir des pièces jointes
-    # réellement éligibles de la conversation courante (jamais une liste
-    # statique figée dans le schéma) : sans le nom de fichier en face de
-    # chaque id, le modèle doit deviner quel entier correspond à quel
-    # document (ticket #50 — cause du mauvais choix de pièce jointe observé
-    # dans l'essai du 2026-09-17).
-    liste_pieces_jointes = "\n".join(
-        f"- id {piece_jointe.id} : {piece_jointe.nom_fichier}"
-        for piece_jointe in pieces_jointes_hors_fenetre
-    )
-    return [
-        {
-            "type": "function",
-            "function": {
-                "name": _OUTIL_CONTENU_PIECE_JOINTE,
-                "description": (
-                    "Récupère le contenu complet d'une pièce jointe de cette "
-                    "conversation dont le message n'est plus dans les derniers "
-                    "messages. Pièces jointes éligibles (id — nom de fichier) "
-                    f":\n{liste_pieces_jointes}"
-                ),
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "piece_jointe_id": {
-                            "type": "integer",
-                            "description": (
-                                "Identifiant de la pièce jointe à récupérer, "
-                                "parmi ceux listés ci-dessus."
-                            ),
-                        }
-                    },
-                    "required": ["piece_jointe_id"],
-                },
-            },
-        }
-    ]
 
 # Sortie structurée stricte (spec V1.1.1) : un seul appel Mistral produit à la
 # fois le résumé glissant mis à jour et, si le profil de travail change, ce
@@ -1020,58 +974,33 @@ def _appeler_reponse_chat(
     return client.chat(messages_pour_mistral, tools=tools)
 
 
-def _pieces_jointes_hors_fenetre(
-    db: Session, conversation_id: int, ids_fenetre: set[int]
-) -> list[PieceJointe]:
-    requete = db.query(PieceJointe).filter(
-        PieceJointe.conversation_id == conversation_id,
-        PieceJointe.message_id.isnot(None),
-    )
-    if ids_fenetre:
-        requete = requete.filter(~PieceJointe.message_id.in_(ids_fenetre))
-    return requete.all()
-
-
 def _traiter_appel_outil(
     client: MistralClient,
     messages_pour_mistral: list[dict[str, str]],
     demande: AppelOutilDemande,
-    db: Session,
-    conversation_id: int,
+    contexte_outils: ContexteTour,
 ) -> tuple[ReponseChat, int | None]:
-    # Un seul outil déclaré pour cette version (spec 1.1.2) : seul le premier
-    # appel demandé est traité.
+    # Boucle inchangée depuis la spec 1.1.2 : seul le premier appel demandé
+    # est traité, et le second appel part sans `tools`.
     appel = demande.appels[0]
-    piece_jointe = db.get(PieceJointe, appel.arguments.get("piece_jointe_id"))
-    if piece_jointe is None or piece_jointe.conversation_id != conversation_id:
-        # Ne devrait pas arriver (l'IA ne voit que des piece_jointe_id réels
-        # dans son propre contexte), mais jamais de 500 sur une divergence :
-        # un contenu explicatif pour l'outil plutôt qu'une pièce jointe
-        # rattachée à une autre conversation, même confidentialité que
-        # _recuperer_piece_jointe_du_compte.
-        contenu_outil = _PIECE_JOINTE_OUTIL_INTROUVABLE
-        piece_jointe_id: int | None = None
-    else:
-        contenu_outil = piece_jointe.contenu_extrait or ""
-        piece_jointe_id = piece_jointe.id
+    resultat = executer_appel(appel, contexte_outils)
 
     messages_second_appel = [
         *messages_pour_mistral,
         demande.message_assistant,
-        {"role": "tool", "tool_call_id": appel.id, "name": appel.nom, "content": contenu_outil},
+        {"role": "tool", "tool_call_id": appel.id, "name": appel.nom, "content": resultat.contenu},
     ]
     # piece_jointe_id renvoyé à part (spec 1.3.0) : c'est celui de la pièce
     # jointe relue par l'outil, distinct de celle éventuellement jointe au
     # nouveau message de ce tour (voir _resoudre_reponse_chat ci-dessous).
-    return client.chat(messages_second_appel), piece_jointe_id
+    return client.chat(messages_second_appel), resultat.piece_jointe_id
 
 
 def _resoudre_reponse_chat(
     obtenir_reponse: Callable[[], ReponseChat],
     client: MistralClient,
     messages_pour_mistral: list[dict[str, str]],
-    db: Session,
-    conversation_id: int,
+    contexte_outils: ContexteTour,
     identifiant_compte: str,
     piece_jointe_id: int | None,
 ) -> ReponseChat:
@@ -1083,6 +1012,8 @@ def _resoudre_reponse_chat(
     # au nouveau message de ce tour (spec 1.3.0), pas celle que l'outil
     # relirait le cas échéant (voir _traiter_appel_outil, qui porte la
     # sienne séparément).
+    db = contexte_outils.db
+    conversation_id = contexte_outils.conversation_id
     try:
         reponse = obtenir_reponse()
     except AppelOutilDemande as demande:
@@ -1107,7 +1038,7 @@ def _resoudre_reponse_chat(
         )
         try:
             reponse, piece_jointe_id = _traiter_appel_outil(
-                client, messages_pour_mistral, demande, db, conversation_id
+                client, messages_pour_mistral, demande, contexte_outils
             )
         except Exception as erreur:
             # piece_jointe_id de la pièce rechargée par l'outil non connu ici
@@ -1181,7 +1112,7 @@ def _generer_reponse_et_resume(
     client: MistralClient,
     messages_pour_mistral: list[dict[str, str]],
     tools: list[dict] | None,
-    db: Session,
+    contexte_outils: ContexteTour,
     conversation: Conversation,
     identifiant_compte: str,
     messages_sortants: list[Message],
@@ -1197,13 +1128,13 @@ def _generer_reponse_et_resume(
     # deux appels ici sont indépendants l'un de l'autre : lancés en parallèle
     # plutôt qu'en séquence pour ne pas doubler la latence de ce tour — mais
     # seulement s'il y a effectivement un résumé à mettre à jour.
+    db = contexte_outils.db
     if not messages_sortants:
         reponse_chat = _resoudre_reponse_chat(
             lambda: _appeler_reponse_chat(client, messages_pour_mistral, tools),
             client,
             messages_pour_mistral,
-            db,
-            conversation.id,
+            contexte_outils,
             identifiant_compte,
             piece_jointe_id,
         )
@@ -1224,8 +1155,7 @@ def _generer_reponse_et_resume(
             futur_reponse.result,
             client,
             messages_pour_mistral,
-            db,
-            conversation.id,
+            contexte_outils,
             identifiant_compte,
             piece_jointe_id,
         )
@@ -1344,14 +1274,17 @@ def envoyer_message(
         # côtés des 2 nouveaux, cf. spec V1.1.1).
         messages_sortants = derniers_messages[:-1]
 
-        # Outil déclaré uniquement sur l'appel de réponse de chat principal
+        # Outils déclarés uniquement sur l'appel de réponse de chat principal
         # ci-dessous, jamais sur celui de résumé+profil (spec 1.1.2) : la
         # fenêtre ici est celle des messages déjà en base avant ce tour
         # (`derniers_messages`), pas `messages_sortants` (qui n'en retire que
         # le plus ancien, propre à l'absorption de CE tour dans le résumé).
-        ids_fenetre = {m.id for m in derniers_messages}
-        pieces_jointes_hors_fenetre = _pieces_jointes_hors_fenetre(db, conversation.id, ids_fenetre)
-        tools = _outils_piece_jointe(pieces_jointes_hors_fenetre) if pieces_jointes_hors_fenetre else None
+        contexte_outils = ContexteTour(
+            db=db,
+            conversation_id=conversation.id,
+            ids_fenetre=frozenset(m.id for m in derniers_messages),
+        )
+        tools = outils_du_tour(contexte_outils)
 
         # Résolues une seule fois, avant l'appel résumé+profil (jamais dans le
         # thread de l'executor ci-dessous, la session SQLAlchemy n'étant pas
@@ -1374,7 +1307,7 @@ def envoyer_message(
             client,
             messages_pour_mistral,
             tools,
-            db,
+            contexte_outils,
             conversation,
             identifiant_compte,
             messages_sortants,
