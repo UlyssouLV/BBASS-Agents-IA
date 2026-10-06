@@ -21,6 +21,7 @@ from vm_centrale.mistral_client import (
 from vm_centrale.models import Compte, ComptePole
 from vm_centrale.moteur_recherche import MoteurIndisponible, ResultatRecherche, get_moteur_recherche
 from vm_centrale.outils.recherche_web import CONSIGNE_EXTRACTION
+from vm_centrale.questions_couvertes import CONSIGNE_QUESTIONS_PIECE_JOINTE
 from vm_centrale.security import hash_password
 from vm_centrale.telechargement_pages import PageIndisponible, PageTelechargee, get_telechargeur_pages
 from vm_centrale.jetons import JetonStore, get_jeton_store
@@ -59,6 +60,7 @@ def _sans_init_db_reel(monkeypatch):
 _USAGE_FACTICE = Usage(tokens_entree=10, tokens_sortie=5, tokens_total=15)
 _PAGES_PROCESSED_FACTICE = 1
 _EXTRAIT_FACTICE = json.dumps({"extrait": "Extrait factice des pages lues.", "questions_couvertes": []})
+_QUESTIONS_PIECE_JOINTE_FACTICES = json.dumps({"questions_couvertes": []})
 
 
 class ClientMistralFactice:
@@ -102,6 +104,12 @@ class ClientMistralFactice:
         self.appels_extraction: list = []
         self._reponse_extraction = _EXTRAIT_FACTICE
         self._exception_extraction: Exception | None = None
+        # Appels de questions couvertes d'une pièce jointe (spec 1.4.1),
+        # reconnus à leur consigne fixe comme l'extraction, et lancés en
+        # parallèle de la réponse de chat.
+        self.appels_questions_piece_jointe: list = []
+        self._reponse_questions_piece_jointe = _QUESTIONS_PIECE_JOINTE_FACTICES
+        self._exception_questions_piece_jointe: Exception | None = None
 
     def repondre_ocr(self, texte: str) -> None:
         self._reponse_ocr = texte
@@ -195,6 +203,22 @@ class ClientMistralFactice:
         self._reponse_extraction = texte
         self._exception_extraction = None
 
+    def repondre_questions_piece_jointe(self, questions: list[tuple[str, str]]) -> None:
+        # (question, réponse) par question couverte.
+        self.repondre_questions_piece_jointe_brute(
+            json.dumps(
+                {"questions_couvertes": [{"question": q, "reponse": r} for q, r in questions]},
+                ensure_ascii=False,
+            )
+        )
+
+    def repondre_questions_piece_jointe_brute(self, texte: str) -> None:
+        self._reponse_questions_piece_jointe = texte
+        self._exception_questions_piece_jointe = None
+
+    def echouer_questions_piece_jointe(self, exception: Exception) -> None:
+        self._exception_questions_piece_jointe = exception
+
     def echouer_extraction(self, exception: Exception) -> None:
         self._exception_extraction = exception
 
@@ -205,22 +229,41 @@ class ClientMistralFactice:
 
     def _extraire(self, messages, response_format) -> ReponseChat:
         self.appels_extraction.append(messages)
+        return self._repondre_canal(
+            messages, response_format, self._reponse_extraction, self._exception_extraction
+        )
+
+    def _questions_piece_jointe(self, messages, response_format) -> ReponseChat:
+        self.appels_questions_piece_jointe.append(messages)
+        return self._repondre_canal(
+            messages,
+            response_format,
+            self._reponse_questions_piece_jointe,
+            self._exception_questions_piece_jointe,
+        )
+
+    @staticmethod
+    def _repondre_canal(messages, response_format, contenu: str, exception: Exception | None) -> ReponseChat:
         payload = {"model": "mistral-factice", "messages": messages, "response_format": response_format}
-        if self._exception_extraction is not None:
-            raise ErreurAppelMistral(
-                str(self._exception_extraction), payload_envoye=payload
-            ) from self._exception_extraction
+        if exception is not None:
+            raise ErreurAppelMistral(str(exception), payload_envoye=payload) from exception
         return ReponseChat(
-            contenu=self._reponse_extraction,
+            contenu=contenu,
             usage=_USAGE_FACTICE,
             payload_envoye=payload,
-            reponse_brute={"choices": [{"message": {"content": self._reponse_extraction}}]},
+            reponse_brute={"choices": [{"message": {"content": contenu}}]},
         )
 
     def chat(self, messages, response_format=None, tools=None) -> ReponseChat:
         with self._verrou:
             if not isinstance(messages, str) and messages and messages[0]["content"] == CONSIGNE_EXTRACTION:
                 return self._extraire(messages, response_format)
+            if (
+                not isinstance(messages, str)
+                and messages
+                and messages[0]["content"] == CONSIGNE_QUESTIONS_PIECE_JOINTE
+            ):
+                return self._questions_piece_jointe(messages, response_format)
             self.messages_recus.append(messages)
             self.response_formats_recus.append(response_format)
             if response_format is not None:

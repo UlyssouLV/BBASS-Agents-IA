@@ -49,6 +49,11 @@ from vm_centrale.models import (
     ResultatRechercheWeb,
 )
 from vm_centrale.moteur_recherche import MoteurRecherche, get_moteur_recherche
+from vm_centrale.questions_couvertes import (
+    AppelQuestionsPieceJointe,
+    appeler_questions_piece_jointe,
+    enregistrer_questions_piece_jointe,
+)
 from vm_centrale.outils import AppelMistralOutil, ContexteTour, executer_appel, outils_du_tour
 from vm_centrale.schemas import (
     ConversationCreeRequest,
@@ -757,6 +762,7 @@ def creer_conversation(
             client_mistral=client,
         )
         tools = outils_du_tour(contexte_outils)
+        attendre_questions = _lancer_questions_piece_jointe(client, piece_jointe, requete.message)
         reponse_chat = _resoudre_reponse_chat(
             lambda: _appeler_reponse_chat(client, message_pour_mistral, tools),
             client,
@@ -805,6 +811,7 @@ def creer_conversation(
             requete_payload=reponse_titrage.payload_envoye,
             reponse_payload=reponse_titrage.reponse_brute,
         )
+        _enregistrer_questions_du_tour(db, attendre_questions, identifiant_compte, conversation.id, piece_jointe)
 
         message_utilisateur = Message(
             conversation_id=conversation.id,
@@ -1121,6 +1128,45 @@ def televerser_piece_jointe_sans_conversation(
     # pas encore au moment de l'upload (spec 1.1.2, référencement — voir
     # ConversationCreeRequest.piece_jointe_id).
     return _creer_piece_jointe(db, client, identifiant_compte, None, fichier)
+
+
+def _lancer_questions_piece_jointe(
+    client: MistralClient, piece_jointe: PieceJointe | None, message: str
+) -> Callable[[], AppelQuestionsPieceJointe] | None:
+    # À l'envoi du message qui porte la pièce jointe, jamais au téléversement
+    # (spec 1.4.1) : en parallèle de la réponse de chat. Renvoie de quoi
+    # attendre son issue, enregistrée seulement si le tour aboutit.
+    if piece_jointe is None:
+        return None
+    executeur = ThreadPoolExecutor(max_workers=1)
+    futur = executeur.submit(
+        appeler_questions_piece_jointe,
+        client,
+        piece_jointe.nom_fichier,
+        piece_jointe.contenu_extrait or "",
+        message,
+    )
+    executeur.shutdown(wait=False)
+    return futur.result
+
+
+def _enregistrer_questions_du_tour(
+    db: Session,
+    attendre_questions: Callable[[], AppelQuestionsPieceJointe] | None,
+    identifiant_compte: str,
+    conversation_id: int,
+    piece_jointe: PieceJointe | None,
+) -> None:
+    if attendre_questions is None or piece_jointe is None:
+        return
+    enregistrer_questions_piece_jointe(
+        db,
+        attendre_questions(),
+        identifiant_compte=identifiant_compte,
+        conversation_id=conversation_id,
+        piece_jointe_id=piece_jointe.id,
+        nom_fichier=piece_jointe.nom_fichier,
+    )
 
 
 def _appeler_reponse_chat(
@@ -1488,6 +1534,7 @@ def envoyer_message(
 
         compte = db.query(Compte).filter(Compte.identifiant == identifiant_compte).first()
 
+        attendre_questions = _lancer_questions_piece_jointe(client, piece_jointe, requete.message)
         reponse_chat, resume_maj, profil_travail = _generer_reponse_et_resume(
             client,
             messages_pour_mistral,
@@ -1504,6 +1551,7 @@ def envoyer_message(
         reponse = _reponse_visible(
             db, identifiant_compte, conversation.id, requete.message, reponse_chat.contenu, piece_jointe
         )
+        _enregistrer_questions_du_tour(db, attendre_questions, identifiant_compte, conversation.id, piece_jointe)
 
         maintenant = datetime.now(timezone.utc)
         if resume_maj is not None:

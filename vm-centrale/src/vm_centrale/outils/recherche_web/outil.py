@@ -11,6 +11,8 @@ from vm_centrale.inspecteur import payload_depuis_erreur, reponse_depuis_erreur
 from vm_centrale.models import QuestionCouverte, ResultatRechercheWeb
 from vm_centrale.moteur_recherche import MoteurIndisponible, ResultatRecherche
 from vm_centrale.outils.base import AppelMistralOutil, ContexteTour, Outil, ResultatOutil
+from vm_centrale.questions_couvertes import QUESTIONS_MAX as _QUESTIONS_MAX
+from vm_centrale.questions_couvertes import REPONSE_MAX as _REPONSE_MAX
 from vm_centrale.telechargement_pages import PageIndisponible, TelechargeurPages
 
 _NOM = "rechercher_web"
@@ -32,10 +34,6 @@ _AUCUN_RESULTAT = (
     "Aucun résultat pour cette recherche. Reformule la requête, ou réponds sans "
     "résultat de recherche et sans lien."
 )
-# Questions couvertes d'un appel d'extraction (spec 1.4.1) : constantes du
-# code, comme la fenêtre de 3 messages.
-_QUESTIONS_MAX = 8
-_REPONSE_MAX = 300
 # Consigne fixe de l'appel d'extraction (spec 1.4.0, étape 5, décision
 # n° 18), sans consigne de style : il ne reçoit que le besoin et les pages,
 # jamais le contexte de la conversation (ADR-0014). Sortie JSON depuis la
