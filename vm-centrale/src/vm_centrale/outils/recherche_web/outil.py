@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 
 import trafilatura
 
+from vm_centrale.compte_tokens import compter_tokens
 from vm_centrale.config import FICHES_MODELES, MODELE_CHAT
 from vm_centrale.inspecteur import payload_depuis_erreur, reponse_depuis_erreur
 from vm_centrale.models import QuestionCouverte, ResultatRechercheWeb
@@ -18,13 +19,12 @@ from vm_centrale.telechargement_pages import PageIndisponible, TelechargeurPages
 _NOM = "rechercher_web"
 _NOMBRE_RESULTATS = 5
 _NOMBRE_PAGES_TELECHARGEES = 3
-# Plafond global des pages nettoyées (spec 1.4.0, étape 4) : environ 80 % de
-# la fenêtre du modèle d'extraction (fiche MODELE_CHAT). Pas de tokenizer
-# Mistral en local : estimation prudente à 3 caractères par token.
+# Plafond global des pages nettoyées (spec 1.4.0, étape 4) : 80 % de la
+# fenêtre du modèle d'extraction (fiche MODELE_CHAT), en vrais tokens depuis
+# la 1.4.2 (tokenizer de la fiche, compte_tokens.py).
 _FENETRE_EXTRACTION_TOKENS = FICHES_MODELES[MODELE_CHAT].fenetre_tokens
 assert _FENETRE_EXTRACTION_TOKENS is not None
-_CARACTERES_PAR_TOKEN = 3
-_PLAFOND_CARACTERES_PAGES = int(_FENETRE_EXTRACTION_TOKENS * 0.8 * _CARACTERES_PAR_TOKEN)
+_PLAFOND_TOKENS_PAGES = int(_FENETRE_EXTRACTION_TOKENS * 0.8)
 _RECHERCHE_INDISPONIBLE = (
     "Recherche indisponible : le moteur de recherche ne répond pas. Réponds sans "
     "résultat de recherche et sans lien."
@@ -140,6 +140,7 @@ class _Page:
     texte: str = ""
     erreur: str | None = None
     retiree_par_plafond: bool = False
+    tokens: int = 0
 
     @property
     def texte_lu(self) -> str:
@@ -152,6 +153,7 @@ class _Page:
             "url": self.url,
             "statut": self.statut,
             "taille": len(self.texte),
+            "tokens": self.tokens,
             "retiree_par_plafond": self.retiree_par_plafond,
             "erreur": self.erreur,
         }
@@ -185,7 +187,9 @@ def _lire_pages(resultats: list[ResultatRecherche], telechargeur: TelechargeurPa
     # Plafond global seulement (décision n° 6) : tant que le total le
     # dépasse, la dernière page lue est retirée entière, jamais coupée.
     lues = [page for page in pages if page.texte]
-    while lues and sum(len(page.texte) for page in lues) > _PLAFOND_CARACTERES_PAGES:
+    for page in lues:
+        page.tokens = compter_tokens(page.texte, MODELE_CHAT)
+    while lues and sum(page.tokens for page in lues) > _PLAFOND_TOKENS_PAGES:
         lues.pop().retiree_par_plafond = True
     return pages
 

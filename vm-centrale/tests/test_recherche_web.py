@@ -400,7 +400,34 @@ def test_une_page_longue_nest_jamais_tronquee(
     assert len(texte) > 100_000 and texte.endswith("FIN DE LA PAGE LONGUE")
 
 
-def test_au_dela_du_plafond_global_la_derniere_page_entiere_est_retiree_et_linspecteur_le_montre(
+# Plafond en vrais tokens (spec 1.4.2) : 80 % de la fenêtre de la fiche
+# MODELE_CHAT, compté par le tokenizer de Mistral Small 4.
+_PLAFOND_TOKENS = int(262_144 * 0.8)
+# Texte nettoyé de _page_html("Bonjour le monde") : titre, remplissage et
+# paragraphe, 352 caractères, 71 tokens pour le tokenizer de Mistral Small 4.
+_TAILLE_PAGE_CONNUE = 352
+_TOKENS_PAGE_CONNUE = 71
+
+
+def _page_dense(marqueur_de_fin: str, nombre_paragraphes: int) -> str:
+    # Des chiffres : environ un token par caractère, bien plus que 3
+    # caractères ≈ 1 token. Paragraphes tous différents : trafilatura
+    # retire les doublons.
+    return _page_html(
+        *(f"Ligne {numero} : " + "0123456789" * 100 for numero in range(nombre_paragraphes)),
+        marqueur_de_fin,
+    )
+
+
+def _page_legere(marqueur_de_fin: str, nombre_paragraphes: int) -> str:
+    # Un mot courant répété : plus de 10 caractères par token.
+    return _page_html(
+        *(f"Paragraphe {numero} : " + "environnement " * 70 for numero in range(nombre_paragraphes)),
+        marqueur_de_fin,
+    )
+
+
+def test_le_tokenizer_compte_les_tokens_dune_page_connue_dans_linspecteur(
     client,
     mistral_client_factice,
     moteur_recherche_factice,
@@ -409,11 +436,35 @@ def test_au_dela_du_plafond_global_la_derniere_page_entiere_est_retiree_et_linsp
     db_session,
     monkeypatch,
 ):
-    # Trois pages d'environ 250 000 caractères : leur total dépasse 80 % de
-    # la fenêtre du modèle d'extraction, deux d'entre elles tiennent.
+    moteur_recherche_factice.repondre(_RESULTATS[0])
+    telechargeur_pages_factice.servir(_URL_TROUVEE, _page_html("Bonjour le monde"))
+    _demander_recherche(mistral_client_factice)
+    mistral_client_factice.repondre("Voici la loi.", "Titre")
+
+    conversation_id = _creer_conversation(client, jeton_valide)
+
+    (texte, *_) = _textes_nettoyes(db_session, conversation_id)
+    assert texte.endswith("Bonjour le monde")
+    (page,) = _echange_outil(client, conversation_id, jeton_valide, monkeypatch)["reponse_payload"]["pages"]
+    assert len(texte) == page["taille"] == _TAILLE_PAGE_CONNUE
+    assert page["tokens"] == _TOKENS_PAGE_CONNUE
+
+
+def test_au_dela_du_plafond_en_tokens_la_derniere_page_entiere_est_retiree_et_linspecteur_le_montre(
+    client,
+    mistral_client_factice,
+    moteur_recherche_factice,
+    telechargeur_pages_factice,
+    jeton_valide,
+    db_session,
+    monkeypatch,
+):
+    # Trois pages d'environ 80 000 tokens et autant de caractères : leur
+    # total dépasse le plafond en tokens, deux d'entre elles tiennent, bien
+    # que le total en caractères soit loin de l'ancien plafond estimé.
     moteur_recherche_factice.repondre(*_RESULTATS[:3])
     for numero, (_, url, _) in enumerate(_RESULTATS[:3]):
-        telechargeur_pages_factice.servir(url, _page_longue(f"FIN DE LA PAGE {numero}", 3400))
+        telechargeur_pages_factice.servir(url, _page_dense(f"FIN DE LA PAGE {numero}", 80))
     _demander_recherche(mistral_client_factice)
     mistral_client_factice.repondre("Voici la loi.", "Titre")
 
@@ -428,10 +479,12 @@ def test_au_dela_du_plafond_global_la_derniere_page_entiere_est_retiree_et_linsp
 
     pages = _echange_outil(client, conversation_id, jeton_valide, monkeypatch)["reponse_payload"]["pages"]
     assert [page["retiree_par_plafond"] for page in pages] == [False, False, True]
-    assert all(page["statut"] == 200 and page["taille"] > 100_000 for page in pages)
+    assert all(page["statut"] == 200 and page["tokens"] > 70_000 for page in pages)
+    assert pages[0]["tokens"] + pages[1]["tokens"] <= _PLAFOND_TOKENS < sum(page["tokens"] for page in pages)
+    assert sum(page["taille"] for page in pages) < int(262_144 * 0.8 * 3)
 
 
-def test_trois_pages_sous_le_plafond_de_la_fenetre_du_modele_ne_sont_pas_retirees(
+def test_des_pages_qui_tiennent_en_tokens_ne_sont_pas_retirees_quelle_que_soit_leur_taille(
     client,
     mistral_client_factice,
     moteur_recherche_factice,
@@ -439,11 +492,12 @@ def test_trois_pages_sous_le_plafond_de_la_fenetre_du_modele_ne_sont_pas_retiree
     jeton_valide,
     monkeypatch,
 ):
-    # Trois pages d'environ 140 000 caractères : au-dessus de 80 % d'une
-    # fenêtre de 131 072 tokens, sous 80 % de 262 144 (fiche MODELE_CHAT).
+    # Trois pages d'environ 250 000 caractères : au-dessus de l'ancien
+    # plafond estimé à 3 caractères par token, bien sous le plafond en
+    # tokens.
     moteur_recherche_factice.repondre(*_RESULTATS[:3])
     for numero, (_, url, _) in enumerate(_RESULTATS[:3]):
-        telechargeur_pages_factice.servir(url, _page_longue(f"FIN DE LA PAGE {numero}", 1900))
+        telechargeur_pages_factice.servir(url, _page_legere(f"FIN DE LA PAGE {numero}", 250))
     _demander_recherche(mistral_client_factice)
     mistral_client_factice.repondre("Voici la loi.", "Titre")
 
@@ -453,7 +507,8 @@ def test_trois_pages_sous_le_plafond_de_la_fenetre_du_modele_ne_sont_pas_retiree
     assert all(f"FIN DE LA PAGE {numero}" in contenu for numero in range(3))
     pages = _echange_outil(client, conversation_id, jeton_valide, monkeypatch)["reponse_payload"]["pages"]
     assert [page["retiree_par_plafond"] for page in pages] == [False, False, False]
-    assert sum(page["taille"] for page in pages) > int(131_072 * 0.8 * 3)
+    assert sum(page["taille"] for page in pages) > int(262_144 * 0.8 * 3)
+    assert sum(page["tokens"] for page in pages) <= _PLAFOND_TOKENS
 
 
 def test_un_chiffre_present_seulement_dans_le_texte_dune_page_reste_dans_la_reponse(

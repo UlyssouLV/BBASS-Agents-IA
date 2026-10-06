@@ -40,6 +40,8 @@ MODELE_OCR = "mistral-ocr-latest"
 class FicheModele:
     # None quand le modèle n'a pas de fenêtre de chat (OCR).
     fenetre_tokens: int | None
+    # Relatif à vm_centrale/tokenizers/ (voir son README) ; None quand rien
+    # ne compte les tokens de ce modèle sur la VM.
     fichier_tokenizer: str | None
     prix_usd_par_token_entree: Decimal
     prix_usd_par_token_sortie: Decimal
@@ -57,7 +59,7 @@ class FicheModele:
 FICHES_MODELES = {
     MODELE_CHAT: FicheModele(
         fenetre_tokens=262_144,
-        fichier_tokenizer=None,
+        fichier_tokenizer="mistral-small-2603/tekken.json",
         prix_usd_par_token_entree=Decimal("0.15") / Decimal(1_000_000),
         prix_usd_par_token_sortie=Decimal("0.60") / Decimal(1_000_000),
         prix_usd_par_page=Decimal(0),
