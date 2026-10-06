@@ -158,9 +158,10 @@ class _Page:
         }
 
 
-def _lire_page(url: str, telechargeur: TelechargeurPages) -> _Page:
+def lire_page(url: str, telechargeur: TelechargeurPages) -> _Page:
     # Une page en échec (délai, statut HTTP, contenu non HTML, PDF compris)
     # est ignorée : son extrait de moteur reste (spec 1.4.0, étape 2).
+    # Partagée avec lire_pages_web pour une URL écrite par le compte (#140).
     try:
         page = telechargeur.telecharger(url)
     except PageIndisponible as erreur:
@@ -181,7 +182,7 @@ def _lire_pages(resultats: list[ResultatRecherche], telechargeur: TelechargeurPa
     # En parallèle : le délai est celui de la page la plus lente, pas la
     # somme (PAGES_HTTP_TIMEOUT au plus chacune).
     with ThreadPoolExecutor(max_workers=_NOMBRE_PAGES_TELECHARGEES) as executeur:
-        pages = list(executeur.map(lambda url: _lire_page(url, telechargeur), urls))
+        pages = list(executeur.map(lambda url: lire_page(url, telechargeur), urls))
     # Plafond global seulement (décision n° 6) : tant que le total le
     # dépasse, la dernière page lue est retirée entière, jamais coupée.
     lues = [page for page in pages if page.texte]

@@ -206,6 +206,10 @@ class ResultatRechercheWeb(Base):
     # Texte principal de la page téléchargée et nettoyée ; vide si la page
     # n'a pas été téléchargée.
     texte_nettoye: Mapped[str] = mapped_column(String, default="")
+    # `recherche` (trouvée par rechercher_web) ou `utilisateur` (URL écrite
+    # par le compte, téléchargée par lire_pages_web, requête vide) : spec
+    # 1.4.1, #140. Les deux sont des sources du garde-fou chiffres.
+    provenance: Mapped[str] = mapped_column(String, default="recherche", server_default="recherche")
     date_creation: Mapped[datetime] = mapped_column(DateTime)
 
 

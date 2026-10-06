@@ -17,6 +17,9 @@ class ContexteTour:
     moteur_recherche: MoteurRecherche
     telechargeur_pages: TelechargeurPages
     client_mistral: MistralClient
+    # Pas encore en base pendant le tour : une URL qu'il contient est déjà
+    # lisible par lire_pages_web (#140).
+    message_du_tour: str
 
 
 @dataclass(frozen=True)

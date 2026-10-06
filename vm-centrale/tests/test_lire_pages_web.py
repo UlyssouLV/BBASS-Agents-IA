@@ -318,3 +318,198 @@ def test_consommation_et_inspecteur_tracent_loutil_local_et_lextraction_web(
     local = client.get(f"/inspecteur/echanges/{echanges[indice]['id']}", headers=entetes_admin).json()
     assert local["requete_payload"]["arguments"] == {"urls": [_URL_LUE], "besoin": _BESOIN}
     assert "Trois mois en moyenne." in local["reponse_payload"]["contenu"]
+
+
+# URL écrites par le compte (spec 1.4.1, #140) : téléchargée et nettoyée au
+# premier appel, enregistrée avec la provenance `utilisateur`, puis lue comme
+# une page trouvée ; jamais retéléchargée dans la conversation.
+
+_URL_COMPTE = "https://www.client-dupont.fr/devis-bornage"
+_URL_COMPTE_PDF = "https://www.client-dupont.fr/devis.pdf"
+_TEXTE_COMPTE = "Le délai prévu est de six semaines."
+
+
+def _conversation_avec_url_du_compte(client, mistral_client_factice, jeton: str, url: str = _URL_COMPTE) -> int:
+    # Tour 1 : le compte écrit l'URL, le modèle répond sans outil.
+    mistral_client_factice.repondre("Bien reçu.", "Titre")
+    reponse = client.post("/conversations", json={"message": f"Voici le devis : {url}"}, headers=_autorisation(jeton))
+    assert reponse.status_code == 200
+    return reponse.json()["conversation"]["id"]
+
+
+def _lignes_url_du_compte(mistral_client_factice, url: str) -> list[str]:
+    return [
+        ligne for ligne in _memoire(mistral_client_factice).splitlines() if "URL envoyée" in ligne and url in ligne
+    ]
+
+
+def test_lire_pages_web_est_declare_des_quune_url_du_compte_est_dans_la_conversation(
+    client, mistral_client_factice, jeton_valide
+):
+    _conversation_avec_url_du_compte(client, mistral_client_factice, jeton_valide)
+
+    # Premier appel de chat, dès le message qui porte l'URL (le titrage suit).
+    assert _OUTIL in _noms_outils(mistral_client_factice.tools_appels_reponse[0])
+
+
+def test_une_url_du_compte_est_telechargee_au_premier_appel_puis_jamais_plus(
+    client, mistral_client_factice, telechargeur_pages_factice, jeton_valide
+):
+    conversation_id = _conversation_avec_url_du_compte(client, mistral_client_factice, jeton_valide)
+    telechargeur_pages_factice.servir(_URL_COMPTE, _page_html(_TEXTE_COMPTE))
+    mistral_client_factice.repondre_lecture_page(True, "Six semaines.", _URL_COMPTE)
+
+    _lire(client, mistral_client_factice, jeton_valide, conversation_id, [_URL_COMPTE])
+
+    assert telechargeur_pages_factice.urls_recues == [_URL_COMPTE]
+    (appel,) = mistral_client_factice.appels_lecture_page
+    # Même chaîne que rechercher_web : texte principal nettoyé, sans menu.
+    assert appel[0]["content"] == CONSIGNE_LECTURE_PAGE
+    assert _TEXTE_COMPTE in appel[1]["content"] and "Menu" not in appel[1]["content"]
+    assert "Six semaines." in _message_tool(mistral_client_factice)
+
+    _lire(client, mistral_client_factice, jeton_valide, conversation_id, [_URL_COMPTE], besoin="Prix du bornage")
+
+    assert telechargeur_pages_factice.urls_recues == [_URL_COMPTE]
+    assert len(mistral_client_factice.appels_lecture_page) == 2
+
+
+def test_une_url_du_message_du_tour_est_lue_au_meme_tour(
+    client, mistral_client_factice, telechargeur_pages_factice, jeton_valide
+):
+    mistral_client_factice.repondre("Bonjour.", "Titre")
+    conversation_id = client.post(
+        "/conversations", json={"message": "Bonjour"}, headers=_autorisation(jeton_valide)
+    ).json()["conversation"]["id"]
+    telechargeur_pages_factice.servir(_URL_COMPTE, _page_html(_TEXTE_COMPTE))
+    mistral_client_factice.repondre_lecture_page(True, "Six semaines.", _URL_COMPTE)
+
+    _lire_avec_message(client, mistral_client_factice, jeton_valide, conversation_id, f"Quel délai dans {_URL_COMPTE} ?")
+
+    assert _OUTIL in _noms_outils(mistral_client_factice.tools_appels_reponse[-2])
+    assert telechargeur_pages_factice.urls_recues == [_URL_COMPTE]
+    assert "Six semaines." in _message_tool(mistral_client_factice)
+
+
+def _lire_avec_message(client, mistral_client_factice, jeton: str, conversation_id: int, message: str):
+    mistral_client_factice.repondre_avec_appel_outil(_OUTIL, {"urls": [_URL_COMPTE], "besoin": _BESOIN})
+    mistral_client_factice.repondre("Six semaines.", resume_et_profil=_resume_et_profil())
+    reponse = client.post(
+        f"/conversations/{conversation_id}/messages", json={"message": message}, headers=_autorisation(jeton)
+    )
+    assert reponse.status_code == 200
+
+
+def test_la_page_du_compte_est_enregistree_avec_la_provenance_utilisateur_et_une_requete_vide(
+    client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide, db_session
+):
+    conversation_id = _conversation_avec_recherche(
+        client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide
+    )
+    _envoyer(client, mistral_client_factice, jeton_valide, conversation_id, f"Et ce devis : {_URL_COMPTE}")
+    telechargeur_pages_factice.servir(_URL_COMPTE, _page_html(_TEXTE_COMPTE))
+    mistral_client_factice.repondre_lecture_page(True, "Six semaines.", _URL_COMPTE)
+
+    _lire(client, mistral_client_factice, jeton_valide, conversation_id, [_URL_COMPTE])
+
+    resultats = db_session.query(ResultatRechercheWeb).filter_by(conversation_id=conversation_id).all()
+    provenances = {resultat.url: (resultat.provenance, resultat.requete) for resultat in resultats}
+    assert provenances[_URL_COMPTE] == ("utilisateur", "")
+    assert provenances[_URL_LUE] == ("recherche", "bornage")
+    (page,) = [resultat for resultat in resultats if resultat.url == _URL_COMPTE]
+    assert _TEXTE_COMPTE in page.texte_nettoye
+    (question,) = _questions_besoin(db_session, conversation_id)
+    assert question.resultat_recherche_web_id == page.id
+
+
+def test_un_chiffre_de_la_page_du_compte_passe_le_garde_fou_chiffres(
+    client, mistral_client_factice, telechargeur_pages_factice, jeton_valide
+):
+    conversation_id = _conversation_avec_url_du_compte(client, mistral_client_factice, jeton_valide)
+    telechargeur_pages_factice.servir(_URL_COMPTE, _page_html("Le devis s'élève à 4870 euros hors taxes."))
+    mistral_client_factice.repondre_lecture_page(True, "4870 euros HT.", _URL_COMPTE)
+    mistral_client_factice.repondre_avec_appel_outil(_OUTIL, {"urls": [_URL_COMPTE], "besoin": "Montant"})
+    mistral_client_factice.repondre(
+        "Le devis est de 4870 euros, plus 735 euros de frais.", resume_et_profil=_resume_et_profil()
+    )
+
+    reponse = client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Quel montant ?"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert reponse.status_code == 200
+    contenu = reponse.json()["reponse"]
+    assert "4870" in contenu
+    assert "735" not in contenu
+
+
+def test_une_url_du_compte_vers_un_pdf_donne_page_non_lue_sans_nouveau_telechargement(
+    client, mistral_client_factice, telechargeur_pages_factice, jeton_valide, db_session
+):
+    conversation_id = _conversation_avec_url_du_compte(
+        client, mistral_client_factice, jeton_valide, url=_URL_COMPTE_PDF
+    )
+    telechargeur_pages_factice.servir(_URL_COMPTE_PDF, "", type_contenu="application/pdf")
+
+    _lire(client, mistral_client_factice, jeton_valide, conversation_id, [_URL_COMPTE_PDF])
+
+    assert mistral_client_factice.appels_lecture_page == []
+    contenu = _message_tool(mistral_client_factice)
+    assert _URL_COMPTE_PDF in contenu and "page non lue" in contenu.lower()
+    assert _questions_besoin(db_session, conversation_id) == []
+
+    _lire(client, mistral_client_factice, jeton_valide, conversation_id, [_URL_COMPTE_PDF])
+
+    assert telechargeur_pages_factice.urls_recues == [_URL_COMPTE_PDF]
+    assert "page non lue" in _message_tool(mistral_client_factice).lower()
+
+
+def test_une_url_du_compte_injoignable_donne_page_non_lue(
+    client, mistral_client_factice, telechargeur_pages_factice, jeton_valide
+):
+    conversation_id = _conversation_avec_url_du_compte(client, mistral_client_factice, jeton_valide)
+
+    _lire(client, mistral_client_factice, jeton_valide, conversation_id, [_URL_COMPTE])
+
+    assert telechargeur_pages_factice.urls_recues == [_URL_COMPTE]
+    assert "page non lue" in _message_tool(mistral_client_factice).lower()
+
+
+def test_la_memoire_passe_de_pas_encore_lue_a_lue(
+    client, mistral_client_factice, telechargeur_pages_factice, jeton_valide
+):
+    conversation_id = _conversation_avec_url_du_compte(client, mistral_client_factice, jeton_valide)
+    _envoyer(client, mistral_client_factice, jeton_valide, conversation_id)
+    assert _lignes_url_du_compte(mistral_client_factice, _URL_COMPTE) == [
+        f"- Tour 1 — URL envoyée par l'utilisateur : {_URL_COMPTE} (pas encore lue)"
+    ]
+
+    telechargeur_pages_factice.servir(_URL_COMPTE, _page_html(_TEXTE_COMPTE))
+    mistral_client_factice.repondre_lecture_page(True, "Six semaines.", _URL_COMPTE)
+    _lire(client, mistral_client_factice, jeton_valide, conversation_id, [_URL_COMPTE])
+    _envoyer(client, mistral_client_factice, jeton_valide, conversation_id)
+
+    ligne_url = f"- Tour 1 — URL envoyée par l'utilisateur : {_URL_COMPTE} (lue)"
+    assert _lignes_url_du_compte(mistral_client_factice, _URL_COMPTE) == [ligne_url]
+    # Ses questions couvertes sous la ligne de l'URL, jamais une recherche à
+    # requête vide.
+    lignes = _memoire(mistral_client_factice).splitlines()
+    assert lignes[lignes.index(ligne_url) + 1] == f"  • {_BESOIN} → Six semaines. ({_URL_COMPTE})"
+    assert not any("recherche « »" in ligne for ligne in lignes)
+
+
+def test_une_url_du_compte_en_pdf_est_marquee_page_non_lue_dans_la_memoire(
+    client, mistral_client_factice, telechargeur_pages_factice, jeton_valide
+):
+    conversation_id = _conversation_avec_url_du_compte(
+        client, mistral_client_factice, jeton_valide, url=_URL_COMPTE_PDF
+    )
+    telechargeur_pages_factice.servir(_URL_COMPTE_PDF, "", type_contenu="application/pdf")
+    _lire(client, mistral_client_factice, jeton_valide, conversation_id, [_URL_COMPTE_PDF])
+    _envoyer(client, mistral_client_factice, jeton_valide, conversation_id)
+
+    assert _lignes_url_du_compte(mistral_client_factice, _URL_COMPTE_PDF) == [
+        f"- Tour 1 — URL envoyée par l'utilisateur : {_URL_COMPTE_PDF} (page non lue)"
+    ]

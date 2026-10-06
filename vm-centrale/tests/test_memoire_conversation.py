@@ -187,7 +187,8 @@ def test_une_url_du_compte_ecrite_au_tour_1_est_dans_la_memoire_au_tour_5(
 
     _envoyer(client, mistral_client_factice, jeton_valide, conversation_id, "Cinq", resume="")
 
-    assert f"- Tour 1 — URL envoyée par l'utilisateur : {_URL_A}" in _memoire(mistral_client_factice).splitlines()
+    lignes = _memoire(mistral_client_factice).splitlines()
+    assert f"- Tour 1 — URL envoyée par l'utilisateur : {_URL_A} (pas encore lue)" in lignes
 
 
 def test_une_url_du_message_du_tour_est_dans_la_memoire_des_le_premier_message(
@@ -199,7 +200,7 @@ def test_une_url_du_message_du_tour_est_dans_la_memoire_des_le_premier_message(
     (memoire,) = _memoires(appel_chat)
     assert memoire.splitlines() == [
         _TITRE_MEMOIRE,
-        f"- Tour 1 — URL envoyée par l'utilisateur : {_URL_A}",
+        f"- Tour 1 — URL envoyée par l'utilisateur : {_URL_A} (pas encore lue)",
     ]
 
 
@@ -220,7 +221,7 @@ def test_une_url_ecrite_par_lassistant_nest_jamais_dans_la_memoire(
     _envoyer(client, mistral_client_factice, jeton_valide, conversation_id, "Suite")
 
     lignes = _memoire(mistral_client_factice).splitlines()
-    assert f"- Tour 1 — URL envoyée par l'utilisateur : {_URL_A}" in lignes
+    assert f"- Tour 1 — URL envoyée par l'utilisateur : {_URL_A} (pas encore lue)" in lignes
     assert not any("URL envoyée" in ligne and "bornage-b" in ligne for ligne in lignes)
 
 
@@ -235,8 +236,8 @@ def test_une_meme_url_ecrite_deux_fois_napparait_quune_fois_au_premier_tour(
 
     assert _memoire(mistral_client_factice).splitlines() == [
         _TITRE_MEMOIRE,
-        f"- Tour 2 — URL envoyée par l'utilisateur : {_URL_A}",
-        f"- Tour 3 — URL envoyée par l'utilisateur : {_URL_B}",
+        f"- Tour 2 — URL envoyée par l'utilisateur : {_URL_A} (pas encore lue)",
+        f"- Tour 3 — URL envoyée par l'utilisateur : {_URL_B} (pas encore lue)",
     ]
 
 

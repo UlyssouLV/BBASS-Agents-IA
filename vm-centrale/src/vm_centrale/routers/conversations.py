@@ -19,6 +19,7 @@ from vm_centrale.consommation import enregistrer_consommation
 from vm_centrale.database import get_db
 from vm_centrale.garde_fous import (
     nettoyer_titre,
+    normaliser_url,
     plafonner,
     retirer_chiffres_hors_source,
     retirer_urls_inventees,
@@ -277,33 +278,49 @@ def _memoire_de_la_conversation(db: Session, conversation_id: int, nouveau_messa
         ligne = f"- Tour {tour(message_id)} — pièce jointe id {piece_jointe_id} « {nom_fichier} »"
         lignes_questions = questions_par_piece_jointe.get(piece_jointe_id, [])
         elements.append((message_id, len(elements), "\n".join([ligne, *lignes_questions])))
-    # URL écrites par le compte, jamais par l'assistant (#134) : une même
-    # URL n'est listée qu'au premier tour qui l'a écrite. Le message du tour
-    # n'est pas encore en base : il passe après tous les messages.
-    textes_du_compte = [contenu for _, contenu in messages_user] + [nouveau_message]
-    for rang, url in urls_ecrites(textes_du_compte):
-        message_id = ids_messages_user[rang] if rang < len(ids_messages_user) else float("inf")
-        ligne = f"- Tour {rang + 1} — URL envoyée par l'utilisateur : {url}"
-        elements.append((message_id, len(elements), ligne))
-    # Requête, URL et questions couvertes, jamais le contenu des pages ni
-    # les extraits du moteur.
     resultats = (
         db.query(
             ResultatRechercheWeb.id,
             ResultatRechercheWeb.message_id,
             ResultatRechercheWeb.requete,
             ResultatRechercheWeb.url,
+            ResultatRechercheWeb.provenance,
+            (ResultatRechercheWeb.texte_nettoye != "").label("lue"),
         )
-        .filter(
-            ResultatRechercheWeb.conversation_id == conversation_id,
-            ResultatRechercheWeb.message_id.isnot(None),
-        )
+        .filter(ResultatRechercheWeb.conversation_id == conversation_id)
         .order_by(ResultatRechercheWeb.id)
         .all()
     )
+    # URL écrites par le compte, jamais par l'assistant (#134) : une même
+    # URL n'est listée qu'au premier tour qui l'a écrite. Le message du tour
+    # n'est pas encore en base : il passe après tous les messages. État de
+    # lecture par lire_pages_web (#140), avec les questions couvertes de sa
+    # page ; une page lue par une recherche compte comme lue.
+    textes_du_compte = [contenu for _, contenu in messages_user] + [nouveau_message]
+    for rang, url in urls_ecrites(textes_du_compte):
+        message_id = ids_messages_user[rang] if rang < len(ids_messages_user) else float("inf")
+        pages = [resultat for resultat in resultats if normaliser_url(resultat.url) == normaliser_url(url)]
+        if any(page.lue for page in pages):
+            etat = "lue"
+        elif any(page.provenance == "utilisateur" for page in pages):
+            etat = "page non lue"
+        else:
+            etat = "pas encore lue"
+        ligne = f"- Tour {rang + 1} — URL envoyée par l'utilisateur : {url} ({etat})"
+        lignes_questions = [
+            question
+            for page in pages
+            if page.provenance == "utilisateur"
+            for question in questions_par_resultat.get(page.id, [])
+        ]
+        elements.append((message_id, len(elements), "\n".join([ligne, *lignes_questions])))
+    # Requête, URL et questions couvertes, jamais le contenu des pages ni
+    # les extraits du moteur. Une page `utilisateur` n'est pas une recherche.
     urls_par_recherche: dict[tuple[int, str], list[str]] = {}
     questions_par_recherche: dict[tuple[int, str], list[str]] = {}
-    for resultat_id, message_id, requete, url in resultats:
+    for resultat_id, message_id, requete, url, provenance, _ in resultats:
+        if message_id is None or provenance != "recherche":
+            continue
         urls_par_recherche.setdefault((message_id, requete), []).append(url)
         questions_par_recherche.setdefault((message_id, requete), []).extend(
             questions_par_resultat.get(resultat_id, [])
@@ -760,6 +777,7 @@ def creer_conversation(
             moteur_recherche=moteur_recherche,
             telechargeur_pages=telechargeur_pages,
             client_mistral=client,
+            message_du_tour=requete.message,
         )
         tools = outils_du_tour(contexte_outils)
         attendre_questions = _lancer_questions_piece_jointe(client, piece_jointe, requete.message)
@@ -1529,6 +1547,7 @@ def envoyer_message(
             moteur_recherche=moteur_recherche,
             telechargeur_pages=telechargeur_pages,
             client_mistral=client,
+            message_du_tour=requete.message,
         )
         tools = outils_du_tour(contexte_outils)
 
