@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -177,22 +178,33 @@ def _extraire(besoin: str, url: str, texte: str, contexte: ContexteTour) -> tupl
 
 def _page_de_la_conversation(url: str | None, resultats: list[ResultatRechercheWeb]) -> ResultatRechercheWeb | None:
     # Une URL ramenée par plusieurs recherches : la dernière page lue, sinon
-    # le dernier résultat (son extrait de moteur).
-    candidats = [resultat for resultat in resultats if resultat.url == url]
+    # le dernier résultat (son extrait de moteur). Comparaison normalisée,
+    # comme pour une URL du compte (le modèle redonne parfois l'URL sans
+    # « www. » ou avec un « / » final).
+    if url is None:
+        return None
+    cle = normaliser_url(url)
+    candidats = [resultat for resultat in resultats if normaliser_url(resultat.url) == cle]
     lus = [resultat for resultat in candidats if resultat.texte_nettoye]
     return (lus or candidats or [None])[-1]
 
 
 def _url_de_la_conversation(url, resultats: list[ResultatRechercheWeb], urls_du_compte: dict[str, str]) -> str | None:
-    # L'URL d'un résultat telle quelle, sinon l'URL écrite par le compte
-    # sous sa forme d'origine (le modèle la redonne parfois sans « www. »
-    # ou avec un « / » final). None : « Page introuvable. ».
+    # L'URL d'un résultat, sinon l'URL écrite par le compte sous sa forme
+    # d'origine (le modèle la redonne parfois sans « www. » ou avec un « / »
+    # final). None : « Page introuvable. ».
     if not isinstance(url, str):
         return None
     url = url.strip()
-    if any(resultat.url == url for resultat in resultats):
+    if _page_de_la_conversation(url, resultats) is not None:
         return url
     return urls_du_compte.get(normaliser_url(url))
+
+
+def _avec_schema(url: str) -> str:
+    # « www.bbass.fr » écrite par le compte : sans schéma, le téléchargeur la
+    # refuse, et la page resterait non lue toute la conversation.
+    return url if re.match(r"https?://", url, re.IGNORECASE) else f"https://{url}"
 
 
 def _telecharger_pages_du_compte(
@@ -206,13 +218,16 @@ def _telecharger_pages_du_compte(
     if not a_telecharger:
         return []
     with ThreadPoolExecutor(max_workers=len(a_telecharger)) as executeur:
-        pages = list(executeur.map(lambda url: lire_page(url, contexte.telechargeur_pages), a_telecharger))
+        pages = list(
+            executeur.map(lambda url: lire_page(_avec_schema(url), contexte.telechargeur_pages), a_telecharger)
+        )
     maintenant = datetime.now(timezone.utc)
     lignes = [
         ResultatRechercheWeb(
             conversation_id=contexte.conversation_id,
             requete="",
-            url=page.url,
+            # Telle qu'écrite par le compte, sans le schéma ajouté.
+            url=url,
             titre="",
             extrait_moteur="",
             # Source du garde-fou chiffres, comme une page trouvée.
@@ -220,7 +235,7 @@ def _telecharger_pages_du_compte(
             provenance="utilisateur",
             date_creation=maintenant,
         )
-        for page in pages
+        for url, page in zip(a_telecharger, pages)
     ]
     contexte.db.add_all(lignes)
     # Flush (jamais commit), comme rechercher_web : rattachée au message à

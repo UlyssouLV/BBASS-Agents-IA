@@ -21,6 +21,7 @@ _MOTIF_NOMBRE = re.compile(
 # numéro (SIRET, TVA, téléphone) que le modèle regroupe autrement que la
 # source (essai 1.4.1, conversation 93 : « 83119345300022 » devenait « 22 »).
 _MOTIF_SEQUENCE = re.compile(r"(?<![\w.,])\d+(?:[  ]\d+)+")
+_MOTIF_GROUPE = re.compile(r"\d+")
 _MOTIF_UNITE = re.compile(
     r"[ \t]+(ans|an|années|année|semaines|semaine|jours|jour|mois|heures|heure)\b",
     re.IGNORECASE,
@@ -78,7 +79,13 @@ def _dans(position: int, plages: list[tuple[int, int]]) -> bool:
 def retirer_chiffres_hors_source(reponse: str, textes_source: Iterable[str]) -> str:
     autorisees = _cles_autorisees(textes_source)
     plages_des_urls = _plages_des_urls(reponse)
-    sequences = [correspondance.span() for correspondance in _MOTIF_SEQUENCE.finditer(reponse)]
+    # Une suite qui commence dans une URL (« …/2011101 12 % ») n'est pas un
+    # numéro : la retirer entière couperait l'URL.
+    sequences = [
+        correspondance.span()
+        for correspondance in _MOTIF_SEQUENCE.finditer(reponse)
+        if not _dans(correspondance.start(), plages_des_urls)
+    ]
     # Une suite de chiffres groupés dont les chiffres, mis bout à bout,
     # sont dans une source reste entière, quel que soit le groupement.
     sequences_autorisees = [
@@ -96,9 +103,13 @@ def retirer_chiffres_hors_source(reponse: str, textes_source: Iterable[str]) -> 
         a_retirer.append(correspondance.span())
     if not a_retirer:
         return reponse
-    # Un chiffre retiré dans une suite groupée emporte toute la suite :
-    # jamais un fragment (« 22 ») qui passerait pour une donnée.
+    # Un chiffre retiré dans une suite d'au moins trois groupes (SIRET,
+    # téléphone) emporte toute la suite : jamais un fragment (« 22 ») qui
+    # passerait pour une donnée. Deux nombres côte à côte (« En 2023 15
+    # salariés ») sont deux données : chacun est jugé seul.
     for debut, fin in sequences:
+        if len(_MOTIF_GROUPE.findall(reponse, debut, fin)) < 3:
+            continue
         if any(debut <= position < fin for position, _ in a_retirer):
             a_retirer.append((debut, fin))
 

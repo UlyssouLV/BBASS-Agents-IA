@@ -374,6 +374,39 @@ def test_une_url_du_compte_est_telechargee_au_premier_appel_puis_jamais_plus(
     assert len(mistral_client_factice.appels_lecture_page) == 2
 
 
+def test_une_url_du_compte_sans_schema_est_telechargee_en_https(
+    client, mistral_client_factice, telechargeur_pages_factice, jeton_valide, db_session
+):
+    # « www.… » sans schéma : refusée par le téléchargeur, la page restait
+    # non lue toute la conversation.
+    url_ecrite = "www.client-dupont.fr/devis-bornage"
+    conversation_id = _conversation_avec_url_du_compte(client, mistral_client_factice, jeton_valide, url=url_ecrite)
+    telechargeur_pages_factice.servir(_URL_COMPTE, _page_html(_TEXTE_COMPTE))
+    mistral_client_factice.repondre_lecture_page(True, "Six semaines.", url_ecrite)
+
+    _lire(client, mistral_client_factice, jeton_valide, conversation_id, [url_ecrite])
+
+    assert telechargeur_pages_factice.urls_recues == [_URL_COMPTE]
+    assert "Six semaines." in _message_tool(mistral_client_factice)
+    (page,) = db_session.query(ResultatRechercheWeb).filter_by(conversation_id=conversation_id).all()
+    assert page.url == url_ecrite
+
+
+def test_une_url_de_recherche_redonnee_sous_une_autre_forme_est_lue(
+    client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide
+):
+    conversation_id = _conversation_avec_recherche(
+        client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide
+    )
+    mistral_client_factice.repondre_lecture_page(True, "Trois mois en moyenne.", _URL_LUE)
+
+    _lire(client, mistral_client_factice, jeton_valide, conversation_id, ["http://exemple.fr/bornage-a/"])
+
+    assert telechargeur_pages_factice.urls_recues == []
+    assert len(mistral_client_factice.appels_lecture_page) == 1
+    assert "Trois mois en moyenne." in _message_tool(mistral_client_factice)
+
+
 def test_une_url_du_message_du_tour_est_lue_au_meme_tour(
     client, mistral_client_factice, telechargeur_pages_factice, jeton_valide
 ):

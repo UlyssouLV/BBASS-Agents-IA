@@ -1262,6 +1262,30 @@ def test_un_numero_de_la_piece_jointe_regroupe_par_espaces_reste_entier(
     # Un numéro absent des sources part en entier, sans fragment.
     assert "119" not in contenu and "3453" not in contenu
 
+
+def test_un_chiffre_retire_juste_apres_une_url_ne_la_coupe_pas(client, mistral_client_factice, jeton_valide):
+    url = "https://insee.fr/statistiques/2011101"
+    mistral_client_factice.repondre(f"Source : {url} 12 % des ménages.", "Titre")
+
+    reponse = client.post("/conversations", json={"message": f"Lis {url}, page de 2020"}, headers=_autorisation(jeton_valide))
+
+    contenu = reponse.json()["reponse"]
+    assert url in contenu
+    assert "12" not in contenu.replace(url, "")
+
+
+def test_deux_nombres_cote_a_cote_sont_juges_chacun_seul(client, mistral_client_factice, jeton_valide):
+    mistral_client_factice.repondre("En 2023 15 salariés sont partis.", "Titre")
+
+    reponse = client.post(
+        "/conversations", json={"message": "Que s'est-il passé en 2023 ?"}, headers=_autorisation(jeton_valide)
+    )
+
+    contenu = reponse.json()["reponse"]
+    assert "2023" in contenu
+    assert "15" not in contenu
+
+
 def test_consigne_de_style_commence_par_la_capacite_reelle(
     client, mistral_client_factice, jeton_valide
 ):
