@@ -42,6 +42,12 @@ Ce n’est **pas** une spec (ça vient après « Ouvre la version »).
 
 **Objectif.** En 1.4.0, les pages téléchargées par une recherche ne vivent que le temps de leur conversation. Garder un cache commun (clé : l’URL) éviterait de retélécharger une page déjà lue. À trancher à l’ouverture : durée de validité au-delà de laquelle on retélécharge (une page change), règle de partage entre comptes (pages publiques seulement), taille et purge du cache. Piste née de l’ouverture de la 1.4.0.
 
+## Ensuite : 1.4.4 — Statut d’attente dynamique pendant une réponse
+
+**Objectif.** Remplacer l’indicateur figé du type « Réflexion… » par un statut qui suit **en direct** ce que la VM est en train de faire (ex. une recherche web en cours, une page lue, une extraction). Formulations, canaux (streaming, polling…), granularité et libellés : **à trancher au grilling** à l’ouverture — rien n’est fixé ici.
+
+**Hors périmètre.** Changer le contenu final de la réponse ; modes Rapide / Approfondi.
+
 ## Ensuite : 1.5.0 — Moduléo en lecture (outil transverse) + premier branchement via l’Agent Administration
 
 **Moduléo n’est pas « l’outil du pôle Administration ».** C’est un logiciel **cabinet**, susceptible d’être utilisé par **tous les pôles**, avec des **restrictions / allowlists différentes** selon le pôle (et l’Agent) qui l’appelle. Le pôle Administration est seulement le **premier** à brancher Moduléo dans le chat (premier Agent métier + premier jeu d’outils Moduléo), pas le propriétaire exclusif de l’intégration.

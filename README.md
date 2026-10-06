@@ -36,10 +36,10 @@ Point visé jeudi 8 octobre : enchaînement jusqu’à **V1.7.0** (n8n) — **pr
 
 ```mermaid
 flowchart LR
-  L05["Lundi 5<br/>V1.2.3, V1.3.0 et V1.3.1 livrées"] --> V140["V1.4.0<br/>recherche web"]
-  V140 --> V150["V1.5.0<br/>Moduléo lecture"]
-  V150 --> V160["V1.6.0<br/>déploiement · priorité"]
-  V160 --> V08["Jeudi 8<br/>visé aussi V1.7.0 n8n"]
+  L05["Lundi 5<br/>V1.2.3, V1.3.0 et V1.3.1 livrées"] --> V140["V1.4.0<br/>recherche web<br/>livraison prévue le 06/10"]
+  V140 --> V150["V1.5.0<br/>Moduléo lecture<br/>livraison prévue le 07/10"]
+  V150 --> V160["V1.6.0<br/>déploiement · priorité<br/>livraison prévue le 07/10"]
+  V160 --> V170["V1.7.0<br/>n8n<br/>livraison prévue le 08/10"]
 ```
 
 ### Travail réalisé
