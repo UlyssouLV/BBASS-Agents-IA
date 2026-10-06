@@ -396,7 +396,7 @@
             <div class="toc-row">
               <a href="#reste-a-implementer">Reste à implémenter</a>
               <span class="toc-dots" aria-hidden="true"></span>
-              <span class="toc-ref">V1.4.1 → …</span>
+              <span class="toc-ref">V1.4.2 → …</span>
             </div>
           </li>
           <li>
@@ -418,6 +418,7 @@
               <li><a href="#version-1-3-0">V1.3.0 — Inspecteur des échanges</a></li>
               <li><a href="#version-1-3-1">V1.3.1 — Le chat ne fige plus ses inventions</a></li>
               <li><a href="#version-1-4-0">V1.4.0 — Recherche web</a></li>
+              <li><a href="#version-1-4-1">V1.4.1 — Mémoire de la conversation</a></li>
               <li><a href="#version-1-5-0">V1.5.0 — Moduléo lecture</a></li>
               <li><a href="#version-1-6-0">V1.6.0 — Documentation mémoire / souveraineté</a></li>
               <li><a href="#version-1-7-0">V1.7.0 — Déploiement postes</a></li>
@@ -453,22 +454,24 @@
     <div class="jour">
       <h3>Mardi 6 octobre</h3>
       <ul>
-        <li>Ouverture, implémentation et <strong>livraison de la V1.4.0</strong> (13:25) : recherche web dans le chat — SearXNG auto-hébergé, outil <code>rechercher_web</code>, pages entières nettoyées, appel d’extraction isolé, registre d’outils, boucle sur 3 tours, inspecteur Mistral / local avec ligne garde-fous.</li>
-        <li>Test humain (conversations 85 à 92) puis corrections livrées avec la version : fil d’une autre conversation (#127), URL abîmées par le garde-fou des chiffres (#128), pages à chaîne de certificats incomplète (#129), date du jour pour les recherches d’actualité (#130).</li>
-        <li>Bug connu à la livraison (#131) : quand la recherche ne trouve rien, l’IA invente encore au lieu de le dire — correction reportée en « Plus tard ».</li>
-        <li>Process : les tickets enfants d’une version sont aussi des sub-issues GitHub (compteur Y/Z sur le parent).</li>
+        <li><strong>Livraison de la V1.4.0</strong> (13:25) : le chat peut chercher sur Internet. L’IA trouve de vraies pages et cite leurs adresses, au lieu d’inventer des liens. La recherche tourne chez le cabinet (pas de moteur externe payant).</li>
+        <li>Tests manuels, puis corrections livrées avec la version : une nouvelle conversation n’affichait plus le fil d’une autre ; les liens contenant des chiffres n’étaient plus abîmés ; certaines pages officielles redeviennent lisibles ; une recherche d’actualité utilise bien l’année en cours.</li>
+        <li>Limite connue à la livraison : quand la recherche ne trouve rien d’utile, l’IA invente encore parfois au lieu de le dire — correction reportée à plus tard.</li>
+        <li><strong>Livraison de la V1.4.1</strong> (17:43) : dans une même conversation, l’IA garde la trace des documents joints, des recherches déjà faites et des liens envoyés par le collaborateur. Elle peut y revenir plus loin dans le fil (relire un document, une page déjà trouvée, ou un lien qu’on lui a donné) sans tout recommencer.</li>
       </ul>
     </div>
 
     <div class="jour">
       <h3>Mercredi 7 octobre</h3>
       <ul>
+        <li>À compléter. <span class="echeance">Suite prévue : Moduléo lecture (V1.5.0).</span></li>
       </ul>
     </div>
 
     <div class="jour">
       <h3>Jeudi 8 octobre</h3>
       <ul>
+        <li>À compléter. <span class="echeance">Horizon semaine : déploiement postes (V1.7.0), éventuellement n8n (V1.8.0).</span></li>
       </ul>
     </div>
 
@@ -484,7 +487,6 @@
     <section class="bloc" id="reste-a-implementer">
     <h2>Reste à implémenter</h2>
     <ul>
-      <li><strong>V1.4.1</strong> — mémoire de la conversation (pièces jointes et recherches hors fenêtre).</li>
       <li><strong>V1.4.2</strong> — tokenizer Mistral pour le plafond des pages web.</li>
       <li><strong>V1.4.3</strong> — cache des pages web entre conversations.</li>
       <li><strong>V1.4.4</strong> — statut d’attente dynamique pendant une réponse.</li>
@@ -500,7 +502,7 @@
     <section class="bloc" id="livre-pour">
     <h2>Livré pour le 08/10/2026</h2>
     <div class="recap">
-      <p><strong>Point jeudi 8 octobre — livré à ce jour : V1.2.2, V1.2.3, V1.3.0, V1.3.1 et V1.4.0</strong></p>
+      <p><strong>Point jeudi 8 octobre — livré à ce jour : V1.2.2, V1.2.3, V1.3.0, V1.3.1, V1.4.0 et V1.4.1</strong></p>
       <h3>Style et lecture du chat (V1.2.2)</h3>
       <ul>
         <li>Réponses de l’IA au ton professionnel : vouvoiement, sans remplissage ni relance systématique en fin de message ; emojis seulement quand ils portent un vrai signal.</li>
@@ -527,6 +529,11 @@
         <li>Outils du modèle rangés au même endroit ; plusieurs outils possibles dans un même tour (jusqu’à 3 allers-retours) ; l’inspecteur montre tout le déroulé (Mistral / local, garde-fous).</li>
         <li>Corrections du test humain livrées avec : nouvelle conversation sans fil parasite, URL intactes malgré les chiffres, pages officielles lisibles malgré une chaîne TLS incomplète, année en cours pour une actualité.</li>
         <li>Bug connu à la livraison (#131) : quand la recherche ne trouve rien, l’IA invente encore parfois — correction reportée en « Plus tard ».</li>
+      </ul>
+      <h3>Mémoire de la conversation (V1.4.1)</h3>
+      <ul>
+        <li>À chaque tour, la VM rappelle au modèle tout ce qui a été partagé dans le fil : pièces jointes, recherches web, URL écrites par le collaborateur (marquées comme telles) — même hors de la fenêtre des 3 messages.</li>
+        <li>Questions couvertes (aperçu de ce à quoi répond chaque document ou page) ; outils pour relire une pièce jointe ou une page déjà trouvée, ou lire une URL envoyée par le collaborateur ; jusqu’à 5 appels d’outils par message.</li>
       </ul>
     </div>
     </section>
@@ -586,6 +593,17 @@
         <div class="version-body">
         <p>Outil de recherche internet exécuté par la VM : le modèle trouve une page réelle au lieu d’en inventer l’adresse. SearXNG auto-hébergé (sans clé ni quota), lecture des pages entières, extraction isolée du contexte de conversation, outils centralisés, boucle sur trois tours, inspecteur chronologique. Seules les URL et les chiffres provenant des pages lues restent dans la réponse.</p>
         <p>Livrée avec un bug connu (#131) : si la recherche ne trouve rien d’utile, l’IA peut encore inventer — correction reportée en « Plus tard ».</p>
+        </div>
+      </div>
+
+      <div class="version" id="version-1-4-1">
+        <div class="version-head">
+          <h3>V1.4.1 — Mémoire de la conversation</h3>
+          <span class="deploye">Déployé le 06/10/2026 à 17:43</span>
+        </div>
+        <div class="version-body">
+        <p>Jusqu’ici, une pièce jointe disparaissait dès le tour suivant, une recherche ne laissait que sa requête, et une URL envoyée par le collaborateur ne survait que si le résumé la gardait. Cette version envoie à chaque appel de chat la liste de tout ce qui a été partagé dans le fil — pièces jointes, recherches, URL du collaborateur — avec un aperçu de questions couvertes.</p>
+        <p>L’IA peut relire une ou plusieurs pièces jointes, relire une page déjà trouvée sans la retélécharger, ou lire une URL que le collaborateur a envoyée. La boucle d’outils passe à cinq appels par message. Aucun changement d’interface côté poste.</p>
         </div>
       </div>
 
