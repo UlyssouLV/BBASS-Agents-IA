@@ -1,7 +1,7 @@
 import re
 from collections.abc import Iterable
 
-from vm_centrale.garde_fous.urls import _MOTIF_LIEN_MARKDOWN, _MOTIF_URL_NUE
+from vm_centrale.garde_fous.urls.garde_fou import _MOTIF_LIEN_MARKDOWN, _MOTIF_URL_NUE
 
 # Le modèle récite des chiffres appris à l'entraînement même quand la
 # consigne lui interdit d'inventer (essai du 2026-10-05, conversation 78 :
