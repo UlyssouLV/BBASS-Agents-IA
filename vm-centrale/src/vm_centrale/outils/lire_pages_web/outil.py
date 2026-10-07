@@ -2,7 +2,7 @@ import json
 import logging
 import re
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
 from vm_centrale.compte_tokens import compter_tokens
@@ -71,6 +71,46 @@ _SCHEMA_LECTURE_PAGE = {
         },
     },
 }
+# Consigne fixe de la revérification des questions couvertes d'une page
+# relue de force (#158) : même cadre isolé (ADR-0014), les anciennes
+# questions seules, jamais leurs anciennes réponses, et le besoin éventuel
+# dans le même appel.
+CONSIGNE_REVERIFICATION_PAGE = (
+    "Cette page a changé. Pour chaque question numérotée, dans l'ordre, dis "
+    "si la nouvelle version de la page y répond et donne la réponse, de façon "
+    "courte. Si un besoin est donné, réponds-y de la même façon. N'ajoute rien "
+    "qui ne soit pas écrit dans la page. Une information absente de la page est "
+    "« non trouvé », jamais une estimation.\n\n"
+    "Réponds en JSON : `questions`, une entrée par question dans l'ordre "
+    "(`trouvee`, vrai si la page répond ; `reponse`, la réponse, vide si non "
+    "trouvé) ; `besoin`, de même forme, seulement si un besoin est donné."
+)
+_LECTURE = {
+    "type": "object",
+    "properties": {"trouvee": {"type": "boolean"}, "reponse": {"type": "string"}},
+    "required": ["trouvee", "reponse"],
+    "additionalProperties": False,
+}
+
+
+def _schema_reverification(avec_besoin: bool) -> dict:
+    proprietes = {"questions": {"type": "array", "items": _LECTURE}}
+    if avec_besoin:
+        proprietes["besoin"] = _LECTURE
+    return {
+        "type": "json_schema",
+        "json_schema": {
+            "name": "reverification_page",
+            "strict": True,
+            "schema": {
+                "type": "object",
+                "properties": proprietes,
+                "required": list(proprietes),
+                "additionalProperties": False,
+            },
+        },
+    }
+
 
 logger = logging.getLogger(__name__)
 
@@ -161,27 +201,46 @@ class _Lecture:
     reponse: str
 
 
-def _lire_reponse(contenu: str) -> _Lecture:
-    # Lève ValueError, KeyError ou TypeError si le JSON n'a pas la forme
-    # demandée. `source` n'est pas relu : une page par appel, la source est
-    # l'URL lue.
-    donnees = json.loads(contenu)
+def _lecture(donnees: dict) -> _Lecture:
+    # Lève KeyError ou TypeError si l'entrée n'a pas la forme demandée.
     trouvee, reponse = donnees["trouvee"], donnees["reponse"]
     if not isinstance(trouvee, bool) or not isinstance(reponse, str):
         raise TypeError("trouvee ou reponse mal formés")
     return _Lecture(trouvee and bool(reponse.strip()), reponse.strip())
 
 
-def _extraire(besoin: str, url: str, texte: str, contexte: ContexteTour) -> tuple[_Lecture | None, AppelMistralOutil]:
-    # Appel isolé : consigne fixe, besoin, texte nettoyé déjà en base. None
-    # si l'appel échoue ou sort du JSON demandé, jamais d'exception. Lancé
-    # dans un thread : ne touche pas à la session.
-    messages = [
-        {"role": "system", "content": CONSIGNE_LECTURE_PAGE},
-        {"role": "user", "content": f"Besoin : {besoin}\n\n--- Page : {url} ---\n{texte}"},
-    ]
+def _lire_reponse(contenu: str) -> _Lecture:
+    # Lève ValueError, KeyError ou TypeError si le JSON n'a pas la forme
+    # demandée. `source` n'est pas relu : une page par appel, la source est
+    # l'URL lue.
+    return _lecture(json.loads(contenu))
+
+
+@dataclass(frozen=True)
+class _Reverification:
+    questions: list[_Lecture]
+    besoin: _Lecture | None
+
+
+def _lire_reverification(contenu: str, nombre: int, avec_besoin: bool) -> _Reverification:
+    # Lève ValueError, KeyError ou TypeError si le JSON n'a pas la forme
+    # demandée, une entrée par question envoyée comprise.
+    donnees = json.loads(contenu)
+    questions = donnees["questions"]
+    if not isinstance(questions, list) or len(questions) != nombre:
+        raise ValueError("une entrée par question attendue")
+    return _Reverification(
+        [_lecture(question) for question in questions], _lecture(donnees["besoin"]) if avec_besoin else None
+    )
+
+
+def _appeler(
+    messages: list[dict], response_format: dict, contexte: ContexteTour
+) -> tuple[str | None, AppelMistralOutil]:
+    # Contenu de la réponse (None si l'appel échoue) et sa trace, jamais
+    # d'exception. Lancé dans un thread : ne touche pas à la session.
     try:
-        reponse = contexte.client_mistral.chat(messages, response_format=_SCHEMA_LECTURE_PAGE)
+        reponse = contexte.client_mistral.chat(messages, response_format=response_format)
     except Exception as erreur:
         logger.warning("Relecture de page en échec : %s", erreur)
         return None, AppelMistralOutil(
@@ -192,15 +251,50 @@ def _extraire(besoin: str, url: str, texte: str, contexte: ContexteTour) -> tupl
             usage=None,
             erreur=str(erreur),
         )
-    appel = AppelMistralOutil(
+    return reponse.contenu, AppelMistralOutil(
         type_appel="extraction_web",
         modele=MODELE_CHAT,
         requete_payload=reponse.payload_envoye,
         reponse_payload=reponse.reponse_brute,
         usage=reponse.usage,
     )
+
+
+def _reverifier(
+    besoin: str, url: str, texte: str, questions: list[str], contexte: ContexteTour
+) -> tuple[_Reverification | None, AppelMistralOutil]:
+    # Un seul appel isolé par page relue de force (#158) : consigne fixe,
+    # anciennes questions, besoin éventuel, nouvelle version de la page.
+    # None si l'appel échoue ou sort du JSON demandé.
+    numerotees = "\n".join(f"{numero}. {question}" for numero, question in enumerate(questions, start=1))
+    demande = f"Questions :\n{numerotees}" + (f"\n\nBesoin : {besoin}" if besoin else "")
+    messages = [
+        {"role": "system", "content": CONSIGNE_REVERIFICATION_PAGE},
+        {"role": "user", "content": f"{demande}\n\n--- Page : {url} ---\n{texte}"},
+    ]
+    contenu, appel = _appeler(messages, _schema_reverification(bool(besoin)), contexte)
+    if contenu is None:
+        return None, appel
     try:
-        return _lire_reponse(reponse.contenu), appel
+        return _lire_reverification(contenu, len(questions), bool(besoin)), appel
+    except (ValueError, KeyError, TypeError) as erreur:
+        logger.warning("Revérification de page hors du JSON attendu : %s", erreur)
+        return None, appel
+
+
+def _extraire(besoin: str, url: str, texte: str, contexte: ContexteTour) -> tuple[_Lecture | None, AppelMistralOutil]:
+    # Appel isolé : consigne fixe, besoin, texte nettoyé déjà en base. None
+    # si l'appel échoue ou sort du JSON demandé, jamais d'exception. Lancé
+    # dans un thread : ne touche pas à la session.
+    messages = [
+        {"role": "system", "content": CONSIGNE_LECTURE_PAGE},
+        {"role": "user", "content": f"Besoin : {besoin}\n\n--- Page : {url} ---\n{texte}"},
+    ]
+    contenu, appel = _appeler(messages, _SCHEMA_LECTURE_PAGE, contexte)
+    if contenu is None:
+        return None, appel
+    try:
+        return _lire_reponse(contenu), appel
     except (ValueError, KeyError, TypeError) as erreur:
         # Appel payé et tracé tel quel : seule sa sortie est inutilisable.
         logger.warning("Relecture de page hors du JSON attendu : %s", erreur)
@@ -254,24 +348,66 @@ def _a_retenter(page: ResultatRechercheWeb | None, contexte: ContexteTour) -> bo
 @dataclass(frozen=True)
 class _RelectureForcee:
     reussie: bool
-    questions_supprimees: int
     # Date de la copie de la conversation, pour la consigne d'échec.
     date_copie: datetime
+    questions_mises_a_jour: int = 0
+    questions_supprimees: int = 0
 
     def trace(self, url: str) -> dict:
-        return {"url": url, "reussie": self.reussie, "questions_supprimees": self.questions_supprimees}
+        return {
+            "url": url,
+            "reussie": self.reussie,
+            "questions_mises_a_jour": self.questions_mises_a_jour,
+            "questions_supprimees": self.questions_supprimees,
+        }
+
+
+@dataclass(frozen=True)
+class _RelecturesForcees:
+    telechargees: list[tuple[ResultatRechercheWeb, dict]] = field(default_factory=list)
+    # Par ligne relue (id de la page choisie avant la relecture).
+    relectures: dict[int, _RelectureForcee] = field(default_factory=dict)
+    # URL normalisée → lecture du besoin faite par la revérification (None :
+    # appel en échec), à la place de l'appel d'extraction habituel.
+    lectures_besoin: dict[str, tuple[_Lecture | None, AppelMistralOutil]] = field(default_factory=dict)
+    # Appels de revérification sans besoin (avec un besoin : dans
+    # lectures_besoin).
+    appels: tuple[AppelMistralOutil, ...] = ()
+
+
+def _appliquer_reverification(
+    questions: list[QuestionCouverte], reverification: _Reverification | None, contexte: ContexteTour
+) -> tuple[int, int]:
+    # Réponse changée → mise à jour ; plus trouvée → supprimée ; appel en
+    # échec ou hors du JSON → toutes supprimées (jamais une réponse non
+    # vérifiée face à une page qui a changé). Rend (mises à jour, supprimées).
+    if reverification is None:
+        for question in questions:
+            contexte.db.delete(question)
+        return 0, len(questions)
+    mises_a_jour = supprimees = 0
+    for question, lecture in zip(questions, reverification.questions):
+        if not lecture.trouvee:
+            contexte.db.delete(question)
+            supprimees += 1
+            continue
+        reponse = lecture.reponse[:REPONSE_MAX]
+        if reponse != question.reponse or not question.trouvee:
+            question.reponse, question.trouvee = reponse, True
+            mises_a_jour += 1
+    return mises_a_jour, supprimees
 
 
 def _relire_de_force(
-    urls: list[str], resultats: list[ResultatRechercheWeb], contexte: ContexteTour
-) -> tuple[list[tuple[ResultatRechercheWeb, dict]], dict[int, _RelectureForcee]]:
+    urls: list[str], resultats: list[ResultatRechercheWeb], besoin: str, contexte: ContexteTour
+) -> _RelecturesForcees:
     # `retelecharger` (#157) : chaque page déjà en base est téléchargée sans
     # passer par le cache, une fois par URL et par tour au plus (un appel
     # suivant du tour sert la copie actuelle). Succès : cache mis à jour par
     # lire_pages, copie de la conversation remplacée sur toutes les lignes
     # de l'URL (sources du garde-fou chiffres), questions couvertes de la
-    # page supprimées (jamais une réponse lue sur l'ancienne version).
-    # Échec : rien ne change.
+    # page revérifiées sur la nouvelle version (#158) par un seul appel,
+    # besoin compris. Échec : rien ne change.
     a_relire: dict[str, ResultatRechercheWeb] = {}
     for url in urls:
         page = _page_de_la_conversation(url, resultats)
@@ -282,29 +418,69 @@ def _relire_de_force(
             contexte.pages_relues_de_force.add(cle)
             a_relire[cle] = page
     if not a_relire:
-        return [], {}
+        return _RelecturesForcees()
     pages = lire_pages([_avec_schema(page.url) for page in a_relire.values()], contexte, sans_cache=True)
     maintenant = datetime.now(timezone.utc)
     relectures: dict[int, _RelectureForcee] = {}
+    # Ligne relue → URL normalisée, questions de la page, et arguments de
+    # l'appel (lus ici : l'appel tourne dans un thread, hors de la session).
+    a_reverifier: dict[int, tuple[str, list[QuestionCouverte], tuple[str, str, list[str]]]] = {}
     for (cle, ligne), page in zip(a_relire.items(), pages):
         # Pas de nouvel essai #156 en plus dans ce tour.
         contexte.pages_retentees.add(ligne.id)
         if not page.texte:
-            relectures[ligne.id] = _RelectureForcee(False, 0, ligne.date_creation)
+            relectures[ligne.id] = _RelectureForcee(False, ligne.date_creation)
             continue
         copies = [resultat for resultat in resultats if normaliser_url(resultat.url) == cle]
         for copie in copies:
             copie.texte_nettoye = page.texte
             copie.titre = page.titre or copie.titre
             copie.date_creation = maintenant
-        supprimees = (
+        questions = (
             contexte.db.query(QuestionCouverte)
             .filter(QuestionCouverte.resultat_recherche_web_id.in_([copie.id for copie in copies]))
-            .delete(synchronize_session=False)
+            .order_by(QuestionCouverte.id)
+            .all()
         )
-        relectures[ligne.id] = _RelectureForcee(True, supprimees, maintenant)
+        # Sans question : aucun appel ici, un besoin est lu comme en 1.4.1.
+        # Au-delà du plafond : questions supprimées sans appel, le refus
+        # « page trop longue » suit avec un besoin.
+        if questions and compter_tokens(page.texte, MODELE_CHAT) > PLAFOND_TOKENS_PAGES:
+            supprimees = _appliquer_reverification(questions, None, contexte)
+            relectures[ligne.id] = _RelectureForcee(True, maintenant, *supprimees)
+        elif questions:
+            arguments = (ligne.url, page.texte, [question.question for question in questions])
+            a_reverifier[ligne.id] = (cle, questions, arguments)
+        else:
+            relectures[ligne.id] = _RelectureForcee(True, maintenant)
+    with ThreadPoolExecutor(max_workers=max(len(a_reverifier), 1)) as executeur:
+        reverifications = dict(
+            zip(
+                a_reverifier,
+                executeur.map(
+                    lambda arguments: _reverifier(besoin, *arguments, contexte),
+                    [arguments for _, _, arguments in a_reverifier.values()],
+                ),
+            )
+        )
+    lectures_besoin: dict[str, tuple[_Lecture | None, AppelMistralOutil]] = {}
+    appels: list[AppelMistralOutil] = []
+    for ligne_id, (cle, questions, _) in a_reverifier.items():
+        reverification, appel = reverifications[ligne_id]
+        relectures[ligne_id] = _RelectureForcee(
+            True, maintenant, *_appliquer_reverification(questions, reverification, contexte)
+        )
+        if besoin:
+            lectures_besoin[cle] = (reverification.besoin if reverification is not None else None, appel)
+        else:
+            appels.append(appel)
     contexte.db.flush()
-    return [(ligne, page.trace()) for ligne, page in zip(a_relire.values(), pages)], relectures
+    return _RelecturesForcees(
+        [(ligne, page.trace()) for ligne, page in zip(a_relire.values(), pages)],
+        relectures,
+        lectures_besoin,
+        tuple(appels),
+    )
 
 
 def _consigne_relecture_en_echec(page: ResultatRechercheWeb, relecture: _RelectureForcee) -> str:
@@ -405,12 +581,16 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
     cibles = [_url_de_la_conversation(url, resultats, urls_du_compte) for url in urls]
     connues = [url for url in cibles if url is not None]
     retelecharger = arguments.get("retelecharger") is True
-    relues, relectures = _relire_de_force(connues, resultats, contexte) if retelecharger else ([], {})
+    forcees = _relire_de_force(connues, resultats, besoin, contexte) if retelecharger else _RelecturesForcees()
+    relectures = forcees.relectures
     if retelecharger:
         # Une URL du compte pas encore en base est téléchargée sans passer
         # par le cache : c'est la relecture forcée de ce tour.
         contexte.pages_relues_de_force.update(normaliser_url(url) for url in connues)
-    telechargees = [*relues, *_lire_pages_sans_texte(connues, resultats, contexte, sans_cache=retelecharger)]
+    telechargees = [
+        *forcees.telechargees,
+        *_lire_pages_sans_texte(connues, resultats, contexte, sans_cache=retelecharger),
+    ]
     pages = [_page_de_la_conversation(url, resultats) if url is not None else None for url in cibles]
     # Une page jugée trop longue plus tôt dans ce tour (#151) est refusée,
     # avec ou sans besoin, sans être recomptée : sans besoin, son aperçu
@@ -430,15 +610,22 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
     for url, nombre in tokens.values():
         if nombre > PLAFOND_TOKENS_PAGES:
             contexte.pages_trop_longues.setdefault(normaliser_url(url), url)
-    a_lire = {
-        page.id: (page.url, page.texte_nettoye)
-        for page in pages
-        if page is not None and page.id in tokens and tokens[page.id][1] <= PLAFOND_TOKENS_PAGES
+    sous_le_plafond = [
+        page for page in pages if page is not None and page.id in tokens and tokens[page.id][1] <= PLAFOND_TOKENS_PAGES
+    ]
+    # Une page relue de force dont les questions ont été revérifiées a déjà
+    # lu le besoin dans le même appel (#158) : pas de second appel.
+    deja_lues = {
+        page.id: forcees.lectures_besoin[normaliser_url(page.url)]
+        for page in sous_le_plafond
+        if normaliser_url(page.url) in forcees.lectures_besoin
     }
+    a_lire = {page.id: (page.url, page.texte_nettoye) for page in sous_le_plafond if page.id not in deja_lues}
     with ThreadPoolExecutor(max_workers=max(len(a_lire), 1)) as executeur:
-        extractions = dict(
-            zip(a_lire, executeur.map(lambda page: _extraire(besoin, *page, contexte), a_lire.values()))
-        )
+        extractions = {
+            **deja_lues,
+            **dict(zip(a_lire, executeur.map(lambda page: _extraire(besoin, *page, contexte), a_lire.values()))),
+        }
 
     blocs: list[str] = []
     enregistrees: set[int] = set()
@@ -493,7 +680,7 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
         )
     # Flush (jamais commit) : un tour qui échoue plus loin les annule.
     contexte.db.flush()
-    appels = tuple(appel for _, appel in extractions.values())
+    appels = (*forcees.appels, *(appel for _, appel in extractions.values()))
     trace: dict = (
         {"pages_telechargees": [_trace_telechargee(ligne, trace, tokens) for ligne, trace in telechargees]}
         if telechargees
