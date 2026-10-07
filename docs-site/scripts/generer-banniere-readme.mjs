@@ -11,7 +11,8 @@ import {chromium} from 'playwright';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../..');
 const LOGO = path.join(REPO_ROOT, 'docs-site/static/img/logo-bbass.png');
-const OUT = path.join(REPO_ROOT, 'docs/img/readme-banniere.png');
+const OUT = path.join(REPO_ROOT, 'docs/img/readme-banniere.jpg');
+const OUT_LEGACY_PNG = path.join(REPO_ROOT, 'docs/img/readme-banniere.png');
 const HTML = path.join(__dirname, '.banniere-readme.html');
 
 const html = `<!DOCTYPE html>
@@ -22,7 +23,7 @@ const html = `<!DOCTYPE html>
   @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@500;700;800&display=swap');
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
-    background: #fff;
+    background: #ffffff;
     width: 1100px;
     height: 280px;
   }
@@ -34,19 +35,20 @@ const html = `<!DOCTYPE html>
     justify-content: center;
     gap: 2.75rem;
     padding: 1.5rem 2rem;
-    background: #fff;
+    background: #ffffff;
     font-family: Outfit, system-ui, sans-serif;
   }
   .logo {
     height: 168px;
     width: auto;
     display: block;
+    background: #ffffff;
   }
   .sep {
     width: 3px;
     height: 120px;
     border-radius: 2px;
-    background: linear-gradient(180deg, transparent, #c8102e 18%, #c8102e 82%, transparent);
+    background: linear-gradient(180deg, #ffffff, #c8102e 18%, #c8102e 82%, #ffffff);
     flex-shrink: 0;
   }
   .agents {
@@ -93,13 +95,18 @@ async function main() {
   });
   await page.goto(pathToFileURL(HTML).href, {waitUntil: 'networkidle', timeout: 60_000});
   await page.waitForTimeout(600);
+  // JPEG : pas de transparence (fond blanc garanti sur GitHub dark mode)
   await page.screenshot({
     path: OUT,
-    type: 'png',
+    type: 'jpeg',
+    quality: 92,
     omitBackground: false,
   });
   await browser.close();
   fs.unlinkSync(HTML);
+  if (fs.existsSync(OUT_LEGACY_PNG)) {
+    fs.unlinkSync(OUT_LEGACY_PNG);
+  }
   console.log(`[bannière] ${OUT}`);
 }
 

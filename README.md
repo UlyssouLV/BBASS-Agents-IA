@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/img/readme-banniere.png" alt="BBASS Agents IA" width="480" />
+  <img src="docs/img/readme-banniere.jpg" alt="BBASS Agents IA" width="480" />
 </p>
 
 <!-- sync:stats-commits -->
