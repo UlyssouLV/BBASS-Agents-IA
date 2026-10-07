@@ -1119,3 +1119,20 @@ def test_la_regle_de_portee_est_dans_lextraction_lire_pages_web_et_la_reponse_de
         assert "le lieu, la période et la population" in consigne
         assert "« en Savoie » ne devient jamais « en France »" in consigne
         assert "conversion" in consigne and "calcul" in consigne
+
+
+def test_une_page_connue_seulement_par_lextrait_du_moteur_nest_pas_citee(
+    client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide
+):
+    # #162, conversation 106 : travaux.com cité sans avoir été lu.
+    moteur_recherche_factice.repondre(
+        (_TITRE_TROUVEE, _URL_TROUVEE, "Un bornage amiable dure de 6 à 12 semaines.")
+    )
+    _demander_recherche(mistral_client_factice)
+    mistral_client_factice.repondre("Un bornage amiable dure 6 à 12 semaines.", "Titre")
+
+    resultat = client.post(
+        "/conversations", json={"message": "Durée d'un bornage ?"}, headers=_autorisation(jeton_valide)
+    )
+
+    assert resultat.json()["reponse"] == "Un bornage amiable dure 6 à 12 semaines."

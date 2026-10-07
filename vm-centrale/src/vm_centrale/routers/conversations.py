@@ -496,24 +496,28 @@ def _extraits_pieces_jointes(
     return extraits
 
 
-def _pages_de_la_conversation(db: Session, conversation_id: int) -> list[PageSource]:
+def _textes_de_recherche(db: Session, conversation_id: int) -> list[str]:
     # Extraits du moteur et texte nettoyé des pages (spec 1.4.0), jamais
     # les faits produits par l'appel d'extraction, qui pourraient inventer.
     lignes = (
-        db.query(
-            ResultatRechercheWeb.url,
-            ResultatRechercheWeb.titre,
-            ResultatRechercheWeb.extrait_moteur,
-            ResultatRechercheWeb.texte_nettoye,
-        )
+        db.query(ResultatRechercheWeb.extrait_moteur, ResultatRechercheWeb.texte_nettoye)
+        .filter(ResultatRechercheWeb.conversation_id == conversation_id)
+        .all()
+    )
+    return [texte for ligne in lignes for texte in ligne if texte and texte.strip()]
+
+
+def _pages_de_la_conversation(db: Session, conversation_id: int) -> list[PageSource]:
+    # Texte nettoyé des pages (spec 1.4.0), jamais l'extrait du moteur
+    # d'une page qu'on n'a pas lue (#162) ni les faits produits par l'appel
+    # d'extraction, qui pourraient inventer. La plus récente en dernier.
+    lignes = (
+        db.query(ResultatRechercheWeb.url, ResultatRechercheWeb.titre, ResultatRechercheWeb.texte_nettoye)
         .filter(ResultatRechercheWeb.conversation_id == conversation_id)
         .order_by(ResultatRechercheWeb.id)
         .all()
     )
-    return [
-        PageSource(url, titre, tuple(texte for texte in (extrait, texte_nettoye) if texte and texte.strip()))
-        for url, titre, extrait, texte_nettoye in lignes
-    ]
+    return [PageSource(url, titre, texte_nettoye or "") for url, titre, texte_nettoye in lignes]
 
 
 def _reponse_visible(
@@ -566,7 +570,7 @@ def _appliquer_garde_fous(
         return reponse
     extraits = _extraits_pieces_jointes(db, conversation_id, piece_jointe)
     # Un texte de recherche non vide compte comme un document.
-    extraits += [texte for page in _pages_de_la_conversation(db, conversation_id) for texte in page.textes]
+    extraits += _textes_de_recherche(db, conversation_id)
     textes_source = [*_messages_du_compte(db, conversation_id, nouveau_message), *extraits]
     sans_chiffre_invente = retirer_chiffres_hors_source(reponse, textes_source)
     if sans_chiffre_invente == reponse:
