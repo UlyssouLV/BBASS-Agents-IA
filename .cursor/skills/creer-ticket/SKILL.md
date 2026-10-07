@@ -19,26 +19,33 @@ Do not merge. Do not commit. Do not open a new PR. Do not rewrite the local
 spec file.
 
 Paths: **`agents/roles.yml`**. Tracker detail: **`agents/issue-tracker.md`**
-(*Version parent and children*).
+(*Version parent and children* — **Child ticket body**).
 
 One child per invocation. Later children: run `/ct` again.
 
 The local `docs/specs/vX.Y.Z-*.md` is the source of truth for the parent
 narrative. The GitHub parent issue body must match it after this skill runs.
 
+**Body format (mandatory):** Matt `/to-tickets` template in
+`agents/issue-tracker.md` — `Part of #<parent>`, then `## What to build`,
+`## Acceptance criteria`, `## Blocked by`. English headings only. If the user
+gave free-form text: reshape into that template; do not invent criteria.
+
 ## 1. Inputs
 
 From the user message:
 
 - **Title** — required. If missing: ask and **wait**.
-- **Body** — what the ticket delivers. If missing: ask and **wait**. Do not invent.
+- **What to build** / acceptance criteria — required (may arrive as a free
+  body). If missing: ask and **wait**. Do not invent.
 - **`#parent`** — optional. If absent: resolve the open PR for the current
   branch (`gh pr view`); take the parent from its `Fixes #<n>` that is the
   version spec (the issue that has the other `Fixes` as children / is not
   itself a `Part of` child). Zero or more than one open PR for this branch →
   **stop** and ask for `#parent`.
 - **`Blocked by #n`** — optional. If present, that child becomes a native
-  blocker of the new issue. If absent: only parent ← child.
+  blocker of the new issue and the body lists `- #<n>`. If absent: body
+  `## Blocked by` → `- Aucun`; only parent ← child on GitHub.
 
 A ticket with **no** parent is out of scope: ask for `#parent` and **wait**.
 
@@ -61,11 +68,14 @@ Done when the ticket fits the file.
 
 ## 3. Create the child
 
-1. `gh issue create` with label `ready-for-agent`, title from the message,
-   body starting with `Part of #<parent>` then the provided body.
-2. Attach as GitHub **sub-issue** of the parent (`POST …/issues/<parent>/sub_issues`,
+1. Build the body exactly as *Child ticket body* in `agents/issue-tracker.md`
+   (reshape the user’s content into `What to build` / `Acceptance criteria` /
+   `Blocked by`). First line: `Part of #<parent>`.
+2. `gh issue create` with label `ready-for-agent`, title from the message,
+   that body.
+3. Attach as GitHub **sub-issue** of the parent (`POST …/issues/<parent>/sub_issues`,
    `sub_issue_id` = child’s database **id**). See `agents/issue-tracker.md`.
-3. Native **blocked-by**: parent blocked by this child
+4. Native **blocked-by**: parent blocked by this child
    (`POST …/issues/<parent>/dependencies/blocked_by`, `issue_id` = child’s
    database **id**). If the message had `Blocked by #n`, also block the new
    child by that issue’s database id.

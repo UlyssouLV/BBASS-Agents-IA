@@ -57,7 +57,7 @@ Show the **implementation order**: tickets with no open blockers first (lowest n
 
 **Wait for an explicit yes** on that list. Then for **each** child, in order:
 
-1. `gh issue create` (`Part of #<parent>` at the top of the body, `ready-for-agent`).
+1. `gh issue create` with label `ready-for-agent` and body in the **canonical Matt shape** from `agents/issue-tracker.md` (*Child ticket body*): first line `Part of #<parent>`, then `## What to build`, `## Acceptance criteria` (checkboxes), `## Blocked by` (`- Aucun` or `- #<n>`). If `/to-tickets` drafted French or free-form headings, **reshape** to those English headings before create. Do not use `Ce qu'il livre` / `Critères d'acceptation` / `Tests attendus` for new tickets.
 2. Attach it as a **GitHub sub-issue** of the parent (POST `issues/<parent>/sub_issues`, JSON integer `sub_issue_id` = the child’s **database id**) — this is what shows **Y/Z** on the parent. See `agents/issue-tracker.md` (*Version parent and children*).
 3. Set **GitHub native** blocked-by (POST `issues/<n>/dependencies/blocked_by`, JSON integer `issue_id` = the blocker’s **database id`):
    - **Between children**, as the quiz said.
@@ -65,7 +65,7 @@ Show the **implementation order**: tickets with no open blockers first (lowest n
 
 Then `gh issue edit <parent> --remove-label "ready-for-agent"`. Confirm the parent’s `sub_issues_summary.total` equals the number of children just created. The parent is never an `/implement` ticket.
 
-A body `Part of` line alone does **not** create the sub-issue link. A body `Blocked by: #n` line is only a fallback for dependencies. Do not create tickets before that yes. Do not `/implement`.
+A body `Part of` line alone does **not** create the sub-issue link. The `## Blocked by` section mirrors native deps (fallback if the API is unavailable). Do not create tickets before that yes. Do not `/implement`.
 
 ## 6. Pull request
 

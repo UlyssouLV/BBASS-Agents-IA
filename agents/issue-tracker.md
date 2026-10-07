@@ -55,6 +55,38 @@ Used by `ouvrir-la-version` (`/to-tickets`) and by any later child under an open
 
 Never `/implement` the parent. Closing children is `encadrer-implement` / `fermer-ticket-enfant`; the parent closes via squash `Fixes #<parent>`.
 
+### Child ticket body (canonical — Matt `/to-tickets`)
+
+**Going forward**, every child issue body uses this exact shape (English headings from Matt Pocock `/to-tickets`). Do **not** invent French equivalents (`Ce qu'il livre`, `Critères d'acceptation`, `Tests attendus`, …). Do **not** rewrite closed historical tickets.
+
+```markdown
+Part of #<parent>
+
+## What to build
+
+<What this ticket delivers — one vertical slice, product language where possible.
+ Concrete enough to implement without re-reading the whole spec.>
+
+## Acceptance criteria
+
+- [ ] <observable criterion>
+- [ ] <…>
+- [ ] Suite pytest verte.
+
+## Blocked by
+
+- Aucun
+```
+
+- **`Part of #<parent>`** — first line, always (even if a `## Parent` block also appears from Matt’s quiz).
+- **`## What to build`** — required. Not a dump of the parent spec.
+- **`## Acceptance criteria`** — required. Checkbox list (`- [ ]`). Include the green-pytest criterion when this repo’s HTTP-boundary tests apply.
+- **`## Blocked by`** — required section. `- Aucun` when no peer blockers; otherwise one `- #<n>` per blocking **child**. Native GitHub `blocked_by` edges are still set by the skills; this section is the human-readable mirror (and fallback).
+- Optional only if Matt’s quiz produced them: `## Implementation decisions` (keep short). No other top-level `##` headings by default.
+- Label on create: **`ready-for-agent`**. Not a `bug` issue (bugs → `/cub`).
+
+When `/to-tickets` or the user drafts free-form content: **reshape** into this template before `gh issue create`.
+
 ## Changes to earlier versions
 
 A version may change behaviour that an earlier version shipped (a renamed tool, a raised limit, a replaced mechanism). The record is one section of the version spec (role `spec`), written by `ouvrir-la-version` and read by `finaliser-la-version`:
@@ -78,7 +110,49 @@ After the squash-merge, each row becomes one block, prepended to the earlier rel
 > Après : <Après>
 ```
 
+**Critical (docs site):** when prepending to release notes, keep **Markdown structure intact**:
+
+1. Each annotation is its own blockquote paragraph (three `>` lines), blocks separated by a blank line.
+2. After the **last** annotation block, always insert a **blank line**, then the existing notes starting at `## Pourquoi` (never glue `Après : … ## Pourquoi` on one line).
+3. Read the current notes first (`gh release view <tag> --json body`). Write back via `--notes-file` (full body), never a one-line paste that collapses newlines.
+4. The docs changelog (`generer-changelog.mjs`) only extracts `## Pourquoi` and `## Ce qu'on peut faire maintenant` — broken newlines empty the functional docs page.
+
 Skip a target that already holds the block for `VX.Y.Z` and that element. `Aucun.`, a missing section, or a failed annotation never blocks a release: report it in one line and continue.
+
+## Release notes (canonical — `/crel`)
+
+**Going forward**, every GitHub Release body uses this layout (skill `creer-release`). French. Do not invent alternate top-level headings.
+
+```markdown
+## Pourquoi
+
+<problem / parent spec, one short paragraph>
+
+## Ce qu'on peut faire maintenant
+
+<features in product language>
+
+## Historique des tickets
+
+- PR : https://github.com/<owner>/<repo>/pull/<n>
+- Commits : https://github.com/<owner>/<repo>/pull/<n>/commits
+
+Tickets (`Fixes`) : #… #…
+
+## Hors périmètre
+
+<what is not in this version>
+
+Spec : https://github.com/<owner>/<repo>/blob/vX.Y.Z/<spec-path>
+
+ADRs de cette version (liens **sur ce tag**, pas `main`) :
+
+- https://github.com/<owner>/<repo>/blob/vX.Y.Z/<adr-path>
+
+Issues laissées de côté (PR / spec hors périmètre) : #…
+```
+
+Title: `VX.Y.Z — <purpose>`. Tag on the **feature SHA**, not `main`. Optional leading `> **Modifié en …**` annotation blocks (from a later version) may sit **above** `## Pourquoi`, each separated by blank lines as above.
 
 ## Wayfinding operations
 

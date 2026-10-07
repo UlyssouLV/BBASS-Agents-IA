@@ -77,7 +77,14 @@ Then run skill **`fusionner-pr`** as if the user had typed **`/mpr`**.
 
 ## 5. Annotate earlier versions
 
-Read the spec section **Changements apportés aux versions antérieures** (format and blocks: `agents/issue-tracker.md`, *Changes to earlier versions*). `Aucun.` or no section → one line, go to step 6. Otherwise annotate each row's targets. Never stop the version on this step: a target that fails is listed in the final reply.
+Read the spec section **Changements apportés aux versions antérieures** (format and blocks: `agents/issue-tracker.md`, *Changes to earlier versions* **and** the Critical newline rules there). `Aucun.` or no section → one line, go to step 6. Otherwise annotate each row's targets:
+
+1. `gh release view <tag> --json body` — keep the existing notes.
+2. Prepend each new `> **Modifié en VX.Y.Z** …` blockquote **with blank lines between blocks**, then a blank line, then the previous body starting at `## Pourquoi` (or whatever already headed the notes).
+3. Write with `gh release edit <tag> --notes-file` (UTF-8 file). Never collapse the body to a single line.
+4. Same block as a comment on each listed issue.
+
+Never stop the version on this step: a target that fails is listed in the final reply.
 
 ## 6. Stop
 
