@@ -26,7 +26,7 @@ Paths: **`agents/roles.yml`**. After step 2, those paths are the pack layout in 
 
 Create only what is absent. Never overwrite an existing file.
 
-- `docs/dev/feuille-de-route-dev.md` — title `# Feuille de route de dev` only
+- `docs/dev/feuille-de-route/feuille-de-route-dev.md` — title `# Feuille de route de dev` only
 - `docs/specs/` (directory)
 - `docs/adr/` (directory)
 - `CONTEXT.md` — title `# Glossary` only

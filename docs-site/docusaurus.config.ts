@@ -80,10 +80,10 @@ const config: Config = {
       respectPrefersColorScheme: false,
     },
     navbar: {
-      title: 'BBASS Agents IA',
+      title: '',
       logo: {
-        alt: 'BBASS',
-        src: 'img/logo-bbass.png',
+        alt: 'BBASS Agents IA',
+        src: 'img/logo-bbass-agents-ia.jpg',
       },
       items: [
         {

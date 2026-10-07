@@ -1,5 +1,5 @@
 /**
- * Extrait les prochaines versions de docs/dev/feuille-de-route-dev.md
+ * Extrait les prochaines versions de docs/dev/feuille-de-route/feuille-de-route-dev.md
  * → JSON accueil + pages docs/feuille-de-route/vX.Y.Z.md
  */
 import fs from 'node:fs';
@@ -8,7 +8,10 @@ import {fileURLToPath} from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../..');
-const SOURCE = path.join(REPO_ROOT, 'docs/dev/feuille-de-route-dev.md');
+const SOURCE = path.join(
+  REPO_ROOT,
+  'docs/dev/feuille-de-route/feuille-de-route-dev.md',
+);
 const OUT_JSON = path.join(__dirname, '../src/data/feuille-de-route.json');
 const OUT_DIR = path.join(REPO_ROOT, 'docs/feuille-de-route');
 
@@ -53,7 +56,7 @@ function escapeYaml(value) {
 }
 
 function parserEnsuite(markdown) {
-  const re = /^## Ensuite : (\d+\.\d+(?:\.\d+)?)\s*[—–\-]\s*(.+)$/gm;
+  const re = /^## (?:Prochaine|Ensuite) : (\d+\.\d+(?:\.\d+)?)\s*[—–\-]\s*(.+)$/gm;
   const indices = [];
   let match;
   while ((match = re.exec(markdown)) !== null) {

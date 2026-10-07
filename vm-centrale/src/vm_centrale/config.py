@@ -54,7 +54,7 @@ class FicheModele:
 
 # Une fiche par modèle (spec 1.4.2), liée au code et non au .env. Tarifs en
 # dur et datés (Mistral n'expose aucune API de tarification programmable —
-# voir docs/dev/recherche-v1.1.3-usage-tarification-mistral.md).
+# voir docs/dev/recherches/recherche-v1.1.3-usage-tarification-mistral.md).
 # - Chat : fenêtre de 262 144 tokens relevée sur GET /v1/models le
 #   2026-10-06. Mistral Small 4 : 0,15 $/M tokens entrée, 0,60 $/M tokens
 #   sortie, revérifié le 2026-10-06 (inchangé depuis le relevé du

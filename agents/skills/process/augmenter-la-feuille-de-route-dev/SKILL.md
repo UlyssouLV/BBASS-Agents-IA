@@ -14,25 +14,24 @@ Triggered by **`/afr`**, **« Augmente la feuille de route de dev »**, or **« 
 
 Git commit goes through **`commit`** (`/c`) only if the user asked to commit this turn. This skill does **not** `/c` on its own.
 
-Paths: **`agents/roles.yml`**. Role **`roadmap`** is the **feuille de route de dev** (not a product marketing plan).
+Paths: **`agents/roles.yml`**. Role **`roadmap`** is the **feuille de route de dev** (not a product marketing plan). Writing standards (sections **Prochaine** / **Ensuite** / **Plus tard**, bugs `### Bug — …`) : **`docs/dev/feuille-de-route/README.md`**.
 
 ## Format
 
-One job per version, product language:
+Follow **`docs/dev/feuille-de-route/README.md`**. One job per version, product language. Typical headings:
 
 ```markdown
 # Feuille de route de dev
 
-## X.Y.Z — <titre, un job>
+## Déjà livré
+## Prochaine : X.Y.Z — <titre>
+## Ensuite : X.Y.Z — <titre>
+## Plus tard (pas encore numéroté)
 
-Un court paragraphe, un seul job.
-
-## Plus tard — <titre>
-
-Idée reportée, pas encore de semver.
+### Bug — <titre> (#n)
 ```
 
-An intro under the H1 is allowed (constraints that apply to several versions). Headings that `ouvrir-la-version` can find are **`## X.Y.Z — …`**. An existing H1 `# Feuille de route` is the same file; leave it or normalize to **`# Feuille de route de dev`** when writing.
+An intro under the H1 is allowed. Deferred ideas without a number stay under **Plus tard** (not a fake semver).
 
 ## 1. Read
 

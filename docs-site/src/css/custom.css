@@ -86,7 +86,12 @@ html {
 }
 
 .navbar__logo {
-  height: 1.75rem;
+  height: 2.35rem;
+}
+
+.navbar__logo img {
+  height: 100%;
+  width: auto;
 }
 
 .footer {
