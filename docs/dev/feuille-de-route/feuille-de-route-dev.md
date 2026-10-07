@@ -157,22 +157,6 @@ Corriger le bug [#131](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/131),
 
 **Suivi :** [#99](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/99) (`bug`). Trouvé dans : Informations manquantes · Contexte : essai manuel · Date : 2026-10-05 · Priorité : Informations manquantes.
 
-### Bug — bascule de conversation pendant qu’une réponse est en cours (#169)
-
-**Constat :** on démarre / envoie un message, l’IA « réfléchit », puis on clique une **autre** conversation dans la sidebar → la **sélection** dans la liste change bien, mais le **fil de chat** affiché ne suit pas (reste celui de la conversation en attente de réponse).
-
-**Reproductibilité :** envoyer un message (réponse en cours), cliquer une autre conversation dans la sidebar pendant l’attente.
-
-**Impact :** Informations manquantes
-
-**Cause probable :** Informations manquantes
-
-**À corriger :** synchroniser l’affichage du fil avec la conversation sélectionnée même si une requête de chat est encore en vol ; décider si on annule / ignore la réponse qui arrive pour l’ancien fil, ou si on la range silencieusement sans écraser le fil affiché.
-
-**Hors périmètre :** Aucun.
-
-**Suivi :** [#169](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/169) (`bug`). Trouvé dans : Informations manquantes · Contexte : Informations manquantes · Date : Informations manquantes · Priorité : Informations manquantes.
-
 ### Bug — données d’un compte visibles par un autre compte (#161)
 
 **Constat :** après une déconnexion puis une connexion à un autre compte, la barre latérale affiche d’abord les conversations du compte précédent, jusqu’au rafraîchissement ; un compte recréé avec le même identifiant retrouve les conversations de l’ancien compte supprimé.

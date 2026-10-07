@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { UseMutationResult } from "@tanstack/react-query";
 
 import { BarreLaterale } from "@/components/BarreLaterale";
+import { useEnvoisEnCours } from "@/hooks/useEnvoisEnCours";
 import type { Compte } from "@/hooks/useSession";
 import { OngletChat } from "@/onglets/OngletChat";
 import { PagePanelAdministration } from "@/screens/PagePanelAdministration";
@@ -29,10 +30,19 @@ export function EcranCompte({ compte, deconnexion }: Readonly<EcranCompteProps>)
   // l'animation (l'utilisateur continue de discuter dans ce fil).
   const [conversationRecenteId, setConversationRecenteId] = useState<number | null>(null);
 
-  function gererConversationCreee(id: number) {
-    setConversationOuverteId(id);
+  // Issue #166 : un premier message dont la réponse arrive pendant qu'on
+  // regarde une autre conversation n'y ramène pas ; seule son entrée
+  // apparaît dans la sidebar.
+  function gererConversationCreee(id: number, ouverte: boolean) {
+    if (ouverte) {
+      setConversationOuverteId(id);
+    }
     setConversationRecenteId(id);
   }
+
+  // Tenu ici plutôt que dans OngletChat (issue #166) : survit à la bascule
+  // de conversation comme au passage par Profil / Panel d'administration.
+  const envois = useEnvoisEnCours(conversationOuverteId, gererConversationCreee);
 
   if (vue === "profil") {
     return <PageProfil deconnexion={deconnexion} onRetour={() => setVue("chat")} />;
@@ -58,6 +68,7 @@ export function EcranCompte({ compte, deconnexion }: Readonly<EcranCompteProps>)
         onOuvrirPanelAdministration={() => setVue("panel-administration")}
         conversationRecenteId={conversationRecenteId}
         onAnimationTitreTerminee={() => setConversationRecenteId(null)}
+        conversationsEnAttente={envois.conversationsEnAttente}
       />
 
       <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-6 py-8">
@@ -67,7 +78,7 @@ export function EcranCompte({ compte, deconnexion }: Readonly<EcranCompteProps>)
           </p>
         )}
 
-        <OngletChat conversationOuverteId={conversationOuverteId} onConversationCreee={gererConversationCreee} />
+        <OngletChat conversationOuverteId={conversationOuverteId} envois={envois} />
       </main>
     </div>
   );
