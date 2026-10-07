@@ -61,6 +61,8 @@ const config: Config = {
             'dev/**',
             'img/**',
             'architecture/**',
+            'changelog/README.md',
+            'feuille-de-route/README.md',
           ],
         },
         blog: false,
@@ -89,6 +91,12 @@ const config: Config = {
           sidebarId: 'featuresSidebar',
           position: 'left',
           label: 'Features',
+        },
+        {
+          type: 'docSidebar',
+          sidebarId: 'changelogSidebar',
+          position: 'left',
+          label: 'Changelog',
         },
         {
           type: 'docSidebar',

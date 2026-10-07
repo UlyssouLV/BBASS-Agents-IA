@@ -46,8 +46,9 @@ Read each role below (paths from `agents/roles.yml`), against the parent spec / 
 - **`spec`** — spec for this version exists there.
 - **`adr`** — new ADRs if decisions changed.
 - **`roadmap`** — **`X.Y.Z`** is recorded as delivered; upcoming versions stay listed; drop claims this version has **not** delivered. Do not invent new versions; only reshuffle what is already listed.
+- **`suivi-avancement`** — HTML bilan for the **current calendar week** under that role (folder `semaine-…` that covers today’s date). None → one line, do **not** stop. Found → update that HTML for **`X.Y.Z`** (what shipped, **functional** language for a cabinet reader — no tool names, stack, or ticket ids in the day bullets), then regenerate the sibling `.pdf` next to the HTML (headless Chrome or Edge: `--print-to-pdf`, no header/footer). Do not create a week folder. Do not edit other weeks.
 
-If anything is stale: **stop the release**. Update those files on the **feature branch**, then run skill **`commit`** as if the user had typed **`/c -a -p`**. Then re-read this section. Do **not** `/crel` or `/mpr` until this gate is green — the tag must include the docs.
+If anything is stale (except soft-skip on missing week HTML): **stop the release**. Update those files on the **feature branch**, then run skill **`commit`** as if the user had typed **`/c -a -p`**. Then re-read this section. Do **not** `/crel` or `/mpr` until this gate is green — the tag must include the docs (HTML + PDF when updated).
 
 ## 3. Quality gate
 

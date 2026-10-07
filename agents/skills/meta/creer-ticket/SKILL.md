@@ -1,10 +1,11 @@
 ---
 name: creer-ticket
 description: >-
-  Create one GitHub child issue under a version parent, verify the version
-  spec file is unchanged and that the ticket fits it, then sync sub-issue /
-  blocked-by and the open PR Fixes lines. Use when the user types `/ct` or
-  says « crée un ticket ». Not « Ouvre la version ». Not `/cci`. Not `/opr`.
+  Create one GitHub child issue under a version parent, check the ticket fits
+  the local version spec, sync that file onto the parent GitHub issue body,
+  then sync sub-issue / blocked-by and the open PR Fixes lines. Use when the
+  user types `/ct` or says « crée un ticket ». Not « Ouvre la version ».
+  Not `/cci`. Not `/opr`.
 ---
 
 # Create a child ticket
@@ -12,14 +13,18 @@ description: >-
 `/` = this skill’s trigger. No hyphen options. Treat `/ct` as a whole token.
 
 `/ct` **is** permission to `gh issue create`, attach the sub-issue, set native
-`blocked_by`, and `gh pr edit` the open version PR’s body when one exists.
-Do not merge. Do not commit. Do not open a new PR. Do not rewrite the spec
-file or the parent issue narrative.
+`blocked_by`, set the **parent** issue body from the local role **`spec`**
+file, and `gh pr edit` the open version PR’s body when one exists.
+Do not merge. Do not commit. Do not open a new PR. Do not rewrite the local
+spec file.
 
 Paths: **`agents/roles.yml`**. Tracker detail: **`agents/issue-tracker.md`**
 (*Version parent and children*).
 
 One child per invocation. Later children: run `/ct` again.
+
+The local `docs/specs/vX.Y.Z-*.md` is the source of truth for the parent
+narrative. The GitHub parent issue body must match it after this skill runs.
 
 ## 1. Inputs
 
@@ -44,20 +49,15 @@ Resolve **`X.Y.Z`** from the branch `vX.Y.Z-<slug>`, the PR title
 version under `docs/specs/` (`vX.Y.Z-*.md`). Missing file / ambiguous match →
 **stop**.
 
-**Unchanged file:** compare the working-tree file to the blob at the **oldest**
-commit on the current branch that **added** it:
-
-`git log origin/main..HEAD --reverse --diff-filter=A --format=%H -- <spec-path>`
-
-Take the first SHA. `git diff <sha> -- <spec-path>` must be empty (also vs
-`HEAD` and the working tree). Any diff → **stop**. Show the diff. Do not
-create the issue. Do not edit the PR.
-
 **Fits the spec:** the title + body must not contradict what that file
 promises and must not add behaviour the file does not describe. If they do
 not fit → **stop**. Quote the conflicting / missing passage. Do not create.
 
-Done when both checks pass.
+A local file that already differs from the parent GitHub body (e.g. human-test
+corrections) is fine: step 4 will push the file onto GitHub. Do **not** stop
+only because the file changed since the branch’s first add commit.
+
+Done when the ticket fits the file.
 
 ## 3. Create the child
 
@@ -72,19 +72,30 @@ Done when both checks pass.
 
 Confirm `sub_issues_summary.total` on the parent increased by one.
 
-## 4. Sync the PR (if any)
+## 4. Sync the parent GitHub body
+
+`gh issue edit <parent> --body-file <spec-path>` with the role **`spec`** file
+from step 2 (working tree).
+
+Compare before/after (or re-read): if the body already matched the file, say
+so. Otherwise report that the parent issue body was updated from the file.
+
+Done when the parent issue body equals that file’s contents.
+
+## 5. Sync the PR (if any)
 
 Find the open PR into `main` whose body already has `Fixes #<parent>`.
 
 - **None** → create is done; say so. Do not `/opr`.
-- **More than one** → **stop** and ask which PR. Child and links already exist.
+- **More than one** → **stop** and ask which PR. Child, links, and parent body
+  already exist / are synced.
 - **Exactly one** → edit its body: add a `Fixes #<n>` line for every parent
   sub-issue that is not `wontfix` and is missing from the body (including
   the child just created). Keep existing lines and the rest of the body
   verbatim. One `Fixes` keyword per issue.
 
 Done when that PR lists `Fixes` for the parent and every in-scope child.
-Reply with the child URL and what changed (links / PR lines).
+Reply with the child URL and what changed (parent body / links / PR lines).
 
 ## Not this skill
 
@@ -93,3 +104,4 @@ Reply with the child URL and what changed (links / PR lines).
 - Opening a PR → `ouvrir-pr` (`/opr`)
 - `/implement` or wrapping it → `encadrer-implement`
 - Standalone issues with no version parent
+- Editing the local spec file (the human or another flow writes it first)

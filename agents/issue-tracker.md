@@ -35,7 +35,7 @@ Run `gh issue view <number> --comments`.
 
 ## Version parent and children
 
-Used by `ouvrir-la-version` (`/to-tickets`) and by any later child under an open parent (human-test follow-ups). A **single** later child is skill `creer-ticket` (`/ct`): it creates the child, checks the version spec file is unchanged and that the ticket fits it, then syncs the three links below and any open PR’s `Fixes` lines. Three links, each with a job:
+Used by `ouvrir-la-version` (`/to-tickets`) and by any later child under an open parent (human-test follow-ups). A **single** later child is skill `creer-ticket` (`/ct`): it creates the child, checks the ticket fits the local version spec file, sets the parent GitHub issue body from that file, then syncs the three links below and any open PR’s `Fixes` lines. Three links, each with a job:
 
 1. **`Part of #<parent>`** at the top of the child body — text marker for `fermer-ticket-enfant` / `encadrer-implement`.
 2. **GitHub sub-issue** — what the UI uses for the parent progress **Y/Z**. After `gh issue create`, attach the child:

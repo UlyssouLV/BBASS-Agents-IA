@@ -31,6 +31,7 @@ HTTP-boundary tests only (observable responses). Do not praise or require tests 
 
 - **`readme`**: « État actuel », lancement, comptes de test — no leftover previous-version branch names or « not built yet » for features this version delivered.
 - **`roadmap`**: move **`X.Y.Z`** into **Déjà livré**; drop it from « Prochaine » / « Ensuite »; the next listed version becomes **Prochaine** (keep objectif / recherche).
+- **`suivi-avancement`**: HTML of the current calendar week under that role — record **`X.Y.Z`** in functional language, regenerate the sibling PDF; soft-skip if no week file (see skill `finaliser-la-version`).
 
 ## Git
 

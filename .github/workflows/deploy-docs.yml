@@ -8,10 +8,14 @@ on:
       - 'docs/**'
       - 'docs-site/**'
       - '.github/workflows/deploy-docs.yml'
+      - 'README.md'
+    # Pas de paths-ignore : la boucle est coupée par [skip ci] sur le commit d’aperçu
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -40,11 +44,81 @@ jobs:
       - name: Build
         working-directory: docs-site
         run: npm run build
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
 
-      - name: Upload artifact
+      - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: docs-site/build
+
+      - name: Upload build for screenshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: docs-site-build
+          path: docs-site/build
+          retention-days: 1
+
+  capture-readme:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: docs-site/package-lock.json
+
+      - name: Install dependencies
+        working-directory: docs-site
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        working-directory: docs-site
+        run: npx playwright install --with-deps chromium
+
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: docs-site-build
+          path: docs-site/build
+
+      - name: Serve and capture homepage
+        working-directory: docs-site
+        run: |
+          npx docusaurus serve --host 127.0.0.1 --port 4173 &
+          for i in $(seq 1 60); do
+            if curl -sf "http://127.0.0.1:4173/BBASS-Agents-IA/" >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          npm run capturer-accueil
+
+      - name: Capture suivi « Travail réalisé »
+        working-directory: docs-site
+        run: npm run capturer-travail-realise
+
+      - name: Sync architecture Mermaid → README
+        working-directory: docs-site
+        run: npm run sync-architecture-readme
+
+      - name: Commit screenshots if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/img/apercu-docs-accueil.png docs/img/apercu-travail-realise.png README.md
+          if git diff --staged --quiet; then
+            echo "Aperçus inchangés."
+            exit 0
+          fi
+          git commit -m "Met à jour les aperçus README (doc + suivi + archi) [skip ci]"
+          git push
 
   deploy:
     needs: build

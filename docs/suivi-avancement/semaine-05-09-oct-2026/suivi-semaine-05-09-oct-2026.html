@@ -375,7 +375,7 @@
   <div class="sheet">
     <header class="couverture">
       <div class="couverture-identite">
-        <img class="logo" src="../logo-bbass.png" alt="BBASS géomètre-expert" />
+        <img class="logo" src="../../../docs-site/static/img/logo-bbass.png" alt="BBASS géomètre-expert" />
         <p class="kicker">Alternance Agents IA · 2026–2027</p>
         <h1>Bilan de semaine - Alternance Ulysse LONG</h1>
         <p class="meta">Semaine du 05 au 09 octobre 2026<br />
@@ -502,38 +502,21 @@
     <section class="bloc" id="livre-pour">
     <h2>Livré pour le 08/10/2026</h2>
     <div class="recap">
-      <p><strong>Point jeudi 8 octobre — livré à ce jour : V1.2.2, V1.2.3, V1.3.0, V1.3.1, V1.4.0 et V1.4.1</strong></p>
-      <h3>Style et lecture du chat (V1.2.2)</h3>
+      <p><strong>Point jeudi 8 octobre — visé : V1.5.0 puis V1.7.0 · livré : V1.4.1</strong></p>
+      <h3>Chat</h3>
       <ul>
-        <li>Réponses de l’IA au ton professionnel : vouvoiement, sans remplissage ni relance systématique en fin de message ; emojis seulement quand ils portent un vrai signal.</li>
-        <li>Affichage structuré : mise en forme (gras, listes), blocs de code colorés selon le langage, liens cliquables vers les sources citées.</li>
+        <li>Ton professionnel et affichage structuré (V1.2.2) : vouvoiement, sans remplissage ni relance systématique ; mise en forme, blocs de code colorés, liens cliquables vers les sources.</li>
+        <li>Fluidité (V1.2.3) : retour immédiat sur une conversation déjà ouverte ; historique long chargé au défilement ; mesures de temps optionnelles (désactivées par défaut).</li>
+        <li>Fiabilité (V1.3.1) : plus de liens inventés (seule une URL écrite par le compte peut ressortir) ; faits inventés refusés sans demande explicite ; résumé glissant qui note « proposé, non vérifié » ; garde-fous URL et chiffres côté VM.</li>
       </ul>
-      <h3>Fluidité (V1.2.3)</h3>
+      <h3>Recherche web et mémoire</h3>
       <ul>
-        <li>Retour sur une conversation déjà ouverte sans écran de chargement vide ; conversations longues : messages récents d’abord, historique plus ancien au défilement.</li>
-        <li>Mesures de temps optionnelles (désactivées par défaut) pour objectiver où passe le temps à l’ouverture des écrans.</li>
+        <li>Recherche web (V1.4.0) : SearXNG auto-hébergé (sans clé) ; la VM lit les pages, en extrait l’essentiel ; l’IA cite de vraies URL. Outils centralisés, jusqu’à 3 allers-retours par tour. Corrections du test humain livrées avec (fil parasite, URL avec chiffres, pages officielles TLS, année courante pour une actualité). Bug connu (#131) : si la recherche ne trouve rien, l’IA invente encore parfois — reporté en « Plus tard ».</li>
+        <li>Mémoire de la conversation (V1.4.1) : à chaque tour, rappel des pièces jointes, recherches et URL du collaborateur (même hors des 3 messages) ; questions couvertes ; outils pour relire un document ou une page, ou lire une URL envoyée ; jusqu’à 5 appels d’outils par message.</li>
       </ul>
-      <h3>Inspecteur / Mode développeur (V1.3.0)</h3>
+      <h3>Mode développeur</h3>
       <ul>
-        <li>Raccourci <code>Ctrl+Maj+D</code> : nouvel onglet inspecteur, débloqué par la Clé d’administration VM (jamais stockée).</li>
-        <li>Lecture de toutes les conversations de tous les comptes : chaque appel Mistral réel (chat, titrage, résumé, OCR, vision, outils) avec payload, réponse et statut succès/échec.</li>
-      </ul>
-      <h3>Chat sans inventions figées (V1.3.1)</h3>
-      <ul>
-        <li>Plus de liens inventés (seule une URL écrite par le compte peut ressortir) ; faits inventés refusés sans demande explicite.</li>
-        <li>Résumé glissant plafonné qui note « proposé, non vérifié » ; profil de travail réécrit en entier ; garde-fous URL et chiffres côté VM.</li>
-      </ul>
-      <h3>Recherche web dans le chat (V1.4.0)</h3>
-      <ul>
-        <li>Le collaborateur demande une information ; la VM cherche via SearXNG (auto-hébergé, sans clé), lit les pages, en extrait l’essentiel, et l’IA répond en citant de vraies URL.</li>
-        <li>Outils du modèle rangés au même endroit ; plusieurs outils possibles dans un même tour (jusqu’à 3 allers-retours) ; l’inspecteur montre tout le déroulé (Mistral / local, garde-fous).</li>
-        <li>Corrections du test humain livrées avec : nouvelle conversation sans fil parasite, URL intactes malgré les chiffres, pages officielles lisibles malgré une chaîne TLS incomplète, année en cours pour une actualité.</li>
-        <li>Bug connu à la livraison (#131) : quand la recherche ne trouve rien, l’IA invente encore parfois — correction reportée en « Plus tard ».</li>
-      </ul>
-      <h3>Mémoire de la conversation (V1.4.1)</h3>
-      <ul>
-        <li>À chaque tour, la VM rappelle au modèle tout ce qui a été partagé dans le fil : pièces jointes, recherches web, URL écrites par le collaborateur (marquées comme telles) — même hors de la fenêtre des 3 messages.</li>
-        <li>Questions couvertes (aperçu de ce à quoi répond chaque document ou page) ; outils pour relire une pièce jointe ou une page déjà trouvée, ou lire une URL envoyée par le collaborateur ; jusqu’à 5 appels d’outils par message.</li>
+        <li>Inspecteur (V1.3.0) : <code>Ctrl+Maj+D</code>, débloqué par la Clé d’administration VM (jamais stockée) ; lecture de toutes les conversations ; chaque appel Mistral réel (chat, titrage, résumé, OCR, vision, outils) avec payload, réponse et succès/échec.</li>
       </ul>
     </div>
     </section>

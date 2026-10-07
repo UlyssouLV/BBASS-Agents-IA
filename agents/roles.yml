@@ -11,6 +11,9 @@ roles:
   roadmap:
     paths:
       - docs/dev/feuille-de-route-dev.md
+  suivi-avancement:
+    paths:
+      - docs/suivi-avancement/
   glossary:
     paths:
       - docs/glossaire.md

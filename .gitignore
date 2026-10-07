@@ -14,3 +14,12 @@ node_modules/
 docs-site/node_modules/
 docs-site/build/
 docs-site/.docusaurus/
+# Généré par docs-site/scripts/generer-changelog.mjs (prestart / prebuild / CI)
+docs/changelog/**
+!docs/changelog/.gitkeep
+!docs/changelog/README.md
+docs-site/src/data/changelog.json
+docs-site/src/data/feuille-de-route.json
+docs/feuille-de-route/**
+!docs/feuille-de-route/.gitkeep
+!docs/feuille-de-route/README.md
