@@ -36,6 +36,14 @@ _PAGE_TROP_LONGUE = (
 _TEXTE_SANS_BESOIN_MAX = 8_000
 _TEXTE_COUPE = "[… texte coupé : relis avec un besoin pour une information précise]"
 _PAGE_DU_COMPTE_NON_LUE = "page non lue (PDF, page refusée ou délai dépassé)."
+# Relecture forcée en échec (#157) : seul cas où le modèle reçoit l'âge de
+# la copie de la conversation (spec 1.4.3, « Visibilité »). Suivie du
+# contenu habituel de cette copie.
+_RELECTURE_EN_ECHEC = (
+    "la page n'a pas pu être relue (nouveau téléchargement en échec). Dis au "
+    "collaborateur que tu n'as pas réussi à relire la page, puis réponds "
+    "d'après la version lue le {date}, en le précisant."
+)
 # Consigne fixe de la relecture d'une page avec un besoin (spec 1.4.1) : elle
 # ne reçoit que le besoin et le texte nettoyé de la page, jamais le contexte
 # de la conversation (même cadre que l'appel d'extraction, ADR-0014).
@@ -129,6 +137,15 @@ def _declarer(contexte: ContexteTour) -> dict | None:
                             "Facultatif : ce qu'on cherche dans ces pages, en "
                             "une ou deux phrases. À omettre si on ne sait pas "
                             "encore de quoi parle la page : ne jamais deviner."
+                        ),
+                    },
+                    "retelecharger": {
+                        "type": "boolean",
+                        "description": (
+                            "Facultatif : vrai seulement si l'utilisateur dit "
+                            "que la page a changé ou demande de la relire à "
+                            "jour. La page est alors téléchargée de nouveau au "
+                            "lieu d'être relue depuis la conversation."
                         ),
                     },
                 },
@@ -234,8 +251,69 @@ def _a_retenter(page: ResultatRechercheWeb | None, contexte: ContexteTour) -> bo
     )
 
 
-def _lire_pages_sans_texte(
+@dataclass(frozen=True)
+class _RelectureForcee:
+    reussie: bool
+    questions_supprimees: int
+    # Date de la copie de la conversation, pour la consigne d'échec.
+    date_copie: datetime
+
+    def trace(self, url: str) -> dict:
+        return {"url": url, "reussie": self.reussie, "questions_supprimees": self.questions_supprimees}
+
+
+def _relire_de_force(
     urls: list[str], resultats: list[ResultatRechercheWeb], contexte: ContexteTour
+) -> tuple[list[tuple[ResultatRechercheWeb, dict]], dict[int, _RelectureForcee]]:
+    # `retelecharger` (#157) : chaque page déjà en base est téléchargée sans
+    # passer par le cache, une fois par URL et par tour au plus (un appel
+    # suivant du tour sert la copie actuelle). Succès : cache mis à jour par
+    # lire_pages, copie de la conversation remplacée sur toutes les lignes
+    # de l'URL (sources du garde-fou chiffres), questions couvertes de la
+    # page supprimées (jamais une réponse lue sur l'ancienne version).
+    # Échec : rien ne change.
+    a_relire: dict[str, ResultatRechercheWeb] = {}
+    for url in urls:
+        page = _page_de_la_conversation(url, resultats)
+        if page is None:
+            continue
+        cle = normaliser_url(page.url)
+        if cle not in contexte.pages_relues_de_force:
+            contexte.pages_relues_de_force.add(cle)
+            a_relire[cle] = page
+    if not a_relire:
+        return [], {}
+    pages = lire_pages([_avec_schema(page.url) for page in a_relire.values()], contexte, sans_cache=True)
+    maintenant = datetime.now(timezone.utc)
+    relectures: dict[int, _RelectureForcee] = {}
+    for (cle, ligne), page in zip(a_relire.items(), pages):
+        # Pas de nouvel essai #156 en plus dans ce tour.
+        contexte.pages_retentees.add(ligne.id)
+        if not page.texte:
+            relectures[ligne.id] = _RelectureForcee(False, 0, ligne.date_creation)
+            continue
+        copies = [resultat for resultat in resultats if normaliser_url(resultat.url) == cle]
+        for copie in copies:
+            copie.texte_nettoye = page.texte
+            copie.titre = page.titre or copie.titre
+            copie.date_creation = maintenant
+        supprimees = (
+            contexte.db.query(QuestionCouverte)
+            .filter(QuestionCouverte.resultat_recherche_web_id.in_([copie.id for copie in copies]))
+            .delete(synchronize_session=False)
+        )
+        relectures[ligne.id] = _RelectureForcee(True, supprimees, maintenant)
+    contexte.db.flush()
+    return [(ligne, page.trace()) for ligne, page in zip(a_relire.values(), pages)], relectures
+
+
+def _consigne_relecture_en_echec(page: ResultatRechercheWeb, relecture: _RelectureForcee) -> str:
+    # Date seule : `date_creation` est enregistrée sans fuseau.
+    return f"Page {page.url} : " + _RELECTURE_EN_ECHEC.format(date=f"{relecture.date_copie:%d/%m/%Y}")
+
+
+def _lire_pages_sans_texte(
+    urls: list[str], resultats: list[ResultatRechercheWeb], contexte: ContexteTour, sans_cache: bool = False
 ) -> list[tuple[ResultatRechercheWeb, dict]]:
     # Même chaîne que rechercher_web (cache commun, téléchargement, statut,
     # HTML, nettoyage) pour une URL du compte pas encore en base (#140) et
@@ -252,7 +330,9 @@ def _lire_pages_sans_texte(
     )
     if not nouvelles and not retentees:
         return []
-    pages = lire_pages([_avec_schema(url) for url in [*nouvelles, *(page.url for page in retentees)]], contexte)
+    pages = lire_pages(
+        [_avec_schema(url) for url in [*nouvelles, *(page.url for page in retentees)]], contexte, sans_cache
+    )
     pages_nouvelles, pages_retentees = pages[: len(nouvelles)], pages[len(nouvelles) :]
     for ligne, page in zip(retentees, pages_retentees):
         contexte.pages_retentees.add(ligne.id)
@@ -261,6 +341,9 @@ def _lire_pages_sans_texte(
             # reste si la page n'en donne pas.
             ligne.texte_nettoye = page.texte
             ligne.titre = page.titre or ligne.titre
+            # Date de la copie de la conversation (consigne d'une relecture
+            # forcée en échec, #157).
+            ligne.date_creation = datetime.now(timezone.utc)
     maintenant = datetime.now(timezone.utc)
     lignes = [
         ResultatRechercheWeb(
@@ -320,7 +403,14 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
     resultats = _resultats_de_la_conversation(contexte)
     urls_du_compte = _urls_du_compte(contexte)
     cibles = [_url_de_la_conversation(url, resultats, urls_du_compte) for url in urls]
-    telechargees = _lire_pages_sans_texte([url for url in cibles if url is not None], resultats, contexte)
+    connues = [url for url in cibles if url is not None]
+    retelecharger = arguments.get("retelecharger") is True
+    relues, relectures = _relire_de_force(connues, resultats, contexte) if retelecharger else ([], {})
+    if retelecharger:
+        # Une URL du compte pas encore en base est téléchargée sans passer
+        # par le cache : c'est la relecture forcée de ce tour.
+        contexte.pages_relues_de_force.update(normaliser_url(url) for url in connues)
+    telechargees = [*relues, *_lire_pages_sans_texte(connues, resultats, contexte, sans_cache=retelecharger)]
     pages = [_page_de_la_conversation(url, resultats) if url is not None else None for url in cibles]
     # Une page jugée trop longue plus tôt dans ce tour (#151) est refusée,
     # avec ou sans besoin, sans être recomptée : sans besoin, son aperçu
@@ -357,6 +447,10 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
         if page is None:
             blocs.append(f"Page {url} : {_PAGE_INTROUVABLE}")
             continue
+        relecture = relectures.get(page.id)
+        if relecture is not None and not relecture.reussie and page.texte_nettoye:
+            # Suivie, bloc suivant, du contenu habituel de l'ancienne copie.
+            blocs.append(_consigne_relecture_en_echec(page, relecture))
         if not page.texte_nettoye and page.provenance == "utilisateur":
             blocs.append(f"Page {page.url} : {_PAGE_DU_COMPTE_NON_LUE}")
             continue
@@ -400,11 +494,15 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
     # Flush (jamais commit) : un tour qui échoue plus loin les annule.
     contexte.db.flush()
     appels = tuple(appel for _, appel in extractions.values())
-    trace = (
+    trace: dict = (
         {"pages_telechargees": [_trace_telechargee(ligne, trace, tokens) for ligne, trace in telechargees]}
         if telechargees
         else {}
     )
+    if relectures:
+        trace["relectures_forcees"] = [
+            relecture.trace(page.url) for page in resultats if (relecture := relectures.get(page.id)) is not None
+        ]
     if tokens:
         trace["plafond_tokens"] = PLAFOND_TOKENS_PAGES
         trace["pages_relues"] = [

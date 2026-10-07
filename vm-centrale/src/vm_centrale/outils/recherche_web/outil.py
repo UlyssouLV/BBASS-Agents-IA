@@ -194,14 +194,15 @@ def _telecharger(url: str, telechargeur: TelechargeurPages) -> _Page:
     return _Page(url, statut=page.statut, texte=texte, titre=titre)
 
 
-def lire_pages(urls: list[str], contexte: ContexteTour) -> list[_Page]:
+def lire_pages(urls: list[str], contexte: ContexteTour, sans_cache: bool = False) -> list[_Page]:
     # Une _Page par URL, dans l'ordre. Cache commun d'abord (spec 1.4.3,
-    # ADR-0015) : une copie valide remplace le téléchargement. Une page
+    # ADR-0015) : une copie valide remplace le téléchargement, sauf
+    # `sans_cache` (relecture forcée de lire_pages_web, #157). Une page
     # téléchargée et lue avec succès (200, HTML, texte principal non vide)
     # est écrite dans le cache, avant tout plafond ; jamais un échec.
     # Partagée avec lire_pages_web pour une URL écrite par le compte (#140).
     maintenant = datetime.now(timezone.utc)
-    copies = {url: lire_copie(contexte.db, url, maintenant) for url in urls}
+    copies = {url: None if sans_cache else lire_copie(contexte.db, url, maintenant) for url in urls}
     a_telecharger = [url for url, copie in copies.items() if copie is None]
     telechargees: dict[str, _Page] = {}
     if a_telecharger:

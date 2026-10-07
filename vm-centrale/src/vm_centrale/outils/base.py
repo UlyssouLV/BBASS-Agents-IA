@@ -28,6 +28,10 @@ class ContexteTour:
     # retentées pendant ce tour (#156) : un seul essai par tour, même en
     # échec.
     pages_retentees: set[int] = field(default_factory=set)
+    # URL normalisées que lire_pages_web a retéléchargées de force pendant
+    # ce tour (`retelecharger`, #157) : une seule fois par URL et par tour,
+    # un appel suivant sert la copie actuelle.
+    pages_relues_de_force: set[str] = field(default_factory=set)
 
 
 @dataclass(frozen=True)
