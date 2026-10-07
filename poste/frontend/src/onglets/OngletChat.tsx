@@ -207,6 +207,60 @@ function ChampMessageAvecPieceJointe({
   );
 }
 
+// Jauge de contexte (spec 1.4.2) : ce que pesait le dernier envoi au modèle
+// principal, rapporté à sa fenêtre. Une seule couleur, orange à partir de ce
+// seuil.
+const _SEUIL_JAUGE_CONTEXTE_PROCHE = 0.8;
+const _RAYON_JAUGE_CONTEXTE = 7;
+const _CIRCONFERENCE_JAUGE_CONTEXTE = 2 * Math.PI * _RAYON_JAUGE_CONTEXTE;
+
+function JaugeContexte({ tokens, fenetre }: Readonly<{ tokens: number; fenetre: number }>) {
+  const [detailOuvert, setDetailOuvert] = useState(false);
+  const ratio = tokens / fenetre;
+  const pourcentage = Math.round(ratio * 100);
+  const detail = `Contexte du dernier envoi : ${tokens.toLocaleString("fr-FR")} / ${fenetre.toLocaleString(
+    "fr-FR"
+  )} tokens (${pourcentage} %)`;
+
+  return (
+    <div className="group relative flex justify-end">
+      <button
+        type="button"
+        onClick={() => setDetailOuvert((ouvert) => !ouvert)}
+        onBlur={() => setDetailOuvert(false)}
+        aria-label={detail}
+        className={cn(
+          "rounded-full p-0.5",
+          ratio >= _SEUIL_JAUGE_CONTEXTE_PROCHE ? "text-orange-500" : "text-primary"
+        )}
+      >
+        <svg viewBox="0 0 18 18" className="size-4 -rotate-90" aria-hidden="true">
+          <circle cx="9" cy="9" r={_RAYON_JAUGE_CONTEXTE} fill="none" strokeWidth="2" className="stroke-muted" />
+          <circle
+            cx="9"
+            cy="9"
+            r={_RAYON_JAUGE_CONTEXTE}
+            fill="none"
+            strokeWidth="2"
+            stroke="currentColor"
+            strokeDasharray={_CIRCONFERENCE_JAUGE_CONTEXTE}
+            strokeDashoffset={_CIRCONFERENCE_JAUGE_CONTEXTE * (1 - Math.min(ratio, 1))}
+          />
+        </svg>
+      </button>
+      <span
+        role="tooltip"
+        className={cn(
+          "pointer-events-none absolute right-0 bottom-full mb-1 rounded-md border bg-popover px-2 py-1 text-xs whitespace-nowrap text-popover-foreground shadow-sm",
+          detailOuvert ? "block" : "hidden group-hover:block"
+        )}
+      >
+        {detail}
+      </span>
+    </div>
+  );
+}
+
 // Issue #93, étendu lors de la validation manuelle de la 1.2.2
 // (2026-10-05) : allowlist des composants Markdown autorisés dans la bulle
 // de message assistant (spec #91, Solution volet 2) : gras, italique,
@@ -750,6 +804,15 @@ export function OngletChat({ conversationOuverteId, onConversationCreee }: Reado
     conversationOuverteId !== null &&
     pagesConversation?.[0]?.id === conversationOuverteId;
 
+  // Jauge de contexte (spec 1.4.2) : dernier message `assistant` qui porte
+  // une valeur ; aucune tant qu'il n'y en a pas (ancienne conversation) ni
+  // sur les données d'une autre conversation (placeholder, issue #127).
+  const dernierMessageAvecContexte = donneesConversationOuverte
+    ? [...messagesConversation]
+        .reverse()
+        .find((message) => message.role === "assistant" && message.tokens_contexte !== null)
+    : undefined;
+
   // Issue #102 : temps entre une ouverture/bascule de conversation
   // (changement de conversationOuverteId, porté par EcranCompte.tsx) et
   // l'arrivée de son contenu.
@@ -983,6 +1046,12 @@ export function OngletChat({ conversationOuverteId, onConversationCreee }: Reado
               onFichierChange={setFichierMessage}
               disabled={envoiEnCours !== null}
             />
+            {dernierMessageAvecContexte?.tokens_contexte != null && (
+              <JaugeContexte
+                tokens={dernierMessageAvecContexte.tokens_contexte}
+                fenetre={dernierMessageAvecContexte.fenetre_contexte}
+              />
+            )}
             {envoyerMessageMutation.data?.pieceJointeEchecAnalyse && (
               <output className="text-sm text-muted-foreground">
                 L'IA n'a pas pu analyser la pièce jointe « {envoyerMessageMutation.data.pieceJointeNomFichier} ».

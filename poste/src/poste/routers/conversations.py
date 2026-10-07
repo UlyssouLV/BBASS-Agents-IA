@@ -94,6 +94,8 @@ def creer_conversation(
     return ConversationCreeResponse(
         conversation=ConversationResume(id=cree.conversation.id, titre=cree.conversation.titre),
         reponse=cree.reponse,
+        tokens_contexte=cree.tokens_contexte,
+        fenetre_contexte=cree.fenetre_contexte,
     )
 
 
@@ -148,6 +150,8 @@ def consulter_conversation(
                 role=message.role,
                 contenu=message.contenu,
                 date_creation=message.date_creation,
+                tokens_contexte=message.tokens_contexte,
+                fenetre_contexte=message.fenetre_contexte,
             )
             for message in detail.messages
         ],
@@ -211,13 +215,17 @@ def envoyer_message(
 ) -> MessageEnvoyeResponse:
     jeton = _jeton_de_session(session)
     try:
-        reponse = client.envoyer_message(
+        envoye = client.envoyer_message(
             jeton, conversation_id, requete.message, requete.cle_idempotence, requete.piece_jointe_id
         )
     except Exception as erreur:
         raise _erreur_vm_vers_http(session, erreur) from erreur
 
-    return MessageEnvoyeResponse(reponse=reponse)
+    return MessageEnvoyeResponse(
+        reponse=envoye.reponse,
+        tokens_contexte=envoye.tokens_contexte,
+        fenetre_contexte=envoye.fenetre_contexte,
+    )
 
 
 def _piece_jointe_creee_response(cree: PieceJointeCreee) -> PieceJointeCreeeResponse:

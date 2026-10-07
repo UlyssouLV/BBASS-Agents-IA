@@ -32,3 +32,27 @@ def test_une_base_existante_demarre_avec_la_colonne_provenance(tmp_path):
     assert "provenance" in colonnes
     with engine.connect() as connexion:
         assert connexion.execute(text("SELECT provenance FROM resultats_recherche_web")).scalar_one() == "recherche"
+
+
+def test_une_base_existante_demarre_avec_la_colonne_tokens_contexte(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path / 'ancienne.db'}")
+    with engine.begin() as connexion:
+        # Table messages telle que la 1.4.1 l'a créée.
+        connexion.execute(
+            text(
+                "CREATE TABLE messages ("
+                "id INTEGER PRIMARY KEY, conversation_id INTEGER, role VARCHAR, "
+                "contenu VARCHAR, date_creation DATETIME)"
+            )
+        )
+        connexion.execute(
+            text("INSERT INTO messages VALUES (1, 1, 'assistant', 'Réponse', '2026-10-01 10:00:00')")
+        )
+
+    init_db(engine)
+    init_db(engine)
+
+    colonnes = {colonne["name"] for colonne in inspect(engine).get_columns("messages")}
+    assert "tokens_contexte" in colonnes
+    with engine.connect() as connexion:
+        assert connexion.execute(text("SELECT tokens_contexte FROM messages")).scalar_one() is None

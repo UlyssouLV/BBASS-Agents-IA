@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from vm_centrale.analyse_pieces_jointes import TYPES_SUPPORTES, analyser, type_appel_mistral
 from vm_centrale.autorisation import get_identifiant_compte_du_jeton
 from vm_centrale.concurrence import cache_idempotence, verrous_comptes
-from vm_centrale.config import MODELE_CHAT, MODELE_OCR, PIECES_JOINTES_DIR
+from vm_centrale.config import FICHES_MODELES, MODELE_CHAT, MODELE_OCR, PIECES_JOINTES_DIR
 from vm_centrale.consommation import enregistrer_consommation
 from vm_centrale.database import get_db
 from vm_centrale.garde_fous import (
@@ -72,6 +72,10 @@ from vm_centrale.schemas import (
 from vm_centrale.telechargement_pages import TelechargeurPages, get_telechargeur_pages
 
 _TAILLE_FENETRE_HISTORIQUE = 3
+# Fenêtre renvoyée avec la jauge de contexte (spec 1.4.2) : celle de la fiche
+# de MODELE_CHAT.
+_FENETRE_CONTEXTE = FICHES_MODELES[MODELE_CHAT].fenetre_tokens
+assert _FENETRE_CONTEXTE is not None
 # Appels de chat principaux par message, le dernier sans `tools` (spec 1.4.0,
 # décision n° 7 ; 3 → 5 en 1.4.1) : évite que le modèle tourne en rond.
 _TOURS_MAX_PAR_MESSAGE = 5
@@ -854,6 +858,7 @@ def creer_conversation(
             conversation_id=conversation.id,
             role="assistant",
             contenu=reponse,
+            tokens_contexte=reponse_chat.usage.tokens_entree,
             date_creation=maintenant,
         )
         db.add_all([message_utilisateur, message_assistant])
@@ -867,6 +872,8 @@ def creer_conversation(
         resultat = ConversationCreeResponse(
             conversation=ConversationResume(id=conversation.id, titre=conversation.titre),
             reponse=reponse,
+            tokens_contexte=message_assistant.tokens_contexte,
+            fenetre_contexte=_FENETRE_CONTEXTE,
         )
         if requete.cle_idempotence is not None:
             cache_idempotence.enregistrer(identifiant_compte, requete.cle_idempotence, resultat)
@@ -927,6 +934,8 @@ def consulter_conversation(
                 role=message.role,
                 contenu=message.contenu,
                 date_creation=message.date_creation,
+                tokens_contexte=message.tokens_contexte,
+                fenetre_contexte=_FENETRE_CONTEXTE,
             )
             for message in messages
         ],
@@ -1605,6 +1614,7 @@ def envoyer_message(
             conversation_id=conversation.id,
             role="assistant",
             contenu=reponse,
+            tokens_contexte=reponse_chat.usage.tokens_entree,
             date_creation=maintenant,
         )
         db.add_all([message_utilisateur, message_assistant])
@@ -1615,7 +1625,11 @@ def envoyer_message(
         conversation.date_derniere_activite = maintenant
         db.commit()
 
-        resultat = MessageEnvoyeResponse(reponse=reponse)
+        resultat = MessageEnvoyeResponse(
+            reponse=reponse,
+            tokens_contexte=message_assistant.tokens_contexte,
+            fenetre_contexte=_FENETRE_CONTEXTE,
+        )
         if requete.cle_idempotence is not None:
             cache_idempotence.enregistrer(identifiant_compte, requete.cle_idempotence, resultat)
         return resultat
