@@ -134,13 +134,13 @@ L'appel au modèle interne à une Recherche web qui reçoit seulement le besoin 
 
 ## Mémoire de la conversation {#memoire-de-la-conversation}
 
-La liste, recalculée par la VM centrale et envoyée au modèle à chaque appel de chat principal, de tout ce qui a été partagé dans une Conversation : Pièces jointes, Recherches web, URL écrites par le compte, chacune avec ses Questions couvertes. Distincte du résumé glissant : jamais réécrite par un modèle. Propre à sa Conversation et supprimée avec elle.
+La liste, recalculée par la VM centrale et envoyée au modèle à chaque appel de chat principal, de tout ce qui a été partagé dans une Conversation : Pièces jointes, Recherches web, URL écrites par le compte, Lectures d'outil (avec leur date), chacune avec ses Questions couvertes. Distincte du résumé glissant : jamais réécrite par un modèle. Propre à sa Conversation et supprimée avec elle.
 
 À éviter : mémoire (seul), historique.
 
 ## Question couverte {#question-couverte}
 
-Une question à laquelle une Pièce jointe ou une page lue répond, enregistrée avec sa réponse courte et sa source (nom de fichier ou URL). Écrite par un modèle : jamais une source des Garde-fous.
+Une question à laquelle une Pièce jointe, une page lue ou une Lecture d'outil répond, enregistrée avec sa réponse courte et sa source (nom de fichier, URL ou référence de la fiche). Écrite par un modèle, ou par script à partir des champs d'une Fiche Moduléo : jamais une source des Garde-fous.
 
 À éviter : FAQ, index, résumé.
 
@@ -173,3 +173,21 @@ Le nouveau téléchargement d'une page déjà lue dans une Conversation, demand�
 L'étape en cours d'un tour de chat, publiée en direct par la VM centrale et affichée dans le fil à la place de « Réflexion… » (« Recherche sur le web : “…” », « Lecture de &lt;domaine&gt; », « Relecture de &lt;fichier&gt; »…). Une étape à la fois, jamais persistée ni visible dans l'inspecteur ([ADR-0016](./adr/0016-envoi-de-message-en-flux-sse.md)).
 
 À éviter : progression, log, raisonnement (le modèle ne montre pas sa réflexion).
+
+## Moduléo {#moduleo}
+
+Le logiciel métier du cabinet (affaires, contacts, planning, GED…), édité par Kipaware. La VM centrale le lit par son API, en lecture seule, avec une seule clé dédiée à BBASS ([ADR-0017](./adr/0017-lecture-moduleo-par-outil.md)).
+
+À éviter : Agent Moduléo (Moduléo est lu par des Outils communs, pas par un Agent), Cogeo (un module de Moduléo).
+
+## Fiche Moduléo {#fiche-moduleo}
+
+Le texte dense qu'un Outil Moduléo renvoie au modèle pour une affaire ou un contact : champs utiles, ids résolus en noms (client, responsable, intervenants, commune). Jamais la réponse brute de l'API.
+
+À éviter : résultat, JSON, enregistrement.
+
+## Lecture d'outil {#lecture-d-outil}
+
+Ce qu'un Outil a lu dans un logiciel pour une Conversation (en 1.5.0 : une Fiche Moduléo), enregistré avec l'outil, une référence (« affaire 2024-123 ») et sa date. Source des Garde-fous sur toute la Conversation, citée dans la ligne « Sources : ». Jamais partagée entre Conversations. Les pages web gardent leur propre enregistrement (Recherche web).
+
+À éviter : cache, appel, échange (l'Échange est celui de l'inspecteur).

@@ -419,6 +419,9 @@
               <li><a href="#version-1-3-1">V1.3.1 — Le chat ne fige plus ses inventions</a></li>
               <li><a href="#version-1-4-0">V1.4.0 — Recherche web</a></li>
               <li><a href="#version-1-4-1">V1.4.1 — Mémoire de la conversation</a></li>
+              <li><a href="#version-1-4-2">V1.4.2 — Contexte en vrais tokens</a></li>
+              <li><a href="#version-1-4-3">V1.4.3 — Cache des pages web</a></li>
+              <li><a href="#version-1-4-4">V1.4.4 — Statut d’attente en direct</a></li>
               <li><a href="#version-1-5-0">V1.5.0 — Moduléo lecture</a></li>
               <li><a href="#version-1-6-0">V1.6.0 — Documentation mémoire / souveraineté</a></li>
               <li><a href="#version-1-7-0">V1.7.0 — Déploiement postes</a></li>
@@ -525,7 +528,7 @@
 
     <section class="bloc versions" id="descriptif-versions">
       <h2>Descriptif des versions</h2>
-      <p class="lead">Versions livrées depuis le bilan précédent, puis prévisionnel de la semaine (feuille de route à jour au 06/10).</p>
+      <p class="lead">Versions livrées depuis le bilan précédent, puis prévisionnel de la semaine (feuille de route à jour au 07/10).</p>
 
       <div class="version" id="version-1-2-2">
         <div class="version-head">
@@ -592,10 +595,32 @@
         </div>
       </div>
 
+      <div class="version" id="version-1-4-2">
+        <div class="version-head">
+          <h3>V1.4.2 — Le contexte en vrais tokens</h3>
+          <span class="deploye">Déployé le 07/10/2026 à 09:35</span>
+        </div>
+        <div class="version-body">
+        <p>Les pages web trop longues étaient plafonnées avec une estimation grossière. Cette version mesure la taille des pages avec le vrai compteur du modèle : une page trop lourde n’est plus relue, et l’assistant répond honnêtement plutôt que de tronquer au hasard.</p>
+        <p>Sous le champ de saisie, une jauge indique à quel point le dernier envoi a rempli la fenêtre du modèle — pour anticiper les conversations qui deviennent trop longues.</p>
+        </div>
+      </div>
+
+      <div class="version" id="version-1-4-3">
+        <div class="version-head">
+          <h3>V1.4.3 — Cache des pages web entre conversations</h3>
+          <span class="deploye">Déployé le 07/10/2026 à 12:56</span>
+        </div>
+        <div class="version-body">
+        <p>Une page déjà lue était retéléchargée à chaque conversation, une page en échec ne pouvait plus être retentée, et une page lue restait figée même si le collaborateur disait qu’elle avait changé.</p>
+        <p>Désormais, une page lue avec succès dans la journée est réutilisée pendant 24 heures, y compris dans une autre conversation. Une page qui n’avait pas pu être lue est retentée plus tard. Si le collaborateur demande une relecture, la page est relue et ce que l’on en savait déjà est revérifié ; en cas d’échec, l’assistant le dit et s’appuie sur la version datée.</p>
+        </div>
+      </div>
+
       <div class="version" id="version-1-4-4">
         <div class="version-head">
           <h3>V1.4.4 — Statut d’attente en direct pendant une réponse</h3>
-          <span class="deploye">Déployé le 07/10/2026</span>
+          <span class="deploye">Déployé le 07/10/2026 à 15:50</span>
         </div>
         <div class="version-body">
         <p>Jusqu’ici, le fil affichait « Réflexion… » pendant toute la préparation de la réponse, alors qu’un tour peut comprendre plusieurs recherches, des pages lues et des documents relus. Le collaborateur ne savait pas si l’assistant avançait ou était bloqué. Désormais, le fil affiche l’étape en cours : « Recherche sur le web : “…” », « Lecture de &lt;site&gt; », « Relecture de &lt;document&gt; », « Vérification de la réponse… ». La réponse finale reste vérifiée avant de s’afficher.</p>
