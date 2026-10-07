@@ -466,7 +466,7 @@ def test_un_chiffre_de_la_page_du_compte_passe_le_garde_fou_chiffres(
     mistral_client_factice.repondre_lecture_page(True, "4870 euros HT.", _URL_COMPTE)
     mistral_client_factice.repondre_avec_appel_outil(_OUTIL, {"urls": [_URL_COMPTE], "besoin": "Montant"})
     mistral_client_factice.repondre(
-        "Le devis est de 4870 euros, plus 735 euros de frais.", resume_et_profil=_resume_et_profil()
+        "Le devis est de 4870 euros. Il faut ajouter 735 euros de frais.", resume_et_profil=_resume_et_profil()
     )
 
     reponse = client.post(
@@ -922,7 +922,7 @@ def test_une_url_du_compte_en_echec_est_retentee_au_tour_suivant_et_sert_au_gard
     mistral_client_factice.repondre_lecture_page(True, "4870 euros HT.", _URL_COMPTE)
     mistral_client_factice.repondre_avec_appel_outil(_OUTIL, {"urls": [_URL_COMPTE], "besoin": "Montant"})
     mistral_client_factice.repondre(
-        "Le devis est de 4870 euros, plus 735 euros de frais.", resume_et_profil=_resume_et_profil()
+        "Le devis est de 4870 euros. Il faut ajouter 735 euros de frais.", resume_et_profil=_resume_et_profil()
     )
 
     reponse = client.post(
@@ -1113,7 +1113,7 @@ def test_retelecharger_contourne_un_cache_frais_et_met_a_jour_cache_et_copie(
         jeton_valide,
         conversation_id,
         besoin="Montant",
-        reponse="Le devis est de 5120 euros, plus 735 euros de frais.",
+        reponse="Le devis est de 5120 euros. Il faut ajouter 735 euros de frais.",
     )
 
     assert telechargeur_pages_factice.urls_recues == [_URL_COMPTE]

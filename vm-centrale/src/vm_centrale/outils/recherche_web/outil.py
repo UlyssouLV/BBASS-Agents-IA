@@ -35,16 +35,30 @@ _AUCUN_RESULTAT = (
     "Aucun résultat pour cette recherche. Reformule la requête, ou réponds sans "
     "résultat de recherche et sans lien."
 )
+# Portée d'un fait, dans chaque consigne qui lit une page (extraction,
+# lire_pages_web) : au test humain 1.4.3 (conversation 103, #160), « 6 à
+# 12 semaines en Savoie » est devenu « en moyenne en France », avec une
+# conversion « (1,5 à 3 mois) » absente des pages. Consigne seule : non
+# vérifiable de façon fiable par le code.
+REGLE_PORTEE = (
+    "Un fait garde le lieu, la période et la population que la page lui donne "
+    "(« en Savoie » ne devient jamais « en France ») ; aucune conversion ni "
+    "aucun calcul absent de la page."
+)
 # Consigne fixe de l'appel d'extraction (spec 1.4.0, étape 5, décision
 # n° 18), sans consigne de style : il ne reçoit que le besoin et les pages,
 # jamais le contexte de la conversation (ADR-0014). Sortie JSON depuis la
-# 1.4.1 : l'extrait et les questions couvertes.
+# 1.4.1 : l'extrait et les questions couvertes. Depuis la 1.4.3 (#160),
+# l'extrait est une liste de faits, chacun avec l'URL de sa page : un texte
+# unique fondait les pages sans URL en face de chaque fait.
 CONSIGNE_EXTRACTION = (
-    "À partir de ces pages, extrais seulement ce qui répond au besoin. Indique "
-    "l'URL de chaque information. N'ajoute rien qui ne soit pas écrit dans les "
-    "pages. Si rien ne répond au besoin, dis-le. Une information absente des "
-    "pages est « non trouvé », jamais une estimation.\n\n"
-    "Réponds en JSON : `extrait`, ce texte ; `questions_couvertes`, jusqu'à "
+    "À partir de ces pages, extrais seulement ce qui répond au besoin, en faits "
+    "courts, chacun avec l'URL de la page qui le dit. N'ajoute rien qui ne soit "
+    f"pas écrit dans les pages. {REGLE_PORTEE} Si rien ne répond au besoin, ne "
+    "donne aucun fait. Une information absente des pages est « non trouvé », "
+    "jamais une estimation.\n\n"
+    "Réponds en JSON : `faits`, la liste des faits (`texte`, le fait ; `source`, "
+    "l'URL de la page qui le dit) ; `questions_couvertes`, jusqu'à "
     f"{_QUESTIONS_MAX} questions auxquelles les pages répondent, chacune avec "
     f"sa réponse (`reponse`, {_REPONSE_MAX} caractères au plus) et l'URL de la "
     "page qui y répond (`source`)."
@@ -57,7 +71,15 @@ _SCHEMA_EXTRACTION = {
         "schema": {
             "type": "object",
             "properties": {
-                "extrait": {"type": "string"},
+                "faits": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {"texte": {"type": "string"}, "source": {"type": "string"}},
+                        "required": ["texte", "source"],
+                        "additionalProperties": False,
+                    },
+                },
                 "questions_couvertes": {
                     "type": "array",
                     "items": {
@@ -72,7 +94,7 @@ _SCHEMA_EXTRACTION = {
                     },
                 },
             },
-            "required": ["extrait", "questions_couvertes"],
+            "required": ["faits", "questions_couvertes"],
             "additionalProperties": False,
         },
     },
@@ -81,6 +103,7 @@ _EXTRACTION_INDISPONIBLE = (
     "Extraction indisponible : le texte des pages n'a pas pu être lu. Seuls le "
     "titre, l'URL et l'extrait du moteur de chaque résultat sont disponibles."
 )
+_AUCUN_FAIT = "Les pages lues ne répondent pas à ce besoin."
 _AUCUNE_PAGE_LUE = (
     "Aucune page n'a pu être lue. Seuls le titre, l'URL et l'extrait du moteur "
     "de chaque résultat sont disponibles."
@@ -258,8 +281,14 @@ class _QuestionLue:
 
 
 @dataclass(frozen=True)
+class _Fait:
+    texte: str
+    source: str
+
+
+@dataclass(frozen=True)
 class _Extraction:
-    extrait: str
+    faits: tuple[_Fait, ...]
     questions: tuple[_QuestionLue, ...]
 
 
@@ -267,23 +296,29 @@ def _lire_extraction(contenu: str) -> _Extraction:
     # Lève ValueError, KeyError ou TypeError si le JSON n'a pas la forme
     # demandée. Seules les _QUESTIONS_MAX premières questions comptent.
     donnees = json.loads(contenu)
-    extrait = donnees["extrait"]
+    faits = donnees["faits"]
     questions = donnees["questions_couvertes"]
-    if not isinstance(extrait, str) or not isinstance(questions, list):
-        raise TypeError("extrait ou questions_couvertes mal formés")
+    if not isinstance(faits, list) or not isinstance(questions, list):
+        raise TypeError("faits ou questions_couvertes mal formés")
+    lus = []
+    for fait in faits:
+        champs = (fait["texte"], fait["source"])
+        if not all(isinstance(champ, str) for champ in champs):
+            raise TypeError("fait mal formé")
+        lus.append(_Fait(champs[0].strip(), champs[1].strip()))
     lues = []
     for question in questions[:_QUESTIONS_MAX]:
         champs = (question["question"], question["reponse"], question["source"])
         if not all(isinstance(champ, str) for champ in champs):
             raise TypeError("question couverte mal formée")
         lues.append(_QuestionLue(champs[0].strip(), champs[1].strip()[:_REPONSE_MAX], champs[2].strip()))
-    return _Extraction(extrait, tuple(lues))
+    return _Extraction(tuple(lus), tuple(lues))
 
 
 def _extraire(besoin: str, lues: list[_Page], contexte: ContexteTour) -> tuple[_Extraction | None, AppelMistralOutil]:
     # Appel d'extraction (ADR-0014) : le besoin et les pages lues, rien
-    # d'autre. Son extrait va au modèle principal mais n'est jamais
-    # enregistré comme source des garde-fous (décision n° 12) : il peut
+    # d'autre. Ses faits vont au modèle principal mais ne sont jamais
+    # enregistrés comme source des garde-fous (décision n° 12) : il peut
     # inventer. Renvoie None si l'appel échoue (décision n° 17) ou si sa
     # réponse n'est pas le JSON demandé (spec 1.4.1), jamais d'exception.
     pages = "\n".join(f"\n--- Page : {page.url} ---\n{page.texte_lu}" for page in lues)
@@ -316,6 +351,18 @@ def _extraire(besoin: str, lues: list[_Page], contexte: ContexteTour) -> tuple[_
         # Appel payé et tracé tel quel : seule sa sortie est inutilisable.
         logger.warning("Appel d'extraction hors du JSON attendu : %s", erreur)
         return None, appel
+
+
+def _faits_des_pages(faits: tuple[_Fait, ...], lues: list[_Page]) -> str:
+    # Un fait par ligne, suivi de son URL (#160). Un fait dont la source
+    # n'est pas une page lue de ce tour (URL inventée, page en échec ou
+    # retirée par le plafond) est écarté, comme une question couverte.
+    urls_lues = {page.url for page in lues}
+    gardes = [fait for fait in faits if fait.texte and fait.source in urls_lues]
+    if not gardes:
+        return _AUCUN_FAIT
+    lignes = "\n".join(f"- {fait.texte} (source : {fait.source})" for fait in gardes)
+    return f"Ce que les pages lues disent du besoin, un fait par ligne avec sa source :\n{lignes}"
 
 
 def _enregistrer_questions(
@@ -399,11 +446,11 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
     if extraction is None:
         contenu = f"{_liste_resultats(requete, resultats, avec_extraits=True)}\n\n{_EXTRACTION_INDISPONIBLE}"
     else:
-        # L'extrait et la liste (titre, URL), jamais le texte des pages
+        # Les faits et la liste (titre, URL), jamais le texte des pages
         # (spec 1.4.0, étape 6).
         contenu = (
             f"{_liste_resultats(requete, resultats, avec_extraits=False)}\n\n"
-            f"Extrait des pages lues, pour ce besoin :\n{extraction.extrait}"
+            f"{_faits_des_pages(extraction.faits, lues)}"
         )
         _enregistrer_questions(extraction.questions, lignes, contexte)
     return ResultatOutil(contenu, trace=trace, appels_mistral=(appel,))

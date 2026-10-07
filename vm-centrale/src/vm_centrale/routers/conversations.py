@@ -18,6 +18,8 @@ from vm_centrale.config import FICHES_MODELES, MODELE_CHAT, MODELE_OCR, PIECES_J
 from vm_centrale.consommation import enregistrer_consommation
 from vm_centrale.database import get_db
 from vm_centrale.garde_fous import (
+    PageSource,
+    ajouter_sources,
     mentionner_pages_trop_longues,
     nettoyer_titre,
     normaliser_url,
@@ -146,7 +148,9 @@ _SCHEMA_RESUME_ET_PROFIL = {
 # puis affirmait les avoir vérifiés. Garanti en plus dans le code par
 # garde_fous.retirer_urls_inventees. Depuis la 1.4.0, la capacité réelle
 # est la recherche web (outil rechercher_web) : seuls les liens trouvés par
-# l'outil ou donnés par l'utilisateur peuvent être cités.
+# l'outil ou donnés par l'utilisateur peuvent être cités. Portée d'un fait
+# depuis la 1.4.3 (#160, conversation 103) : « en Savoie » devenait « en
+# France », même règle que les consignes qui lisent une page (REGLE_PORTEE).
 _PROMPT_STYLE = (
     "Capacité réelle, avant toute autre consigne : tu peux chercher sur "
     "Internet avec l'outil rechercher_web ; tu cites les pages trouvées par "
@@ -157,7 +161,10 @@ _PROMPT_STYLE = (
     "explicitement d'inventer, d'imaginer ou de faire une hypothèse. Si tu "
     "n'es pas sûr qu'il faille inventer, pose la question de confirmation "
     "en tout début de réponse, et n'invente rien tant qu'il n'a pas "
-    "confirmé.\n"
+    "confirmé. Un fait tiré d'une page garde le lieu, la période et la "
+    "population que la page lui donne (« en Savoie » ne devient jamais « en "
+    "France ») ; tu n'ajoutes aucune conversion ni aucun calcul absent de la "
+    "page.\n"
     "Consigne de style pour ta réponse, à respecter systématiquement :\n"
     "- Ton : vouvoiement, professionnel, cohérent avec un outil de travail "
     "de cabinet.\n"
@@ -455,18 +462,23 @@ def _reponse_sans_url_inventee(
     # de recherche de la conversation (spec 1.4.0), ce tour compris. Point
     # d'appel unique du garde-fou, pour le premier message comme pour les
     # suivants (voir garde_fous/README.md).
-    messages_du_compte = (
-        db.query(Message.contenu)
-        .filter(Message.conversation_id == conversation_id, Message.role == "user")
-        .all()
-    )
-    textes_du_compte = [contenu for (contenu,) in messages_du_compte] + [nouveau_message]
     urls_trouvees = (
         db.query(ResultatRechercheWeb.url)
         .filter(ResultatRechercheWeb.conversation_id == conversation_id)
         .all()
     )
-    return retirer_urls_inventees(reponse, textes_du_compte, [url for (url,) in urls_trouvees])
+    return retirer_urls_inventees(
+        reponse, _messages_du_compte(db, conversation_id, nouveau_message), [url for (url,) in urls_trouvees]
+    )
+
+
+def _messages_du_compte(db: Session, conversation_id: int, nouveau_message: str) -> list[str]:
+    messages = (
+        db.query(Message.contenu)
+        .filter(Message.conversation_id == conversation_id, Message.role == "user")
+        .all()
+    )
+    return [contenu for (contenu,) in messages] + [nouveau_message]
 
 
 def _extraits_pieces_jointes(
@@ -484,15 +496,24 @@ def _extraits_pieces_jointes(
     return extraits
 
 
-def _textes_recherche_web(db: Session, conversation_id: int) -> list[str]:
+def _pages_de_la_conversation(db: Session, conversation_id: int) -> list[PageSource]:
     # Extraits du moteur et texte nettoyé des pages (spec 1.4.0), jamais
-    # l'extrait produit par l'appel d'extraction, qui pourrait inventer.
+    # les faits produits par l'appel d'extraction, qui pourraient inventer.
     lignes = (
-        db.query(ResultatRechercheWeb.extrait_moteur, ResultatRechercheWeb.texte_nettoye)
+        db.query(
+            ResultatRechercheWeb.url,
+            ResultatRechercheWeb.titre,
+            ResultatRechercheWeb.extrait_moteur,
+            ResultatRechercheWeb.texte_nettoye,
+        )
         .filter(ResultatRechercheWeb.conversation_id == conversation_id)
+        .order_by(ResultatRechercheWeb.id)
         .all()
     )
-    return [texte for ligne in lignes for texte in ligne if texte and texte.strip()]
+    return [
+        PageSource(url, titre, tuple(texte for texte in (extrait, texte_nettoye) if texte and texte.strip()))
+        for url, titre, extrait, texte_nettoye in lignes
+    ]
 
 
 def _reponse_visible(
@@ -506,13 +527,19 @@ def _reponse_visible(
 ) -> str:
     # Ligne garde_fous de l'inspecteur à chaque réponse de chat (spec 1.4.0,
     # décision 15), même sans retrait : sans elle, on ne voit pas pourquoi la
-    # réponse affichée diffère de celle du modèle. La mention des pages trop
-    # longues (#151) vient après les garde-fous URL et chiffres : ajoutée par
-    # le code, elle n'est jamais contrôlée comme un texte du modèle.
-    visible = mentionner_pages_trop_longues(
-        _appliquer_garde_fous(db, conversation_id, nouveau_message, reponse, piece_jointe),
-        pages_trop_longues,
+    # réponse affichée diffère de celle du modèle. La ligne « Sources : »
+    # (#160) et la mention des pages trop longues (#151) viennent après les
+    # garde-fous URL et chiffres : ajoutées par le code, elles ne sont jamais
+    # contrôlées comme un texte du modèle, et seuls les chiffres gardés sont
+    # cités.
+    visible = _appliquer_garde_fous(db, conversation_id, nouveau_message, reponse, piece_jointe)
+    visible = ajouter_sources(
+        visible,
+        _messages_du_compte(db, conversation_id, nouveau_message)
+        + _extraits_pieces_jointes(db, conversation_id, piece_jointe),
+        _pages_de_la_conversation(db, conversation_id),
     )
+    visible = mentionner_pages_trop_longues(visible, pages_trop_longues)
     enregistrer_echange_local(
         db,
         identifiant_compte=identifiant_compte,
@@ -537,25 +564,21 @@ def _appliquer_garde_fous(
     reponse = _reponse_sans_url_inventee(db, conversation_id, nouveau_message, reponse)
     if _demande_invention(nouveau_message):
         return reponse
-    messages_du_compte = (
-        db.query(Message.contenu)
-        .filter(Message.conversation_id == conversation_id, Message.role == "user")
-        .all()
-    )
     extraits = _extraits_pieces_jointes(db, conversation_id, piece_jointe)
     # Un texte de recherche non vide compte comme un document.
-    extraits += _textes_recherche_web(db, conversation_id)
-    textes_source = [contenu for (contenu,) in messages_du_compte] + [nouveau_message, *extraits]
+    extraits += [texte for page in _pages_de_la_conversation(db, conversation_id) for texte in page.textes]
+    textes_source = [*_messages_du_compte(db, conversation_id, nouveau_message), *extraits]
     sans_chiffre_invente = retirer_chiffres_hors_source(reponse, textes_source)
     if sans_chiffre_invente == reponse:
         return reponse
     # Un document, ou un chiffre déjà écrit dans le message du tour : on
-    # retire seulement le chiffre absent. Sans rien de tout ça, la réponse
-    # entière devient la phrase fixe — un rapport troué n'est pas une réponse.
+    # retire seulement le chiffre absent, avec sa phrase. Sans rien de tout
+    # ça, ou si plus rien ne reste, la réponse entière devient la phrase
+    # fixe — un rapport troué n'est pas une réponse.
     message_apporte_une_donnee = (
         retirer_chiffres_hors_source(nouveau_message, []) != nouveau_message
     )
-    if extraits or message_apporte_une_donnee:
+    if (extraits or message_apporte_une_donnee) and sans_chiffre_invente:
         return sans_chiffre_invente
     return _REPONSE_SANS_DONNEES
 

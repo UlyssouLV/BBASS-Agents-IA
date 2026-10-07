@@ -112,7 +112,7 @@ def test_une_page_lue_par_un_compte_est_servie_a_un_autre_sans_telechargement(
         mistral_client_factice,
         moteur_recherche_factice,
         jeton_autre_compte,
-        reponse="La loi compte 305 articles et 48 décrets.",
+        reponse="La loi compte 305 articles. Elle a 48 décrets.",
     )
 
     assert telechargeur_pages_factice.urls_recues == []
@@ -228,10 +228,10 @@ def test_les_questions_couvertes_dun_compte_napparaissent_pas_dans_la_memoire_du
 ):
     telechargeur_pages_factice.servir(_URL, _page_html("La loi compte 305 articles."))
     mistral_client_factice.repondre_extraction(
-        "305 articles.", [("Combien d'articles pour le dossier Dupont ?", "305 articles", _URL)]
+        [("305 articles.", _URL)], [("Combien d'articles pour le dossier Dupont ?", "305 articles", _URL)]
     )
     _rechercher(client, mistral_client_factice, moteur_recherche_factice, jeton_valide)
-    mistral_client_factice.repondre_extraction("Extrait.")
+    mistral_client_factice.repondre_extraction()
 
     seconde = _rechercher(client, mistral_client_factice, moteur_recherche_factice, jeton_autre_compte)
     mistral_client_factice.repondre("Suite.", resume_et_profil=_resume_et_profil())

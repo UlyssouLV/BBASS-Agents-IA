@@ -11,7 +11,7 @@ from vm_centrale.garde_fous import normaliser_url, urls_ecrites
 from vm_centrale.inspecteur import payload_depuis_erreur, reponse_depuis_erreur
 from vm_centrale.models import Message, QuestionCouverte, ResultatRechercheWeb
 from vm_centrale.outils.base import AppelMistralOutil, ContexteTour, Outil, ResultatOutil
-from vm_centrale.outils.recherche_web.outil import PLAFOND_TOKENS_PAGES, lire_pages
+from vm_centrale.outils.recherche_web.outil import PLAFOND_TOKENS_PAGES, REGLE_PORTEE, lire_pages
 from vm_centrale.questions_couvertes import REPONSE_MAX
 
 _NOM = "lire_pages_web"
@@ -49,8 +49,9 @@ _RELECTURE_EN_ECHEC = (
 # de la conversation (même cadre que l'appel d'extraction, ADR-0014).
 CONSIGNE_LECTURE_PAGE = (
     "À partir de cette page, réponds seulement au besoin, de façon courte. "
-    "N'ajoute rien qui ne soit pas écrit dans la page. Une information absente "
-    "de la page est « non trouvé », jamais une estimation.\n\n"
+    f"N'ajoute rien qui ne soit pas écrit dans la page. {REGLE_PORTEE} Une "
+    "information absente de la page est « non trouvé », jamais une "
+    "estimation.\n\n"
     "Réponds en JSON : `trouvee`, vrai si la page répond au besoin ; "
     "`reponse`, la réponse (vide si non trouvé) ; `source`, l'URL de la page."
 )
@@ -79,8 +80,8 @@ CONSIGNE_REVERIFICATION_PAGE = (
     "Cette page a changé. Pour chaque question numérotée, dans l'ordre, dis "
     "si la nouvelle version de la page y répond et donne la réponse, de façon "
     "courte. Si un besoin est donné, réponds-y de la même façon. N'ajoute rien "
-    "qui ne soit pas écrit dans la page. Une information absente de la page est "
-    "« non trouvé », jamais une estimation.\n\n"
+    f"qui ne soit pas écrit dans la page. {REGLE_PORTEE} Une information absente "
+    "de la page est « non trouvé », jamais une estimation.\n\n"
     "Réponds en JSON : `questions`, une entrée par question dans l'ordre "
     "(`trouvee`, vrai si la page répond ; `reponse`, la réponse, vide si non "
     "trouvé) ; `besoin`, de même forme, seulement si un besoin est donné."

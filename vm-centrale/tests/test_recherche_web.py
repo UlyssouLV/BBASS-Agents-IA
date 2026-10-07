@@ -3,6 +3,8 @@ import re
 
 from vm_centrale.config import MODELE_CHAT
 from vm_centrale.models import Consommation, EchangeInspecteur, QuestionCouverte, ResultatRechercheWeb
+from vm_centrale.outils.lire_pages_web import CONSIGNE_LECTURE_PAGE, CONSIGNE_REVERIFICATION_PAGE
+from vm_centrale.outils.recherche_web import CONSIGNE_EXTRACTION
 
 # Outil rechercher_web (spec 1.4.0) : SearXNG remplacé par
 # MoteurRechercheFactice (conftest), aucun accès réseau.
@@ -228,7 +230,7 @@ def test_un_chiffre_dun_extrait_du_moteur_reste_un_chiffre_absent_part_sans_phra
         ("Loi Climat et résilience", _URL_TROUVEE, "Promulguée le 22 août 2021, 305 articles."),
     )
     _demander_recherche(mistral_client_factice)
-    mistral_client_factice.repondre("La loi compte 305 articles et 48 décrets.", "Titre")
+    mistral_client_factice.repondre("La loi compte 305 articles. Elle a 48 décrets.", "Titre")
 
     reponse = client.post(
         "/conversations", json={"message": "Trouve la loi Climat"}, headers=_autorisation(jeton_valide)
@@ -519,7 +521,7 @@ def test_un_chiffre_present_seulement_dans_le_texte_dune_page_reste_dans_la_repo
         _URL_TROUVEE, _page_html("La loi a été promulguée en 2021 et compte 305 articles.")
     )
     _demander_recherche(mistral_client_factice)
-    mistral_client_factice.repondre("La loi compte 305 articles et 48 décrets.", "Titre")
+    mistral_client_factice.repondre("La loi compte 305 articles. Elle a 48 décrets.", "Titre")
 
     reponse = client.post(
         "/conversations", json={"message": "Trouve la loi Climat"}, headers=_autorisation(jeton_valide)
@@ -570,7 +572,7 @@ def test_le_message_tool_porte_lextrait_et_la_liste_jamais_les_pages(
     _recherche_avec_page(
         moteur_recherche_factice, telechargeur_pages_factice, mistral_client_factice, "Texte de la loi lue."
     )
-    mistral_client_factice.repondre_extraction(f"La loi est publiée sur Légifrance ({_URL_TROUVEE}).")
+    mistral_client_factice.repondre_extraction([("La loi est publiée sur Légifrance.", _URL_TROUVEE)])
     mistral_client_factice.repondre("Voici la loi.", "Titre")
 
     _creer_conversation(client, jeton_valide)
@@ -593,8 +595,8 @@ def test_un_chiffre_present_seulement_dans_lextrait_est_retire_de_la_reponse(
         mistral_client_factice,
         "La loi a été promulguée en 2021 et compte 305 articles.",
     )
-    mistral_client_factice.repondre_extraction("La loi compte 305 articles et 48 décrets.")
-    mistral_client_factice.repondre("La loi compte 305 articles et 48 décrets.", "Titre")
+    mistral_client_factice.repondre_extraction([("La loi compte 305 articles et 48 décrets.", _URL_TROUVEE)])
+    mistral_client_factice.repondre("La loi compte 305 articles. Elle a 48 décrets.", "Titre")
 
     reponse = client.post(
         "/conversations", json={"message": "Trouve la loi Climat"}, headers=_autorisation(jeton_valide)
@@ -681,7 +683,7 @@ def test_inspecteur_place_lextraction_entre_loutil_et_lappel_principal_suivant(
     _recherche_avec_page(
         moteur_recherche_factice, telechargeur_pages_factice, mistral_client_factice, "Texte de la loi lue."
     )
-    mistral_client_factice.repondre_extraction("Extrait de la loi.")
+    mistral_client_factice.repondre_extraction([("Extrait de la loi.", _URL_TROUVEE)])
     mistral_client_factice.repondre("Voici la loi.", "Titre")
     conversation_id = _creer_conversation(client, jeton_valide)
 
@@ -726,7 +728,7 @@ def test_un_lien_markdown_vers_un_resultat_garde_ses_nombres_un_chiffre_hors_sou
         mistral_client_factice,
         moteur_recherche_factice,
         jeton_valide,
-        f"Voir le [guide]({_URL_DATEE}) : 48 aides.",
+        f"Voir le [guide]({_URL_DATEE}). Il recense 48 aides.",
     )
 
     assert f"[guide]({_URL_DATEE})" in contenu
@@ -755,11 +757,11 @@ def test_un_chiffre_hors_source_dans_le_texte_dun_lien_markdown_est_retire(
         mistral_client_factice,
         moteur_recherche_factice,
         jeton_valide,
-        f"Voir le [Guide 2031]({_URL_DATEE}).",
+        f"Le guide est en ligne. Voir le [Guide 2031]({_URL_DATEE}).",
     )
 
-    assert "2031" not in contenu
-    assert f"({_URL_DATEE})" in contenu
+    # Depuis la 1.4.3 (#160), la phrase du chiffre part entière, lien compris.
+    assert contenu == "Le guide est en ligne."
 
 
 def test_une_url_de_resultat_avec_parentheses_reste_entiere_une_url_inventee_avec_parentheses_part(
@@ -814,7 +816,7 @@ def test_les_questions_de_lextraction_sont_enregistrees_sur_la_page_source(
 ):
     _recherche_avec_deux_pages(moteur_recherche_factice, telechargeur_pages_factice, mistral_client_factice)
     mistral_client_factice.repondre_extraction(
-        f"La loi est sur Légifrance ({_URL_TROUVEE}).",
+        [("La loi est sur Légifrance.", _URL_TROUVEE)],
         [
             ("Où lire la loi ?", "Sur Légifrance.", _URL_TROUVEE),
             ("Quel décret l'applique ?", "Le décret d'application.", _URL_DECRET),
@@ -835,9 +837,9 @@ def test_les_questions_de_lextraction_sont_enregistrees_sur_la_page_source(
         q.piece_jointe_id is None and q.trouvee and q.origine == "initiale" and q.date_creation for q in questions
     )
 
-    # L'extrait part au modèle comme en 1.4.0, jamais le JSON brut.
+    # Les faits partent au modèle, un par ligne avec leur URL, jamais le JSON brut.
     (message_tool,) = _messages_tool(mistral_client_factice.appels_reponse[-2])
-    assert f"La loi est sur Légifrance ({_URL_TROUVEE})." in message_tool["content"]
+    assert f"- La loi est sur Légifrance. (source : {_URL_TROUVEE})" in message_tool["content"]
     assert "questions_couvertes" not in message_tool["content"]
 
 
@@ -867,7 +869,7 @@ def test_au_dela_de_huit_questions_seules_les_huit_premieres_et_reponse_tronquee
     _recherche_avec_deux_pages(moteur_recherche_factice, telechargeur_pages_factice, mistral_client_factice)
     longue = "x" * 450
     mistral_client_factice.repondre_extraction(
-        "Extrait.", [(f"Question {n} ?", longue if n == 1 else f"Réponse {n}", _URL_TROUVEE) for n in range(1, 11)]
+        [], [(f"Question {n} ?", longue if n == 1 else f"Réponse {n}", _URL_TROUVEE) for n in range(1, 11)]
     )
     mistral_client_factice.repondre("Voici la loi.", "Titre")
 
@@ -883,7 +885,7 @@ def test_une_question_dont_la_source_nest_pas_une_page_lue_est_ignoree(
 ):
     _recherche_avec_deux_pages(moteur_recherche_factice, telechargeur_pages_factice, mistral_client_factice)
     mistral_client_factice.repondre_extraction(
-        "Extrait.",
+        [],
         [
             ("Inventée ?", "Oui.", _URL_INVENTEE),
             ("Jamais lue ?", "Oui.", _URL_JAMAIS_LUE),
@@ -922,7 +924,7 @@ def test_supprimer_la_conversation_supprime_ses_questions_couvertes(
     client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide, db_session
 ):
     _recherche_avec_deux_pages(moteur_recherche_factice, telechargeur_pages_factice, mistral_client_factice)
-    mistral_client_factice.repondre_extraction("Extrait.", [("Où lire la loi ?", "Sur Légifrance.", _URL_TROUVEE)])
+    mistral_client_factice.repondre_extraction([], [("Où lire la loi ?", "Sur Légifrance.", _URL_TROUVEE)])
     mistral_client_factice.repondre("Voici la loi.", "Titre")
     conversation_id = _creer_conversation(client, jeton_valide)
     assert _questions_couvertes(db_session, conversation_id)
@@ -931,3 +933,189 @@ def test_supprimer_la_conversation_supprime_ses_questions_couvertes(
 
     assert suppression.status_code == 204
     assert db_session.query(QuestionCouverte).count() == 0
+
+
+# Corrections du test humain 1.4.3 (#160, conversation 103) : un fait, une
+# source ; portée gardée ; ligne « Sources : » ajoutée par le code ; plus de
+# fragment vide laissé par le garde-fou chiffres.
+
+_TITRE_TROUVEE = _RESULTATS[0][0]
+
+
+def test_chaque_fait_de_lextraction_arrive_au_modele_avec_son_url_un_fait_sans_page_lue_est_ecarte(
+    client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide
+):
+    _recherche_avec_deux_pages(moteur_recherche_factice, telechargeur_pages_factice, mistral_client_factice)
+    mistral_client_factice.repondre_extraction(
+        [
+            ("La loi est publiée sur Légifrance.", _URL_TROUVEE),
+            ("Le décret applique la loi.", _URL_DECRET),
+            ("Le rapport compte 48 pages.", _URL_INVENTEE),
+            ("La loi est commentée.", _URL_JAMAIS_LUE),
+        ]
+    )
+    mistral_client_factice.repondre("Voici la loi.", "Titre")
+
+    _creer_conversation(client, jeton_valide)
+
+    (message_tool,) = _messages_tool(mistral_client_factice.appels_reponse[-2])
+    lignes = message_tool["content"].splitlines()
+    assert f"- La loi est publiée sur Légifrance. (source : {_URL_TROUVEE})" in lignes
+    assert f"- Le décret applique la loi. (source : {_URL_DECRET})" in lignes
+    assert "48 pages" not in message_tool["content"]
+    assert "La loi est commentée." not in message_tool["content"]
+
+
+def test_sans_fait_le_message_tool_dit_que_les_pages_ne_repondent_pas(
+    client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide
+):
+    _recherche_avec_deux_pages(moteur_recherche_factice, telechargeur_pages_factice, mistral_client_factice)
+    mistral_client_factice.repondre_extraction([("Inventé.", _URL_INVENTEE)])
+    mistral_client_factice.repondre("Rien trouvé.", "Titre")
+
+    _creer_conversation(client, jeton_valide)
+
+    (message_tool,) = _messages_tool(mistral_client_factice.appels_reponse[-2])
+    assert "ne répondent pas à ce besoin" in message_tool["content"]
+
+
+def _reponse_sur_page_de_bornage(
+    client,
+    mistral_client_factice,
+    moteur_recherche_factice,
+    telechargeur_pages_factice,
+    jeton: str,
+    reponse: str,
+    message: str = "Combien de temps dure un bornage amiable ?",
+) -> str:
+    moteur_recherche_factice.repondre(_RESULTATS[0])
+    telechargeur_pages_factice.servir(
+        _URL_TROUVEE, _page_html("En Savoie, un bornage amiable dure de 6 à 12 semaines.")
+    )
+    _demander_recherche(mistral_client_factice)
+    mistral_client_factice.repondre(reponse, "Titre")
+    resultat = client.post("/conversations", json={"message": message}, headers=_autorisation(jeton))
+    assert resultat.status_code == 200
+    return resultat.json()["reponse"]
+
+
+def test_un_chiffre_garde_venu_dune_page_ajoute_une_ligne_sources_avec_son_lien(
+    client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide
+):
+    contenu = _reponse_sur_page_de_bornage(
+        client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide,
+        "En Savoie, un bornage amiable dure 6 à 12 semaines.",
+    )
+
+    assert contenu == (
+        "En Savoie, un bornage amiable dure 6 à 12 semaines.\n\n"
+        f"Sources : [{_TITRE_TROUVEE}]({_URL_TROUVEE})"
+    )
+
+
+def test_un_chiffre_venu_seulement_du_message_du_compte_najoute_pas_de_ligne_sources(
+    client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide
+):
+    contenu = _reponse_sur_page_de_bornage(
+        client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide,
+        "Votre bornage a duré 14 semaines.",
+        message="Mon bornage a duré 14 semaines, est-ce normal ?",
+    )
+
+    assert contenu == "Votre bornage a duré 14 semaines."
+
+
+def test_un_lien_deja_present_dans_la_reponse_najoute_pas_de_doublon(
+    client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide
+):
+    reponse = f"Selon [cette page]({_URL_TROUVEE}), un bornage dure 6 à 12 semaines en Savoie."
+    contenu = _reponse_sur_page_de_bornage(
+        client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide, reponse
+    )
+
+    assert contenu == reponse
+
+
+def test_la_ligne_sources_est_visible_dans_lechange_garde_fous_de_linspecteur(
+    client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide, monkeypatch
+):
+    contenu = _reponse_sur_page_de_bornage(
+        client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide,
+        "Un bornage dure 6 à 12 semaines en Savoie.",
+    )
+    monkeypatch.setenv("VM_ADMIN_KEY", "cle-admin-de-test")
+    entetes_admin = {**_autorisation(jeton_valide), "X-Admin-Key": "cle-admin-de-test"}
+    (conversation,) = client.get("/conversations", headers=_autorisation(jeton_valide)).json()
+    echanges = client.get(
+        f"/inspecteur/conversations/{conversation['id']}/echanges", headers=entetes_admin
+    ).json()
+    (garde_fous,) = [e for e in echanges if e["type_appel"] == "garde_fous"]
+    detail = client.get(f"/inspecteur/echanges/{garde_fous['id']}", headers=entetes_admin).json()
+
+    assert detail["requete_payload"]["reponse_brute"] == "Un bornage dure 6 à 12 semaines en Savoie."
+    assert detail["reponse_payload"]["reponse_visible"] == contenu
+    assert "Sources : " in contenu
+
+
+def test_un_chiffre_hors_source_entre_parentheses_emporte_sa_parenthese_pas_la_phrase(
+    client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide
+):
+    contenu = _reponse_sur_page_de_bornage(
+        client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide,
+        "Un bornage dure 6 à 12 semaines (soit 1,5 à 3 mois).",
+    )
+
+    assert contenu.split("\n\nSources : ")[0] == "Un bornage dure 6 à 12 semaines."
+
+
+def test_un_chiffre_hors_source_hors_parenthese_emporte_sa_phrase_la_voisine_reste(
+    client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide
+):
+    contenu = _reponse_sur_page_de_bornage(
+        client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide,
+        "Un bornage dure 6 à 12 semaines. Il coûte environ 1 500 € TTC. Le géomètre fixe les limites.",
+    )
+
+    assert contenu.split("\n\nSources : ")[0] == "Un bornage dure 6 à 12 semaines. Le géomètre fixe les limites."
+
+
+def test_une_reponse_dont_toutes_les_phrases_sont_retirees_devient_la_phrase_fixe(
+    client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide
+):
+    contenu = _reponse_sur_page_de_bornage(
+        client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide,
+        "Un bornage coûte 1 500 €.",
+    )
+
+    assert contenu == "Je n'ai trouvé ni page ni document pour appuyer une réponse chiffrée."
+
+
+def test_une_phrase_retiree_dans_une_puce_ou_un_tableau_ne_casse_pas_la_ligne(
+    client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide
+):
+    contenu = _reponse_sur_page_de_bornage(
+        client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide,
+        "- Délai : 6 à 12 semaines. Coût : 1 500 €.\n"
+        "- Coût moyen : 1 500 €.\n"
+        "- Acteur : le géomètre.\n\n"
+        "| Étape | Délai |\n| --- | --- |\n| Bornage | 6 à 12 semaines |\n| Recours | 18 mois |",
+    )
+
+    assert contenu.split("\n\nSources : ")[0] == (
+        "- Délai : 6 à 12 semaines.\n"
+        "- Acteur : le géomètre.\n\n"
+        "| Étape | Délai |\n| --- | --- |\n| Bornage | 6 à 12 semaines |\n| Recours | |"
+    )
+
+
+def test_la_regle_de_portee_est_dans_lextraction_lire_pages_web_et_la_reponse_de_chat(
+    client, mistral_client_factice, jeton_valide
+):
+    mistral_client_factice.repondre("Bonjour.", "Titre")
+    _creer_conversation(client, jeton_valide, "Bonjour")
+
+    consigne_chat = mistral_client_factice.appels_reponse[0][0]["content"]
+    for consigne in (CONSIGNE_EXTRACTION, CONSIGNE_LECTURE_PAGE, CONSIGNE_REVERIFICATION_PAGE, consigne_chat):
+        assert "le lieu, la période et la population" in consigne
+        assert "« en Savoie » ne devient jamais « en France »" in consigne
+        assert "conversion" in consigne and "calcul" in consigne

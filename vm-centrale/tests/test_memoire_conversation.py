@@ -283,7 +283,7 @@ def _rechercher_et_lire(
 ):
     _rechercher(mistral_client_factice, moteur_recherche_factice, requete, url)
     telechargeur_pages_factice.servir(url, _page_html("Texte de la page lue."))
-    mistral_client_factice.repondre_extraction("Extrait.", questions)
+    mistral_client_factice.repondre_extraction([], questions)
 
 
 def _ajouter_question(db_session, conversation_id: int, *, trouvee: bool = True, **element) -> None:

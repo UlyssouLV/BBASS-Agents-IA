@@ -61,7 +61,7 @@ def _sans_init_db_reel(monkeypatch):
 # viendra avec le ticket suivant).
 _USAGE_FACTICE = Usage(tokens_entree=10, tokens_sortie=5, tokens_total=15)
 _PAGES_PROCESSED_FACTICE = 1
-_EXTRAIT_FACTICE = json.dumps({"extrait": "Extrait factice des pages lues.", "questions_couvertes": []})
+_EXTRAIT_FACTICE = json.dumps({"faits": [], "questions_couvertes": []})
 _QUESTIONS_PIECE_JOINTE_FACTICES = json.dumps({"questions_couvertes": []})
 _LECTURE_PAGE_FACTICE = json.dumps({"trouvee": False, "reponse": "", "source": ""})
 # Hors du JSON attendu (aucune question pour des questions envoyées) : sans
@@ -219,13 +219,16 @@ class ClientMistralFactice:
             for demande in demandes
         )
 
-    def repondre_extraction(self, extrait: str, questions: list[tuple[str, str, str]] = ()) -> None:
-        # Sortie JSON de l'appel d'extraction (spec 1.4.1) : l'extrait et
-        # les questions couvertes (question, réponse, source).
+    def repondre_extraction(
+        self, faits: list[tuple[str, str]] = (), questions: list[tuple[str, str, str]] = ()
+    ) -> None:
+        # Sortie JSON de l'appel d'extraction : les faits (texte, source ;
+        # spec 1.4.3, #160) et les questions couvertes (question, réponse,
+        # source ; spec 1.4.1).
         self.repondre_extraction_brute(
             json.dumps(
                 {
-                    "extrait": extrait,
+                    "faits": [{"texte": texte, "source": source} for texte, source in faits],
                     "questions_couvertes": [
                         {"question": question, "reponse": reponse, "source": source}
                         for question, reponse, source in questions

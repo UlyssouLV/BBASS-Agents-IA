@@ -1183,7 +1183,7 @@ def test_chiffre_ecrit_par_le_compte_reste_et_le_chiffre_absent_part(
     client, mistral_client_factice, jeton_valide
 ):
     mistral_client_factice.repondre(
-        "Le taux est 1,7 %, et l'écart atteint 52,3 ans.",
+        "Le taux est 1,7 %. L'écart atteint 52,3 ans.",
         "Titre",
     )
 
@@ -1210,7 +1210,7 @@ def test_piece_jointe_conserve_le_chiffre_de_lextrait(
     )
     piece_jointe_id = upload.json()["piece_jointe"]["id"]
     mistral_client_factice.repondre(
-        "Le document indique 1,7 % et un écart de 52,3 ans.",
+        "Le document indique 1,7 %. L'écart est de 52,3 ans.",
         "Titre",
     )
 
@@ -1249,7 +1249,7 @@ def test_un_numero_de_la_piece_jointe_regroupe_par_espaces_reste_entier(
         files={"fichier": ("facture.pdf", b"%PDF-1.4 contenu factice", "application/pdf")},
         headers=_autorisation(jeton_valide),
     )
-    mistral_client_factice.repondre("SIRET : 831 193 453 00022 ; autre : 831 119 3453.", "Titre")
+    mistral_client_factice.repondre("SIRET : 831 193 453 00022. Autre : 831 119 3453.", "Titre")
 
     reponse = client.post(
         "/conversations",
@@ -1265,7 +1265,7 @@ def test_un_numero_de_la_piece_jointe_regroupe_par_espaces_reste_entier(
 
 def test_un_chiffre_retire_juste_apres_une_url_ne_la_coupe_pas(client, mistral_client_factice, jeton_valide):
     url = "https://insee.fr/statistiques/2011101"
-    mistral_client_factice.repondre(f"Source : {url} 12 % des ménages.", "Titre")
+    mistral_client_factice.repondre(f"Source : {url} (12 % des ménages).", "Titre")
 
     reponse = client.post("/conversations", json={"message": f"Lis {url}, page de 2020"}, headers=_autorisation(jeton_valide))
 
@@ -1275,7 +1275,7 @@ def test_un_chiffre_retire_juste_apres_une_url_ne_la_coupe_pas(client, mistral_c
 
 
 def test_deux_nombres_cote_a_cote_sont_juges_chacun_seul(client, mistral_client_factice, jeton_valide):
-    mistral_client_factice.repondre("En 2023 15 salariés sont partis.", "Titre")
+    mistral_client_factice.repondre("En 2023 15 salariés sont partis. L'effectif a baissé en 2023.", "Titre")
 
     reponse = client.post(
         "/conversations", json={"message": "Que s'est-il passé en 2023 ?"}, headers=_autorisation(jeton_valide)
