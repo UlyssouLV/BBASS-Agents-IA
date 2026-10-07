@@ -123,6 +123,10 @@ class ClientMistralFactice:
         self.appels_relecture_pieces_jointes: list = []
         self._reponse_relecture_pieces_jointes = _LECTURE_PAGE_FACTICE
         self._exception_relecture_pieces_jointes: Exception | None = None
+        # prompt_tokens des prochains appels de chat principaux (spec 1.4.2,
+        # jauge de contexte), consommés dans l'ordre ; sans valeur, l'usage
+        # factice habituel.
+        self._prompt_tokens_principaux: list[int] = []
 
     def repondre_ocr(self, texte: str) -> None:
         self._reponse_ocr = texte
@@ -178,6 +182,17 @@ class ClientMistralFactice:
 
     def echouer(self, exception: Exception) -> None:
         self._exception = exception
+
+    def fixer_prompt_tokens_principaux(self, *valeurs: int) -> None:
+        self._prompt_tokens_principaux = list(valeurs)
+
+    def _usage_principal(self, messages) -> Usage:
+        # Un appel principal reçoit une liste de messages ; le titrage, une
+        # chaîne.
+        if isinstance(messages, str) or not self._prompt_tokens_principaux:
+            return _USAGE_FACTICE
+        tokens_entree = self._prompt_tokens_principaux.pop(0)
+        return Usage(tokens_entree=tokens_entree, tokens_sortie=5, tokens_total=tokens_entree + 5)
 
     def repondre_avec_appel_outil(
         self, nom_outil: str, arguments: dict, tool_call_id: str = "call_1"
@@ -380,7 +395,7 @@ class ClientMistralFactice:
                 raise AppelOutilDemande(
                     appels,
                     message_assistant,
-                    _USAGE_FACTICE,
+                    self._usage_principal(messages),
                     payload_envoye=payload,
                     reponse_brute={"choices": [{"message": message_assistant}]},
                 )
@@ -394,7 +409,7 @@ class ClientMistralFactice:
             contenu = self._reponses.pop(0) if len(self._reponses) > 1 else self._reponses[0]
             return ReponseChat(
                 contenu=contenu,
-                usage=_USAGE_FACTICE,
+                usage=self._usage_principal(messages),
                 payload_envoye=payload,
                 reponse_brute={"choices": [{"message": {"content": contenu}}]},
             )

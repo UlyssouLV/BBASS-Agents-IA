@@ -17,6 +17,28 @@ from poste.vm_centrale_client import (
 )
 
 
+def _message(
+    id: int, role: str, contenu: str, date_creation: datetime, tokens_contexte: int | None = None
+) -> Message:
+    return Message(
+        id=id,
+        role=role,
+        contenu=contenu,
+        date_creation=date_creation,
+        tokens_contexte=tokens_contexte,
+        fenetre_contexte=262_144,
+    )
+
+
+def _conversation_creee() -> ConversationCree:
+    return ConversationCree(
+        conversation=ConversationResume(id=1, titre="Salutations"),
+        reponse="Bonjour",
+        tokens_contexte=None,
+        fenetre_contexte=262_144,
+    )
+
+
 def _connecter(client, vm_centrale_client_factice, identifiant="j.dupont"):
     vm_centrale_client_factice.accepter()
     client.post("/connexion", json={"identifiant": identifiant, "mot_de_passe": "x"})
@@ -30,6 +52,8 @@ def test_creer_une_conversation_avec_session_active_retourne_le_titre_et_la_repo
         ConversationCree(
             conversation=ConversationResume(id=1, titre="Salutations"),
             reponse="Bonjour, comment puis-je vous aider ?",
+            tokens_contexte=None,
+            fenetre_contexte=262_144,
         )
     )
 
@@ -39,6 +63,8 @@ def test_creer_une_conversation_avec_session_active_retourne_le_titre_et_la_repo
     assert reponse.json() == {
         "conversation": {"id": 1, "titre": "Salutations"},
         "reponse": "Bonjour, comment puis-je vous aider ?",
+        "tokens_contexte": None,
+        "fenetre_contexte": 262_144,
     }
     assert vm_centrale_client_factice._messages_creation_conversation == ["Bonjour"]
     assert vm_centrale_client_factice._jetons_creation_conversation == ["jeton-factice"]
@@ -127,8 +153,8 @@ def test_consulter_une_conversation_retourne_le_detail_et_les_messages(client, v
             date_creation=maintenant,
             date_derniere_activite=maintenant,
             messages=[
-                Message(id=1, role="user", contenu="Bonjour", date_creation=maintenant),
-                Message(id=2, role="assistant", contenu="Bonjour !", date_creation=maintenant),
+                _message(1, "user", "Bonjour", maintenant),
+                _message(2, "assistant", "Bonjour !", maintenant),
             ],
             a_des_messages_plus_anciens=False,
         )
@@ -262,7 +288,7 @@ def test_envoyer_un_message_dans_une_conversation_existante(client, vm_centrale_
     reponse = client.post("/conversations/1/messages", json={"message": "Et ensuite ?"})
 
     assert reponse.status_code == 200
-    assert reponse.json() == {"reponse": "Réponse suivante"}
+    assert reponse.json()["reponse"] == "Réponse suivante"
     assert vm_centrale_client_factice._requetes_envoi_message_conversation == [
         {"conversation_id": 1, "message": "Et ensuite ?"}
     ]
@@ -313,7 +339,7 @@ def test_envoyer_un_message_jeton_revoque_pendant_l_usage_ferme_la_session(
 def test_creer_une_conversation_relaie_la_cle_idempotence_a_la_vm(client, vm_centrale_client_factice):
     _connecter(client, vm_centrale_client_factice)
     vm_centrale_client_factice.creation_conversation_reussit(
-        ConversationCree(conversation=ConversationResume(id=1, titre="Salutations"), reponse="Bonjour")
+        _conversation_creee()
     )
 
     client.post("/conversations", json={"message": "Bonjour", "cle_idempotence": "cle-1"})
@@ -326,7 +352,7 @@ def test_creer_une_conversation_sans_cle_idempotence_en_relaie_labsence(
 ):
     _connecter(client, vm_centrale_client_factice)
     vm_centrale_client_factice.creation_conversation_reussit(
-        ConversationCree(conversation=ConversationResume(id=1, titre="Salutations"), reponse="Bonjour")
+        _conversation_creee()
     )
 
     client.post("/conversations", json={"message": "Bonjour"})
@@ -349,7 +375,7 @@ def test_envoyer_un_message_relaie_la_cle_idempotence_a_la_vm(client, vm_central
 def test_creer_une_conversation_relaie_le_piece_jointe_id_a_la_vm(client, vm_centrale_client_factice):
     _connecter(client, vm_centrale_client_factice)
     vm_centrale_client_factice.creation_conversation_reussit(
-        ConversationCree(conversation=ConversationResume(id=1, titre="Salutations"), reponse="Bonjour")
+        _conversation_creee()
     )
 
     client.post("/conversations", json={"message": "Bonjour", "piece_jointe_id": 7})
@@ -360,7 +386,7 @@ def test_creer_une_conversation_relaie_le_piece_jointe_id_a_la_vm(client, vm_cen
 def test_creer_une_conversation_sans_piece_jointe_en_relaie_labsence(client, vm_centrale_client_factice):
     _connecter(client, vm_centrale_client_factice)
     vm_centrale_client_factice.creation_conversation_reussit(
-        ConversationCree(conversation=ConversationResume(id=1, titre="Salutations"), reponse="Bonjour")
+        _conversation_creee()
     )
 
     client.post("/conversations", json={"message": "Bonjour"})
@@ -534,3 +560,62 @@ def test_televerser_une_piece_jointe_sans_conversation_fichier_trop_volumineux_r
 
     assert reponse.status_code == 400
     assert reponse.json()["detail"] == "Fichier trop volumineux (max 20 Mo)"
+
+
+# Jauge de contexte (spec 1.4.2) : le poste relaie tokens_contexte et
+# fenetre_contexte de la VM, sans jamais coder la fenêtre en dur.
+
+
+def test_envoyer_un_message_relaie_la_jauge_de_contexte(client, vm_centrale_client_factice):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.envoi_message_conversation_reussit(
+        "Réponse", tokens_contexte=45_210, fenetre_contexte=262_144
+    )
+
+    reponse = client.post("/conversations/1/messages", json={"message": "Et ensuite ?"})
+
+    assert reponse.json() == {"reponse": "Réponse", "tokens_contexte": 45_210, "fenetre_contexte": 262_144}
+
+
+def test_creer_une_conversation_relaie_la_jauge_de_contexte(client, vm_centrale_client_factice):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.creation_conversation_reussit(
+        ConversationCree(
+            conversation=ConversationResume(id=1, titre="Salutations"),
+            reponse="Bonjour",
+            tokens_contexte=3_000,
+            fenetre_contexte=262_144,
+        )
+    )
+
+    reponse = client.post("/conversations", json={"message": "Bonjour"})
+
+    assert reponse.json()["tokens_contexte"] == 3_000
+    assert reponse.json()["fenetre_contexte"] == 262_144
+
+
+def test_consulter_une_conversation_relaie_la_jauge_de_chaque_message(client, vm_centrale_client_factice):
+    _connecter(client, vm_centrale_client_factice)
+    maintenant = datetime(2026, 10, 7, 12, 0, tzinfo=timezone.utc)
+    vm_centrale_client_factice.detail_conversation_retourne(
+        ConversationDetail(
+            id=1,
+            titre="Salutations",
+            date_creation=maintenant,
+            date_derniere_activite=maintenant,
+            messages=[
+                _message(1, "assistant", "Réponse d'avant la jauge", maintenant),
+                _message(2, "user", "Bonjour", maintenant),
+                _message(3, "assistant", "Bonjour !", maintenant, tokens_contexte=45_210),
+            ],
+            a_des_messages_plus_anciens=False,
+        )
+    )
+
+    corps = client.get("/conversations/1").json()
+
+    assert [(m["tokens_contexte"], m["fenetre_contexte"]) for m in corps["messages"]] == [
+        (None, 262_144),
+        (None, 262_144),
+        (45_210, 262_144),
+    ]

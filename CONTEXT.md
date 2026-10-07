@@ -98,3 +98,11 @@ _Avoid_: mémoire (seul, ambigu avec le résumé glissant et le Profil de travai
 **Question couverte**:
 Une question à laquelle une Pièce jointe ou une page lue répond, enregistrée avec sa réponse courte et sa source (nom de fichier ou URL) ([spec 1.4.1](docs/specs/v1.4.1-memoire-de-la-conversation.md)). Jusqu'à 8 générées d'emblée (par l'Appel d'extraction pour une page, par un appel dédié à l'envoi pour une Pièce jointe), puis une de plus à chaque relecture avec un besoin ; un besoin sans réponse est noté « non présent selon l'extraction ». Écrite par un modèle : jamais une source des Garde-fous.
 _Avoid_: FAQ, index, résumé
+
+**Fiche de modèle**:
+Tout ce qui dépend d'un modèle Mistral, regroupé à un seul endroit de la VM centrale : sa fenêtre de contexte en tokens, son fichier tokenizer, ses tarifs ([spec 1.4.2](docs/specs/v1.4.2-contexte-en-vrais-tokens.md)). Le modèle est désigné par un nom figé (jamais un alias mobile `-latest` pour le chat) : en changer, c'est changer sa fiche en entier, dans un commit.
+_Avoid_: configuration du modèle (le `.env` ne la porte pas), alias
+
+**Jauge de contexte**:
+Le cercle, sous le champ de saisie du Poste, qui montre ce que pesait le dernier envoi au modèle principal d'une Conversation : tokens envoyés (exacts, renvoyés par Mistral) sur la fenêtre de contexte du modèle ([spec 1.4.2](docs/specs/v1.4.2-contexte-en-vrais-tokens.md)). Mesure le dernier envoi, pas la longueur de la Conversation : le contexte est recomposé à chaque envoi (résumé glissant, Mémoire de la conversation, 3 derniers messages, résultats d'outils). Orange à partir de 80 %.
+_Avoid_: usage, consommation (le coût, pas le remplissage), mémoire

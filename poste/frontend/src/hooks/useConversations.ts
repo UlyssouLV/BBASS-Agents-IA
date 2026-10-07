@@ -12,7 +12,15 @@ export interface Conversation {
   date_derniere_activite: string;
 }
 
-export interface Message {
+// Jauge de contexte (spec 1.4.2) : prompt_tokens du dernier appel principal
+// du tour (null pour un message `user` ou d'avant la 1.4.2) et fenêtre du
+// modèle, toujours lue de la VM, jamais codée en dur ici.
+interface JaugeContexte {
+  tokens_contexte: number | null;
+  fenetre_contexte: number;
+}
+
+export interface Message extends JaugeContexte {
   id: number;
   role: string;
   contenu: string;
@@ -54,14 +62,18 @@ interface ResultatPieceJointe {
   pieceJointeEchecAnalyse: boolean;
 }
 
-export interface ConversationCreee extends ResultatPieceJointe {
+interface ConversationCreeeReponse extends JaugeContexte {
   conversation: { id: number; titre: string };
   reponse: string;
 }
 
-export interface MessageEnvoye extends ResultatPieceJointe {
+interface MessageEnvoyeReponse extends JaugeContexte {
   reponse: string;
 }
+
+export interface ConversationCreee extends ResultatPieceJointe, ConversationCreeeReponse {}
+
+export interface MessageEnvoye extends ResultatPieceJointe, MessageEnvoyeReponse {}
 
 const _MSG_ERREUR_RESEAU_CONVERSATIONS = "Impossible de joindre le service de conversations. Réessayez plus tard.";
 const _MSG_ERREUR_RESEAU_PIECES_JOINTES = "Impossible de joindre le service de pièces jointes. Réessayez plus tard.";
@@ -151,7 +163,7 @@ async function creerConversation({
 }: CreerConversationVariables): Promise<ConversationCreee> {
   const piece = fichier ? await _envoyerPieceJointeAvecCache("/pieces-jointes", fichier) : null;
 
-  const cree = await appelApi<{ conversation: { id: number; titre: string }; reponse: string }>(
+  const cree = await appelApi<ConversationCreeeReponse>(
     "/conversations",
     {
       method: "POST",
@@ -186,7 +198,7 @@ async function envoyerMessage({
     ? await _envoyerPieceJointeAvecCache(`/conversations/${conversationId}/pieces-jointes`, fichier)
     : null;
 
-  const envoi = await appelApi<{ reponse: string }>(
+  const envoi = await appelApi<MessageEnvoyeReponse>(
     `/conversations/${conversationId}/messages`,
     {
       method: "POST",

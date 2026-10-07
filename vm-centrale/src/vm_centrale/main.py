@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from vm_centrale.compte_tokens import charger_tokenizers
 from vm_centrale.config import VM_CENTRALE_HOST, VM_CENTRALE_PORT
 from vm_centrale.database import init_db
 from vm_centrale.routers.auth import router as auth_router
@@ -13,6 +14,7 @@ from vm_centrale.routers.inspecteur import router as inspecteur_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    charger_tokenizers()
     init_db()
     yield
 

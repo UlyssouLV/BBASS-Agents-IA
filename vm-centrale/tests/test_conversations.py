@@ -478,7 +478,7 @@ def test_envoyer_message_persiste_le_message_et_la_reponse(
     )
 
     assert reponse.status_code == 200
-    assert reponse.json() == {"reponse": "Suite de la réponse"}
+    assert reponse.json()["reponse"] == "Suite de la réponse"
 
     detail = client.get(f"/conversations/{conversation_id}", headers=_autorisation(jeton_valide))
     assert [(m["role"], m["contenu"]) for m in detail.json()["messages"]] == [

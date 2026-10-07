@@ -111,6 +111,9 @@ class ConversationResume(BaseModel):
 class ConversationCreeResponse(BaseModel):
     conversation: ConversationResume
     reponse: str
+    # Voir MessageEnvoyeResponse.
+    tokens_contexte: int | None
+    fenetre_contexte: int
 
 
 class ConversationResponse(BaseModel):
@@ -124,6 +127,10 @@ class MessageResponse(BaseModel):
     role: str
     contenu: str
     date_creation: datetime
+    # Voir MessageEnvoyeResponse ; null pour un message `user` ou d'avant la
+    # 1.4.2.
+    tokens_contexte: int | None
+    fenetre_contexte: int
 
 
 class ConversationDetailResponse(BaseModel):
@@ -153,6 +160,11 @@ class MessageEnvoyeRequest(BaseModel):
 
 class MessageEnvoyeResponse(BaseModel):
     reponse: str
+    # Jauge de contexte (spec 1.4.2) : prompt_tokens du dernier appel
+    # principal du tour, et la fenêtre de la fiche MODELE_CHAT — le poste ne
+    # code jamais la fenêtre en dur.
+    tokens_contexte: int | None
+    fenetre_contexte: int
 
 
 class PieceJointeResume(BaseModel):

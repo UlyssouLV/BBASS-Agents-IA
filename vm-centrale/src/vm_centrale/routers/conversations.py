@@ -14,10 +14,11 @@ from sqlalchemy.orm import Session
 from vm_centrale.analyse_pieces_jointes import TYPES_SUPPORTES, analyser, type_appel_mistral
 from vm_centrale.autorisation import get_identifiant_compte_du_jeton
 from vm_centrale.concurrence import cache_idempotence, verrous_comptes
-from vm_centrale.config import MODELE_CHAT, MODELE_OCR, PIECES_JOINTES_DIR
+from vm_centrale.config import FICHES_MODELES, MODELE_CHAT, MODELE_OCR, PIECES_JOINTES_DIR
 from vm_centrale.consommation import enregistrer_consommation
 from vm_centrale.database import get_db
 from vm_centrale.garde_fous import (
+    mentionner_pages_trop_longues,
     nettoyer_titre,
     normaliser_url,
     plafonner,
@@ -72,6 +73,10 @@ from vm_centrale.schemas import (
 from vm_centrale.telechargement_pages import TelechargeurPages, get_telechargeur_pages
 
 _TAILLE_FENETRE_HISTORIQUE = 3
+# Fenêtre renvoyée avec la jauge de contexte (spec 1.4.2) : celle de la fiche
+# de MODELE_CHAT.
+_FENETRE_CONTEXTE = FICHES_MODELES[MODELE_CHAT].fenetre_tokens
+assert _FENETRE_CONTEXTE is not None
 # Appels de chat principaux par message, le dernier sans `tools` (spec 1.4.0,
 # décision n° 7 ; 3 → 5 en 1.4.1) : évite que le modèle tourne en rond.
 _TOURS_MAX_PAR_MESSAGE = 5
@@ -497,11 +502,17 @@ def _reponse_visible(
     nouveau_message: str,
     reponse: str,
     piece_jointe: PieceJointe | None,
+    pages_trop_longues: list[str],
 ) -> str:
     # Ligne garde_fous de l'inspecteur à chaque réponse de chat (spec 1.4.0,
     # décision 15), même sans retrait : sans elle, on ne voit pas pourquoi la
-    # réponse affichée diffère de celle du modèle.
-    visible = _appliquer_garde_fous(db, conversation_id, nouveau_message, reponse, piece_jointe)
+    # réponse affichée diffère de celle du modèle. La mention des pages trop
+    # longues (#151) vient après les garde-fous URL et chiffres : ajoutée par
+    # le code, elle n'est jamais contrôlée comme un texte du modèle.
+    visible = mentionner_pages_trop_longues(
+        _appliquer_garde_fous(db, conversation_id, nouveau_message, reponse, piece_jointe),
+        pages_trop_longues,
+    )
     enregistrer_echange_local(
         db,
         identifiant_compte=identifiant_compte,
@@ -806,7 +817,13 @@ def creer_conversation(
         )
 
         reponse = _reponse_visible(
-            db, identifiant_compte, conversation.id, requete.message, reponse_chat.contenu, piece_jointe
+            db,
+            identifiant_compte,
+            conversation.id,
+            requete.message,
+            reponse_chat.contenu,
+            piece_jointe,
+            list(contexte_outils.pages_trop_longues.values()),
         )
 
         try:
@@ -854,6 +871,7 @@ def creer_conversation(
             conversation_id=conversation.id,
             role="assistant",
             contenu=reponse,
+            tokens_contexte=reponse_chat.usage.tokens_entree,
             date_creation=maintenant,
         )
         db.add_all([message_utilisateur, message_assistant])
@@ -867,6 +885,8 @@ def creer_conversation(
         resultat = ConversationCreeResponse(
             conversation=ConversationResume(id=conversation.id, titre=conversation.titre),
             reponse=reponse,
+            tokens_contexte=message_assistant.tokens_contexte,
+            fenetre_contexte=_FENETRE_CONTEXTE,
         )
         if requete.cle_idempotence is not None:
             cache_idempotence.enregistrer(identifiant_compte, requete.cle_idempotence, resultat)
@@ -927,6 +947,8 @@ def consulter_conversation(
                 role=message.role,
                 contenu=message.contenu,
                 date_creation=message.date_creation,
+                tokens_contexte=message.tokens_contexte,
+                fenetre_contexte=_FENETRE_CONTEXTE,
             )
             for message in messages
         ],
@@ -1581,7 +1603,13 @@ def envoyer_message(
         )
 
         reponse = _reponse_visible(
-            db, identifiant_compte, conversation.id, requete.message, reponse_chat.contenu, piece_jointe
+            db,
+            identifiant_compte,
+            conversation.id,
+            requete.message,
+            reponse_chat.contenu,
+            piece_jointe,
+            list(contexte_outils.pages_trop_longues.values()),
         )
         _enregistrer_questions_du_tour(db, attendre_questions, identifiant_compte, conversation.id, piece_jointe)
 
@@ -1605,6 +1633,7 @@ def envoyer_message(
             conversation_id=conversation.id,
             role="assistant",
             contenu=reponse,
+            tokens_contexte=reponse_chat.usage.tokens_entree,
             date_creation=maintenant,
         )
         db.add_all([message_utilisateur, message_assistant])
@@ -1615,7 +1644,11 @@ def envoyer_message(
         conversation.date_derniere_activite = maintenant
         db.commit()
 
-        resultat = MessageEnvoyeResponse(reponse=reponse)
+        resultat = MessageEnvoyeResponse(
+            reponse=reponse,
+            tokens_contexte=message_assistant.tokens_contexte,
+            fenetre_contexte=_FENETRE_CONTEXTE,
+        )
         if requete.cle_idempotence is not None:
             cache_idempotence.enregistrer(identifiant_compte, requete.cle_idempotence, resultat)
         return resultat

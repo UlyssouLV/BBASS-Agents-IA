@@ -20,6 +20,8 @@ _COLONNES_AJOUTEES = (
     # Spec 1.4.1 (#140) : les lignes existantes sont des résultats de
     # recherche.
     ("resultats_recherche_web", "provenance", "VARCHAR NOT NULL DEFAULT 'recherche'"),
+    # Spec 1.4.2 : les messages existants restent à NULL.
+    ("messages", "tokens_contexte", "INTEGER"),
 )
 
 

@@ -128,6 +128,10 @@ class ConversationResume:
 class ConversationCree:
     conversation: ConversationResume
     reponse: str
+    # Jauge de contexte (spec 1.4.2), relayée telle quelle : voir
+    # vm_centrale.schemas.MessageEnvoyeResponse.
+    tokens_contexte: int | None
+    fenetre_contexte: int
 
 
 @dataclass
@@ -143,6 +147,18 @@ class Message:
     role: str
     contenu: str
     date_creation: datetime
+    # Voir ConversationCree.tokens_contexte ; null pour un message `user` ou
+    # d'avant la 1.4.2.
+    tokens_contexte: int | None
+    fenetre_contexte: int
+
+
+@dataclass
+class MessageEnvoye:
+    reponse: str
+    # Voir ConversationCree.tokens_contexte.
+    tokens_contexte: int | None
+    fenetre_contexte: int
 
 
 @dataclass
@@ -336,6 +352,8 @@ def _vers_message(corps: dict) -> Message:
         role=corps["role"],
         contenu=corps["contenu"],
         date_creation=datetime.fromisoformat(corps["date_creation"]),
+        tokens_contexte=corps["tokens_contexte"],
+        fenetre_contexte=corps["fenetre_contexte"],
     )
 
 
@@ -509,6 +527,8 @@ class VmCentraleClient:
         return ConversationCree(
             conversation=ConversationResume(**corps["conversation"]),
             reponse=corps["reponse"],
+            tokens_contexte=corps["tokens_contexte"],
+            fenetre_contexte=corps["fenetre_contexte"],
         )
 
     def lister_conversations(self, jeton: str) -> list[Conversation]:
@@ -582,7 +602,7 @@ class VmCentraleClient:
         message: str,
         cle_idempotence: str | None = None,
         piece_jointe_id: int | None = None,
-    ) -> str:
+    ) -> MessageEnvoye:
         reponse = _http_client.post(
             f"{VM_CENTRALE_BASE_URL}/conversations/{conversation_id}/messages",
             json={
@@ -595,7 +615,12 @@ class VmCentraleClient:
         _lever_si_jeton_invalide(reponse)
         _lever_si_erreur_piece_jointe(reponse)
         reponse.raise_for_status()
-        return reponse.json()["reponse"]
+        corps = reponse.json()
+        return MessageEnvoye(
+            reponse=corps["reponse"],
+            tokens_contexte=corps["tokens_contexte"],
+            fenetre_contexte=corps["fenetre_contexte"],
+        )
 
     def televerser_piece_jointe(
         self,

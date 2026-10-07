@@ -5,18 +5,32 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
+from vm_centrale.compte_tokens import compter_tokens
 from vm_centrale.config import MODELE_CHAT
 from vm_centrale.garde_fous import normaliser_url, urls_ecrites
 from vm_centrale.inspecteur import payload_depuis_erreur, reponse_depuis_erreur
 from vm_centrale.models import Message, QuestionCouverte, ResultatRechercheWeb
 from vm_centrale.outils.base import AppelMistralOutil, ContexteTour, Outil, ResultatOutil
-from vm_centrale.outils.recherche_web.outil import lire_page
+from vm_centrale.outils.recherche_web.outil import PLAFOND_TOKENS_PAGES, lire_page
 from vm_centrale.questions_couvertes import REPONSE_MAX
 
 _NOM = "lire_pages_web"
 _PAGE_INTROUVABLE = "Page introuvable."
 _EXTRACTION_INDISPONIBLE = "Extraction indisponible : la page n'a pas pu être relue."
 _NON_TROUVE = "Non trouvé dans cette page pour ce besoin."
+# Avec un besoin, une page au-delà du plafond de rechercher_web (spec 1.4.2)
+# n'est ni coupée ni relue : un « non trouvé » sur une page coupée passerait
+# pour un « non trouvé » sur la page entière. Consigne de réponse honnête
+# (#151) : le modèle a résumé de mémoire une page qu'il n'avait pas lue.
+# Durcie en #152 : sans rien de la page, il en devinait le sujet.
+_PAGE_TROP_LONGUE = (
+    "Page trop longue pour être lue : son contenu ne t'a pas été transmis. "
+    "Dis au collaborateur que la page était trop longue pour être lue. Tu ne "
+    "connais de cette page que son URL et, s'il est donné, son titre : "
+    "n'affirme rien d'autre sur ce qu'elle contient. Réponds sur le sujet "
+    "seulement s'il est connu (titre de la page ou message du collaborateur), "
+    "en précisant que cela vient de tes connaissances et non de la page."
+)
 # Sans besoin, le texte nettoyé de chaque page part au modèle, coupé à ce
 # plafond : de quoi découvrir de quoi parle une page, pas la relire entière.
 _TEXTE_SANS_BESOIN_MAX = 8_000
@@ -209,7 +223,7 @@ def _avec_schema(url: str) -> str:
 
 def _telecharger_pages_du_compte(
     urls: list[str], resultats: list[ResultatRechercheWeb], contexte: ContexteTour
-) -> list[dict]:
+) -> list[tuple[ResultatRechercheWeb, dict]]:
     # Au premier appel seulement (#140) : une URL déjà en base n'est jamais
     # retéléchargée dans la conversation, lue ou non. Même chaîne que
     # rechercher_web (téléchargement, statut, HTML, nettoyage) ; en échec
@@ -228,7 +242,9 @@ def _telecharger_pages_du_compte(
             requete="",
             # Telle qu'écrite par le compte, sans le schéma ajouté.
             url=url,
-            titre="",
+            # `<title>` de la page : seul indice donné au modèle sur une
+            # page trop longue (#152).
+            titre=page.titre,
             extrait_moteur="",
             # Source du garde-fou chiffres, comme une page trouvée.
             texte_nettoye=page.texte,
@@ -242,7 +258,26 @@ def _telecharger_pages_du_compte(
     # la fin du tour, annulée si le tour échoue.
     contexte.db.flush()
     resultats.extend(lignes)
-    return [page.trace() for page in pages]
+    # Ligne enregistrée et trace de son téléchargement : la page n'est
+    # comptée en tokens qu'avec un besoin (voir _trace_telechargee).
+    return [(ligne, page.trace()) for ligne, page in zip(lignes, pages)]
+
+
+def _trace_telechargee(ligne: ResultatRechercheWeb, trace: dict, tokens: dict[int, tuple[str, int]]) -> dict:
+    # Jamais un « tokens: 0 » trompeur dans l'inspecteur (#151) : le vrai
+    # compte de la page s'il a été fait, sinon pas de champ.
+    trace = {cle: valeur for cle, valeur in trace.items() if cle != "tokens"}
+    if ligne.id in tokens:
+        trace["tokens"] = tokens[ligne.id][1]
+    return trace
+
+
+def _refus_page_trop_longue(page: ResultatRechercheWeb) -> str:
+    # Le titre (du moteur, ou `<title>` d'une page du compte), jamais une
+    # ligne du texte : sans lui, le modèle devinait le sujet de la page à
+    # partir de son URL (#152, Les Trois Mousquetaires pour Les Misérables).
+    bloc = f"Page {page.url} : {_PAGE_TROP_LONGUE}"
+    return f"{bloc}\nTitre de la page : {page.titre.strip()}" if page.titre.strip() else bloc
 
 
 def _texte_sans_besoin(texte: str) -> str:
@@ -261,13 +296,28 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
     cibles = [_url_de_la_conversation(url, resultats, urls_du_compte) for url in urls]
     telechargees = _telecharger_pages_du_compte([url for url in cibles if url is not None], resultats, contexte)
     pages = [_page_de_la_conversation(url, resultats) if url is not None else None for url in cibles]
+    # Une page jugée trop longue plus tôt dans ce tour (#151) est refusée,
+    # avec ou sans besoin, sans être recomptée : sans besoin, son aperçu
+    # passerait pour la page lue.
+    refusees = {
+        page.id for page in pages if page is not None and normaliser_url(page.url) in contexte.pages_trop_longues
+    }
     # Jamais de retéléchargement : seules les pages déjà lues (texte nettoyé
     # en base) passent à l'appel d'extraction, une fois chacune, en
-    # parallèle. Sans besoin, aucun appel : le texte part tel quel.
+    # parallèle. Sans besoin, aucun appel : le texte part tel quel. Avec un
+    # besoin, une page au-delà du plafond n'est pas relue.
+    tokens = {
+        page.id: (page.url, compter_tokens(page.texte_nettoye, MODELE_CHAT))
+        for page in pages
+        if besoin and page is not None and page.texte_nettoye and page.id not in refusees
+    }
+    for url, nombre in tokens.values():
+        if nombre > PLAFOND_TOKENS_PAGES:
+            contexte.pages_trop_longues.setdefault(normaliser_url(url), url)
     a_lire = {
         page.id: (page.url, page.texte_nettoye)
         for page in pages
-        if besoin and page is not None and page.texte_nettoye
+        if page is not None and page.id in tokens and tokens[page.id][1] <= PLAFOND_TOKENS_PAGES
     }
     with ThreadPoolExecutor(max_workers=max(len(a_lire), 1)) as executeur:
         extractions = dict(
@@ -289,8 +339,14 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
             # retéléchargée, le modèle garde l'extrait du moteur.
             blocs.append(f"Page {page.url} : non lue, seul l'extrait du moteur est disponible.\n{page.extrait_moteur}")
             continue
+        if page.id in refusees:
+            blocs.append(_refus_page_trop_longue(page))
+            continue
         if not besoin:
             blocs.append(f"Page {page.url} :\n{_texte_sans_besoin(page.texte_nettoye)}")
+            continue
+        if page.id not in extractions:
+            blocs.append(_refus_page_trop_longue(page))
             continue
         lecture, _ = extractions[page.id]
         if lecture is None:
@@ -317,7 +373,17 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
     # Flush (jamais commit) : un tour qui échoue plus loin les annule.
     contexte.db.flush()
     appels = tuple(appel for _, appel in extractions.values())
-    trace = {"pages_telechargees": telechargees} if telechargees else {}
+    trace = (
+        {"pages_telechargees": [_trace_telechargee(ligne, trace, tokens) for ligne, trace in telechargees]}
+        if telechargees
+        else {}
+    )
+    if tokens:
+        trace["plafond_tokens"] = PLAFOND_TOKENS_PAGES
+        trace["pages_relues"] = [
+            {"url": url, "tokens": nombre, "trop_longue": nombre > PLAFOND_TOKENS_PAGES}
+            for url, nombre in tokens.values()
+        ]
     return ResultatOutil("\n\n".join(blocs), trace=trace, appels_mistral=appels)
 
 

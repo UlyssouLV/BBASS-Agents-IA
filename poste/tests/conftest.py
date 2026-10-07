@@ -16,6 +16,7 @@ from poste.vm_centrale_client import (
     InspecteurConversation,
     InspecteurEchangeDetail,
     InspecteurEchangeResume,
+    MessageEnvoye,
     PieceJointeCreee,
     ProfilTravail,
     VerificationReussie,
@@ -92,7 +93,7 @@ class VmCentraleClientFactice:
         self._exception_suppression_conversation: Exception | None = None
         self._jetons_suppression_conversation: list[str] = []
         self._ids_suppression_conversation: list[int] = []
-        self._reponse_message_conversation = ""
+        self._reponse_message_conversation: MessageEnvoye | None = None
         self._exception_envoi_message_conversation: Exception | None = None
         self._jetons_envoi_message_conversation: list[str] = []
         self._requetes_envoi_message_conversation: list[dict] = []
@@ -445,8 +446,12 @@ class VmCentraleClientFactice:
         if self._exception_suppression_conversation is not None:
             raise self._exception_suppression_conversation
 
-    def envoi_message_conversation_reussit(self, reponse: str) -> None:
-        self._reponse_message_conversation = reponse
+    def envoi_message_conversation_reussit(
+        self, reponse: str, tokens_contexte: int | None = None, fenetre_contexte: int = 262_144
+    ) -> None:
+        self._reponse_message_conversation = MessageEnvoye(
+            reponse=reponse, tokens_contexte=tokens_contexte, fenetre_contexte=fenetre_contexte
+        )
         self._exception_envoi_message_conversation = None
 
     def envoi_message_conversation_echoue(self, exception: Exception) -> None:
@@ -459,7 +464,7 @@ class VmCentraleClientFactice:
         message: str,
         cle_idempotence: str | None = None,
         piece_jointe_id: int | None = None,
-    ) -> str:
+    ) -> MessageEnvoye:
         self._jetons_envoi_message_conversation.append(jeton)
         self._requetes_envoi_message_conversation.append(
             {"conversation_id": conversation_id, "message": message}
@@ -468,6 +473,7 @@ class VmCentraleClientFactice:
         self._pieces_jointes_id_envoi_message_conversation.append(piece_jointe_id)
         if self._exception_envoi_message_conversation is not None:
             raise self._exception_envoi_message_conversation
+        assert self._reponse_message_conversation is not None
         return self._reponse_message_conversation
 
     def televersement_piece_jointe_reussit(self, piece_jointe: PieceJointeCreee) -> None:

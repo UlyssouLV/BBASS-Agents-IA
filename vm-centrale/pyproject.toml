@@ -15,6 +15,7 @@ dependencies = [
     "openpyxl>=3.1",
     "trafilatura>=2.0",
     "truststore>=0.10",
+    "mistral-common>=1.12",
 ]
 
 [project.optional-dependencies]

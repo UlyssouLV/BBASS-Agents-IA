@@ -69,6 +69,10 @@ class Message(Base):
     )
     role: Mapped[str] = mapped_column(String)
     contenu: Mapped[str] = mapped_column(String)
+    # Jauge de contexte (spec 1.4.2) : prompt_tokens du dernier appel
+    # principal du tour, sur le message `assistant` seulement. NULL pour un
+    # message `user` et pour un message d'avant la 1.4.2 (jamais recalculé).
+    tokens_contexte: Mapped[int | None] = mapped_column(Integer, nullable=True)
     date_creation: Mapped[datetime] = mapped_column(DateTime)
 
 
