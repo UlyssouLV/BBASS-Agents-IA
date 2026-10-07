@@ -5,7 +5,9 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from vm_centrale.database import get_db
+from flux_sse import erreur, fin
+
+from vm_centrale.database import get_db, get_fabrique_session
 from vm_centrale.routers import conversations
 from vm_centrale.jetons import JetonStore, get_jeton_store
 from vm_centrale.main import app
@@ -21,7 +23,7 @@ def _creer_conversation(client, mistral_client_factice, jeton: str, message: str
     reponse = client.post(
         "/conversations", json={"message": message}, headers=_autorisation(jeton)
     )
-    return reponse.json()["conversation"]["id"]
+    return fin(reponse)["conversation"]["id"]
 
 
 def _reponse_resume_et_profil(resume_contexte: str, profil_travail: str | None = None) -> str:
@@ -49,7 +51,7 @@ def test_premier_message_cree_la_conversation_persiste_les_messages_et_titre(
     )
 
     assert reponse.status_code == 200
-    corps = reponse.json()
+    corps = fin(reponse)
     assert corps["conversation"]["titre"] == "Salutations"
     assert corps["reponse"] == "Bonjour, comment puis-je vous aider ?"
     # Prompt de style de l'appel de chat principal (spec 1.2.2), en tête.
@@ -75,7 +77,7 @@ def test_titre_genere_par_un_appel_mistral_dedie_a_partir_du_premier_echange(
     )
 
     assert reponse.status_code == 200
-    assert reponse.json()["conversation"]["titre"] == "Titre auto-généré"
+    assert fin(reponse)["conversation"]["titre"] == "Titre auto-généré"
     # Un appel dédié, distinct de celui produisant la réponse de chat.
     assert len(mistral_client_factice.messages_recus) == 2
     # Prompt de style de l'appel de chat principal (spec 1.2.2), en tête.
@@ -123,7 +125,7 @@ def test_echec_appel_mistral_ne_cree_aucune_conversation(
         "/conversations", json={"message": "Bonjour"}, headers=_autorisation(jeton_valide)
     )
 
-    assert reponse.status_code == 502
+    assert erreur(reponse)["status"] == 502
     assert client.get("/conversations", headers=_autorisation(jeton_valide)).json() == []
 
 
@@ -478,7 +480,7 @@ def test_envoyer_message_persiste_le_message_et_la_reponse(
     )
 
     assert reponse.status_code == 200
-    assert reponse.json()["reponse"] == "Suite de la réponse"
+    assert fin(reponse)["reponse"] == "Suite de la réponse"
 
     detail = client.get(f"/conversations/{conversation_id}", headers=_autorisation(jeton_valide))
     assert [(m["role"], m["contenu"]) for m in detail.json()["messages"]] == [
@@ -565,7 +567,7 @@ def test_envoyer_message_echec_appel_mistral_ne_persiste_rien(
         headers=_autorisation(jeton_valide),
     )
 
-    assert reponse.status_code == 502
+    assert erreur(reponse)["status"] == 502
     detail = client.get(f"/conversations/{conversation_id}", headers=_autorisation(jeton_valide))
     assert len(detail.json()["messages"]) == 2
 
@@ -945,7 +947,7 @@ def test_envoyer_message_reponse_resume_et_profil_malformee_retourne_une_erreur_
         headers=_autorisation(jeton_valide),
     )
 
-    assert reponse.status_code == 502
+    assert erreur(reponse)["status"] == 502
     detail = client.get(f"/conversations/{conversation_id}", headers=_autorisation(jeton_valide))
     assert len(detail.json()["messages"]) == 2
 
@@ -971,7 +973,7 @@ def test_creer_conversation_avec_la_meme_cle_idempotence_ne_cree_quune_conversat
 
     assert premiere.status_code == 200
     assert seconde.status_code == 200
-    assert seconde.json() == premiere.json()
+    assert fin(seconde) == fin(premiere)
     # Un seul tour d'appels Mistral (réponse + titrage) : la seconde requête
     # n'a rien rejoué.
     assert len(mistral_client_factice.messages_recus) == 2
@@ -996,7 +998,7 @@ def test_envoyer_message_avec_la_meme_cle_idempotence_ne_persiste_quune_fois(
     )
 
     assert premiere.status_code == 200
-    assert seconde.json() == premiere.json()
+    assert fin(seconde) == fin(premiere)
     detail = client.get(f"/conversations/{conversation_id}", headers=_autorisation(jeton_valide))
     assert [(m["role"], m["contenu"]) for m in detail.json()["messages"]] == [
         ("user", "Bonjour"),
@@ -1039,7 +1041,9 @@ def test_envoyer_message_echec_mistral_ne_revele_jamais_la_cle_api(
     assert "sk-secrete-cle-api-mistral" not in reponse.text
 
 
-def test_cle_api_manquante_retourne_une_erreur_propre_et_pas_un_plantage(db_session, monkeypatch):
+def test_cle_api_manquante_retourne_une_erreur_propre_et_pas_un_plantage(
+    db_session, fabrique_session, monkeypatch
+):
     monkeypatch.delenv("MISTRAL_API_KEY", raising=False)
 
     def override_get_db():
@@ -1050,6 +1054,7 @@ def test_cle_api_manquante_retourne_une_erreur_propre_et_pas_un_plantage(db_sess
 
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_jeton_store] = lambda: jeton_store
+    app.dependency_overrides[get_fabrique_session] = lambda: fabrique_session
     try:
         with TestClient(app) as test_client:
             reponse = test_client.post(
@@ -1058,7 +1063,7 @@ def test_cle_api_manquante_retourne_une_erreur_propre_et_pas_un_plantage(db_sess
     finally:
         app.dependency_overrides.clear()
 
-    assert reponse.status_code == 502
+    assert erreur(reponse)["status"] == 502
     assert "MISTRAL_API_KEY" not in reponse.text
 
 
@@ -1081,7 +1086,7 @@ def test_premier_message_url_inventee_ni_renvoyee_ni_persistee_texte_du_lien_con
     )
 
     assert reponse.status_code == 200
-    corps = reponse.json()
+    corps = fin(reponse)
     assert "http" not in corps["reponse"]
     assert "rapport OCDE" in corps["reponse"]
     detail = client.get(
@@ -1105,7 +1110,7 @@ def test_premier_message_url_ecrite_par_le_compte_est_conservee(
         headers=_autorisation(jeton_valide),
     )
 
-    assert reponse.json()["reponse"] == "Votre lien : [la page](https://bbass.fr/projets/42)."
+    assert fin(reponse)["reponse"] == "Votre lien : [la page](https://bbass.fr/projets/42)."
 
 
 def test_url_du_compte_sortie_de_la_fenetre_passe_et_url_inventee_est_retiree(
@@ -1130,7 +1135,7 @@ def test_url_du_compte_sortie_de_la_fenetre_passe_et_url_inventee_est_retiree(
     )
 
     assert reponse.status_code == 200
-    contenu = reponse.json()["reponse"]
+    contenu = fin(reponse)["reponse"]
     assert "https://bbass.fr/dossier/7" in contenu
     assert "invente.example" not in contenu
     assert "étude" in contenu
@@ -1156,10 +1161,10 @@ def test_chiffre_absent_sans_document_est_remplace_par_la_phrase_fixe(
     )
 
     assert reponse.status_code == 200
-    assert reponse.json()["reponse"] == _REPONSE_SANS_DONNEES
-    assert "accès à Internet" not in reponse.json()["reponse"]
+    assert fin(reponse)["reponse"] == _REPONSE_SANS_DONNEES
+    assert "accès à Internet" not in fin(reponse)["reponse"]
     detail = client.get(
-        f"/conversations/{reponse.json()['conversation']['id']}",
+        f"/conversations/{fin(reponse)['conversation']['id']}",
         headers=_autorisation(jeton_valide),
     )
     assert detail.json()["messages"][-1]["contenu"] == _REPONSE_SANS_DONNEES
@@ -1176,7 +1181,7 @@ def test_demande_explicite_d_inventer_conserve_le_chiffre(
         headers=_autorisation(jeton_valide),
     )
 
-    assert reponse.json()["reponse"] == "Écart imaginé : 52,3 ans."
+    assert fin(reponse)["reponse"] == "Écart imaginé : 52,3 ans."
 
 
 def test_chiffre_ecrit_par_le_compte_reste_et_le_chiffre_absent_part(
@@ -1193,7 +1198,7 @@ def test_chiffre_ecrit_par_le_compte_reste_et_le_chiffre_absent_part(
         headers=_autorisation(jeton_valide),
     )
 
-    contenu = reponse.json()["reponse"]
+    contenu = fin(reponse)["reponse"]
     assert "1,7" in contenu
     assert "52,3" not in contenu
     assert contenu != _REPONSE_SANS_DONNEES
@@ -1220,7 +1225,7 @@ def test_piece_jointe_conserve_le_chiffre_de_lextrait(
         headers=_autorisation(jeton_valide),
     )
 
-    contenu = reponse.json()["reponse"]
+    contenu = fin(reponse)["reponse"]
     assert reponse.status_code == 200
     assert "1,7" in contenu
     assert "52,3" not in contenu
@@ -1235,7 +1240,7 @@ def test_url_du_compte_en_gras_est_conservee(client, mistral_client_factice, jet
 
     reponse = client.post("/conversations", json={"message": "https://bbass.fr/"}, headers=_autorisation(jeton_valide))
 
-    assert reponse.json()["reponse"] == "La page **https://bbass.fr/** présente le cabinet."
+    assert fin(reponse)["reponse"] == "La page **https://bbass.fr/** présente le cabinet."
 
 
 def test_un_numero_de_la_piece_jointe_regroupe_par_espaces_reste_entier(
@@ -1257,7 +1262,7 @@ def test_un_numero_de_la_piece_jointe_regroupe_par_espaces_reste_entier(
         headers=_autorisation(jeton_valide),
     )
 
-    contenu = reponse.json()["reponse"]
+    contenu = fin(reponse)["reponse"]
     assert "831 193 453 00022" in contenu
     # Un numéro absent des sources part en entier, sans fragment.
     assert "119" not in contenu and "3453" not in contenu
@@ -1269,7 +1274,7 @@ def test_un_chiffre_retire_juste_apres_une_url_ne_la_coupe_pas(client, mistral_c
 
     reponse = client.post("/conversations", json={"message": f"Lis {url}, page de 2020"}, headers=_autorisation(jeton_valide))
 
-    contenu = reponse.json()["reponse"]
+    contenu = fin(reponse)["reponse"]
     assert url in contenu
     assert "12" not in contenu.replace(url, "")
 
@@ -1281,7 +1286,7 @@ def test_deux_nombres_cote_a_cote_sont_juges_chacun_seul(client, mistral_client_
         "/conversations", json={"message": "Que s'est-il passé en 2023 ?"}, headers=_autorisation(jeton_valide)
     )
 
-    contenu = reponse.json()["reponse"]
+    contenu = fin(reponse)["reponse"]
     assert "2023" in contenu
     assert "15" not in contenu
 
@@ -1328,4 +1333,4 @@ def test_titre_genere_est_nettoye_de_sa_mise_en_forme_markdown(
         "/conversations", json={"message": "Bonjour"}, headers=_autorisation(jeton_valide)
     )
 
-    assert reponse.json()["conversation"]["titre"] == "Bilan du projet 10*2"
+    assert fin(reponse)["conversation"]["titre"] == "Bilan du projet 10*2"

@@ -3,6 +3,8 @@ from datetime import datetime, timezone
 
 import pytest
 
+from flux_sse import fin
+
 from vm_centrale.models import QuestionCouverte
 from vm_centrale.routers.conversations import NOTE_MEMOIRE
 
@@ -40,7 +42,7 @@ def _creer_conversation(client, mistral_client_factice, jeton: str, message: str
     mistral_client_factice.repondre("Réponse", "Titre")
     reponse = client.post("/conversations", json={"message": message, **corps}, headers=_autorisation(jeton))
     assert reponse.status_code == 200
-    return reponse.json()["conversation"]["id"]
+    return fin(reponse)["conversation"]["id"]
 
 
 def _envoyer(client, mistral_client_factice, jeton: str, conversation_id: int, message: str, resume="Résumé", **corps):
@@ -235,7 +237,7 @@ def test_une_url_ecrite_par_lassistant_nest_jamais_dans_la_memoire(
         json={"message": "Cherche"},
         headers=_autorisation(jeton_valide),
     )
-    assert _URL_B in reponse.json()["reponse"]
+    assert _URL_B in fin(reponse)["reponse"]
 
     _envoyer(client, mistral_client_factice, jeton_valide, conversation_id, "Suite")
 
@@ -396,4 +398,4 @@ def test_un_chiffre_present_seulement_dans_une_question_couverte_est_retire(
 
     assert "437" in _memoire(mistral_client_factice)
     assert reponse.status_code == 200
-    assert "437" not in reponse.json()["reponse"]
+    assert "437" not in fin(reponse)["reponse"]

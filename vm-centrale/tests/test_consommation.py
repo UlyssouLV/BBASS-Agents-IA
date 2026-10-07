@@ -3,6 +3,8 @@ from decimal import Decimal
 
 import pytest
 
+from flux_sse import erreur, fin
+
 from vm_centrale.models import Consommation
 
 _TAUX_TOLERANCE = Decimal("0.0000001")
@@ -21,7 +23,7 @@ def _creer_conversation(client, mistral_client_factice, jeton: str, message: str
     reponse = client.post(
         "/conversations", json={"message": message}, headers=_autorisation(jeton)
     )
-    return reponse.json()["conversation"]["id"]
+    return fin(reponse)["conversation"]["id"]
 
 
 def _lignes_consommation(db_session) -> list[Consommation]:
@@ -194,11 +196,11 @@ def test_appel_doutil_hors_fenetre_produit_une_ligne_chat_supplementaire(
     ).json()["piece_jointe"]["id"]
 
     mistral_client_factice.repondre("Première réponse", "Titre")
-    conversation_id = client.post(
+    conversation_id = fin(client.post(
         "/conversations",
         json={"message": "Regarde ce document", "piece_jointe_id": piece_jointe_id},
         headers=_autorisation(jeton_valide),
-    ).json()["conversation"]["id"]
+    ))["conversation"]["id"]
 
     mistral_client_factice.repondre(
         "Deuxième réponse", resume_et_profil=_reponse_resume_et_profil()
@@ -243,7 +245,7 @@ def test_echec_appel_mistral_ne_persiste_aucune_ligne_de_consommation(
         "/conversations", json={"message": "Bonjour"}, headers=_autorisation(jeton_valide)
     )
 
-    assert reponse.status_code == 502
+    assert erreur(reponse)["status"] == 502
     assert _lignes_consommation(db_session) == []
 
 
@@ -369,11 +371,11 @@ def test_get_consommation_inclut_lappel_de_chat_declenche_par_tool_calling(
     ).json()["piece_jointe"]["id"]
 
     mistral_client_factice.repondre("Première réponse", "Titre")
-    conversation_id = client.post(
+    conversation_id = fin(client.post(
         "/conversations",
         json={"message": "Regarde ce document", "piece_jointe_id": piece_jointe_id},
         headers=_autorisation(jeton_valide),
-    ).json()["conversation"]["id"]
+    ))["conversation"]["id"]
 
     mistral_client_factice.repondre(
         "Deuxième réponse", resume_et_profil=_reponse_resume_et_profil()

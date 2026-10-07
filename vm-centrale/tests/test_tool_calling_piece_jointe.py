@@ -2,6 +2,8 @@ import json
 
 import pytest
 
+from flux_sse import fin
+
 from vm_centrale.models import EchangeInspecteur
 
 _PDF = ("document.pdf", b"%PDF-1.4 contenu factice", "application/pdf")
@@ -52,11 +54,11 @@ def _amener_piece_jointe_hors_fenetre(
     piece_jointe_id = _televerser_sans_conversation(client, jeton)
 
     mistral_client_factice.repondre("Première réponse", "Titre")
-    conversation_id = client.post(
+    conversation_id = fin(client.post(
         "/conversations",
         json={"message": "Regarde ce document", "piece_jointe_id": piece_jointe_id},
         headers=_autorisation(jeton),
-    ).json()["conversation"]["id"]
+    ))["conversation"]["id"]
 
     mistral_client_factice.repondre(
         "Deuxième réponse", resume_et_profil=_reponse_resume_et_profil()
@@ -91,9 +93,9 @@ def test_sans_piece_jointe_hors_fenetre_loutil_piece_jointe_nest_pas_declare(
     client, mistral_client_factice, jeton_valide
 ):
     mistral_client_factice.repondre("Réponse", "Titre")
-    conversation_id = client.post(
+    conversation_id = fin(client.post(
         "/conversations", json={"message": "Bonjour"}, headers=_autorisation(jeton_valide)
-    ).json()["conversation"]["id"]
+    ))["conversation"]["id"]
 
     mistral_client_factice.repondre(
         "Toujours pas de pièce jointe", resume_et_profil=_reponse_resume_et_profil()
@@ -128,7 +130,7 @@ def test_appel_doutil_relance_un_second_appel_avec_le_contenu_injecte_et_en_renv
     )
 
     assert reponse.status_code == 200
-    assert reponse.json()["reponse"] == "Réponse finale après relecture du plan"
+    assert fin(reponse)["reponse"] == "Réponse finale après relecture du plan"
 
     # Le premier appel (avec tools) a bien déclenché un second appel dont les
     # messages portent le contenu de la pièce jointe injecté via un message
@@ -150,11 +152,11 @@ def test_avec_deux_pieces_jointes_hors_fenetre_le_tool_mentionne_chaque_nom_de_f
     piece_jointe_plan = _televerser_sans_conversation(client, jeton_valide, fichier=_PDF_PLAN)
 
     mistral_client_factice.repondre("Première réponse", "Titre")
-    conversation_id = client.post(
+    conversation_id = fin(client.post(
         "/conversations",
         json={"message": "Regarde ce plan", "piece_jointe_id": piece_jointe_plan},
         headers=_autorisation(jeton_valide),
-    ).json()["conversation"]["id"]
+    ))["conversation"]["id"]
 
     mistral_client_factice.repondre_ocr("Contenu du devis")
     upload_devis = client.post(
@@ -275,7 +277,7 @@ def test_url_inventee_retiree_de_la_reponse_finale_apres_un_appel_doutil(
     )
 
     assert reponse.status_code == 200
-    assert reponse.json()["reponse"] == "Le plan est téléchargeable ici."
+    assert fin(reponse)["reponse"] == "Le plan est téléchargeable ici."
 
 
 def test_apres_rechercher_web_lappel_principal_suivant_garde_la_piece_jointe_du_message(
@@ -300,7 +302,7 @@ def test_apres_rechercher_web_lappel_principal_suivant_garde_la_piece_jointe_du_
     assert reponse.status_code == 200
     appels_chat = (
         db_session.query(EchangeInspecteur)
-        .filter_by(conversation_id=reponse.json()["conversation"]["id"], type_appel="chat")
+        .filter_by(conversation_id=fin(reponse)["conversation"]["id"], type_appel="chat")
         .order_by(EchangeInspecteur.id)
         .all()
     )
@@ -313,11 +315,11 @@ def _creer_conversation_avec_piece_jointe(
     mistral_client_factice.repondre_ocr(contenu_extrait)
     piece_jointe_id = _televerser_sans_conversation(client, jeton, fichier=fichier)
     mistral_client_factice.repondre("Première réponse", "Titre")
-    conversation_id = client.post(
+    conversation_id = fin(client.post(
         "/conversations",
         json={"message": "Regarde ce document", "piece_jointe_id": piece_jointe_id},
         headers=_autorisation(jeton),
-    ).json()["conversation"]["id"]
+    ))["conversation"]["id"]
     return conversation_id, piece_jointe_id
 
 
@@ -378,7 +380,7 @@ def test_deux_ids_renvoient_deux_contenus_et_un_id_etranger_est_introuvable_pour
     )
 
     assert reponse.status_code == 200
-    assert reponse.json()["reponse"] == "Comparaison faite"
+    assert fin(reponse)["reponse"] == "Comparaison faite"
     messages_outils = [m for m in mistral_client_factice.appels_reponse[-1] if m["role"] == "tool"]
     assert len(messages_outils) == 1
     assert messages_outils[0]["content"] == (

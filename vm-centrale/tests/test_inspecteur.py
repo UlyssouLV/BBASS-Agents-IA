@@ -2,6 +2,8 @@ import json
 
 import pytest
 
+from flux_sse import erreur, fin
+
 from vm_centrale.models import Consommation, Conversation, EchangeInspecteur
 
 _PDF = ("document.pdf", b"%PDF-1.4 contenu factice", "application/pdf")
@@ -24,7 +26,7 @@ def _creer_conversation(client, mistral_client_factice, jeton: str, message: str
     reponse = client.post(
         "/conversations", json={"message": message}, headers=_autorisation(jeton)
     )
-    return reponse.json()["conversation"]["id"]
+    return fin(reponse)["conversation"]["id"]
 
 
 def _echanges(db_session) -> list[EchangeInspecteur]:
@@ -184,11 +186,11 @@ def test_appel_doutil_produit_deux_echanges_chat_distincts(
     piece_jointe_id = _televerser_sans_conversation(client, jeton_valide)
 
     mistral_client_factice.repondre("Première réponse", "Titre")
-    conversation_id = client.post(
+    conversation_id = fin(client.post(
         "/conversations",
         json={"message": "Regarde ce document", "piece_jointe_id": piece_jointe_id},
         headers=_autorisation(jeton_valide),
-    ).json()["conversation"]["id"]
+    ))["conversation"]["id"]
 
     mistral_client_factice.repondre(
         "Deuxième réponse", resume_et_profil=_reponse_resume_et_profil()
@@ -243,7 +245,7 @@ def test_echec_appel_mistral_principal_produit_un_echange_echec_malgre_le_rollba
         "/conversations", json={"message": "Bonjour"}, headers=_autorisation(jeton_valide)
     )
 
-    assert reponse.status_code == 502
+    assert erreur(reponse)["status"] == 502
     # Aucune conversation n'a survécu au rollback (non-régression spec 1.1.2).
     assert db_session.query(Conversation).count() == 0
 
@@ -485,7 +487,7 @@ def test_echec_resume_apres_chat_reussi_ne_persiste_ni_consommation_ni_echange_s
         headers=_autorisation(jeton_valide),
     )
 
-    assert reponse.status_code == 502
+    assert erreur(reponse)["status"] == 502
     # Le chat a réussi, mais le tour a échoué : ni son coût ni son échange
     # « succès » ne doivent survivre (sinon comptés deux fois à la relance).
     assert db_session.query(Consommation).count() == consommations_avant
@@ -500,11 +502,11 @@ def test_echec_second_appel_outil_ne_persiste_pas_la_demande_doutil(
     mistral_client_factice.repondre_ocr("Plan de masse détaillé")
     piece_jointe_id = _televerser_sans_conversation(client, jeton_valide)
     mistral_client_factice.repondre("Première réponse", "Titre")
-    conversation_id = client.post(
+    conversation_id = fin(client.post(
         "/conversations",
         json={"message": "Regarde ce document", "piece_jointe_id": piece_jointe_id},
         headers=_autorisation(jeton_valide),
-    ).json()["conversation"]["id"]
+    ))["conversation"]["id"]
     mistral_client_factice.repondre("Deuxième réponse", resume_et_profil=_reponse_resume_et_profil())
     client.post(
         f"/conversations/{conversation_id}/messages",
@@ -526,7 +528,7 @@ def test_echec_second_appel_outil_ne_persiste_pas_la_demande_doutil(
         headers=_autorisation(jeton_valide),
     )
 
-    assert reponse.status_code == 502
+    assert erreur(reponse)["status"] == 502
     assert db_session.query(Consommation).count() == consommations_avant
     nouveaux_echanges = _echanges(db_session)[echanges_avant:]
     assert [(e.type_appel, e.statut) for e in nouveaux_echanges] == [("chat", "echec")]
@@ -571,7 +573,7 @@ def test_echec_premier_message_avec_piece_jointe_ne_la_reference_pas(
         headers=_autorisation(jeton_valide),
     )
 
-    assert reponse.status_code == 502
+    assert erreur(reponse)["status"] == 502
     echanges = _echanges(db_session)
     assert len(echanges) == 1
     assert echanges[0].statut == "echec"
@@ -592,8 +594,8 @@ def test_un_garde_fou_qui_retire_une_url_produit_une_ligne_garde_fous_brute_et_v
         "/conversations", json={"message": "Trouve le rapport"}, headers=_autorisation(jeton_valide)
     )
     assert reponse.status_code == 200
-    conversation_id = reponse.json()["conversation"]["id"]
-    reponse_visible = reponse.json()["reponse"]
+    conversation_id = fin(reponse)["conversation"]["id"]
+    reponse_visible = fin(reponse)["reponse"]
     assert "inventee.example.org" not in reponse_visible
 
     echanges = client.get(

@@ -2,6 +2,8 @@ import json
 
 import pytest
 
+from flux_sse import fin
+
 from vm_centrale.models import Consommation, EchangeInspecteur, Message, QuestionCouverte
 from vm_centrale.questions_couvertes import CONSIGNE_QUESTIONS_PIECE_JOINTE
 
@@ -38,7 +40,7 @@ def _creer_conversation(client, mistral_client_factice, jeton: str, message: str
     mistral_client_factice.repondre("Réponse", "Titre")
     reponse = client.post("/conversations", json={"message": message, **corps}, headers=_autorisation(jeton))
     assert reponse.status_code == 200
-    return reponse.json()["conversation"]["id"]
+    return fin(reponse)["conversation"]["id"]
 
 
 def _envoyer(client, mistral_client_factice, jeton: str, conversation_id: int, message: str, **corps):
@@ -159,8 +161,7 @@ def test_un_echec_de_lappel_nempeche_ni_la_reponse_ni_sa_persistance(
         client, mistral_client_factice, jeton_valide
     )
 
-    assert reponse.status_code == 200
-    assert reponse.json()["reponse"] == "Suite"
+    assert fin(reponse)["reponse"] == "Suite"
     assert db_session.query(Message).filter_by(conversation_id=conversation_id).count() == 4
     assert _questions(db_session, conversation_id) == []
     assert not db_session.query(Consommation).filter_by(type_appel="questions_piece_jointe").count()

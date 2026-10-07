@@ -1,6 +1,8 @@
 import json
 from datetime import datetime, timezone
 
+from flux_sse import fin
+
 from vm_centrale.config import MODELE_CHAT
 from vm_centrale.models import Consommation, PageWebEnCache, QuestionCouverte, ResultatRechercheWeb
 from vm_centrale.outils.lire_pages_web import CONSIGNE_LECTURE_PAGE
@@ -56,7 +58,7 @@ def _conversation_avec_recherche(
     )
     assert reponse.status_code == 200
     telechargeur_pages_factice.urls_recues.clear()
-    return reponse.json()["conversation"]["id"]
+    return fin(reponse)["conversation"]["id"]
 
 
 def _lire(client, mistral_client_factice, jeton: str, conversation_id: int, urls: list[str], besoin: str = _BESOIN):
@@ -226,7 +228,7 @@ def test_une_url_dune_autre_conversation_est_introuvable(
     # mais un appel quand même ne lit jamais la page d'une autre.
     mistral_client_factice.repondre("Réponse", "Titre")
     nouvelle = client.post("/conversations", json={"message": "Bonjour"}, headers=_autorisation(jeton_valide))
-    _lire(client, mistral_client_factice, jeton_valide, nouvelle.json()["conversation"]["id"], [_URL_LUE])
+    _lire(client, mistral_client_factice, jeton_valide, fin(nouvelle)["conversation"]["id"], [_URL_LUE])
 
     assert mistral_client_factice.appels_lecture_page == []
     assert "Page introuvable." in _message_tool(mistral_client_factice)
@@ -337,7 +339,7 @@ def _conversation_avec_url_du_compte(client, mistral_client_factice, jeton: str,
     mistral_client_factice.repondre("Bien reçu.", "Titre")
     reponse = client.post("/conversations", json={"message": f"Voici le devis : {url}"}, headers=_autorisation(jeton))
     assert reponse.status_code == 200
-    return reponse.json()["conversation"]["id"]
+    return fin(reponse)["conversation"]["id"]
 
 
 def _lignes_url_du_compte(mistral_client_factice, url: str) -> list[str]:
@@ -414,9 +416,9 @@ def test_une_url_du_message_du_tour_est_lue_au_meme_tour(
     client, mistral_client_factice, telechargeur_pages_factice, jeton_valide
 ):
     mistral_client_factice.repondre("Bonjour.", "Titre")
-    conversation_id = client.post(
+    conversation_id = fin(client.post(
         "/conversations", json={"message": "Bonjour"}, headers=_autorisation(jeton_valide)
-    ).json()["conversation"]["id"]
+    ))["conversation"]["id"]
     telechargeur_pages_factice.servir(_URL_COMPTE, _page_html(_TEXTE_COMPTE))
     mistral_client_factice.repondre_lecture_page(True, "Six semaines.", _URL_COMPTE)
 
@@ -476,7 +478,7 @@ def test_un_chiffre_de_la_page_du_compte_passe_le_garde_fou_chiffres(
     )
 
     assert reponse.status_code == 200
-    contenu = reponse.json()["reponse"]
+    contenu = fin(reponse)["reponse"]
     assert "4870" in contenu
     assert "735" not in contenu
 
@@ -735,7 +737,7 @@ def _lire_puis_relire_sans_besoin(client, mistral_client_factice, jeton: str, co
         headers=_autorisation(jeton),
     )
     assert reponse.status_code == 200
-    return reponse.json()
+    return fin(reponse)
 
 
 def _messages_tool(mistral_client_factice) -> list[str]:
@@ -803,7 +805,7 @@ def test_un_tour_sans_page_trop_longue_na_pas_de_mention(
         f"/conversations/{conversation_id}/messages", json={"message": "Merci"}, headers=_autorisation(jeton_valide)
     )
 
-    assert reponse.json()["reponse"] == "Suite."
+    assert fin(reponse)["reponse"] == "Suite."
 
 
 def test_au_premier_message_une_page_trop_longue_est_mentionnee(
@@ -818,7 +820,7 @@ def test_au_premier_message_une_page_trop_longue_est_mentionnee(
     )
 
     assert reponse.status_code == 200
-    assert reponse.json()["reponse"] == f"Résumé de mémoire.\n\n{_MENTION_TROP_LONGUE}"
+    assert fin(reponse)["reponse"] == f"Résumé de mémoire.\n\n{_MENTION_TROP_LONGUE}"
 
 
 def test_linspecteur_montre_les_vrais_tokens_dune_page_du_compte_telechargee(
@@ -936,7 +938,7 @@ def test_une_url_du_compte_en_echec_est_retentee_au_tour_suivant_et_sert_au_gard
     assert "4870 euros HT." in _message_tool(mistral_client_factice)
     (ligne,) = db_session.query(ResultatRechercheWeb).filter_by(conversation_id=conversation_id).all()
     assert "4870 euros" in ligne.texte_nettoye
-    contenu = reponse.json()["reponse"]
+    contenu = fin(reponse)["reponse"]
     assert "4870" in contenu and "735" not in contenu
 
 
@@ -1077,7 +1079,7 @@ def _relire(
         headers=_autorisation(jeton),
     )
     assert resultat.status_code == 200
-    return resultat.json()
+    return fin(resultat)
 
 
 def _ligne_du_compte(db_session, conversation_id: int) -> ResultatRechercheWeb:

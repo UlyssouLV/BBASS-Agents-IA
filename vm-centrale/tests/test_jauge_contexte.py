@@ -1,6 +1,8 @@
 import json
 from datetime import datetime, timezone
 
+from flux_sse import fin
+
 from vm_centrale.models import Message
 
 # Jauge de contexte (spec 1.4.2) : le message `assistant` porte le
@@ -22,7 +24,7 @@ def _reponse_resume_et_profil() -> str:
 def _creer_conversation(client, jeton: str) -> int:
     reponse = client.post("/conversations", json={"message": "Bonjour"}, headers=_autorisation(jeton))
     assert reponse.status_code == 200
-    return reponse.json()["conversation"]["id"]
+    return fin(reponse)["conversation"]["id"]
 
 
 def _envoyer(client, jeton: str, conversation_id: int, message: str = "Trouve la loi Climat"):
@@ -47,8 +49,8 @@ def test_un_envoi_avec_un_tour_doutils_renvoie_le_prompt_tokens_du_dernier_appel
     reponse = _envoyer(client, jeton_valide, conversation_id)
 
     assert reponse.status_code == 200
-    assert reponse.json()["tokens_contexte"] == 45_210
-    assert reponse.json()["fenetre_contexte"] == _FENETRE
+    assert fin(reponse)["tokens_contexte"] == 45_210
+    assert fin(reponse)["fenetre_contexte"] == _FENETRE
 
     detail = client.get(f"/conversations/{conversation_id}", headers=_autorisation(jeton_valide)).json()
     assistant = detail["messages"][-1]
@@ -65,9 +67,9 @@ def test_le_premier_message_porte_aussi_le_prompt_tokens_de_son_appel_principal(
     mistral_client_factice.fixer_prompt_tokens_principaux(3_000)
     reponse = client.post("/conversations", json={"message": "Bonjour"}, headers=_autorisation(jeton_valide))
 
-    assert reponse.json()["tokens_contexte"] == 3_000
-    assert reponse.json()["fenetre_contexte"] == _FENETRE
-    conversation_id = reponse.json()["conversation"]["id"]
+    assert fin(reponse)["tokens_contexte"] == 3_000
+    assert fin(reponse)["fenetre_contexte"] == _FENETRE
+    conversation_id = fin(reponse)["conversation"]["id"]
     detail = client.get(f"/conversations/{conversation_id}", headers=_autorisation(jeton_valide)).json()
     assert detail["messages"][-1]["tokens_contexte"] == 3_000
 

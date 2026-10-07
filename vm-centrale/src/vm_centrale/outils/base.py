@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from vm_centrale.mistral_client import MistralClient, Usage
 from vm_centrale.moteur_recherche import MoteurRecherche
+from vm_centrale.statut_tour import Publier, ne_rien_publier
 from vm_centrale.telechargement_pages import TelechargeurPages
 
 
@@ -32,6 +33,8 @@ class ContexteTour:
     # ce tour (`retelecharger`, #157) : une seule fois par URL et par tour,
     # un appel suivant sert la copie actuelle.
     pages_relues_de_force: set[str] = field(default_factory=set)
+    # Statut du tour (spec 1.4.4) : l'étape en cours, affichée par le poste.
+    publier: Publier = ne_rien_publier
 
 
 @dataclass(frozen=True)

@@ -1,13 +1,12 @@
 from datetime import datetime, timezone
 
 import httpx
+from flux_sse import evenements
 
 from poste.vm_centrale_client import (
     Conversation,
-    ConversationCree,
     ConversationDetail,
     ConversationIntrouvableError,
-    ConversationResume,
     JetonInvalideError,
     Message,
     PieceJointeCreee,
@@ -30,13 +29,18 @@ def _message(
     )
 
 
-def _conversation_creee() -> ConversationCree:
-    return ConversationCree(
-        conversation=ConversationResume(id=1, titre="Salutations"),
-        reponse="Bonjour",
-        tokens_contexte=None,
-        fenetre_contexte=262_144,
-    )
+# Flux SSE de la VM (spec 1.4.4, ADR-0016), relayé tel quel par le poste.
+_FIN_CREATION = (
+    "fin",
+    {
+        "conversation": {"id": 1, "titre": "Salutations"},
+        "reponse": "Bonjour",
+        "tokens_contexte": 3_000,
+        "fenetre_contexte": 262_144,
+    },
+)
+_FIN_ENVOI = ("fin", {"reponse": "Réponse suivante", "tokens_contexte": 45_210, "fenetre_contexte": 262_144})
+_VM_INDISPONIBLE = "Le service de conversations de la VM centrale est indisponible"
 
 
 def _connecter(client, vm_centrale_client_factice, identifiant="j.dupont"):
@@ -44,28 +48,19 @@ def _connecter(client, vm_centrale_client_factice, identifiant="j.dupont"):
     client.post("/connexion", json={"identifiant": identifiant, "mot_de_passe": "x"})
 
 
-def test_creer_une_conversation_avec_session_active_retourne_le_titre_et_la_reponse(
-    client, vm_centrale_client_factice
-):
+def test_creer_une_conversation_relaie_le_flux_de_la_vm_dans_l_ordre(client, vm_centrale_client_factice):
     _connecter(client, vm_centrale_client_factice)
-    vm_centrale_client_factice.creation_conversation_reussit(
-        ConversationCree(
-            conversation=ConversationResume(id=1, titre="Salutations"),
-            reponse="Bonjour, comment puis-je vous aider ?",
-            tokens_contexte=None,
-            fenetre_contexte=262_144,
-        )
+    flux = (
+        ("statut", {"libelle": "Réflexion…"}),
+        ("statut", {"libelle": "Vérification de la réponse…"}),
+        ("statut", {"libelle": "Titre de la conversation…"}),
+        _FIN_CREATION,
     )
+    vm_centrale_client_factice.creation_conversation_reussit(*flux)
 
     reponse = client.post("/conversations", json={"message": "Bonjour"})
 
-    assert reponse.status_code == 200
-    assert reponse.json() == {
-        "conversation": {"id": 1, "titre": "Salutations"},
-        "reponse": "Bonjour, comment puis-je vous aider ?",
-        "tokens_contexte": None,
-        "fenetre_contexte": 262_144,
-    }
+    assert evenements(reponse) == list(flux)
     assert vm_centrale_client_factice._messages_creation_conversation == ["Bonjour"]
     assert vm_centrale_client_factice._jetons_creation_conversation == ["jeton-factice"]
 
@@ -283,12 +278,12 @@ def test_supprimer_une_conversation_sans_session_active_est_refuse(client):
 
 def test_envoyer_un_message_dans_une_conversation_existante(client, vm_centrale_client_factice):
     _connecter(client, vm_centrale_client_factice)
-    vm_centrale_client_factice.envoi_message_conversation_reussit("Réponse suivante")
+    flux = (("statut", {"libelle": "Réflexion…"}), ("statut", {"libelle": "Vérification de la réponse…"}), _FIN_ENVOI)
+    vm_centrale_client_factice.envoi_message_conversation_reussit(*flux)
 
     reponse = client.post("/conversations/1/messages", json={"message": "Et ensuite ?"})
 
-    assert reponse.status_code == 200
-    assert reponse.json()["reponse"] == "Réponse suivante"
+    assert evenements(reponse) == list(flux)
     assert vm_centrale_client_factice._requetes_envoi_message_conversation == [
         {"conversation_id": 1, "message": "Et ensuite ?"}
     ]
@@ -338,9 +333,7 @@ def test_envoyer_un_message_jeton_revoque_pendant_l_usage_ferme_la_session(
 
 def test_creer_une_conversation_relaie_la_cle_idempotence_a_la_vm(client, vm_centrale_client_factice):
     _connecter(client, vm_centrale_client_factice)
-    vm_centrale_client_factice.creation_conversation_reussit(
-        _conversation_creee()
-    )
+    vm_centrale_client_factice.creation_conversation_reussit(_FIN_CREATION)
 
     client.post("/conversations", json={"message": "Bonjour", "cle_idempotence": "cle-1"})
 
@@ -351,9 +344,7 @@ def test_creer_une_conversation_sans_cle_idempotence_en_relaie_labsence(
     client, vm_centrale_client_factice
 ):
     _connecter(client, vm_centrale_client_factice)
-    vm_centrale_client_factice.creation_conversation_reussit(
-        _conversation_creee()
-    )
+    vm_centrale_client_factice.creation_conversation_reussit(_FIN_CREATION)
 
     client.post("/conversations", json={"message": "Bonjour"})
 
@@ -362,7 +353,7 @@ def test_creer_une_conversation_sans_cle_idempotence_en_relaie_labsence(
 
 def test_envoyer_un_message_relaie_la_cle_idempotence_a_la_vm(client, vm_centrale_client_factice):
     _connecter(client, vm_centrale_client_factice)
-    vm_centrale_client_factice.envoi_message_conversation_reussit("Réponse")
+    vm_centrale_client_factice.envoi_message_conversation_reussit(_FIN_ENVOI)
 
     client.post(
         "/conversations/1/messages",
@@ -374,9 +365,7 @@ def test_envoyer_un_message_relaie_la_cle_idempotence_a_la_vm(client, vm_central
 
 def test_creer_une_conversation_relaie_le_piece_jointe_id_a_la_vm(client, vm_centrale_client_factice):
     _connecter(client, vm_centrale_client_factice)
-    vm_centrale_client_factice.creation_conversation_reussit(
-        _conversation_creee()
-    )
+    vm_centrale_client_factice.creation_conversation_reussit(_FIN_CREATION)
 
     client.post("/conversations", json={"message": "Bonjour", "piece_jointe_id": 7})
 
@@ -385,9 +374,7 @@ def test_creer_une_conversation_relaie_le_piece_jointe_id_a_la_vm(client, vm_cen
 
 def test_creer_une_conversation_sans_piece_jointe_en_relaie_labsence(client, vm_centrale_client_factice):
     _connecter(client, vm_centrale_client_factice)
-    vm_centrale_client_factice.creation_conversation_reussit(
-        _conversation_creee()
-    )
+    vm_centrale_client_factice.creation_conversation_reussit(_FIN_CREATION)
 
     client.post("/conversations", json={"message": "Bonjour"})
 
@@ -408,7 +395,7 @@ def test_creer_une_conversation_piece_jointe_refusee_retourne_400(client, vm_cen
 
 def test_envoyer_un_message_relaie_le_piece_jointe_id_a_la_vm(client, vm_centrale_client_factice):
     _connecter(client, vm_centrale_client_factice)
-    vm_centrale_client_factice.envoi_message_conversation_reussit("Réponse")
+    vm_centrale_client_factice.envoi_message_conversation_reussit(_FIN_ENVOI)
 
     client.post("/conversations/1/messages", json={"message": "Et ensuite ?", "piece_jointe_id": 9})
 
@@ -562,36 +549,31 @@ def test_televerser_une_piece_jointe_sans_conversation_fichier_trop_volumineux_r
     assert reponse.json()["detail"] == "Fichier trop volumineux (max 20 Mo)"
 
 
-# Jauge de contexte (spec 1.4.2) : le poste relaie tokens_contexte et
-# fenetre_contexte de la VM, sans jamais coder la fenêtre en dur.
-
-
-def test_envoyer_un_message_relaie_la_jauge_de_contexte(client, vm_centrale_client_factice):
+def test_une_erreur_de_la_vm_pendant_le_tour_est_relayee(client, vm_centrale_client_factice):
     _connecter(client, vm_centrale_client_factice)
-    vm_centrale_client_factice.envoi_message_conversation_reussit(
-        "Réponse", tokens_contexte=45_210, fenetre_contexte=262_144
+    flux = (
+        ("statut", {"libelle": "Réflexion…"}),
+        ("erreur", {"status": 502, "detail": "Le relais Mistral est indisponible"}),
     )
+    vm_centrale_client_factice.envoi_message_conversation_reussit(*flux)
 
     reponse = client.post("/conversations/1/messages", json={"message": "Et ensuite ?"})
 
-    assert reponse.json() == {"reponse": "Réponse", "tokens_contexte": 45_210, "fenetre_contexte": 262_144}
+    assert evenements(reponse) == list(flux)
 
 
-def test_creer_une_conversation_relaie_la_jauge_de_contexte(client, vm_centrale_client_factice):
+def test_une_vm_coupee_en_plein_flux_termine_par_une_erreur(client, vm_centrale_client_factice):
     _connecter(client, vm_centrale_client_factice)
     vm_centrale_client_factice.creation_conversation_reussit(
-        ConversationCree(
-            conversation=ConversationResume(id=1, titre="Salutations"),
-            reponse="Bonjour",
-            tokens_contexte=3_000,
-            fenetre_contexte=262_144,
-        )
+        ("statut", {"libelle": "Réflexion…"}), coupure=httpx.ReadTimeout("délai dépassé")
     )
 
     reponse = client.post("/conversations", json={"message": "Bonjour"})
 
-    assert reponse.json()["tokens_contexte"] == 3_000
-    assert reponse.json()["fenetre_contexte"] == 262_144
+    assert evenements(reponse) == [
+        ("statut", {"libelle": "Réflexion…"}),
+        ("erreur", {"status": 502, "detail": _VM_INDISPONIBLE}),
+    ]
 
 
 def test_consulter_une_conversation_relaie_la_jauge_de_chaque_message(client, vm_centrale_client_factice):

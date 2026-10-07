@@ -44,19 +44,6 @@ class ConversationCreationRequest(BaseModel):
     piece_jointe_id: int | None = None
 
 
-class ConversationResume(BaseModel):
-    id: int
-    titre: str
-
-
-class ConversationCreeResponse(BaseModel):
-    conversation: ConversationResume
-    reponse: str
-    # Voir MessageEnvoyeResponse.
-    tokens_contexte: int | None
-    fenetre_contexte: int
-
-
 class ConversationResponse(BaseModel):
     id: int
     titre: str
@@ -68,7 +55,8 @@ class MessageResponse(BaseModel):
     role: str
     contenu: str
     date_creation: datetime
-    # Voir MessageEnvoyeResponse.
+    # Jauge de contexte (spec 1.4.2), relayée de la VM centrale : la fenêtre
+    # n'est jamais codée en dur dans le poste.
     tokens_contexte: int | None
     fenetre_contexte: int
 
@@ -94,14 +82,6 @@ class MessageEnvoyeRequest(BaseModel):
     cle_idempotence: str | None = None
     # Voir ConversationCreationRequest.piece_jointe_id.
     piece_jointe_id: int | None = None
-
-
-class MessageEnvoyeResponse(BaseModel):
-    reponse: str
-    # Jauge de contexte (spec 1.4.2), relayée de la VM centrale : la fenêtre
-    # n'est jamais codée en dur dans le poste.
-    tokens_contexte: int | None
-    fenetre_contexte: int
 
 
 class PieceJointeResumeResponse(BaseModel):

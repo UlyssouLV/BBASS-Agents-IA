@@ -742,7 +742,8 @@ function TexteAnimeReponse({ texte, onTermine }: Readonly<{ texte: string; onTer
 // attendre la réponse d'un bloc. `envoiEnCours` porte l'état visuel de la
 // conversation pendant qu'une réponse est en vol, indépendamment de l'accroche ou de la
 // conversation ouverte :
-// - "attente" : la VM n'a pas encore répondu (indicateur « Réflexion… »).
+// - "attente" : la VM n'a pas encore répondu ; affiche le dernier statut
+//   du tour reçu (spec 1.4.4), « Réflexion… » avant le premier.
 // - "frappe"  : la réponse est connue et s'écrit progressivement (voir
 //   TexteAnimeReponse ci-dessus).
 // - "termine" : la frappe est finie ; on attend que `conversationQuery`
@@ -760,6 +761,14 @@ interface EnvoiEnCours {
   message: string;
   phase: PhaseEnvoi;
   reponse: string;
+  statut: string;
+}
+
+const _STATUT_INITIAL = "Réflexion…";
+
+function avecStatut(libelle: string) {
+  return (precedent: EnvoiEnCours | null) =>
+    precedent?.phase === "attente" ? { ...precedent, statut: libelle } : precedent;
 }
 
 // Issue #103 : distance au bord haut du fil (en px) sous laquelle un
@@ -871,7 +880,7 @@ export function OngletChat({ conversationOuverteId, onConversationCreee }: Reado
     creerConversationMutation.reset();
 
     messagesAvantEnvoiRef.current = [];
-    setEnvoiEnCours({ message, phase: "attente", reponse: "" });
+    setEnvoiEnCours({ message, phase: "attente", reponse: "", statut: _STATUT_INITIAL });
     setChampNouveauMessage("");
 
     creerConversationMutation.mutate(
@@ -879,11 +888,12 @@ export function OngletChat({ conversationOuverteId, onConversationCreee }: Reado
         message,
         fichier,
         cleIdempotence: crypto.randomUUID(),
+        onStatut: (libelle) => setEnvoiEnCours(avecStatut(libelle)),
       },
       {
         onSuccess: (donnees) => {
           setFichierNouvelleConversation(null);
-          setEnvoiEnCours({ message, phase: "frappe", reponse: donnees.reponse });
+          setEnvoiEnCours({ message, phase: "frappe", reponse: donnees.reponse, statut: "" });
           onConversationCreee(donnees.conversation.id);
         },
         onError: () => {
@@ -905,7 +915,7 @@ export function OngletChat({ conversationOuverteId, onConversationCreee }: Reado
     envoyerMessageMutation.reset();
 
     messagesAvantEnvoiRef.current = messagesConversation;
-    setEnvoiEnCours({ message, phase: "attente", reponse: "" });
+    setEnvoiEnCours({ message, phase: "attente", reponse: "", statut: _STATUT_INITIAL });
     setChampMessage("");
 
     envoyerMessageMutation.mutate(
@@ -914,11 +924,12 @@ export function OngletChat({ conversationOuverteId, onConversationCreee }: Reado
         message,
         fichier,
         cleIdempotence: crypto.randomUUID(),
+        onStatut: (libelle) => setEnvoiEnCours(avecStatut(libelle)),
       },
       {
         onSuccess: (donnees) => {
           setFichierMessage(null);
-          setEnvoiEnCours({ message, phase: "frappe", reponse: donnees.reponse });
+          setEnvoiEnCours({ message, phase: "frappe", reponse: donnees.reponse, statut: "" });
         },
         onError: () => {
           setEnvoiEnCours(null);
@@ -1020,7 +1031,7 @@ export function OngletChat({ conversationOuverteId, onConversationCreee }: Reado
                 {envoiEnCours.phase === "attente" ? (
                   <output className="flex max-w-[70%] items-center gap-2 self-start rounded-md bg-muted px-3 py-1.5 text-sm text-muted-foreground">
                     <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
-                    Réflexion…
+                    {envoiEnCours.statut}
                   </output>
                 ) : (
                   <div className="max-w-[70%] self-start rounded-md bg-muted px-3 py-1.5 text-sm">

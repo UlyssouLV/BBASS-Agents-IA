@@ -2,6 +2,8 @@ import json
 
 import pytest
 
+from flux_sse import erreur, fin
+
 from vm_centrale.models import Consommation, EchangeInspecteur
 
 # Boucle de tool calling (spec 1.4.0) : tous les appels d'une réponse, au plus
@@ -38,11 +40,11 @@ def _amener_piece_jointe_hors_fenetre(client, mistral_client_factice, jeton: str
     ).json()["piece_jointe"]["id"]
 
     mistral_client_factice.repondre("Première réponse", "Titre")
-    conversation_id = client.post(
+    conversation_id = fin(client.post(
         "/conversations",
         json={"message": "Regarde ce document", "piece_jointe_id": piece_jointe_id},
         headers=_autorisation(jeton),
-    ).json()["conversation"]["id"]
+    ))["conversation"]["id"]
 
     mistral_client_factice.repondre("Deuxième réponse", resume_et_profil=_reponse_resume_et_profil())
     reponse = client.post(
@@ -83,7 +85,7 @@ def test_deux_appels_doutil_dans_une_reponse_font_partir_deux_messages_tool(
     reponse = _envoyer(client, jeton_valide, conversation_id)
 
     assert reponse.status_code == 200
-    assert reponse.json()["reponse"] == "Réponse finale"
+    assert fin(reponse)["reponse"] == "Réponse finale"
     assert len(mistral_client_factice.appels_reponse) - appels_avant == 2
     messages_outils = [
         m for m in mistral_client_factice.appels_reponse[-1] if m["role"] == "tool"
@@ -110,7 +112,7 @@ def test_le_cinquieme_appel_principal_part_sans_tools_et_sa_reponse_est_persiste
     reponse = _envoyer(client, jeton_valide, conversation_id)
 
     assert reponse.status_code == 200
-    assert reponse.json()["reponse"] == "Réponse forcée"
+    assert fin(reponse)["reponse"] == "Réponse forcée"
     tools_du_message = mistral_client_factice.tools_appels_reponse[appels_avant:]
     assert len(tools_du_message) == 5
     assert all(tools_du_message[:4])
@@ -142,7 +144,7 @@ def test_un_tour_qui_echoue_ne_laisse_ni_consommation_ni_echange_succes(
     mistral_client_factice.repondre("Inutilisée", resume_et_profil=_reponse_resume_et_profil())
     reponse = _envoyer(client, jeton_valide, conversation_id)
 
-    assert reponse.status_code == 502
+    assert erreur(reponse)["status"] == 502
     assert db_session.query(Consommation).count() == consommations_avant
     nouveaux = db_session.query(EchangeInspecteur).order_by(EchangeInspecteur.id).all()[echanges_avant:]
     assert [(e.type_appel, e.statut) for e in nouveaux] == [("chat", "echec")]

@@ -2,6 +2,8 @@ import json
 
 import pytest
 
+from flux_sse import fin
+
 from vm_centrale.config import MODELE_CHAT
 from vm_centrale.models import Consommation, QuestionCouverte
 from vm_centrale.outils.piece_jointe import CONSIGNE_RELECTURE_PIECES_JOINTES
@@ -39,11 +41,11 @@ def _conversation_avec_deux_pieces_jointes(client, mistral_client_factice, jeton
         "piece_jointe"
     ]["id"]
     mistral_client_factice.repondre("Première réponse", "Titre")
-    conversation_id = client.post(
+    conversation_id = fin(client.post(
         "/conversations",
         json={"message": "Regarde le plan de M. Dupont", "piece_jointe_id": plan},
         headers=_autorisation(jeton),
-    ).json()["conversation"]["id"]
+    ))["conversation"]["id"]
     mistral_client_factice.repondre_ocr("Devis : 12 400 € HT")
     devis = client.post(
         f"/conversations/{conversation_id}/pieces-jointes", files={"fichier": _PDF_DEVIS}, headers=_autorisation(jeton)
