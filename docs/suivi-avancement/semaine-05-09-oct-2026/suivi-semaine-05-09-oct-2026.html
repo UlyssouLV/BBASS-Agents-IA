@@ -396,7 +396,7 @@
             <div class="toc-row">
               <a href="#reste-a-implementer">Reste à implémenter</a>
               <span class="toc-dots" aria-hidden="true"></span>
-              <span class="toc-ref">V1.4.2 → …</span>
+              <span class="toc-ref">V1.4.4 → …</span>
             </div>
           </li>
           <li>
@@ -464,7 +464,8 @@
     <div class="jour">
       <h3>Mercredi 7 octobre</h3>
       <ul>
-        <li>À compléter. <span class="echeance">Suite prévue : Moduléo lecture (V1.5.0).</span></li>
+        <li><strong>Livraison de la V1.4.2</strong> : les pages web trop longues sont mesurées avec le vrai compteur du modèle, et une jauge sous le champ de saisie indique à quel point la conversation remplit la fenêtre.</li>
+        <li><strong>Livraison de la V1.4.3</strong> : une page déjà lue dans la journée est réutilisée pendant 24 heures, y compris dans une autre conversation. Une page qui n’avait pas pu être lue est retentée plus tard. Si le collaborateur dit que la page a changé, elle est relue ; ce que l’on en savait déjà est revérifié. Si la relecture échoue, l’assistant le dit et répond d’après la version datée.</li>
       </ul>
     </div>
 
@@ -487,8 +488,6 @@
     <section class="bloc" id="reste-a-implementer">
     <h2>Reste à implémenter</h2>
     <ul>
-      <li><strong>V1.4.2</strong> — tokenizer Mistral pour le plafond des pages web.</li>
-      <li><strong>V1.4.3</strong> — cache des pages web entre conversations.</li>
       <li><strong>V1.4.4</strong> — statut d’attente dynamique pendant une réponse.</li>
       <li><strong>V1.5.0</strong> — Moduléo en lecture seule depuis le chat, via le premier Agent métier (pôle Administration).</li>
       <li><strong>V1.6.0</strong> — documentation : mémoire conversationnelle et souveraineté des données.</li>
@@ -502,7 +501,7 @@
     <section class="bloc" id="livre-pour">
     <h2>Livré pour le 08/10/2026</h2>
     <div class="recap">
-      <p><strong>Point jeudi 8 octobre — visé : V1.5.0 puis V1.7.0 · livré : V1.4.1</strong></p>
+      <p><strong>Point jeudi 8 octobre — visé : V1.5.0 puis V1.7.0 · livré : V1.4.3</strong></p>
       <h3>Chat</h3>
       <ul>
         <li>Ton professionnel et affichage structuré (V1.2.2) : vouvoiement, sans remplissage ni relance systématique ; mise en forme, blocs de code colorés, liens cliquables vers les sources.</li>
@@ -513,6 +512,8 @@
       <ul>
         <li>Recherche web (V1.4.0) : SearXNG auto-hébergé (sans clé) ; la VM lit les pages, en extrait l’essentiel ; l’IA cite de vraies URL. Outils centralisés, jusqu’à 3 allers-retours par tour. Corrections du test humain livrées avec (fil parasite, URL avec chiffres, pages officielles TLS, année courante pour une actualité). Bug connu (#131) : si la recherche ne trouve rien, l’IA invente encore parfois — reporté en « Plus tard ».</li>
         <li>Mémoire de la conversation (V1.4.1) : à chaque tour, rappel des pièces jointes, recherches et URL du collaborateur (même hors des 3 messages) ; questions couvertes ; outils pour relire un document ou une page, ou lire une URL envoyée ; jusqu’à 5 appels d’outils par message.</li>
+        <li>Plafond des pages (V1.4.2) : les pages trop longues sont mesurées avec le vrai compteur du modèle ; une jauge sous la saisie montre le remplissage de la conversation.</li>
+        <li>Cache des pages (V1.4.3) : une page lue dans la journée est réutilisée 24 h, y compris dans une autre conversation ; relecture possible si elle a changé ; en cas d’échec, l’assistant le dit et s’appuie sur la version datée.</li>
       </ul>
       <h3>Mode développeur</h3>
       <ul>
