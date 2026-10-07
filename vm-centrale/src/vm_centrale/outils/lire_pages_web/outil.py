@@ -681,7 +681,14 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
         )
     # Flush (jamais commit) : un tour qui échoue plus loin les annule.
     contexte.db.flush()
-    appels = (*forcees.appels, *(appel for _, appel in extractions.values()))
+    # Toute revérification avec un besoin est comptée, même sur une page
+    # refusée plus tôt dans le tour et donc absente des extractions : payée,
+    # ses réponses appliquées.
+    appels = (
+        *forcees.appels,
+        *(appel for _, appel in forcees.lectures_besoin.values()),
+        *(appel for page_id, (_, appel) in extractions.items() if page_id not in deja_lues),
+    )
     trace: dict = (
         {"pages_telechargees": [_trace_telechargee(ligne, trace, tokens) for ligne, trace in telechargees]}
         if telechargees

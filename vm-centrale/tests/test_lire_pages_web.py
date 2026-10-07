@@ -1434,3 +1434,38 @@ def test_la_reverification_est_tracee_en_consommation_et_dans_linspecteur(
     local = client.get(f"/inspecteur/echanges/{echanges[indice]['id']}", headers=entetes_admin).json()
     (relecture,) = local["reponse_payload"]["relectures_forcees"]
     assert relecture == {"url": _URL_COMPTE, "reussie": True, "questions_mises_a_jour": 1, "questions_supprimees": 1}
+
+
+def test_une_reverification_avec_besoin_dune_page_refusee_plus_tot_dans_le_tour_est_tracee_en_consommation(
+    client, mistral_client_factice, telechargeur_pages_factice, jeton_valide, db_session
+):
+    # Copie de la conversation devenue trop longue, question couverte
+    # gardée : refusée au premier appel du tour, puis relue de force avec un
+    # besoin. La page reste refusée, mais la revérification est payée.
+    conversation_id = _conversation_avec_page_du_compte_lue(
+        client, mistral_client_factice, telechargeur_pages_factice, jeton_valide, db_session
+    )
+    ligne = _ligne_du_compte(db_session, conversation_id)
+    ligne.texte_nettoye = _page_dense(220)
+    db_session.commit()
+    telechargeur_pages_factice.servir(_URL_COMPTE, _page_html(_NOUVEAU_TEXTE))
+    mistral_client_factice.repondre_reverification_page(
+        [(True, "Neuf semaines.")], besoin=(True, "Un géomètre-expert.")
+    )
+    extractions_avant = db_session.query(Consommation).filter_by(type_appel="extraction_web").count()
+    mistral_client_factice.repondre_avec_appels_outils(
+        [(_OUTIL, {"urls": [_URL_COMPTE], "besoin": _BESOIN}, "call_1")],
+        [(_OUTIL, {"urls": [_URL_COMPTE], "besoin": "Qui fait le bornage", "retelecharger": True}, "call_2")],
+    )
+    mistral_client_factice.repondre("Réponse.", resume_et_profil=_resume_et_profil())
+
+    reponse = client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Relis-la à jour."},
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert reponse.status_code == 200
+    assert len(mistral_client_factice.appels_reverification_page) == 1
+    assert all(_PAGE_TROP_LONGUE in contenu for contenu in _messages_tool(mistral_client_factice))
+    assert db_session.query(Consommation).filter_by(type_appel="extraction_web").count() == extractions_avant + 1

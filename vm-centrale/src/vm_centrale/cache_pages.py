@@ -49,10 +49,20 @@ def lire_copie(db: Session, url: str, maintenant: datetime) -> CopieEnCache | No
 def ecrire_copie(db: Session, url: str, texte: str, titre: str, maintenant: datetime) -> None:
     # Insertion ou écrasement en une instruction : deux conversations qui
     # écrivent la même URL en même temps, la dernière écriture l'emporte,
-    # sans erreur de clé. Dans la transaction du tour, comme le reste.
+    # sans erreur de clé. Sous PostgreSQL, dans une transaction à part,
+    # validée aussitôt : dans celle du tour, la ligne resterait verrouillée
+    # jusqu'à la fin du tour (appels Mistral compris), un autre tour sur la
+    # même URL attendrait, et deux tours écrivant deux URL dans l'ordre
+    # inverse s'interbloqueraient. Copie gardée même si le tour échoue.
+    # SQLite n'a qu'un écrivain à la fois : dans la transaction du tour.
     if len(url) > _URL_MAX:
         return
-    inserer = postgresql.insert if db.get_bind().dialect.name == "postgresql" else sqlite.insert
     valeurs = {"texte_nettoye": texte, "titre": titre, "date_telechargement": maintenant}
-    instruction = inserer(PageWebEnCache).values(url=url, **valeurs)
-    db.execute(instruction.on_conflict_do_update(index_elements=[PageWebEnCache.url], set_=valeurs))
+    bind = db.get_bind()
+    if bind.dialect.name != "postgresql":
+        instruction = sqlite.insert(PageWebEnCache).values(url=url, **valeurs)
+        db.execute(instruction.on_conflict_do_update(index_elements=[PageWebEnCache.url], set_=valeurs))
+        return
+    instruction = postgresql.insert(PageWebEnCache).values(url=url, **valeurs)
+    with Session(bind) as session, session.begin():
+        session.execute(instruction.on_conflict_do_update(index_elements=[PageWebEnCache.url], set_=valeurs))

@@ -42,4 +42,10 @@ jobs:
             exit 0
           fi
           git commit -m "Met à jour les compteurs de commits du README [skip ci]"
-          git push
+          # L'autre workflow (README stats / Deploy docs) a pu pousser sur main
+          # depuis le checkout : rebase avant chaque essai de push.
+          for essai in 1 2 3; do
+            git pull --rebase origin main && git push origin HEAD:main && exit 0
+            sleep 5
+          done
+          exit 1
