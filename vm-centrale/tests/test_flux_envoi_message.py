@@ -161,15 +161,9 @@ def test_rejeu_avec_la_meme_cle_ne_renvoie_que_la_fin(client, mistral_client_fac
     assert len(mistral_client_factice.messages_recus) == appels_avant_rejeu
 
 
-def test_un_second_tour_du_meme_compte_attend_le_premier_et_l_annonce(
-    client, mistral_client_factice, jeton_valide, fabrique_session, db_session
-):
-    conversation_a = _creer_conversation(client, mistral_client_factice, jeton_valide)
-    conversation_b = _creer_conversation(client, mistral_client_factice, jeton_valide)
-    assert fabrique_session.attendre_tours(2)
-    mistral_client_factice.repondre("Réponse", resume_et_profil=_RESUME_ET_PROFIL)
+def _deux_envois_concurrents(client, mistral_client_factice, jeton: str, premiere: int, seconde: int) -> list:
     # Le premier tour garde le verrou du compte tant que son premier appel
-    # Mistral n'est pas débloqué.
+    # Mistral n'est pas débloqué ; le second démarre et trouve le verrou pris.
     appel_atteint, debloquer = threading.Event(), threading.Event()
     chat = mistral_client_factice.chat
     premier_appel = threading.Lock()
@@ -181,36 +175,84 @@ def test_un_second_tour_du_meme_compte_attend_le_premier_et_l_annonce(
         return chat(*args, **kwargs)
 
     mistral_client_factice.chat = chat_bloque_au_premier_appel
-    reponses = {}
+    reponses = [None, None]
 
-    def envoyer(conversation_id: int) -> None:
-        reponses[conversation_id] = client.post(
+    def envoyer(rang: int, conversation_id: int) -> None:
+        reponses[rang] = client.post(
             f"/conversations/{conversation_id}/messages",
             json={"message": f"Question {conversation_id}"},
-            headers=_autorisation(jeton_valide),
+            headers=_autorisation(jeton),
         )
 
-    envoi_a = threading.Thread(target=envoyer, args=(conversation_a,))
-    envoi_a.start()
+    envoi_1 = threading.Thread(target=envoyer, args=(0, premiere))
+    envoi_1.start()
     assert appel_atteint.wait(5)
-    envoi_b = threading.Thread(target=envoyer, args=(conversation_b,))
-    envoi_b.start()
-    # Le tour de B a démarré et trouvé le verrou pris avant que A ne reparte.
+    envoi_2 = threading.Thread(target=envoyer, args=(1, seconde))
+    envoi_2.start()
     _attendre(lambda: sum(t.name == "tour-de-chat" for t in threading.enumerate()) == 2)
     time.sleep(0.2)
     debloquer.set()
-    envoi_a.join(5)
-    envoi_b.join(5)
+    envoi_1.join(5)
+    envoi_2.join(5)
+    return reponses
 
-    assert ATTENTE not in statuts(reponses[conversation_a])
-    assert statuts(reponses[conversation_b]) == [ATTENTE, "Réflexion…", "Vérification de la réponse…"]
-    assert fin(reponses[conversation_a])["reponse"] == fin(reponses[conversation_b])["reponse"] == "Réponse"
+
+def test_un_second_tour_du_meme_compte_attend_le_premier_et_l_annonce(
+    client, mistral_client_factice, jeton_valide, fabrique_session, db_session
+):
+    conversation_a = _creer_conversation(client, mistral_client_factice, jeton_valide)
+    conversation_b = _creer_conversation(client, mistral_client_factice, jeton_valide)
+    assert fabrique_session.attendre_tours(2)
+    mistral_client_factice.repondre("Réponse", resume_et_profil=_RESUME_ET_PROFIL)
+
+    reponse_a, reponse_b = _deux_envois_concurrents(
+        client, mistral_client_factice, jeton_valide, conversation_a, conversation_b
+    )
+
+    assert ATTENTE not in statuts(reponse_a)
+    assert statuts(reponse_b) == [ATTENTE, "Réflexion…", "Vérification de la réponse…"]
+    assert fin(reponse_a)["reponse"] == fin(reponse_b)["reponse"] == "Réponse"
     for conversation_id in (conversation_a, conversation_b):
         detail = client.get(f"/conversations/{conversation_id}", headers=_autorisation(jeton_valide)).json()
         assert [m["contenu"] for m in detail["messages"]][-2:] == [f"Question {conversation_id}", "Réponse"]
         db_session.expire_all()
         assert db_session.get(Conversation, conversation_id).resume_contexte == "Résumé après deux tours"
     assert db_session.get(ProfilTravail, "j.dupont").contenu == "Profil après deux tours"
+
+
+def test_l_attente_du_verrou_republie_son_statut(
+    client, mistral_client_factice, jeton_valide, fabrique_session, monkeypatch
+):
+    # Sans statut pendant l'attente, le poste couperait le flux au bout de
+    # POSTE_HTTP_TIMEOUT alors que le tour attendu, lui, s'exécuterait.
+    monkeypatch.setattr("vm_centrale.routers.conversations.INTERVALLE_STATUT_ATTENTE_SECONDES", 0.05)
+    conversation_a = _creer_conversation(client, mistral_client_factice, jeton_valide)
+    conversation_b = _creer_conversation(client, mistral_client_factice, jeton_valide)
+    assert fabrique_session.attendre_tours(2)
+    mistral_client_factice.repondre("Réponse", resume_et_profil=_RESUME_ET_PROFIL)
+
+    _, reponse_b = _deux_envois_concurrents(
+        client, mistral_client_factice, jeton_valide, conversation_a, conversation_b
+    )
+
+    assert statuts(reponse_b).count(ATTENTE) >= 2
+    assert statuts(reponse_b)[-2:] == ["Réflexion…", "Vérification de la réponse…"]
+
+
+def test_un_second_envoi_dans_la_meme_conversation_n_annonce_pas_une_autre_conversation(
+    client, mistral_client_factice, jeton_valide, fabrique_session
+):
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide)
+    assert fabrique_session.attendre_tours(1)
+    mistral_client_factice.repondre("Réponse", resume_et_profil=_RESUME_ET_PROFIL)
+
+    _, seconde = _deux_envois_concurrents(
+        client, mistral_client_factice, jeton_valide, conversation_id, conversation_id
+    )
+
+    assert ATTENTE not in statuts(seconde)
+    assert statuts(seconde)[0] == "Réflexion…"
+    assert fin(seconde)["reponse"] == "Réponse"
 
 
 def _attendre(condition, delai: float = 5.0) -> None:

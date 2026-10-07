@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 import httpx
+import pytest
 from flux_sse import evenements
 
 from poste.vm_centrale_client import (
@@ -549,17 +550,41 @@ def test_televerser_une_piece_jointe_sans_conversation_fichier_trop_volumineux_r
     assert reponse.json()["detail"] == "Fichier trop volumineux (max 20 Mo)"
 
 
-def test_une_erreur_de_la_vm_pendant_le_tour_est_relayee(client, vm_centrale_client_factice):
+@pytest.mark.parametrize(
+    ("erreur_vm", "erreur_relayee"),
+    [
+        ({"status": 500, "detail": "Internal Server Error"}, {"status": 502, "detail": _VM_INDISPONIBLE}),
+        ({"status": 502, "detail": "Le relais Mistral est indisponible"}, {"status": 502, "detail": _VM_INDISPONIBLE}),
+        (
+            {"status": 400, "detail": "Pièce jointe déjà liée à un message"},
+            {"status": 400, "detail": "Pièce jointe déjà liée à un message"},
+        ),
+        ({"status": 404, "detail": "Conversation introuvable"}, {"status": 404, "detail": "Conversation introuvable"}),
+    ],
+)
+def test_une_erreur_de_la_vm_pendant_le_tour_est_traduite_comme_avant_le_flux(
+    client, vm_centrale_client_factice, erreur_vm, erreur_relayee
+):
     _connecter(client, vm_centrale_client_factice)
-    flux = (
-        ("statut", {"libelle": "Réflexion…"}),
-        ("erreur", {"status": 502, "detail": "Le relais Mistral est indisponible"}),
+    vm_centrale_client_factice.envoi_message_conversation_reussit(
+        ("statut", {"libelle": "Réflexion…"}), ("erreur", erreur_vm)
     )
-    vm_centrale_client_factice.envoi_message_conversation_reussit(*flux)
 
     reponse = client.post("/conversations/1/messages", json={"message": "Et ensuite ?"})
 
-    assert evenements(reponse) == list(flux)
+    assert evenements(reponse) == [("statut", {"libelle": "Réflexion…"}), ("erreur", erreur_relayee)]
+
+
+def test_un_jeton_refuse_pendant_le_tour_ferme_la_session(client, vm_centrale_client_factice):
+    _connecter(client, vm_centrale_client_factice)
+    vm_centrale_client_factice.envoi_message_conversation_reussit(
+        ("erreur", {"status": 401, "detail": "Jeton invalide"})
+    )
+
+    reponse = client.post("/conversations/1/messages", json={"message": "Et ensuite ?"})
+
+    assert evenements(reponse) == [("erreur", {"status": 401, "detail": "Aucune session active"})]
+    assert client.get("/conversations").status_code == 401
 
 
 def test_une_vm_coupee_en_plein_flux_termine_par_une_erreur(client, vm_centrale_client_factice):

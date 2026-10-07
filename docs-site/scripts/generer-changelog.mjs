@@ -6,6 +6,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
+import {escapeMdx, escapeYaml} from './echappement.mjs';
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../..');
 const OUT_DIR = path.join(REPO_ROOT, 'docs/changelog');
@@ -155,7 +157,16 @@ function extractFunctional(body) {
     parts.push(`## Ce qu'on peut faire maintenant\n\n${faire}`);
   }
   if (parts.length === 0) {
-    return '_Aucune note produit structurée (Pourquoi / Ce qu’on peut faire) dans la release._';
+    // Notes d'avant le format (autres titres) : le corps tel quel, sans les
+    // lignes PR / Tickets déjà portées par <LiensRelease>.
+    const brut = normalized
+      .replace(/^.*(?:PR\s*:\s*https:|Tickets\s*\(`Fixes`\)).*$/gim, '')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+    return (
+      brut ||
+      '_Aucune note produit structurée (Pourquoi / Ce qu’on peut faire) dans la release._'
+    );
   }
   return parts.join('\n\n');
 }
@@ -172,22 +183,13 @@ function extractFixes(body) {
   if (!m) {
     return [];
   }
-  return [...m[1].matchAll(/#(\d+)/g)].map((x) => x[1]);
+  // Le parent (issue de la version) vient en premier (format des notes,
+  // agents/issue-tracker.md) ; un numéro répété n'est gardé qu'une fois.
+  return [...new Set([...m[1].matchAll(/#(\d+)/g)].map((x) => x[1]))];
 }
 
 function stripSpecTitle(specMarkdown) {
   return specMarkdown.replace(/^#\s+[^\n]+\n+/, '').trim();
-}
-
-function escapeYaml(value) {
-  return JSON.stringify(String(value ?? ''));
-}
-
-function escapeMdx(text) {
-  return String(text)
-    .replace(/\{/g, '\\{')
-    .replace(/\}/g, '\\}')
-    .replace(/<([A-Za-z/])/g, '\\<$1');
 }
 
 function writeVersionPage(release, specPath, positionInSerie) {

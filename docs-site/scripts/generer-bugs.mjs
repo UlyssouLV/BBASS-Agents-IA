@@ -6,6 +6,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
+import {escapeMdx, escapeYaml} from './echappement.mjs';
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../..');
 const SOURCE = path.join(
@@ -26,17 +28,6 @@ const RUBRIQUES = [
   'Hors périmètre',
   'Suivi',
 ];
-
-function escapeMdx(text) {
-  return String(text)
-    .replace(/\{/g, '\\{')
-    .replace(/\}/g, '\\}')
-    .replace(/<([A-Za-z/])/g, '\\<$1');
-}
-
-function escapeYaml(value) {
-  return JSON.stringify(String(value ?? ''));
-}
 
 function nettoyerTexte(texte) {
   return texte
@@ -101,7 +92,8 @@ function parserBugs(markdown) {
     return [];
   }
   const suite = markdown.slice(debut);
-  const finSection = suite.search(/\n## [^P]/);
+  // Fin de section : le prochain titre ##, quel qu'il soit.
+  const finSection = suite.search(/\n## /);
   const bloc = finSection > 0 ? suite.slice(0, finSection) : suite;
 
   const reTitre = /^### Bug — (.+?)(?:\s*\(#(\d+)\))?\s*$/gm;

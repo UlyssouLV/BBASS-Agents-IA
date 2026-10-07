@@ -16,7 +16,13 @@ from sqlalchemy.orm import Session
 from vm_centrale.analyse_pieces_jointes import TYPES_SUPPORTES, analyser, type_appel_mistral
 from vm_centrale.autorisation import get_identifiant_compte_du_jeton
 from vm_centrale.concurrence import cache_idempotence, verrous_comptes
-from vm_centrale.config import FICHES_MODELES, MODELE_CHAT, MODELE_OCR, PIECES_JOINTES_DIR
+from vm_centrale.config import (
+    FICHES_MODELES,
+    INTERVALLE_STATUT_ATTENTE_SECONDES,
+    MODELE_CHAT,
+    MODELE_OCR,
+    PIECES_JOINTES_DIR,
+)
 from vm_centrale.consommation import enregistrer_consommation
 from vm_centrale.database import FabriqueSession, get_db, get_fabrique_session
 from vm_centrale.garde_fous import (
@@ -777,7 +783,6 @@ def creer_conversation(
     client: MistralClient = Depends(get_mistral_client),
     moteur_recherche: MoteurRecherche = Depends(get_moteur_recherche),
     telechargeur_pages: TelechargeurPages = Depends(get_telechargeur_pages),
-    db: Session = Depends(get_db),
     fabrique_session: FabriqueSession = Depends(get_fabrique_session),
 ) -> StreamingResponse:
     reponse_en_cache = _reponse_en_cache(identifiant_compte, requete.cle_idempotence)
@@ -785,15 +790,19 @@ def creer_conversation(
         return flux_de_la_fin(reponse_en_cache)
     # Vrai statut HTTP avant le flux (ADR-0016) : la conversation n'existe
     # pas encore, une pièce jointe déjà rattachée l'est donc à une autre.
+    # Dans une session courte, pas celle de get_db : FastAPI ne ferme cette
+    # dernière qu'une fois la réponse en flux terminée, elle garderait sa
+    # connexion du pool pendant tout le tour.
     if requete.piece_jointe_id is not None:
-        _recuperer_piece_jointe_du_compte(db, identifiant_compte, requete.piece_jointe_id, None)
+        with fabrique_session() as db:
+            _recuperer_piece_jointe_du_compte(db, identifiant_compte, requete.piece_jointe_id, None)
 
     def tour(db_tour: Session, publier: Publier) -> ConversationCreeResponse:
         return _tour_creer_conversation(
             db_tour, publier, requete, identifiant_compte, client, moteur_recherche, telechargeur_pages
         )
 
-    return _flux_du_tour(identifiant_compte, requete.cle_idempotence, fabrique_session, tour)
+    return _flux_du_tour(identifiant_compte, None, requete.cle_idempotence, fabrique_session, tour)
 
 
 def _reponse_en_cache(identifiant_compte: str, cle_idempotence: str | None) -> BaseModel | None:
@@ -804,8 +813,30 @@ def _reponse_en_cache(identifiant_compte: str, cle_idempotence: str | None) -> B
     return reponse
 
 
+# Tour qui tient le verrou de chaque compte : (conversation, clé
+# d'idempotence), conversation à None pour une conversation en création.
+_tours_en_cours: dict[str, tuple[int | None, str | None]] = {}
+
+
+def _statut_d_attente(
+    identifiant_compte: str, conversation_id: int | None, cle_idempotence: str | None
+) -> str:
+    # ATTENTE n'annonce que l'autre conversation : un rejeu de la même clé,
+    # ou un second envoi dans la même conversation (deux onglets), attend
+    # la réponse qu'il affiche déjà.
+    en_cours = _tours_en_cours.get(identifiant_compte)
+    if en_cours is not None:
+        conversation_en_cours, cle_en_cours = en_cours
+        if (cle_idempotence is not None and cle_idempotence == cle_en_cours) or (
+            conversation_id is not None and conversation_id == conversation_en_cours
+        ):
+            return REFLEXION
+    return ATTENTE
+
+
 def _flux_du_tour(
     identifiant_compte: str,
+    conversation_id: int | None,
     cle_idempotence: str | None,
     fabrique_session: FabriqueSession,
     tour: Callable[[Session, Publier], BaseModel],
@@ -814,13 +845,16 @@ def _flux_du_tour(
     # session (ADR-0016) : il termine et commite même si personne ne lit
     # plus le flux. Clé relue sous le verrou : une requête rejouée pendant
     # le premier tour l'attend, puis ne renvoie que sa fin. Verrou déjà pris
-    # (un tour du même compte, dans une autre conversation) : le statut
-    # l'annonce avant d'attendre.
+    # (un tour du même compte) : le statut l'annonce, republié pendant
+    # l'attente pour que le flux ne reste pas muet.
     def executer(publier: Publier) -> BaseModel:
         verrou = verrous_comptes.pour(identifiant_compte)
         if not verrou.acquire(blocking=False):
-            publier(ATTENTE)
-            verrou.acquire()
+            statut = _statut_d_attente(identifiant_compte, conversation_id, cle_idempotence)
+            publier(statut)
+            while not verrou.acquire(timeout=INTERVALLE_STATUT_ATTENTE_SECONDES):
+                publier(statut)
+        _tours_en_cours[identifiant_compte] = (conversation_id, cle_idempotence)
         try:
             reponse_en_cache = _reponse_en_cache(identifiant_compte, cle_idempotence)
             if reponse_en_cache is not None:
@@ -831,6 +865,7 @@ def _flux_du_tour(
                 cache_idempotence.enregistrer(identifiant_compte, cle_idempotence, resultat)
             return resultat
         finally:
+            del _tours_en_cours[identifiant_compte]
             verrou.release()
 
     return lancer_tour(executer)
@@ -1633,16 +1668,17 @@ def envoyer_message(
     client: MistralClient = Depends(get_mistral_client),
     moteur_recherche: MoteurRecherche = Depends(get_moteur_recherche),
     telechargeur_pages: TelechargeurPages = Depends(get_telechargeur_pages),
-    db: Session = Depends(get_db),
     fabrique_session: FabriqueSession = Depends(get_fabrique_session),
 ) -> StreamingResponse:
     reponse_en_cache = _reponse_en_cache(identifiant_compte, requete.cle_idempotence)
     if reponse_en_cache is not None:
         return flux_de_la_fin(reponse_en_cache)
     # Vrais statuts HTTP avant le flux (ADR-0016).
-    _recuperer_conversation_du_compte(db, conversation_id, identifiant_compte)
-    if requete.piece_jointe_id is not None:
-        _recuperer_piece_jointe_du_compte(db, identifiant_compte, requete.piece_jointe_id, conversation_id)
+    # Session courte : voir creer_conversation.
+    with fabrique_session() as db:
+        _recuperer_conversation_du_compte(db, conversation_id, identifiant_compte)
+        if requete.piece_jointe_id is not None:
+            _recuperer_piece_jointe_du_compte(db, identifiant_compte, requete.piece_jointe_id, conversation_id)
 
     def tour(db_tour: Session, publier: Publier) -> MessageEnvoyeResponse:
         return _tour_envoyer_message(
@@ -1656,7 +1692,7 @@ def envoyer_message(
             telechargeur_pages,
         )
 
-    return _flux_du_tour(identifiant_compte, requete.cle_idempotence, fabrique_session, tour)
+    return _flux_du_tour(identifiant_compte, conversation_id, requete.cle_idempotence, fabrique_session, tour)
 
 
 def _tour_envoyer_message(

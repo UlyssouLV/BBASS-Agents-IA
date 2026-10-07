@@ -2,6 +2,7 @@ import {
   createContext,
   Fragment,
   memo,
+  useCallback,
   useContext,
   useEffect,
   useLayoutEffect,
@@ -37,7 +38,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useConversationQuery, type Message } from "@/hooks/useConversations";
-import { cleEnvoi, type EnvoisEnCours } from "@/hooks/useEnvoisEnCours";
+import { cleEnvoi, type CleEnvoi, type EnvoisEnCours } from "@/hooks/useEnvoisEnCours";
 import { messageErreur } from "@/lib/api";
 import { usePerfChargementParCle } from "@/lib/instrumentationTemps";
 import { cn } from "@/lib/utils";
@@ -758,11 +759,13 @@ function TexteAnimeReponse({
 // collaborateur n'atteigne réellement le haut du fil.
 const _SEUIL_DECLENCHEMENT_HISTORIQUE_PX = 150;
 
+// Message en cours de saisie et pièce jointe choisie, gardés par
+// conversation (« nouvelle » pour l'écran de composition).
+type Brouillon = { message: string; fichier: File | null };
+const _BROUILLON_VIDE: Brouillon = { message: "", fichier: null };
+
 export function OngletChat({ conversationOuverteId, envois }: Readonly<OngletChatProps>) {
-  const [champNouveauMessage, setChampNouveauMessage] = useState("");
-  const [champMessage, setChampMessage] = useState("");
-  const [fichierNouvelleConversation, setFichierNouvelleConversation] = useState<File | null>(null);
-  const [fichierMessage, setFichierMessage] = useState<File | null>(null);
+  const [brouillons, setBrouillons] = useState<ReadonlyMap<CleEnvoi, Brouillon>>(new Map());
   const refFilMessages = useRef<HTMLDivElement>(null);
   const hauteurScrollAvantChargementRef = useRef<number | null>(null);
 
@@ -771,6 +774,13 @@ export function OngletChat({ conversationOuverteId, envois }: Readonly<OngletCha
   const envoiOuvert = envois.envois.get(cleOuverte);
   const retourOuvert = envois.retours.get(cleOuverte);
   const { consommerRestauration, oublierEnvoi } = envois;
+  const brouillon = brouillons.get(cleOuverte) ?? _BROUILLON_VIDE;
+
+  const modifierBrouillon = useCallback((cle: CleEnvoi, modification: Partial<Brouillon>) => {
+    setBrouillons((precedents) =>
+      new Map(precedents).set(cle, { ...(precedents.get(cle) ?? _BROUILLON_VIDE), ...modification })
+    );
+  }, []);
 
   // Issue #103 : pages[0] est toujours la fenêtre la plus récente (titre et
   // dates lus sur elle, voir useConversationQuery) ; chaque page suivante
@@ -821,22 +831,18 @@ export function OngletChat({ conversationOuverteId, envois }: Readonly<OngletCha
     }
   }, [envoiOuvert, donneesConversationOuverte, messagesConversation, oublierEnvoi, cleOuverte]);
 
-  // Un envoi échoué rend son message (et sa pièce jointe) au champ de sa
+  // Un envoi échoué rend son message (et sa pièce jointe) au brouillon de sa
   // conversation — dès qu'elle est ouverte, si l'échec est arrivé ailleurs.
+  // Un brouillon par conversation : celui qu'on tape ailleurs n'est pas
+  // écrasé.
   useEffect(() => {
     const aRestaurer = retourOuvert?.aRestaurer;
     if (!aRestaurer) {
       return;
     }
-    if (cleOuverte === "nouvelle") {
-      setChampNouveauMessage(aRestaurer.message);
-      setFichierNouvelleConversation(aRestaurer.fichier);
-    } else {
-      setChampMessage(aRestaurer.message);
-      setFichierMessage(aRestaurer.fichier);
-    }
+    modifierBrouillon(cleOuverte, aRestaurer);
     consommerRestauration(cleOuverte);
-  }, [retourOuvert, cleOuverte, consommerRestauration]);
+  }, [retourOuvert, cleOuverte, consommerRestauration, modifierBrouillon]);
 
   // Préserve la position de lecture quand une page plus ancienne vient
   // d'être insérée au-dessus du contenu déjà affiché (issue #103) : la
@@ -872,25 +878,23 @@ export function OngletChat({ conversationOuverteId, envois }: Readonly<OngletCha
   function gererEnvoiNouvelleConversation(evenement: FormEvent<HTMLFormElement>) {
     evenement.preventDefault();
 
-    const message = champNouveauMessage;
+    const { message, fichier } = brouillon;
     if (!message.trim() || envoiOuvert) {
       return;
     }
-    setChampNouveauMessage("");
-    setFichierNouvelleConversation(null);
-    void envois.envoyerPremierMessage(message, fichierNouvelleConversation);
+    modifierBrouillon(cleOuverte, _BROUILLON_VIDE);
+    void envois.envoyerPremierMessage(message, fichier);
   }
 
   function gererEnvoiMessage(evenement: FormEvent<HTMLFormElement>) {
     evenement.preventDefault();
 
-    const message = champMessage;
+    const { message, fichier } = brouillon;
     if (!message.trim() || conversationOuverteId === null || envoiOuvert) {
       return;
     }
-    setChampMessage("");
-    setFichierMessage(null);
-    void envois.envoyerMessage(conversationOuverteId, message, fichierMessage, messagesConversation);
+    modifierBrouillon(cleOuverte, _BROUILLON_VIDE);
+    void envois.envoyerMessage(conversationOuverteId, message, fichier, messagesConversation);
   }
 
   // Issue #84 : l'accroche ne s'affiche que si rien n'a encore été envoyé —
@@ -926,10 +930,10 @@ export function OngletChat({ conversationOuverteId, envois }: Readonly<OngletCha
               <ChampMessageAvecPieceJointe
                 id="nouveau-message-conversation"
                 label="Premier message"
-                valeur={champNouveauMessage}
-                onChange={setChampNouveauMessage}
-                fichier={fichierNouvelleConversation}
-                onFichierChange={setFichierNouvelleConversation}
+                valeur={brouillon.message}
+                onChange={(message) => modifierBrouillon(cleOuverte, { message })}
+                fichier={brouillon.fichier}
+                onFichierChange={(fichier) => modifierBrouillon(cleOuverte, { fichier })}
                 disabled={envoiOuvert !== undefined}
               />
               {erreurNouvelleConversation && (
@@ -997,10 +1001,10 @@ export function OngletChat({ conversationOuverteId, envois }: Readonly<OngletCha
             <ChampMessageAvecPieceJointe
               id="message"
               label="Message"
-              valeur={champMessage}
-              onChange={setChampMessage}
-              fichier={fichierMessage}
-              onFichierChange={setFichierMessage}
+              valeur={brouillon.message}
+              onChange={(message) => modifierBrouillon(cleOuverte, { message })}
+              fichier={brouillon.fichier}
+              onFichierChange={(fichier) => modifierBrouillon(cleOuverte, { fichier })}
               disabled={envoiOuvert !== undefined}
             />
             {dernierMessageAvecContexte?.tokens_contexte != null && (

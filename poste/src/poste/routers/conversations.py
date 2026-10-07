@@ -23,6 +23,7 @@ from poste.vm_centrale_client import (
     PieceJointeRefuseeError,
     VmCentraleClient,
     get_vm_centrale_client,
+    lever_erreur_du_tour,
 )
 
 router = APIRouter()
@@ -76,17 +77,42 @@ _RESPONSES_PIECE_JOINTE = {
 _RESPONSE_FLUX = {200: {"content": {"text/event-stream": {}}}}
 
 
-def _relayer_flux(flux: Iterator[bytes]) -> StreamingResponse:
-    # Flux de la VM relayé tel quel (spec 1.4.4, ADR-0016). Une VM coupée en
-    # plein flux (connexion perdue, POSTE_HTTP_TIMEOUT dépassé entre deux
-    # événements) le termine par un événement `erreur`, après une ligne vide
-    # qui clôt un événement à moitié reçu.
+_FIN_EVENEMENT = b"\n\n"
+
+
+def _evenement_sse(nom: str, donnees: dict) -> bytes:
+    return f"event: {nom}\ndata: {json.dumps(donnees, ensure_ascii=False)}".encode() + _FIN_EVENEMENT
+
+
+def _evenement_relaye(session: SessionStore, evenement: bytes) -> bytes:
+    # Un `erreur` de la VM (HTTPException levée pendant le tour) est traduit
+    # comme un refus d'avant le flux, par _erreur_vm_vers_http ; les autres
+    # événements passent tels quels.
+    lignes = dict(ligne.split(": ", 1) for ligne in evenement.decode().splitlines() if ": " in ligne)
+    if lignes.get("event") != "erreur":
+        return evenement + _FIN_EVENEMENT
+    donnees = json.loads(lignes.get("data", "{}"))
+    try:
+        lever_erreur_du_tour(donnees.get("status", 500), donnees.get("detail"))
+    except Exception as erreur:
+        http = _erreur_vm_vers_http(session, erreur)
+    return _evenement_sse("erreur", {"status": http.status_code, "detail": http.detail})
+
+
+def _relayer_flux(session: SessionStore, flux: Iterator[bytes]) -> StreamingResponse:
+    # Flux de la VM relayé événement par événement (spec 1.4.4, ADR-0016).
+    # Une VM coupée en plein flux (connexion perdue, POSTE_HTTP_TIMEOUT
+    # dépassé entre deux événements) le termine par un événement `erreur` ;
+    # un événement à moitié reçu n'est jamais relayé.
     def relais() -> Iterator[bytes]:
+        tampon = b""
         try:
-            yield from flux
+            for morceau in flux:
+                *evenements, tampon = (tampon + morceau).split(_FIN_EVENEMENT)
+                for evenement in evenements:
+                    yield _evenement_relaye(session, evenement)
         except Exception:
-            donnees = json.dumps({"status": 502, "detail": _VM_CENTRALE_INDISPONIBLE}, ensure_ascii=False)
-            yield f"\n\nevent: erreur\ndata: {donnees}\n\n".encode()
+            yield _evenement_sse("erreur", {"status": 502, "detail": _VM_CENTRALE_INDISPONIBLE})
 
     return StreamingResponse(relais(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
 
@@ -109,7 +135,7 @@ def creer_conversation(
     except Exception as erreur:
         raise _erreur_vm_vers_http(session, erreur) from erreur
 
-    return _relayer_flux(flux)
+    return _relayer_flux(session, flux)
 
 
 @router.get("/conversations", responses=_RESPONSES_BASE)
@@ -236,7 +262,7 @@ def envoyer_message(
     except Exception as erreur:
         raise _erreur_vm_vers_http(session, erreur) from erreur
 
-    return _relayer_flux(flux)
+    return _relayer_flux(session, flux)
 
 
 def _piece_jointe_creee_response(cree: PieceJointeCreee) -> PieceJointeCreeeResponse:

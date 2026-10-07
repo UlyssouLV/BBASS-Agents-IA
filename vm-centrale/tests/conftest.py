@@ -535,7 +535,9 @@ class FabriqueSessionPartagee:
     # Le tour d'un envoi de message (ADR-0016) s'exécute dans son propre
     # thread avec sa propre session : ici celle du test, comme get_db, pour
     # qu'un test relise en base ce que le tour a écrit. Compte les tours
-    # terminés, pour attendre celui dont personne ne lit le flux.
+    # terminés, pour attendre celui dont personne ne lit le flux ; les
+    # vérifications d'avant le flux, sur le thread de la requête, ne
+    # comptent pas.
     def __init__(self, db) -> None:
         self._db = db
         self._tours_termines = threading.Semaphore(0)
@@ -545,7 +547,8 @@ class FabriqueSessionPartagee:
         try:
             yield self._db
         finally:
-            self._tours_termines.release()
+            if threading.current_thread().name == "tour-de-chat":
+                self._tours_termines.release()
 
     def attendre_tours(self, nombre: int, delai: float = 5.0) -> bool:
         return all(self._tours_termines.acquire(timeout=delai) for _ in range(nombre))

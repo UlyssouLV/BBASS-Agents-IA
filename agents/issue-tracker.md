@@ -137,7 +137,7 @@ Skip a target that already holds the block for `VX.Y.Z` and that element. `Aucun
 - PR : https://github.com/<owner>/<repo>/pull/<n>
 - Commits : https://github.com/<owner>/<repo>/pull/<n>/commits
 
-Tickets (`Fixes`) : #… #…
+Tickets (`Fixes`) : #<parent> #<enfant> …
 
 ## Hors périmètre
 

@@ -61,14 +61,6 @@ function IconeTickets(): ReactNode {
   );
 }
 
-function numeroDepuisUrl(url: string | null | undefined): string | null {
-  if (!url) {
-    return null;
-  }
-  const m = url.match(/\/(?:pull|issues)\/(\d+)/);
-  return m ? `#${m[1]}` : null;
-}
-
 export default function LiensRelease({
   releaseUrl,
   releaseLabel = 'Sur GitHub',
@@ -78,7 +70,8 @@ export default function LiensRelease({
   specLabel,
   tickets = [],
 }: Props): ReactNode {
-  const prTitre = prLabel || numeroDepuisUrl(prUrl) || 'Ouvrir';
+  // `#<n>` calculé par generer-changelog.mjs.
+  const prTitre = prLabel || 'Ouvrir';
   const specTitre = specLabel || 'Spec versionnée';
   const [parent, ...enfants] = tickets;
 

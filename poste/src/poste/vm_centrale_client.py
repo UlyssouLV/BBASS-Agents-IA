@@ -1,4 +1,5 @@
 from collections.abc import Iterator
+from typing import NoReturn
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
@@ -480,6 +481,16 @@ def _ouvrir_flux_du_tour(url: str, corps: dict, jeton: str) -> Iterator[bytes]:
         reponse.close()
         raise
     return _octets_du_flux(reponse)
+
+
+def lever_erreur_du_tour(status: int, detail: object) -> NoReturn:
+    # Événement `erreur` du flux (une HTTPException levée pendant le tour,
+    # ADR-0016) : la même exception qu'un refus d'avant le flux, pour que le
+    # poste la traduise de la même façon.
+    reponse = httpx.Response(status, json={"detail": detail})
+    _lever_si_jeton_invalide(reponse)
+    _lever_si_erreur_piece_jointe(reponse)
+    raise RuntimeError(f"Erreur {status} de la VM centrale pendant le tour : {detail}")
 
 
 def _octets_du_flux(reponse: httpx.Response) -> Iterator[bytes]:

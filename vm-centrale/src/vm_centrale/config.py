@@ -31,6 +31,10 @@ VALIDITE_CACHE_PAGES = timedelta(hours=24)
 # fichier d'une pièce jointe relue est tronqué dans le statut du tour (spec
 # 1.4.4, #165) : le statut tient sur une ligne du fil.
 LONGUEUR_MAX_DETAIL_STATUT = 60
+# Un tour qui attend le verrou de son compte republie son statut à cet
+# intervalle : le poste borne le silence entre deux lectures du flux
+# (POSTE_HTTP_TIMEOUT), et l'attente peut durer tout un autre tour.
+INTERVALLE_STATUT_ATTENTE_SECONDES = 15.0
 
 # Tags de modèle centralisés par fonction (spec V1.1.2), pas par valeur : tout
 # code appelant Mistral référence l'une de ces constantes plutôt qu'une
