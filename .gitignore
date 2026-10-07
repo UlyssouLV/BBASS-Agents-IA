@@ -20,6 +20,10 @@ docs/changelog/**
 !docs/changelog/README.md
 docs-site/src/data/changelog.json
 docs-site/src/data/feuille-de-route.json
+docs-site/src/data/bugs.json
 docs/feuille-de-route/**
 !docs/feuille-de-route/.gitkeep
 !docs/feuille-de-route/README.md
+docs/bugs/**
+!docs/bugs/.gitkeep
+!docs/bugs/README.md

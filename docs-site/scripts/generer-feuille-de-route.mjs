@@ -99,7 +99,9 @@ function parserPlusTard(markdown) {
   const suite = markdown.slice(debut);
   const fin = suite.search(/\n## [^P]/);
   const bloc = fin > 0 ? suite.slice(0, fin) : suite;
-  return [...bloc.matchAll(/^### (.+)$/gm)].map((m) => m[1].trim());
+  return [...bloc.matchAll(/^### (.+)$/gm)]
+    .map((m) => m[1].trim())
+    .filter((titre) => !/^Bug\s*[—–\-]/.test(titre));
 }
 
 function resetOutDir() {

@@ -12,16 +12,19 @@ Triggered by **« Ouvre la version »**. The user **must** give a semver **`X.Y.
 
 Do **not** `/implement` here. Do **not** merge. Do **not** `git commit` on **`main`**. Git branch / commit / PR go through the skills below, not inline.
 
-Paths: **`agents/roles.yml`**.
+Paths: **`agents/roles.yml`**. Roadmap writing standards: **`docs/dev/feuille-de-route/README.md`** (this skill does **not** edit the roadmap — adding / renumbering versions is **`/afr`**).
 
 ## 1. Purpose
 
-Read role **`roadmap`**. If that file already describes version **`X.Y.Z`**:
+Read role **`roadmap`**. Look for **`X.Y.Z`** as **`## Prochaine : X.Y.Z — …`** or **`## Ensuite : X.Y.Z — …`** (or a **Déjà livré** bullet — then stop: already shipped).
 
-- That section **is** the purpose (one job, product language). State it back in one sentence, then go to step 2. Do **not** ask « what is this version for? ».
+If that file already describes version **`X.Y.Z`**:
+
+- That section **is** the purpose: take **`Objectif.`** (one job, product language). State it back in one sentence, then go to step 2. Do **not** ask « what is this version for? ».
 - The file is a roadmap, not a spec: grilling may still refine it. Do not invent a different job.
+- Prefer opening the current **Prochaine**. If the user names an **Ensuite**, say so in one line and continue only if they confirm.
 
-If **`X.Y.Z` is absent** from that file: ask **what is this version for?** (one job, in product language) and **wait**.
+If **`X.Y.Z` is absent** from that file: tell them to add it with **`/afr`** (standards in the README), **or** ask **what is this version for?** (one job, product language) and **wait** — do not invent a number or rewrite the feuille here.
 
 ## 2. `/grill-with-docs` (conversation only if you are on `main`)
 
@@ -71,6 +74,7 @@ Run skill **`ouvrir-pr`** as if the user had typed **`/opr -draft`** with:
 - Title: `VX.Y.Z — <purpose in one line>`
 - `## Summary` (what this version is)
 - `Fixes #<parent>` and `Fixes #<child>` **one keyword per issue**
+- If this version **fixes** known roadmap bugs: also `Fixes #<bug>` for each GitHub issue with label **`bug`** that this version closes (so `finaliser-la-version` can remove them from **Plus tard** and close them)
 - `## Test plan` (checkboxes)
 
 ## 7. Hand off to implement

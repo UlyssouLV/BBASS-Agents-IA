@@ -4,6 +4,7 @@ import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import Layout from '@theme/Layout';
 import Heading from '@theme/Heading';
 
+import BugsConnusAccueil from '../components/BugsConnusAccueil';
 import ChangelogListe from '../components/ChangelogListe';
 import FeuilleDeRouteAccueil from '../components/FeuilleDeRouteAccueil';
 import styles from './accueil.module.css';
@@ -29,10 +30,20 @@ export default function Home(): ReactNode {
             <Heading as="h2" className={styles.sousTitre}>
               Dernières versions
             </Heading>
-            <ChangelogListe limite={5} />
+            <ChangelogListe limite={3} />
             <p className="margin-top--md">
               <Link to="/docs/changelog/">Tout le changelog →</Link>
             </p>
+
+            <section data-readme="bugs">
+              <Heading as="h2" className={styles.sousTitre}>
+                Bugs connus
+              </Heading>
+              <BugsConnusAccueil />
+              <p className="margin-top--md" data-readme="bugs-lien-sommaire">
+                <Link to="/docs/bugs/">Tous les bugs →</Link>
+              </p>
+            </section>
           </div>
 
           <aside className={styles.colonneDroite}>

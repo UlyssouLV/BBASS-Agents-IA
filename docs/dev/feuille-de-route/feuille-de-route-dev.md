@@ -143,21 +143,51 @@ Corriger le bug [#131](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/131),
 
 ### Bug — lien de source peu visible (#99)
 
-Constat (essai manuel 2026-10-05, suite #98) : malgré les travaux front sur le rendu des sources, l’affichage **ne valide toujours pas** les critères — le texte de l’ancre n’est pas clairement cliquable (URL au survol natif), et l’affordance (couleur / soulignement) ne rend pas le lien repérable sans pastille seule, ni sans laisser croire que toute la phrase est cliquable.
+**Constat :** malgré les travaux front sur le rendu des sources (suite #98), l’affichage **ne valide toujours pas** les critères — le texte de l’ancre n’est pas clairement cliquable (URL au survol natif), et l’affordance (couleur / soulignement) ne rend pas le lien repérable sans pastille seule, ni sans laisser croire que toute la phrase est cliquable.
 
-Suivi : [#99](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/99) (`bug`). À traiter dans une version ultérieure (front `LienSource` / Markdown chat), hors version courante.
+**Reproductibilité :** essai manuel — ouvrir une réponse qui cite une source et vérifier ancre, `href` au survol, et affordance dans le fil.
 
-### Bug — bascule de conversation pendant qu’une réponse est en cours
+**Impact :** citations de sources peu repérables / peu utilisables ; critères d’acceptation de #98 non tenus.
 
-Constat : on démarre / envoie un message, l’IA « réfléchit », puis on clique une **autre** conversation dans la sidebar → la **sélection** dans la liste change bien, mais le **fil de chat** affiché ne suit pas (reste celui de la conversation en attente de réponse).
+**Cause probable :** Informations manquantes
 
-À corriger dans une version ultérieure (front poste) : synchroniser l’affichage du fil avec la conversation sélectionnée même si une requête de chat est encore en vol ; décider si on annule / ignore la réponse qui arrive pour l’ancien fil, ou si on la range silencieusement sans écraser le fil affiché.
+**À corriger :** rendre le texte de l’ancre cliquable (URL au survol natif) ; affordance claire sans pastille seule et sans faire croire que toute la phrase hors citation est cliquable (front `LienSource` / Markdown chat).
+
+**Hors périmètre :** vm-centrale / prompt de style (hors sujet, déjà #96).
+
+**Suivi :** [#99](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/99) (`bug`). Trouvé dans : Informations manquantes · Contexte : essai manuel · Date : 2026-10-05 · Priorité : Informations manquantes.
+
+### Bug — bascule de conversation pendant qu’une réponse est en cours (#169)
+
+**Constat :** on démarre / envoie un message, l’IA « réfléchit », puis on clique une **autre** conversation dans la sidebar → la **sélection** dans la liste change bien, mais le **fil de chat** affiché ne suit pas (reste celui de la conversation en attente de réponse).
+
+**Reproductibilité :** envoyer un message (réponse en cours), cliquer une autre conversation dans la sidebar pendant l’attente.
+
+**Impact :** Informations manquantes
+
+**Cause probable :** Informations manquantes
+
+**À corriger :** synchroniser l’affichage du fil avec la conversation sélectionnée même si une requête de chat est encore en vol ; décider si on annule / ignore la réponse qui arrive pour l’ancien fil, ou si on la range silencieusement sans écraser le fil affiché.
+
+**Hors périmètre :** Aucun.
+
+**Suivi :** [#169](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/169) (`bug`). Trouvé dans : Informations manquantes · Contexte : Informations manquantes · Date : Informations manquantes · Priorité : Informations manquantes.
 
 ### Bug — données d’un compte visibles par un autre compte (#161)
 
-Constat (test humain 2 de la 1.4.3, 2026-10-07) : après une déconnexion puis une connexion à un autre compte, la barre latérale affiche d’abord les conversations du compte précédent, jusqu’au rafraîchissement ; un compte recréé avec le même identifiant retrouve les conversations de l’ancien compte supprimé.
+**Constat :** après une déconnexion puis une connexion à un autre compte, la barre latérale affiche d’abord les conversations du compte précédent, jusqu’au rafraîchissement ; un compte recréé avec le même identifiant retrouve les conversations de l’ancien compte supprimé.
 
-À corriger dans une version ultérieure, avant le déploiement des postes : la déconnexion vide toute la mémoire du compte côté poste ; la suppression d’un compte supprime aussi ses conversations, pièces jointes, profil de travail et échanges d’inspecteur, avec un nettoyage des données déjà orphelines. À trancher : garder ou non la consommation d’un compte supprimé pour le suivi des coûts. Suivi : [#161](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/161) (`bug`). Non prioritaire tant que le logiciel reste en développement.
+**Reproductibilité :** (1) compte A → déconnexion → compte B sur le même poste : sidebar montre d’abord les conversations de A jusqu’au rafraîchissement ; (2) supprimer un compte puis le recréer avec le même identifiant → anciennes conversations / données liées réapparaissent.
+
+**Impact :** un collaborateur peut voir, même brièvement, les conversations d’un autre compte ; un compte recréé hérite des données de l’ancien (isolation des comptes).
+
+**Cause probable :** poste — déconnexion ne vide pas le cache React Query ; VM centrale — suppression de compte n’efface pas les tables liées par identifiant.
+
+**À corriger :** la déconnexion vide toute la mémoire du compte côté poste ; la suppression d’un compte supprime aussi ses conversations, pièces jointes, profil de travail et échanges d’inspecteur, avec nettoyage des données déjà orphelines.
+
+**Hors périmètre :** décision de garder ou non la consommation d’un compte supprimé pour le suivi des coûts — à trancher.
+
+**Suivi :** [#161](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/161) (`bug`). Trouvé dans : 1.4.3 · Contexte : test humain · Date : 2026-10-07 · Priorité : non prioritaire en dev.
 
 ### Agent IA de continuation du développement, validation par compte administrateur
 

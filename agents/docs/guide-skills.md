@@ -175,6 +175,31 @@ Le reverse d’un message avec chiffres doit rejouer le garde-fou avant envoi.
 Blocked by #40
 ```
 
+### Créer un bug
+
+**Commande :** `/cub`
+
+**Options :** aucune.
+
+**Corps :** titre court + constat, reproductibilité, impact, cause probable, à corriger ; métadonnées (version trouvée, contexte, date, priorité). Hors périmètre optionnel.
+
+Crée **une** issue GitHub (`Bug — …`, label `bug`, corps à titres fixes) et l’entrée sous **Plus tard** de la feuille de route (`docs/dev/feuille-de-route/`). Standards : `docs/dev/feuille-de-route/README.md` (jeton `Informations manquantes` si une case manque → bug **incomplet**). Pas de commit. Pas de promo en Prochaine/Ensuite (`/afr`). Équivalents : « crée un bug », « ajoute un bug », « documente un bug ». Skill `creer-un-bug`.
+
+**Exemple :**
+
+```
+/cub
+Titre : bascule de conversation pendant qu’une réponse est en cours
+Constat : le fil affiché ne suit pas la sidebar…
+Reproductibilité : envoyer un message, cliquer une autre conversation
+Impact : mauvais fil affiché
+Cause probable : état React non synchronisé avec la sélection
+À corriger : synchroniser le fil même si une requête est en vol
+Trouvé dans : 1.4.3
+Contexte : test humain
+Priorité : avant déploiement postes
+```
+
 ### Créer une release
 
 **Commande :** `/crel`

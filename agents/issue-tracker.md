@@ -25,6 +25,17 @@ When set to `yes`, PRs run through the same labels and states as issues, using t
 
 GitHub shares one number space across issues and PRs, so a bare `#42` may be either: resolve with `gh pr view 42` and fall back to `gh issue view 42`.
 
+## Bugs (standalone)
+
+Used by `creer-un-bug` (`/cub`). A **bug** is not a version child (`/ct`):
+
+- Title: `Bug — <short description>`.
+- Label: **`bug`** only (not `ready-for-agent` until the bug is scheduled into a version and turned into implement work).
+- Body: fixed `##` headings — Constat, Reproductibilité, Impact, Cause probable, À corriger, Hors périmètre, Métadonnées — see `docs/dev/feuille-de-route/README.md` (*Bugs*). Same fields go under **Plus tard** on the feuille de route.
+- Missing facts: exact token `Informations manquantes` (do not invent). Derived states **complet** / **incomplet** — same README.
+- Scheduling into a version: `/afr` removes the `### Bug — … (#n)` block from **Plus tard** (objectif de version). Do not close the issue yet.
+- Closing / fixing: version PR includes `Fixes #<n>` ; **`finaliser-la-version`** deletes any leftover Plus tard block and `gh issue close <n>` with `Corrigé en VX.Y.Z.` — not `/cub`.
+
 ## When a skill says "publish to the issue tracker"
 
 Create a GitHub issue.

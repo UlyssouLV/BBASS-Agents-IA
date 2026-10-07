@@ -25,6 +25,16 @@
 
 [![Aperçu de la documentation](docs/img/apercu-docs-accueil.png)](https://ulyssoulv.github.io/BBASS-Agents-IA/)
 
+## Bugs
+
+![Bugs connus](docs/img/apercu-docs-bugs.png)
+
+<p align="center">
+  <a href="https://ulyssoulv.github.io/BBASS-Agents-IA/docs/bugs/">
+    <img src="https://img.shields.io/badge/Voir_les_bugs-Documentation-c8102e?style=for-the-badge" alt="Voir les bugs" />
+  </a>
+</p>
+
 ## Agents prévus
 
 - Administration

@@ -63,6 +63,7 @@ const config: Config = {
             'architecture/**',
             'changelog/README.md',
             'feuille-de-route/README.md',
+            'bugs/README.md',
           ],
         },
         blog: false,
@@ -87,6 +88,12 @@ const config: Config = {
       },
       items: [
         {
+          to: '/',
+          label: 'Accueil',
+          position: 'left',
+          className: 'navbar-accueil',
+        },
+        {
           type: 'docSidebar',
           sidebarId: 'featuresSidebar',
           position: 'left',
@@ -97,6 +104,12 @@ const config: Config = {
           sidebarId: 'changelogSidebar',
           position: 'left',
           label: 'Changelog',
+        },
+        {
+          type: 'docSidebar',
+          sidebarId: 'bugsSidebar',
+          position: 'left',
+          label: 'Bugs',
         },
         {
           type: 'docSidebar',

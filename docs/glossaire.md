@@ -170,6 +170,6 @@ Le nouveau téléchargement d'une page déjà lue dans une Conversation, demand�
 
 ## Statut du tour {#statut-du-tour}
 
-L'étape en cours d'un tour de chat, publiée en direct par la VM centrale et affichée dans le fil à la place de « Réflexion… » (« Recherche sur le web : “…” », « Lecture de <domaine> », « Relecture de <fichier> »…). Une étape à la fois, jamais persistée ni visible dans l'inspecteur ([ADR-0016](./adr/0016-envoi-de-message-en-flux-sse.md)).
+L'étape en cours d'un tour de chat, publiée en direct par la VM centrale et affichée dans le fil à la place de « Réflexion… » (« Recherche sur le web : “…” », « Lecture de &lt;domaine&gt; », « Relecture de &lt;fichier&gt; »…). Une étape à la fois, jamais persistée ni visible dans l'inspecteur ([ADR-0016](./adr/0016-envoi-de-message-en-flux-sse.md)).
 
 À éviter : progression, log, raisonnement (le modèle ne montre pas sa réflexion).
