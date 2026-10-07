@@ -20,6 +20,10 @@ class ContexteTour:
     # Pas encore en base pendant le tour : une URL qu'il contient est déjà
     # lisible par lire_pages_web (#140).
     message_du_tour: str
+    # URL normalisée → URL des pages que lire_pages_web a jugées trop
+    # longues pendant ce tour (#151) : refusées à tout appel suivant du
+    # tour, et mentionnées par le garde-fou à la fin de la réponse visible.
+    pages_trop_longues: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

@@ -18,6 +18,7 @@ from vm_centrale.config import FICHES_MODELES, MODELE_CHAT, MODELE_OCR, PIECES_J
 from vm_centrale.consommation import enregistrer_consommation
 from vm_centrale.database import get_db
 from vm_centrale.garde_fous import (
+    mentionner_pages_trop_longues,
     nettoyer_titre,
     normaliser_url,
     plafonner,
@@ -501,11 +502,17 @@ def _reponse_visible(
     nouveau_message: str,
     reponse: str,
     piece_jointe: PieceJointe | None,
+    pages_trop_longues: list[str],
 ) -> str:
     # Ligne garde_fous de l'inspecteur à chaque réponse de chat (spec 1.4.0,
     # décision 15), même sans retrait : sans elle, on ne voit pas pourquoi la
-    # réponse affichée diffère de celle du modèle.
-    visible = _appliquer_garde_fous(db, conversation_id, nouveau_message, reponse, piece_jointe)
+    # réponse affichée diffère de celle du modèle. La mention des pages trop
+    # longues (#151) vient après les garde-fous URL et chiffres : ajoutée par
+    # le code, elle n'est jamais contrôlée comme un texte du modèle.
+    visible = mentionner_pages_trop_longues(
+        _appliquer_garde_fous(db, conversation_id, nouveau_message, reponse, piece_jointe),
+        pages_trop_longues,
+    )
     enregistrer_echange_local(
         db,
         identifiant_compte=identifiant_compte,
@@ -810,7 +817,13 @@ def creer_conversation(
         )
 
         reponse = _reponse_visible(
-            db, identifiant_compte, conversation.id, requete.message, reponse_chat.contenu, piece_jointe
+            db,
+            identifiant_compte,
+            conversation.id,
+            requete.message,
+            reponse_chat.contenu,
+            piece_jointe,
+            list(contexte_outils.pages_trop_longues.values()),
         )
 
         try:
@@ -1590,7 +1603,13 @@ def envoyer_message(
         )
 
         reponse = _reponse_visible(
-            db, identifiant_compte, conversation.id, requete.message, reponse_chat.contenu, piece_jointe
+            db,
+            identifiant_compte,
+            conversation.id,
+            requete.message,
+            reponse_chat.contenu,
+            piece_jointe,
+            list(contexte_outils.pages_trop_longues.values()),
         )
         _enregistrer_questions_du_tour(db, attendre_questions, identifiant_compte, conversation.id, piece_jointe)
 

@@ -6,7 +6,7 @@ Chaque garde-fou est une fonction pure (texte en entrée, texte en sortie), appe
 
 Depuis la 1.4.0, `routers/conversations._reponse_visible` enregistre à chaque réponse de chat un échange `local` de type `garde_fous` dans l'inspecteur : la réponse brute du modèle et la réponse visible.
 
-Chaque garde-fou est un paquet (`longueur/`, `titre/`, `urls/`, `chiffres/`) : `garde_fou.py` porte le comportement, `__init__.py` exporte ses fonctions publiques, et `vm_centrale.garde_fous` les réexporte toutes. Les règles, l'appelant, l'origine et les limites connues sont dans le `README.md` du paquet.
+Chaque garde-fou est un paquet (`longueur/`, `titre/`, `urls/`, `chiffres/`, `pages_trop_longues/`) : `garde_fou.py` porte le comportement, `__init__.py` exporte ses fonctions publiques, et `vm_centrale.garde_fous` les réexporte toutes. Les règles, l'appelant, l'origine et les limites connues sont dans le `README.md` du paquet.
 
 | Garde-fou | Ce qu'il corrige | Depuis |
 | --- | --- | --- |
@@ -14,3 +14,4 @@ Chaque garde-fou est un paquet (`longueur/`, `titre/`, `urls/`, `chiffres/`) : `
 | `nettoyer_titre` ([`titre/`](titre/README.md)) | Retire la mise en forme Markdown du titre généré, affiché en texte brut côté poste. | 1.2.2 (déplacé ici en 1.3.1) |
 | `retirer_urls_inventees` ([`urls/`](urls/README.md)) | Retire de la réponse de chat toute URL ni écrite par le compte, ni ramenée par une recherche de la conversation. | 1.3.1 (résultats de recherche : 1.4.0) |
 | `retirer_chiffres_hors_source` ([`chiffres/`](chiffres/README.md)) | Retire de la réponse de chat un chiffre absent des textes source, ou remplace une réponse chiffrée sans aucune source. | 1.3.1 (recherche web : 1.4.0) |
+| `mentionner_pages_trop_longues` ([`pages_trop_longues/`](pages_trop_longues/README.md)) | Ajoute à la fin de la réponse de chat une phrase fixe par page jugée trop longue par `lire_pages_web` pendant le tour. | 1.4.2 |

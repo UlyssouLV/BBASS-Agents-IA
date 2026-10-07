@@ -625,7 +625,13 @@ def test_sans_besoin_un_long_texte_est_coupe_et_signale(
 # Plafond en tokens de la page relue avec un besoin (spec 1.4.2, #147) : le
 # même que rechercher_web, 80 % de la fenêtre de la fiche MODELE_CHAT.
 _PLAFOND_TOKENS = int(262_144 * 0.8)
-_PAGE_TROP_LONGUE = "Page trop longue pour être relue en entier."
+# Consigne de réponse honnête (#151) : le contenu n'a pas été transmis.
+_PAGE_TROP_LONGUE = (
+    "Page trop longue pour être lue : son contenu ne t'a pas été transmis. "
+    "Dis au collaborateur que la page était trop longue pour être lue. Tu peux "
+    "répondre avec ce que tu sais du sujet, en précisant que cela vient de tes "
+    "connaissances et non de la page."
+)
 
 
 def _page_dense(nombre_paragraphes: int) -> str:
@@ -702,3 +708,133 @@ def test_sans_besoin_une_page_au_dela_du_plafond_est_coupee_a_8000_caracteres(
     contenu = _message_tool(mistral_client_factice)
     assert _PAGE_TROP_LONGUE not in contenu
     assert "texte coupé" in contenu and len(contenu) < 12_000
+
+
+# Page trop longue (#151) : pas d'aperçu en douce dans le même tour, mention
+# garantie à la fin de la réponse visible.
+_MENTION_TROP_LONGUE = f"La page {_URL_COMPTE} était trop longue pour être lue en entier."
+
+
+def _lire_puis_relire_sans_besoin(client, mistral_client_factice, jeton: str, conversation_id: int):
+    mistral_client_factice.repondre_avec_appels_outils(
+        [(_OUTIL, {"urls": [_URL_COMPTE], "besoin": _BESOIN}, "call_1")],
+        [(_OUTIL, {"urls": [_URL_COMPTE]}, "call_2")],
+    )
+    mistral_client_factice.repondre("Résumé de mémoire.", resume_et_profil=_resume_et_profil())
+    reponse = client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Résume-moi cette page"},
+        headers=_autorisation(jeton),
+    )
+    assert reponse.status_code == 200
+    return reponse.json()
+
+
+def _messages_tool(mistral_client_factice) -> list[str]:
+    return [m["content"] for m in mistral_client_factice.appels_reponse[-1] if m["role"] == "tool"]
+
+
+def test_une_page_trop_longue_relue_sans_besoin_dans_le_meme_tour_renvoie_le_meme_refus(
+    client, mistral_client_factice, telechargeur_pages_factice, jeton_valide, db_session
+):
+    conversation_id = _conversation_avec_url_du_compte(client, mistral_client_factice, jeton_valide)
+    telechargeur_pages_factice.servir(_URL_COMPTE, _page_dense(220))
+    extractions_avant = db_session.query(Consommation).filter_by(type_appel="extraction_web").count()
+
+    _lire_puis_relire_sans_besoin(client, mistral_client_factice, jeton_valide, conversation_id)
+
+    refus = f"Page {_URL_COMPTE} : {_PAGE_TROP_LONGUE}"
+    assert _messages_tool(mistral_client_factice) == [refus, refus]
+    assert mistral_client_factice.appels_lecture_page == []
+    assert db_session.query(Consommation).filter_by(type_appel="extraction_web").count() == extractions_avant
+
+
+def test_au_tour_suivant_une_page_trop_longue_retrouve_son_apercu_sans_besoin(
+    client, mistral_client_factice, telechargeur_pages_factice, jeton_valide
+):
+    conversation_id = _conversation_avec_url_du_compte(client, mistral_client_factice, jeton_valide)
+    telechargeur_pages_factice.servir(_URL_COMPTE, _page_dense(220))
+    _lire(client, mistral_client_factice, jeton_valide, conversation_id, [_URL_COMPTE])
+
+    _lire_sans_besoin(client, mistral_client_factice, jeton_valide, conversation_id, [_URL_COMPTE])
+
+    contenu = _message_tool(mistral_client_factice)
+    assert _PAGE_TROP_LONGUE not in contenu
+    assert "texte coupé" in contenu
+
+
+def test_un_tour_avec_une_page_trop_longue_se_termine_par_la_mention_fixe(
+    client, mistral_client_factice, telechargeur_pages_factice, jeton_valide, monkeypatch
+):
+    conversation_id = _conversation_avec_url_du_compte(client, mistral_client_factice, jeton_valide)
+    telechargeur_pages_factice.servir(_URL_COMPTE, _page_dense(220))
+
+    corps = _lire_puis_relire_sans_besoin(client, mistral_client_factice, jeton_valide, conversation_id)
+
+    assert corps["reponse"] == f"Résumé de mémoire.\n\n{_MENTION_TROP_LONGUE}"
+    detail = client.get(f"/conversations/{conversation_id}", headers=_autorisation(jeton_valide)).json()
+    assert detail["messages"][-1]["contenu"] == corps["reponse"]
+    monkeypatch.setenv("VM_ADMIN_KEY", "cle-admin-de-test")
+    entetes_admin = {**_autorisation(jeton_valide), "X-Admin-Key": "cle-admin-de-test"}
+    echanges = client.get(f"/inspecteur/conversations/{conversation_id}/echanges", headers=entetes_admin).json()
+    *_, garde_fous = [e for e in echanges if e["type_appel"] == "garde_fous"]
+    garde_fous = client.get(f"/inspecteur/echanges/{garde_fous['id']}", headers=entetes_admin).json()
+    assert garde_fous["requete_payload"] == {"reponse_brute": "Résumé de mémoire."}
+    assert garde_fous["reponse_payload"] == {"reponse_visible": corps["reponse"]}
+
+
+def test_un_tour_sans_page_trop_longue_na_pas_de_mention(
+    client, mistral_client_factice, telechargeur_pages_factice, jeton_valide
+):
+    conversation_id = _conversation_avec_url_du_compte(client, mistral_client_factice, jeton_valide)
+    telechargeur_pages_factice.servir(_URL_COMPTE, _page_dense(220))
+    _lire(client, mistral_client_factice, jeton_valide, conversation_id, [_URL_COMPTE])
+
+    mistral_client_factice.repondre("Suite.", resume_et_profil=_resume_et_profil())
+    reponse = client.post(
+        f"/conversations/{conversation_id}/messages", json={"message": "Merci"}, headers=_autorisation(jeton_valide)
+    )
+
+    assert reponse.json()["reponse"] == "Suite."
+
+
+def test_au_premier_message_une_page_trop_longue_est_mentionnee(
+    client, mistral_client_factice, telechargeur_pages_factice, jeton_valide
+):
+    telechargeur_pages_factice.servir(_URL_COMPTE, _page_dense(220))
+    mistral_client_factice.repondre_avec_appel_outil(_OUTIL, {"urls": [_URL_COMPTE], "besoin": _BESOIN})
+    mistral_client_factice.repondre("Résumé de mémoire.", "Titre")
+
+    reponse = client.post(
+        "/conversations", json={"message": f"Résume-moi {_URL_COMPTE}"}, headers=_autorisation(jeton_valide)
+    )
+
+    assert reponse.status_code == 200
+    assert reponse.json()["reponse"] == f"Résumé de mémoire.\n\n{_MENTION_TROP_LONGUE}"
+
+
+def test_linspecteur_montre_les_vrais_tokens_dune_page_du_compte_telechargee(
+    client, mistral_client_factice, telechargeur_pages_factice, jeton_valide, monkeypatch
+):
+    conversation_id = _conversation_avec_url_du_compte(client, mistral_client_factice, jeton_valide)
+    telechargeur_pages_factice.servir(_URL_COMPTE, _page_dense(220))
+
+    _lire(client, mistral_client_factice, jeton_valide, conversation_id, [_URL_COMPTE])
+
+    reponse = _echange_local(client, conversation_id, jeton_valide, monkeypatch)["reponse_payload"]
+    (telechargee,) = reponse["pages_telechargees"]
+    (relue,) = reponse["pages_relues"]
+    assert telechargee["tokens"] == relue["tokens"] > _PLAFOND_TOKENS
+
+
+def test_sans_besoin_linspecteur_naffiche_pas_de_tokens_non_comptes(
+    client, mistral_client_factice, telechargeur_pages_factice, jeton_valide, monkeypatch
+):
+    conversation_id = _conversation_avec_url_du_compte(client, mistral_client_factice, jeton_valide)
+    telechargeur_pages_factice.servir(_URL_COMPTE, _page_html(_TEXTE_COMPTE))
+
+    _lire_sans_besoin(client, mistral_client_factice, jeton_valide, conversation_id, [_URL_COMPTE])
+
+    reponse = _echange_local(client, conversation_id, jeton_valide, monkeypatch)["reponse_payload"]
+    (telechargee,) = reponse["pages_telechargees"]
+    assert "tokens" not in telechargee
