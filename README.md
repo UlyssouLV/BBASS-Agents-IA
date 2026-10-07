@@ -2,6 +2,14 @@
   <img src="docs/img/readme-banniere.png" alt="BBASS Agents IA" width="480" />
 </p>
 
+<!-- sync:stats-commits -->
+<p align="center">
+  <img src="https://img.shields.io/badge/commits_main-19-c8102e?style=for-the-badge" alt="19 commits sur main" />
+  <img src="https://img.shields.io/badge/commits_PR_(historique)-229-1e3a5f?style=for-the-badge" alt="229 commits dans les PR mergées" />
+  <img src="https://img.shields.io/github/commit-activity/y/UlyssouLV/BBASS-Agents-IA?style=for-the-badge&color=c8102e&label=activit%C3%A9" alt="Activité de commits sur un an" />
+</p>
+<!-- /sync:stats-commits -->
+
 # Un copilote multi-agents pour le cabinet
 
 **BBASS Agents IA** est un espace de discussion type ChatGPT, branché sur plusieurs agents métiers : ils répondent aux questions du quotidien et peuvent aussi enchaîner des actions (outils, recherches, workflows) à la place du collaborateur. Le moteur de langage est Mistral AI — choix du cabinet pour la souveraineté et la sécurité : on ne forme pas un modèle, on construit les agents et l’application qui les exploitent.

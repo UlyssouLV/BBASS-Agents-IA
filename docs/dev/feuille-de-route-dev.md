@@ -156,6 +156,12 @@ Constat : on démarre / envoie un message, l’IA « réfléchit », puis on cli
 
 À corriger dans une version ultérieure (front poste) : synchroniser l’affichage du fil avec la conversation sélectionnée même si une requête de chat est encore en vol ; décider si on annule / ignore la réponse qui arrive pour l’ancien fil, ou si on la range silencieusement sans écraser le fil affiché.
 
+### Bug — données d’un compte visibles par un autre compte (#161)
+
+Constat (test humain 2 de la 1.4.3, 2026-10-07) : après une déconnexion puis une connexion à un autre compte, la barre latérale affiche d’abord les conversations du compte précédent, jusqu’au rafraîchissement ; un compte recréé avec le même identifiant retrouve les conversations de l’ancien compte supprimé.
+
+À corriger dans une version ultérieure, avant le déploiement des postes : la déconnexion vide toute la mémoire du compte côté poste ; la suppression d’un compte supprime aussi ses conversations, pièces jointes, profil de travail et échanges d’inspecteur, avec un nettoyage des données déjà orphelines. À trancher : garder ou non la consommation d’un compte supprimé pour le suivi des coûts. Suivi : [#161](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/161) (`bug`). Non prioritaire tant que le logiciel reste en développement.
+
 ### Agent IA de continuation du développement, validation par compte administrateur
 
 Constat (grilling 1.2.0) : à terme, plus aucune personne qualifiée ne sera sur place pour faire évoluer le logiciel elle-même. L'évolution du code (nouvelles versions, corrections, nouveaux Agents métier) serait alors portée par un agent IA dédié à la continuation du développement, avec un compte administrateur qui ne fait que **valider** (approuver/refuser) les changements proposés, sans avoir à coder ni à relire le code en détail.

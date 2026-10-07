@@ -14,7 +14,9 @@
     "capturer-accueil": "node scripts/capturer-accueil.mjs",
     "capturer-travail-realise": "node scripts/capturer-travail-realise.mjs",
     "sync-architecture-readme": "node scripts/sync-architecture-readme.mjs",
+    "generer-stats-commits": "node scripts/generer-stats-commits.mjs",
     "generer-banniere-readme": "node scripts/generer-banniere-readme.mjs",
+
 
 
     "clear": "docusaurus clear",
