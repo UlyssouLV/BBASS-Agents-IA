@@ -27,6 +27,10 @@ PAGES_HTTP_TIMEOUT = float(os.environ.get("PAGES_HTTP_TIMEOUT", "10"))
 # Validité d'une copie du cache commun des pages web (spec 1.4.3,
 # ADR-0015) : au-delà, la copie est ignorée et la page retéléchargée.
 VALIDITE_CACHE_PAGES = timedelta(hours=24)
+# Longueur au-delà de laquelle la requête d'une recherche web ou le nom de
+# fichier d'une pièce jointe relue est tronqué dans le statut du tour (spec
+# 1.4.4, #165) : le statut tient sur une ligne du fil.
+LONGUEUR_MAX_DETAIL_STATUT = 60
 
 # Tags de modèle centralisés par fonction (spec V1.1.2), pas par valeur : tout
 # code appelant Mistral référence l'une de ces constantes plutôt qu'une

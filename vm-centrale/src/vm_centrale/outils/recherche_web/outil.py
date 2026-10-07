@@ -15,6 +15,7 @@ from vm_centrale.moteur_recherche import MoteurIndisponible, ResultatRecherche
 from vm_centrale.outils.base import AppelMistralOutil, ContexteTour, Outil, ResultatOutil
 from vm_centrale.questions_couvertes import QUESTIONS_MAX as _QUESTIONS_MAX
 from vm_centrale.questions_couvertes import REPONSE_MAX as _REPONSE_MAX
+from vm_centrale.statut_tour import lecture_de, recherche_web
 from vm_centrale.telechargement_pages import PageIndisponible, TelechargeurPages
 
 _NOM = "rechercher_web"
@@ -252,7 +253,12 @@ def lire_pages(urls: list[str], contexte: ContexteTour, sans_cache: bool = False
 
 
 def _lire_pages(resultats: list[ResultatRecherche], contexte: ContexteTour) -> list[_Page]:
-    pages = lire_pages([resultat.url for resultat in resultats[:_NOMBRE_PAGES_TELECHARGEES]], contexte)
+    urls = [resultat.url for resultat in resultats[:_NOMBRE_PAGES_TELECHARGEES]]
+    # Un statut par page, téléchargée ou servie par le cache (#165) ; les
+    # pages sont lues ensemble, en parallèle.
+    for url in urls:
+        contexte.publier(lecture_de(url))
+    pages = lire_pages(urls, contexte)
     # Plafond global seulement (décision n° 6) : tant que le total le
     # dépasse, la dernière page lue est retirée entière, jamais coupée.
     lues = [page for page in pages if page.texte]
@@ -399,6 +405,7 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
     requete = str(arguments.get("requete") or "").strip()
     if not requete:
         return ResultatOutil(_AUCUN_RESULTAT, trace={"resultats": []})
+    contexte.publier(recherche_web(requete))
     try:
         resultats = contexte.moteur_recherche.rechercher(requete)[:_NOMBRE_RESULTATS]
     except MoteurIndisponible as erreur:

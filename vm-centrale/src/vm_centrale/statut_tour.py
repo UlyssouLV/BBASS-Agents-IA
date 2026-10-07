@@ -3,10 +3,13 @@ import logging
 import queue
 import threading
 from collections.abc import Callable, Iterator
+from urllib.parse import urlsplit
 
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+
+from vm_centrale.config import LONGUEUR_MAX_DETAIL_STATUT
 
 # Statut du tour (spec 1.4.4, ADR-0016) : le tour d'un envoi de message
 # s'exécute dans son propre thread et publie ses étapes dans une file ; la
@@ -25,6 +28,28 @@ logger = logging.getLogger(__name__)
 def ne_rien_publier(libelle: str) -> None:
     # Émetteur d'un outil appelé hors d'un tour en flux (tests, scripts).
     pass
+
+
+def _tronquer(detail: str) -> str:
+    detail = detail.strip()
+    return detail if len(detail) <= LONGUEUR_MAX_DETAIL_STATUT else f"{detail[:LONGUEUR_MAX_DETAIL_STATUT]}…"
+
+
+# Libellés des outils (#165), construits ici seulement : le poste affiche le
+# texte reçu.
+def recherche_web(requete: str) -> str:
+    return f"Recherche sur le web : “{_tronquer(requete)}”"
+
+
+def lecture_de(url: str) -> str:
+    # Domaine = hôte sans `www.` ; une URL écrite par le compte peut venir
+    # sans schéma (« www.bbass.fr »).
+    hote = urlsplit(url if "://" in url else f"https://{url}").hostname or url
+    return f"Lecture de {hote.removeprefix('www.')}"
+
+
+def relecture_de(nom_fichier: str) -> str:
+    return f"Relecture de {_tronquer(nom_fichier)}"
 
 
 def _evenement(nom: str, donnees: dict) -> str:
