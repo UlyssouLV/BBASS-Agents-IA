@@ -1,5 +1,6 @@
 import os
 from dataclasses import dataclass
+from datetime import timedelta
 from decimal import Decimal
 
 from dotenv import load_dotenv
@@ -23,6 +24,9 @@ SEARXNG_HTTP_TIMEOUT = float(os.environ.get("SEARXNG_HTTP_TIMEOUT", "10"))
 # Délai par page trouvée par le moteur (spec 1.4.0, étape 2) : au-delà, la
 # page est ignorée et son extrait de moteur reste.
 PAGES_HTTP_TIMEOUT = float(os.environ.get("PAGES_HTTP_TIMEOUT", "10"))
+# Validité d'une copie du cache commun des pages web (spec 1.4.3,
+# ADR-0015) : au-delà, la copie est ignorée et la page retéléchargée.
+VALIDITE_CACHE_PAGES = timedelta(hours=24)
 
 # Tags de modèle centralisés par fonction (spec V1.1.2), pas par valeur : tout
 # code appelant Mistral référence l'une de ces constantes plutôt qu'une

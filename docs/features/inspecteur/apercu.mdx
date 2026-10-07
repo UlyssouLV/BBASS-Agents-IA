@@ -1,0 +1,51 @@
+import ApercuComptes from '@site/src/components/inspecteur/ApercuComptes';
+import ApercuConversations from '@site/src/components/inspecteur/ApercuConversations';
+import CarteApercu from '@site/src/components/inspecteur/CarteApercu';
+
+# Navigation
+
+Une fois la clé acceptée, trois niveaux, avec un fil d’Ariane. L’historique ne se met **pas** à jour tout seul : chaque niveau a un bouton **Rafraîchir**.
+
+## 1. Comptes
+
+Comptes qui ont au moins une conversation — tous les comptes, pas seulement le sien.
+
+<ApercuComptes />
+
+## 2. Conversations
+
+Titre, date de création, dernière activité.
+
+<ApercuConversations />
+
+## 3. Fil des échanges
+
+Chaque carte est une étape technique, dans l’ordre. Cliquer l’en-tête charge le détail (payload / réponse). Les étiquettes sont décrites une par une à partir de [Chat](./chat.mdx).
+
+<CarteApercu libelle="Chat" origine="mistral" modele="mistral-small-latest" />
+<CarteApercu libelle="Outil : rechercher_web" origine="local" />
+<CarteApercu libelle="Garde-fous" origine="local" />
+
+### Ordre typique d’un message avec recherche web
+
+1. **Chat** — le modèle demande `rechercher_web`.
+2. **Outil : rechercher_web** — la VM exécute la recherche.
+3. **Extraction web** — seulement si au moins une page a été lue.
+4. **Chat** — le modèle répond avec le résultat d’outil.
+5. **Garde-fous** — texte du modèle vs texte affiché.
+6. **Titrage** — à la création de la conversation seulement.
+7. **Résumé + profil** — s’il y a des messages qui sortent de la fenêtre.
+
+Un échange en échec reste dans le fil même si le tour est annulé en base.
+
+### Quand le message porte une pièce jointe
+
+C’est au **tour où le collaborateur joint le fichier** (pas plus tard) que le contenu est extrait. Selon le type :
+
+| Fichier | Ce qui se passe | Carte dans l’inspecteur |
+| --- | --- | --- |
+| **PDF** | Appel OCR au modèle | Oui — [OCR](./ocr.mdx) |
+| **Image** | Appel vision au modèle | Oui — [Vision](./vision.mdx) |
+| **Word** ou **Excel** | Extraction **locale** sur la VM, sans appel au modèle | **Non** — pas de carte dédiée |
+
+Pour Word et Excel, le texte extrait part ensuite dans le message système du [Chat](./chat.mdx) du même tour (référence « Pièce jointe : … »). On voit le résultat dans le payload du Chat, pas dans une carte OCR ou Vision.

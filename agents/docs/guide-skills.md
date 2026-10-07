@@ -156,6 +156,25 @@ Fixes #12
 Fixes #13
 ```
 
+### Créer un ticket
+
+**Commande :** `/ct`
+
+**Options :** aucune.
+
+**Corps :** titre + ce que le ticket livre ; `#parent` si besoin ; éventuellement `Blocked by #n`.
+
+Crée **un** enfant GitHub (`Part of`, sub-issue, parent bloqué par l’enfant). Avant : le ticket tient dans `docs/specs/vX.Y.Z-*.md`. Après : le corps de l’issue parente GitHub = ce fichier ; si une PR ouverte cite déjà le parent, ajoute les `Fixes #n` manquants. Pas de nouvelle PR. Équivalent : « crée un ticket ». Skill `creer-ticket`.
+
+**Exemple :**
+
+```
+/ct #12
+Titre : garde-fou chiffres manquants après reverse
+Le reverse d’un message avec chiffres doit rejouer le garde-fou avant envoi.
+Blocked by #40
+```
+
 ### Créer une release
 
 **Commande :** `/crel`
@@ -338,7 +357,7 @@ TDD du ticket (plugin `/implement`). La **fin** : **`/t`**, **`/c -p`**, **`/cci
 
 **Corps :** inutile.
 
-Après une **`/code-review`** acceptée : enfants Closed + docs à jour (`/c -a -p` si besoin), puis **`/qg -w`** (puis **`/cqg`** si le gate n’est pas `OK`), puis **`/crel`**, puis **`/mpr`**. Skill `finaliser-la-version`. Ne relance pas `/code-review`.
+Après une **`/code-review`** acceptée : enfants Closed + docs à jour (`readme`, `roadmap`, **`suivi-avancement`** HTML+PDF de la semaine courante si présent — `/c -a -p` si besoin), puis **`/qg -w`** (puis **`/cqg`** si le gate n’est pas `OK`), puis **`/crel`**, puis **`/mpr`**. Skill `finaliser-la-version`. Ne relance pas `/code-review`.
 
 **Exemple :**
 

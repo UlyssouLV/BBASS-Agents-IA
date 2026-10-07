@@ -217,6 +217,23 @@ class ResultatRechercheWeb(Base):
     date_creation: Mapped[datetime] = mapped_column(DateTime)
 
 
+class PageWebEnCache(Base):
+    # Cache commun des pages web (spec 1.4.3, ADR-0015) : une ligne par URL
+    # exacte, partagée entre tous les comptes et tous les pôles. Aucune clé
+    # étrangère vers une conversation : la supprimer ne touche pas au cache.
+    # Seulement des pages lues avec succès, jamais un extrait ni une
+    # question couverte (ils portent le besoin d'un compte).
+    __tablename__ = "cache_pages_web"
+
+    url: Mapped[str] = mapped_column(String, primary_key=True)
+    # Texte principal nettoyé, avant tout plafond de tokens.
+    texte_nettoye: Mapped[str] = mapped_column(String)
+    titre: Mapped[str] = mapped_column(String)
+    # Avec fuseau : l'âge de la copie se calcule en UTC quel que soit le
+    # fuseau du serveur PostgreSQL.
+    date_telechargement: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 class QuestionCouverte(Base):
     # Une question à laquelle le contenu d'un élément de la conversation
     # répond (spec 1.4.1) : une pièce jointe ou un résultat de recherche web,

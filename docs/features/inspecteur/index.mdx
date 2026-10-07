@@ -1,0 +1,17 @@
+# Inspecteur des échanges
+
+L’inspecteur est le **mode développeur** du poste. Il montre, pour une conversation, **chaque étape technique dans l’ordre** — pas seulement la bulle affichée dans le chat.
+
+Une ligne = un échange (`echanges_inspecteur`) : un appel au modèle, ou un travail fait par la VM (outil, garde-fous). La clé API du fournisseur n’apparaît jamais : elle part dans l’en-tête HTTP, après la capture du corps JSON.
+
+## Comment l’ouvrir
+
+Raccourci **`Ctrl+Maj+D`**, depuis n’importe quel écran du poste (y compris la connexion). Un **nouvel onglet** s’ouvre sur `/inspecteur`. Le chat en cours ne change pas.
+
+Il faut déjà une session poste (compte connecté). Ce n’est pas réservé aux comptes administrateur : n’importe quel compte peut ouvrir l’onglet. Ce qui débloque le contenu, c’est la clé, page suivante.
+
+## Ensuite
+
+1. [Saisie de la clé](./connexion.mdx)
+2. [Comptes, conversations, fil](./apercu.mdx)
+3. [Les étiquettes](./chat.mdx)

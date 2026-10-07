@@ -1,0 +1,240 @@
+.cadre {
+  max-width: 42rem;
+  margin: 1.25rem 0 1.75rem;
+  padding: 1.25rem 1.25rem 1.5rem;
+  border: 1px solid oklch(0.9 0.006 315);
+  border-radius: 0.5rem;
+  background: #fff;
+  color: oklch(0.18 0.012 315);
+  font-family: Manrope, ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  box-shadow: 0 1px 2px oklch(0.27 0.02 315 / 6%);
+}
+
+.titre {
+  margin: 0 0 0.35rem;
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.aide {
+  margin: 0 0 1rem;
+  font-size: 0.875rem;
+  color: oklch(0.5 0.01 315);
+}
+
+.champ {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.champ input {
+  height: 2.25rem;
+  padding: 0 0.75rem;
+  border: 1px solid oklch(0.9 0.006 315);
+  border-radius: 0.375rem;
+  font: inherit;
+  font-weight: 400;
+}
+
+.bouton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 2.25rem;
+  padding: 0 1rem;
+  border: 0;
+  border-radius: 0.375rem;
+  background: oklch(0.27 0.02 315);
+  color: #fff;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: default;
+}
+
+.fil {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0 0 1rem;
+  font-size: 0.875rem;
+  color: oklch(0.5 0.01 315);
+}
+
+.fil strong {
+  color: oklch(0.18 0.012 315);
+  font-weight: 500;
+}
+
+.enteteNiveau {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.enteteNiveau h3 {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.boutonSecondaire {
+  height: 2rem;
+  padding: 0 0.75rem;
+  border: 1px solid oklch(0.9 0.006 315);
+  border-radius: 0.375rem;
+  background: #fff;
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: default;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.table th {
+  text-align: left;
+  font-weight: 500;
+  color: oklch(0.5 0.01 315);
+  padding: 0.45rem 0.5rem;
+  border-bottom: 1px solid oklch(0.9 0.006 315);
+}
+
+.table td {
+  padding: 0.55rem 0.5rem;
+  border-bottom: 1px solid oklch(0.9 0.006 315);
+}
+
+.lien {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.carte {
+  border: 1px solid oklch(0.9 0.006 315);
+  border-radius: 0.375rem;
+  background: #fff;
+  font-size: 0.875rem;
+  margin: 0.75rem 0 1.25rem;
+}
+
+.barre {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.barre:hover {
+  background: oklch(0.96 0.006 315 / 50%);
+}
+
+.chevron {
+  color: oklch(0.5 0.01 315);
+  font-size: 0.75rem;
+}
+
+.libelle {
+  font-weight: 500;
+}
+
+.badge,
+.badgeOk,
+.badgeKo {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 0.375rem;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.badge {
+  border: 1px solid oklch(0.9 0.006 315);
+}
+
+.badgeOk {
+  border: 1px solid transparent;
+  background: oklch(0.96 0.006 315);
+  color: oklch(0.27 0.02 315);
+}
+
+.badgeKo {
+  border: 1px solid transparent;
+  background: oklch(0.4 0.13 23);
+  color: #fff;
+}
+
+.date {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: oklch(0.5 0.01 315);
+}
+
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-top: 1px solid oklch(0.9 0.006 315);
+}
+
+.modele {
+  margin: 0;
+  font-size: 0.75rem;
+  color: oklch(0.5 0.01 315);
+}
+
+.section h4 {
+  margin: 0 0 0.35rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: oklch(0.5 0.01 315);
+}
+
+.message {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 0.4rem;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid oklch(0.9 0.006 315);
+  border-radius: 0.375rem;
+}
+
+.role {
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.pre {
+  margin: 0;
+  max-height: 16rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  border-radius: 0.375rem;
+  background: oklch(0.96 0.006 315);
+  padding: 0.5rem 0.75rem;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 0.75rem;
+}

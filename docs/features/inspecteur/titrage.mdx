@@ -1,0 +1,66 @@
+import CarteApercu, {
+  JsonApercu,
+  MessageApercu,
+  SectionApercu,
+} from '@site/src/components/inspecteur/CarteApercu';
+
+# Titrage
+
+Appel court au modèle, **une seule fois**, lors de la **création** de la conversation (`POST /conversations`). Il ne repasse pas aux tours suivants : le collaborateur peut renommer la conversation à la main, sans nouvelle carte Titrage.
+
+Badge d’origine fournisseur (aujourd’hui **Mistral**). Compté en Consommation `titrage`. Pas d’outils sur cet appel.
+
+## Où ça se place
+
+Suite du scénario [Extraction web](./extraction-web.mdx) et [Garde-fous](./garde-fous.mdx) :
+
+1. Chat (éventuellement avec recherche web) → réponse du modèle.
+2. **Garde-fous** → texte **visible** affiché au collaborateur.
+3. **Titrage** (cette carte) → titre proposé pour la barre latérale.
+4. Enregistrement du premier message et de la réponse en base.
+
+Le prompt de titrage reprend le **message du compte** et la **réponse visible** (après garde-fous), pas la réponse brute du modèle. Si un lien inventé a été retiré, le titre ne s’appuie pas dessus.
+
+## Exemple concret
+
+Le collaborateur a demandé la date d’approbation du PLU de Castries. Après recherche, extraction et garde-fous, la bulle affiche seulement :
+
+> Le PLU de Castries a été approuvé le 12 mars 2019.
+
+La VM envoie alors un **seul** message `user` (pas l’historique du chat) :
+
+<CarteApercu
+  libelle="Titrage"
+  origine="mistral"
+  modele="mistral-small-latest"
+  ouvertParDefaut>
+  <SectionApercu titre="Payload envoyé">
+    <MessageApercu role="user">
+      Propose un titre court (moins de 8 mots), sans guillemets et sans aucune mise
+      en forme Markdown (pas de **, #, etc.), résumant l'échange suivant :
+      <br />
+      <br />
+      Utilisateur : Quelle est la date d'approbation du PLU de Castries ?
+      <br />
+      Assistant : Le PLU de Castries a été approuvé le 12 mars 2019.
+    </MessageApercu>
+  </SectionApercu>
+  <SectionApercu titre="Réponse brute reçue">
+    <JsonApercu>{`{
+  "choices": [{
+    "message": {
+      "content": "**PLU Castries** — approbation 2019"
+    }
+  }]
+}`}</JsonApercu>
+  </SectionApercu>
+  <SectionApercu titre="Titre retenu">
+    <p>PLU Castries — approbation 2019</p>
+  </SectionApercu>
+</CarteApercu>
+
+La consigne interdit le Markdown, mais le modèle peut quand même en laisser : `nettoyer_titre` (Local, après la réponse) retire `#`, `**`, `__`, etc. avant d’écrire `conversation.titre`. Ce nettoyage ne s’applique **pas** à un renommage manuel.
+
+## Échec
+
+Si le relais titrage échoue, la VM **annule** la création entière (rollback) : pas de conversation fantôme en base. L’inspecteur peut montrer une carte Titrage en **Échec** avec `conversation_id` vide, au même titre que les autres échecs de relais sur le premier message.

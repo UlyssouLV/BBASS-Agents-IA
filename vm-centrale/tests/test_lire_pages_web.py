@@ -1,7 +1,8 @@
 import json
+from datetime import datetime, timezone
 
 from vm_centrale.config import MODELE_CHAT
-from vm_centrale.models import Consommation, QuestionCouverte, ResultatRechercheWeb
+from vm_centrale.models import Consommation, PageWebEnCache, QuestionCouverte, ResultatRechercheWeb
 from vm_centrale.outils.lire_pages_web import CONSIGNE_LECTURE_PAGE
 
 # Outil lire_pages_web sur les pages trouvées par une recherche (spec 1.4.1,
@@ -231,7 +232,7 @@ def test_une_url_dune_autre_conversation_est_introuvable(
     assert "Page introuvable." in _message_tool(mistral_client_factice)
 
 
-def test_une_page_non_lue_renvoie_lextrait_du_moteur_seulement(
+def test_une_page_non_lue_en_echec_au_nouvel_essai_renvoie_lextrait_du_moteur_seulement(
     client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide, db_session
 ):
     conversation_id = _conversation_avec_recherche(
@@ -240,7 +241,8 @@ def test_une_page_non_lue_renvoie_lextrait_du_moteur_seulement(
     _lire(client, mistral_client_factice, jeton_valide, conversation_id, [_URL_NON_LUE])
 
     assert mistral_client_factice.appels_lecture_page == []
-    assert telechargeur_pages_factice.urls_recues == []
+    # Retentée au tour suivant (#156), toujours injoignable.
+    assert telechargeur_pages_factice.urls_recues == [_URL_NON_LUE]
     contenu = _message_tool(mistral_client_factice)
     assert _URL_NON_LUE in contenu and "Extrait moteur B" in contenu
     assert _questions_besoin(db_session, conversation_id) == []
@@ -322,7 +324,8 @@ def test_consommation_et_inspecteur_tracent_loutil_local_et_lextraction_web(
 
 # URL écrites par le compte (spec 1.4.1, #140) : téléchargée et nettoyée au
 # premier appel, enregistrée avec la provenance `utilisateur`, puis lue comme
-# une page trouvée ; jamais retéléchargée dans la conversation.
+# une page trouvée ; une page lue n'est jamais retéléchargée dans la
+# conversation (une page en échec est retentée au tour suivant, #156).
 
 _URL_COMPTE = "https://www.client-dupont.fr/devis-bornage"
 _URL_COMPTE_PDF = "https://www.client-dupont.fr/devis.pdf"
@@ -463,7 +466,7 @@ def test_un_chiffre_de_la_page_du_compte_passe_le_garde_fou_chiffres(
     mistral_client_factice.repondre_lecture_page(True, "4870 euros HT.", _URL_COMPTE)
     mistral_client_factice.repondre_avec_appel_outil(_OUTIL, {"urls": [_URL_COMPTE], "besoin": "Montant"})
     mistral_client_factice.repondre(
-        "Le devis est de 4870 euros, plus 735 euros de frais.", resume_et_profil=_resume_et_profil()
+        "Le devis est de 4870 euros. Il faut ajouter 735 euros de frais.", resume_et_profil=_resume_et_profil()
     )
 
     reponse = client.post(
@@ -478,7 +481,7 @@ def test_un_chiffre_de_la_page_du_compte_passe_le_garde_fou_chiffres(
     assert "735" not in contenu
 
 
-def test_une_url_du_compte_vers_un_pdf_donne_page_non_lue_sans_nouveau_telechargement(
+def test_une_url_du_compte_vers_un_pdf_donne_page_non_lue_a_chaque_essai(
     client, mistral_client_factice, telechargeur_pages_factice, jeton_valide, db_session
 ):
     conversation_id = _conversation_avec_url_du_compte(
@@ -495,7 +498,8 @@ def test_une_url_du_compte_vers_un_pdf_donne_page_non_lue_sans_nouveau_telecharg
 
     _lire(client, mistral_client_factice, jeton_valide, conversation_id, [_URL_COMPTE_PDF])
 
-    assert telechargeur_pages_factice.urls_recues == [_URL_COMPTE_PDF]
+    # Retentée au tour suivant (#156), toujours un PDF.
+    assert telechargeur_pages_factice.urls_recues == [_URL_COMPTE_PDF, _URL_COMPTE_PDF]
     assert "page non lue" in _message_tool(mistral_client_factice).lower()
 
 
@@ -600,7 +604,8 @@ def test_sans_besoin_une_page_de_recherche_est_relue_depuis_la_base(
 
     _lire_sans_besoin(client, mistral_client_factice, jeton_valide, conversation_id, [_URL_LUE, _URL_NON_LUE])
 
-    assert telechargeur_pages_factice.urls_recues == []
+    # Seule la page sans texte est retentée (#156), toujours injoignable.
+    assert telechargeur_pages_factice.urls_recues == [_URL_NON_LUE]
     assert mistral_client_factice.appels_lecture_page == []
     contenu = _message_tool(mistral_client_factice)
     assert "Le délai moyen est de trois mois." in contenu
@@ -876,3 +881,591 @@ def test_le_refus_dune_page_trop_longue_sans_titre_na_pas_de_ligne_de_titre(
     _lire(client, mistral_client_factice, jeton_valide, conversation_id, [_URL_COMPTE])
 
     assert _message_tool(mistral_client_factice) == f"Page {_URL_COMPTE} : {_PAGE_TROP_LONGUE}"
+
+
+# Page sans texte retentée à un tour suivant (spec 1.4.3, #156) : remplace la
+# règle 1.4.1 « jamais retéléchargée ensuite dans la conversation ». Au même
+# tour, pas de nouvel essai.
+
+
+def _lire_deux_fois_au_meme_tour(client, mistral_client_factice, jeton: str, conversation_id: int, url: str):
+    mistral_client_factice.repondre_avec_appels_outils(
+        [(_OUTIL, {"urls": [url], "besoin": _BESOIN}, "call_1")],
+        [(_OUTIL, {"urls": [url], "besoin": _BESOIN}, "call_2")],
+    )
+    mistral_client_factice.repondre("Réponse.", resume_et_profil=_resume_et_profil())
+    reponse = client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Elle est accessible."},
+        headers=_autorisation(jeton),
+    )
+    assert reponse.status_code == 200
+
+
+def test_une_url_du_compte_en_echec_redemandee_au_meme_tour_nest_pas_retentee(
+    client, mistral_client_factice, telechargeur_pages_factice, jeton_valide
+):
+    conversation_id = _conversation_avec_url_du_compte(client, mistral_client_factice, jeton_valide)
+
+    _lire_deux_fois_au_meme_tour(client, mistral_client_factice, jeton_valide, conversation_id, _URL_COMPTE)
+
+    assert telechargeur_pages_factice.urls_recues == [_URL_COMPTE]
+    assert all("page non lue" in contenu.lower() for contenu in _messages_tool(mistral_client_factice))
+
+
+def test_une_url_du_compte_en_echec_est_retentee_au_tour_suivant_et_sert_au_garde_fou_chiffres(
+    client, mistral_client_factice, telechargeur_pages_factice, jeton_valide, db_session
+):
+    conversation_id = _conversation_avec_url_du_compte(client, mistral_client_factice, jeton_valide)
+    _lire(client, mistral_client_factice, jeton_valide, conversation_id, [_URL_COMPTE])
+    telechargeur_pages_factice.servir(_URL_COMPTE, _page_html("Le devis s'élève à 4870 euros hors taxes."))
+    mistral_client_factice.repondre_lecture_page(True, "4870 euros HT.", _URL_COMPTE)
+    mistral_client_factice.repondre_avec_appel_outil(_OUTIL, {"urls": [_URL_COMPTE], "besoin": "Montant"})
+    mistral_client_factice.repondre(
+        "Le devis est de 4870 euros. Il faut ajouter 735 euros de frais.", resume_et_profil=_resume_et_profil()
+    )
+
+    reponse = client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Pour moi elle est accessible, quel montant ?"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert reponse.status_code == 200
+    assert telechargeur_pages_factice.urls_recues == [_URL_COMPTE, _URL_COMPTE]
+    assert "4870 euros HT." in _message_tool(mistral_client_factice)
+    (ligne,) = db_session.query(ResultatRechercheWeb).filter_by(conversation_id=conversation_id).all()
+    assert "4870 euros" in ligne.texte_nettoye
+    contenu = reponse.json()["reponse"]
+    assert "4870" in contenu and "735" not in contenu
+
+
+def test_une_page_retentee_avec_succes_entre_dans_le_cache(
+    client, mistral_client_factice, telechargeur_pages_factice, jeton_valide, db_session
+):
+    conversation_id = _conversation_avec_url_du_compte(client, mistral_client_factice, jeton_valide)
+    _lire(client, mistral_client_factice, jeton_valide, conversation_id, [_URL_COMPTE])
+    assert db_session.query(PageWebEnCache).filter_by(url=_URL_COMPTE).first() is None
+    telechargeur_pages_factice.servir(_URL_COMPTE, _page_html(_TEXTE_COMPTE))
+
+    _lire_sans_besoin(client, mistral_client_factice, jeton_valide, conversation_id, [_URL_COMPTE])
+
+    assert _TEXTE_COMPTE in _message_tool(mistral_client_factice)
+    copie = db_session.query(PageWebEnCache).filter_by(url=_URL_COMPTE).one()
+    assert _TEXTE_COMPTE in copie.texte_nettoye
+
+
+def test_une_page_retentee_en_echec_ne_lest_quune_fois_par_tour(
+    client, mistral_client_factice, telechargeur_pages_factice, jeton_valide, db_session
+):
+    conversation_id = _conversation_avec_url_du_compte(client, mistral_client_factice, jeton_valide)
+    _lire(client, mistral_client_factice, jeton_valide, conversation_id, [_URL_COMPTE])
+    telechargeur_pages_factice.urls_recues.clear()
+
+    _lire_deux_fois_au_meme_tour(client, mistral_client_factice, jeton_valide, conversation_id, _URL_COMPTE)
+
+    assert telechargeur_pages_factice.urls_recues == [_URL_COMPTE]
+    assert all("page non lue" in contenu.lower() for contenu in _messages_tool(mistral_client_factice))
+    (ligne,) = db_session.query(ResultatRechercheWeb).filter_by(conversation_id=conversation_id).all()
+    assert ligne.texte_nettoye == ""
+
+
+def test_une_page_de_recherche_sans_texte_est_lue_au_tour_suivant(
+    client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide, db_session
+):
+    conversation_id = _conversation_avec_recherche(
+        client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide
+    )
+    telechargeur_pages_factice.servir(_URL_NON_LUE, _page_html("Le délai est de deux mois à Lyon."))
+    mistral_client_factice.repondre_lecture_page(True, "Deux mois.", _URL_NON_LUE)
+
+    _lire(client, mistral_client_factice, jeton_valide, conversation_id, [_URL_NON_LUE])
+
+    assert telechargeur_pages_factice.urls_recues == [_URL_NON_LUE]
+    (appel,) = mistral_client_factice.appels_lecture_page
+    assert "deux mois à Lyon" in appel[1]["content"]
+    assert "Deux mois." in _message_tool(mistral_client_factice)
+    ligne = db_session.query(ResultatRechercheWeb).filter_by(conversation_id=conversation_id, url=_URL_NON_LUE).one()
+    assert "deux mois à Lyon" in ligne.texte_nettoye
+
+
+def test_une_page_de_recherche_sans_texte_est_servie_par_le_cache_au_tour_suivant(
+    client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide, db_session
+):
+    conversation_id = _conversation_avec_recherche(
+        client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide
+    )
+    db_session.add(
+        PageWebEnCache(
+            url=_URL_NON_LUE,
+            texte_nettoye="Le délai est de deux mois à Lyon.",
+            titre="Bornage à Lyon",
+            date_telechargement=datetime.now(timezone.utc),
+        )
+    )
+    db_session.commit()
+
+    _lire_sans_besoin(client, mistral_client_factice, jeton_valide, conversation_id, [_URL_NON_LUE])
+
+    assert telechargeur_pages_factice.urls_recues == []
+    assert "Le délai est de deux mois à Lyon." in _message_tool(mistral_client_factice)
+    ligne = db_session.query(ResultatRechercheWeb).filter_by(conversation_id=conversation_id, url=_URL_NON_LUE).one()
+    assert ligne.titre == "Bornage à Lyon"
+
+
+def test_une_page_de_recherche_sans_texte_au_meme_tour_donne_lextrait_du_moteur_seulement(
+    client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide
+):
+    moteur_recherche_factice.repondre(
+        ("Bornage A", _URL_LUE, "Extrait moteur A"), ("Bornage B", _URL_NON_LUE, "Extrait moteur B")
+    )
+    telechargeur_pages_factice.servir(_URL_LUE, _page_html("Le délai moyen est de trois mois."))
+    mistral_client_factice.repondre_avec_appels_outils(
+        [("rechercher_web", {"requete": "bornage", "besoin": "Comprendre le bornage"}, "call_1")],
+        [(_OUTIL, {"urls": [_URL_NON_LUE], "besoin": _BESOIN}, "call_2")],
+    )
+    mistral_client_factice.repondre("Voici.", "Titre")
+
+    reponse = client.post("/conversations", json={"message": "Cherche le bornage"}, headers=_autorisation(jeton_valide))
+
+    assert reponse.status_code == 200
+    assert telechargeur_pages_factice.urls_recues.count(_URL_NON_LUE) == 1
+    # Dernier appel principal (le titrage suit, sans message `tool`).
+    *_, lecture = [
+        m["content"]
+        for appel in mistral_client_factice.appels_reponse
+        if isinstance(appel, list)
+        for m in appel
+        if m["role"] == "tool"
+    ]
+    assert "Extrait moteur B" in lecture
+
+
+# Relecture forcée (spec 1.4.3, #157) : `retelecharger` télécharge la page
+# sans passer par le cache, une fois par URL et par tour au plus. Succès :
+# cache et copie de la conversation remplacés, questions couvertes de la page
+# revérifiées (#158). Échec : ancienne copie gardée, consigne avec sa date.
+
+_NOUVEAU_TEXTE = "Le délai prévu est désormais de neuf semaines."
+
+
+def _conversation_avec_page_du_compte_lue(
+    client, mistral_client_factice, telechargeur_pages_factice, jeton: str, db_session
+) -> int:
+    # Tour 1 : URL écrite ; tour 2 : page lue avec un besoin, une question
+    # couverte enregistrée, copie fraîche dans le cache.
+    conversation_id = _conversation_avec_url_du_compte(client, mistral_client_factice, jeton)
+    telechargeur_pages_factice.servir(_URL_COMPTE, _page_html(_TEXTE_COMPTE))
+    mistral_client_factice.repondre_lecture_page(True, "Six semaines.", _URL_COMPTE)
+    _lire(client, mistral_client_factice, jeton, conversation_id, [_URL_COMPTE])
+    assert len(_questions_besoin(db_session, conversation_id)) == 1
+    telechargeur_pages_factice.urls_recues.clear()
+    return conversation_id
+
+
+def _relire(
+    client, mistral_client_factice, jeton: str, conversation_id: int, besoin: str | None = None, reponse: str = "Réponse."
+):
+    arguments = {"urls": [_URL_COMPTE], "retelecharger": True}
+    if besoin is not None:
+        arguments["besoin"] = besoin
+    mistral_client_factice.repondre_avec_appel_outil(_OUTIL, arguments)
+    mistral_client_factice.repondre(reponse, resume_et_profil=_resume_et_profil())
+    resultat = client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "La page a été mise à jour, relis-la."},
+        headers=_autorisation(jeton),
+    )
+    assert resultat.status_code == 200
+    return resultat.json()
+
+
+def _ligne_du_compte(db_session, conversation_id: int) -> ResultatRechercheWeb:
+    db_session.expire_all()
+    (ligne,) = db_session.query(ResultatRechercheWeb).filter_by(conversation_id=conversation_id).all()
+    return ligne
+
+
+def test_retelecharger_est_un_parametre_facultatif_qui_dit_quand_lutiliser(
+    client, mistral_client_factice, jeton_valide
+):
+    _conversation_avec_url_du_compte(client, mistral_client_factice, jeton_valide)
+
+    (outil,) = [o for o in mistral_client_factice.tools_appels_reponse[0] if o["function"]["name"] == _OUTIL]
+    parametres = outil["function"]["parameters"]
+    assert parametres["properties"]["retelecharger"]["type"] == "boolean"
+    assert "changé" in parametres["properties"]["retelecharger"]["description"]
+    assert parametres["required"] == ["urls"]
+
+
+def test_retelecharger_contourne_un_cache_frais_et_met_a_jour_cache_et_copie(
+    client, mistral_client_factice, telechargeur_pages_factice, jeton_valide, db_session
+):
+    conversation_id = _conversation_avec_page_du_compte_lue(
+        client, mistral_client_factice, telechargeur_pages_factice, jeton_valide, db_session
+    )
+    telechargeur_pages_factice.servir(_URL_COMPTE, _page_html(_NOUVEAU_TEXTE, "Le devis s'élève à 5120 euros."))
+    mistral_client_factice.repondre_reverification_page([(True, "Neuf semaines.")], besoin=(True, "5120 euros."))
+
+    corps = _relire(
+        client,
+        mistral_client_factice,
+        jeton_valide,
+        conversation_id,
+        besoin="Montant",
+        reponse="Le devis est de 5120 euros. Il faut ajouter 735 euros de frais.",
+    )
+
+    assert telechargeur_pages_factice.urls_recues == [_URL_COMPTE]
+    ligne = _ligne_du_compte(db_session, conversation_id)
+    assert _NOUVEAU_TEXTE in ligne.texte_nettoye and _TEXTE_COMPTE not in ligne.texte_nettoye
+    copie = db_session.query(PageWebEnCache).filter_by(url=_URL_COMPTE).one()
+    assert _NOUVEAU_TEXTE in copie.texte_nettoye
+    assert _NOUVEAU_TEXTE in mistral_client_factice.appels_reverification_page[-1][1]["content"]
+    # Garde-fou chiffres sur le nouveau texte.
+    assert "5120" in corps["reponse"] and "735" not in corps["reponse"]
+
+
+def test_une_relecture_forcee_en_echec_garde_lancienne_copie_et_donne_une_consigne_datee(
+    client, mistral_client_factice, telechargeur_pages_factice, jeton_valide, db_session
+):
+    conversation_id = _conversation_avec_page_du_compte_lue(
+        client, mistral_client_factice, telechargeur_pages_factice, jeton_valide, db_session
+    )
+    telechargeur_pages_factice.servir(_URL_COMPTE, "Interdit", statut=403)
+    date_copie = _ligne_du_compte(db_session, conversation_id).date_creation.strftime("%d/%m/%Y")
+
+    _relire(client, mistral_client_factice, jeton_valide, conversation_id)
+
+    assert telechargeur_pages_factice.urls_recues == [_URL_COMPTE]
+    assert _TEXTE_COMPTE in _ligne_du_compte(db_session, conversation_id).texte_nettoye
+    assert len(_questions_besoin(db_session, conversation_id)) == 1
+    contenu = _message_tool(mistral_client_factice)
+    assert "n'a pas pu être relue" in contenu and f"lue le {date_copie}" in contenu
+    # Puis le contenu habituel de l'ancienne copie (aperçu, sans besoin).
+    assert contenu.index("n'a pas pu être relue") < contenu.index(_TEXTE_COMPTE)
+
+
+def test_une_relecture_forcee_en_echec_avec_un_besoin_relit_lancienne_copie(
+    client, mistral_client_factice, telechargeur_pages_factice, jeton_valide, db_session
+):
+    conversation_id = _conversation_avec_page_du_compte_lue(
+        client, mistral_client_factice, telechargeur_pages_factice, jeton_valide, db_session
+    )
+    telechargeur_pages_factice.servir(_URL_COMPTE, "Interdit", statut=403)
+    mistral_client_factice.repondre_lecture_page(True, "Six semaines.", _URL_COMPTE)
+
+    _relire(client, mistral_client_factice, jeton_valide, conversation_id, besoin=_BESOIN)
+
+    assert _TEXTE_COMPTE in mistral_client_factice.appels_lecture_page[-1][1]["content"]
+    contenu = _message_tool(mistral_client_factice)
+    assert "n'a pas pu être relue" in contenu and "Six semaines." in contenu
+
+
+def test_une_nouvelle_version_trop_longue_remplace_la_copie_et_donne_le_refus(
+    client, mistral_client_factice, telechargeur_pages_factice, jeton_valide, db_session
+):
+    conversation_id = _conversation_avec_page_du_compte_lue(
+        client, mistral_client_factice, telechargeur_pages_factice, jeton_valide, db_session
+    )
+    telechargeur_pages_factice.servir(_URL_COMPTE, _page_dense(220))
+    lectures_avant = len(mistral_client_factice.appels_lecture_page)
+
+    _relire(client, mistral_client_factice, jeton_valide, conversation_id, besoin=_BESOIN)
+
+    assert len(mistral_client_factice.appels_lecture_page) == lectures_avant
+    assert mistral_client_factice.appels_reverification_page == []
+    assert _PAGE_TROP_LONGUE in _message_tool(mistral_client_factice)
+    assert _TEXTE_COMPTE not in _ligne_du_compte(db_session, conversation_id).texte_nettoye
+    assert db_session.query(QuestionCouverte).filter_by(conversation_id=conversation_id).all() == []
+
+
+def test_une_seule_relecture_forcee_par_url_et_par_tour(
+    client, mistral_client_factice, telechargeur_pages_factice, jeton_valide, db_session
+):
+    conversation_id = _conversation_avec_page_du_compte_lue(
+        client, mistral_client_factice, telechargeur_pages_factice, jeton_valide, db_session
+    )
+    telechargeur_pages_factice.servir(_URL_COMPTE, _page_html(_NOUVEAU_TEXTE))
+    mistral_client_factice.repondre_avec_appels_outils(
+        [(_OUTIL, {"urls": [_URL_COMPTE], "retelecharger": True}, "call_1")],
+        [(_OUTIL, {"urls": [_URL_COMPTE], "retelecharger": True}, "call_2")],
+    )
+    mistral_client_factice.repondre("Réponse.", resume_et_profil=_resume_et_profil())
+
+    reponse = client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Relis-la à jour."},
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert reponse.status_code == 200
+    assert telechargeur_pages_factice.urls_recues == [_URL_COMPTE]
+    premier, second = _messages_tool(mistral_client_factice)
+    assert _NOUVEAU_TEXTE in premier and _NOUVEAU_TEXTE in second
+
+
+def test_une_page_de_recherche_peut_etre_relue_de_force(
+    client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide, db_session
+):
+    conversation_id = _conversation_avec_recherche(
+        client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide
+    )
+    telechargeur_pages_factice.servir(_URL_LUE, _page_html("Le délai moyen est désormais de cinq mois."))
+    mistral_client_factice.repondre_avec_appel_outil(_OUTIL, {"urls": [_URL_LUE], "retelecharger": True})
+    mistral_client_factice.repondre("Réponse.", resume_et_profil=_resume_et_profil())
+
+    reponse = client.post(
+        f"/conversations/{conversation_id}/messages", json={"message": "Relis-la."}, headers=_autorisation(jeton_valide)
+    )
+
+    assert reponse.status_code == 200
+    assert telechargeur_pages_factice.urls_recues == [_URL_LUE]
+    assert "cinq mois" in _message_tool(mistral_client_factice)
+    ligne = db_session.query(ResultatRechercheWeb).filter_by(conversation_id=conversation_id, url=_URL_LUE).one()
+    assert "cinq mois" in ligne.texte_nettoye
+
+
+def test_sans_retelecharger_une_page_lue_nest_pas_retelechargee(
+    client, mistral_client_factice, telechargeur_pages_factice, jeton_valide, db_session
+):
+    conversation_id = _conversation_avec_page_du_compte_lue(
+        client, mistral_client_factice, telechargeur_pages_factice, jeton_valide, db_session
+    )
+    telechargeur_pages_factice.servir(_URL_COMPTE, _page_html(_NOUVEAU_TEXTE))
+
+    _lire_sans_besoin(client, mistral_client_factice, jeton_valide, conversation_id, [_URL_COMPTE])
+
+    assert telechargeur_pages_factice.urls_recues == []
+    assert _TEXTE_COMPTE in _message_tool(mistral_client_factice)
+    assert len(_questions_besoin(db_session, conversation_id)) == 1
+
+
+def test_linspecteur_montre_largument_et_lissue_de_la_relecture_forcee(
+    client, mistral_client_factice, telechargeur_pages_factice, jeton_valide, db_session, monkeypatch
+):
+    conversation_id = _conversation_avec_page_du_compte_lue(
+        client, mistral_client_factice, telechargeur_pages_factice, jeton_valide, db_session
+    )
+    telechargeur_pages_factice.servir(_URL_COMPTE, _page_html(_NOUVEAU_TEXTE))
+    mistral_client_factice.repondre_reverification_page([(True, "Neuf semaines.")])
+    _relire(client, mistral_client_factice, jeton_valide, conversation_id)
+    reussie = _echange_local(client, conversation_id, jeton_valide, monkeypatch)
+    telechargeur_pages_factice.servir(_URL_COMPTE, "Interdit", statut=403)
+    _relire(client, mistral_client_factice, jeton_valide, conversation_id)
+    en_echec = _echange_local(client, conversation_id, jeton_valide, monkeypatch)
+
+    assert reussie["requete_payload"]["arguments"]["retelecharger"] is True
+    (relecture,) = reussie["reponse_payload"]["relectures_forcees"]
+    assert relecture == {"url": _URL_COMPTE, "reussie": True, "questions_mises_a_jour": 1, "questions_supprimees": 0}
+    (page,) = reussie["reponse_payload"]["pages_telechargees"]
+    assert page["origine"] == "telechargement" and page["statut"] == 200
+    (relecture,) = en_echec["reponse_payload"]["relectures_forcees"]
+    assert relecture == {"url": _URL_COMPTE, "reussie": False, "questions_mises_a_jour": 0, "questions_supprimees": 0}
+
+
+# Revérification des questions couvertes d'une page relue de force (spec
+# 1.4.3, #158) : un seul appel d'extraction isolé par page, anciennes
+# questions et `besoin` éventuel ; réponse changée → mise à jour, plus
+# trouvée → supprimée, appel en échec ou hors du JSON → toutes supprimées.
+
+_AUTRE_BESOIN = "Montant du devis"
+
+
+def _conversation_avec_deux_questions(
+    client, mistral_client_factice, telechargeur_pages_factice, jeton: str, db_session
+) -> int:
+    conversation_id = _conversation_avec_page_du_compte_lue(
+        client, mistral_client_factice, telechargeur_pages_factice, jeton, db_session
+    )
+    mistral_client_factice.repondre_lecture_page(True, "Quatre mille euros.", _URL_COMPTE)
+    _lire(client, mistral_client_factice, jeton, conversation_id, [_URL_COMPTE], besoin=_AUTRE_BESOIN)
+    assert len(_questions_besoin(db_session, conversation_id)) == 2
+    telechargeur_pages_factice.servir(_URL_COMPTE, _page_html(_NOUVEAU_TEXTE))
+    return conversation_id
+
+
+def _questions(db_session, conversation_id: int) -> list[tuple[str, str, bool]]:
+    db_session.expire_all()
+    return [(q.question, q.reponse, q.trouvee) for q in _questions_besoin(db_session, conversation_id)]
+
+
+def test_une_reponse_changee_est_mise_a_jour_et_une_reponse_plus_trouvee_supprimee(
+    client, mistral_client_factice, telechargeur_pages_factice, jeton_valide, db_session
+):
+    conversation_id = _conversation_avec_deux_questions(
+        client, mistral_client_factice, telechargeur_pages_factice, jeton_valide, db_session
+    )
+    mistral_client_factice.repondre_reverification_page([(True, "Neuf semaines."), (False, "")])
+
+    _relire(client, mistral_client_factice, jeton_valide, conversation_id)
+
+    assert _questions(db_session, conversation_id) == [(_BESOIN, "Neuf semaines.", True)]
+    (appel,) = mistral_client_factice.appels_reverification_page
+    # Isolé : consigne fixe, puis les anciennes questions et la nouvelle
+    # version de la page, jamais la conversation ni les anciennes réponses.
+    assert [m["role"] for m in appel] == ["system", "user"]
+    contenu = appel[1]["content"]
+    assert _BESOIN in contenu and _AUTRE_BESOIN in contenu and _NOUVEAU_TEXTE in contenu
+    assert "Six semaines." not in contenu and "relis-la" not in contenu
+    assert _NOUVEAU_TEXTE in _message_tool(mistral_client_factice)
+
+
+def test_une_reverification_en_echec_supprime_toutes_les_questions_de_la_page(
+    client, mistral_client_factice, telechargeur_pages_factice, jeton_valide, db_session
+):
+    conversation_id = _conversation_avec_deux_questions(
+        client, mistral_client_factice, telechargeur_pages_factice, jeton_valide, db_session
+    )
+    mistral_client_factice.echouer_reverification_page(RuntimeError("Mistral injoignable"))
+
+    _relire(client, mistral_client_factice, jeton_valide, conversation_id)
+
+    assert _questions(db_session, conversation_id) == []
+    assert _NOUVEAU_TEXTE in _message_tool(mistral_client_factice)
+
+
+def test_une_reverification_hors_du_json_attendu_supprime_toutes_les_questions_de_la_page(
+    client, mistral_client_factice, telechargeur_pages_factice, jeton_valide, db_session
+):
+    conversation_id = _conversation_avec_deux_questions(
+        client, mistral_client_factice, telechargeur_pages_factice, jeton_valide, db_session
+    )
+    # Une réponse pour deux questions : hors du JSON attendu.
+    mistral_client_factice.repondre_reverification_page([(True, "Neuf semaines.")])
+
+    _relire(client, mistral_client_factice, jeton_valide, conversation_id)
+
+    assert _questions(db_session, conversation_id) == []
+
+
+def test_avec_un_besoin_un_seul_appel_reverifie_les_questions_et_traite_le_besoin(
+    client, mistral_client_factice, telechargeur_pages_factice, jeton_valide, db_session
+):
+    conversation_id = _conversation_avec_page_du_compte_lue(
+        client, mistral_client_factice, telechargeur_pages_factice, jeton_valide, db_session
+    )
+    telechargeur_pages_factice.servir(_URL_COMPTE, _page_html(_NOUVEAU_TEXTE))
+    lectures_avant = len(mistral_client_factice.appels_lecture_page)
+    mistral_client_factice.repondre_reverification_page(
+        [(True, "Neuf semaines.")], besoin=(True, "Un géomètre-expert.")
+    )
+
+    _relire(client, mistral_client_factice, jeton_valide, conversation_id, besoin="Qui fait le bornage")
+
+    assert len(mistral_client_factice.appels_reverification_page) == 1
+    assert len(mistral_client_factice.appels_lecture_page) == lectures_avant
+    assert "Qui fait le bornage" in mistral_client_factice.appels_reverification_page[0][1]["content"]
+    assert "Un géomètre-expert." in _message_tool(mistral_client_factice)
+    assert _questions(db_session, conversation_id) == [
+        (_BESOIN, "Neuf semaines.", True),
+        ("Qui fait le bornage", "Un géomètre-expert.", True),
+    ]
+
+
+def test_avec_un_besoin_une_reverification_en_echec_rend_lextraction_indisponible(
+    client, mistral_client_factice, telechargeur_pages_factice, jeton_valide, db_session
+):
+    conversation_id = _conversation_avec_page_du_compte_lue(
+        client, mistral_client_factice, telechargeur_pages_factice, jeton_valide, db_session
+    )
+    telechargeur_pages_factice.servir(_URL_COMPTE, _page_html(_NOUVEAU_TEXTE))
+    mistral_client_factice.echouer_reverification_page(RuntimeError("Mistral injoignable"))
+
+    _relire(client, mistral_client_factice, jeton_valide, conversation_id, besoin="Qui fait le bornage")
+
+    assert "extraction indisponible" in _message_tool(mistral_client_factice).lower()
+    assert _questions(db_session, conversation_id) == []
+
+
+def test_sans_question_ni_besoin_aucun_appel_ni_consommation(
+    client, mistral_client_factice, telechargeur_pages_factice, jeton_valide, db_session
+):
+    conversation_id = _conversation_avec_url_du_compte(client, mistral_client_factice, jeton_valide)
+    telechargeur_pages_factice.servir(_URL_COMPTE, _page_html(_TEXTE_COMPTE))
+    _lire_sans_besoin(client, mistral_client_factice, jeton_valide, conversation_id, [_URL_COMPTE])
+    telechargeur_pages_factice.servir(_URL_COMPTE, _page_html(_NOUVEAU_TEXTE))
+    extractions_avant = db_session.query(Consommation).filter_by(type_appel="extraction_web").count()
+
+    _relire(client, mistral_client_factice, jeton_valide, conversation_id)
+
+    assert mistral_client_factice.appels_reverification_page == []
+    assert db_session.query(Consommation).filter_by(type_appel="extraction_web").count() == extractions_avant
+    assert _NOUVEAU_TEXTE in _message_tool(mistral_client_factice)
+
+
+def test_sans_question_avec_un_besoin_la_page_est_lue_comme_en_1_4_1(
+    client, mistral_client_factice, telechargeur_pages_factice, jeton_valide, db_session
+):
+    conversation_id = _conversation_avec_url_du_compte(client, mistral_client_factice, jeton_valide)
+    telechargeur_pages_factice.servir(_URL_COMPTE, _page_html(_TEXTE_COMPTE))
+    _lire_sans_besoin(client, mistral_client_factice, jeton_valide, conversation_id, [_URL_COMPTE])
+    telechargeur_pages_factice.servir(_URL_COMPTE, _page_html(_NOUVEAU_TEXTE))
+    mistral_client_factice.repondre_lecture_page(True, "Neuf semaines.", _URL_COMPTE)
+
+    _relire(client, mistral_client_factice, jeton_valide, conversation_id, besoin=_BESOIN)
+
+    assert mistral_client_factice.appels_reverification_page == []
+    assert _NOUVEAU_TEXTE in mistral_client_factice.appels_lecture_page[-1][1]["content"]
+    assert _questions(db_session, conversation_id) == [(_BESOIN, "Neuf semaines.", True)]
+
+
+def test_la_reverification_est_tracee_en_consommation_et_dans_linspecteur(
+    client, mistral_client_factice, telechargeur_pages_factice, jeton_valide, db_session, monkeypatch
+):
+    monkeypatch.setenv("VM_ADMIN_KEY", "cle-admin-de-test")
+    entetes_admin = {**_autorisation(jeton_valide), "X-Admin-Key": "cle-admin-de-test"}
+    conversation_id = _conversation_avec_deux_questions(
+        client, mistral_client_factice, telechargeur_pages_factice, jeton_valide, db_session
+    )
+    extractions_avant = db_session.query(Consommation).filter_by(type_appel="extraction_web").count()
+    mistral_client_factice.repondre_reverification_page([(True, "Neuf semaines."), (False, "")])
+
+    _relire(client, mistral_client_factice, jeton_valide, conversation_id)
+
+    assert db_session.query(Consommation).filter_by(type_appel="extraction_web").count() == extractions_avant + 1
+    echanges = client.get(f"/inspecteur/conversations/{conversation_id}/echanges", headers=entetes_admin).json()
+    types = [(e["origine"], e["type_appel"]) for e in echanges]
+    indice = len(types) - 1 - types[::-1].index(("local", f"outil:{_OUTIL}"))
+    assert types[indice + 1] == ("mistral", "extraction_web")
+    detail = client.get(f"/inspecteur/echanges/{echanges[indice + 1]['id']}", headers=entetes_admin).json()
+    assert detail["statut"] == "succes" and detail["modele"] == MODELE_CHAT
+    assert detail["requete_payload"]["response_format"]["type"] == "json_schema"
+    local = client.get(f"/inspecteur/echanges/{echanges[indice]['id']}", headers=entetes_admin).json()
+    (relecture,) = local["reponse_payload"]["relectures_forcees"]
+    assert relecture == {"url": _URL_COMPTE, "reussie": True, "questions_mises_a_jour": 1, "questions_supprimees": 1}
+
+
+def test_une_reverification_avec_besoin_dune_page_refusee_plus_tot_dans_le_tour_est_tracee_en_consommation(
+    client, mistral_client_factice, telechargeur_pages_factice, jeton_valide, db_session
+):
+    # Copie de la conversation devenue trop longue, question couverte
+    # gardée : refusée au premier appel du tour, puis relue de force avec un
+    # besoin. La page reste refusée, mais la revérification est payée.
+    conversation_id = _conversation_avec_page_du_compte_lue(
+        client, mistral_client_factice, telechargeur_pages_factice, jeton_valide, db_session
+    )
+    ligne = _ligne_du_compte(db_session, conversation_id)
+    ligne.texte_nettoye = _page_dense(220)
+    db_session.commit()
+    telechargeur_pages_factice.servir(_URL_COMPTE, _page_html(_NOUVEAU_TEXTE))
+    mistral_client_factice.repondre_reverification_page(
+        [(True, "Neuf semaines.")], besoin=(True, "Un géomètre-expert.")
+    )
+    extractions_avant = db_session.query(Consommation).filter_by(type_appel="extraction_web").count()
+    mistral_client_factice.repondre_avec_appels_outils(
+        [(_OUTIL, {"urls": [_URL_COMPTE], "besoin": _BESOIN}, "call_1")],
+        [(_OUTIL, {"urls": [_URL_COMPTE], "besoin": "Qui fait le bornage", "retelecharger": True}, "call_2")],
+    )
+    mistral_client_factice.repondre("Réponse.", resume_et_profil=_resume_et_profil())
+
+    reponse = client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Relis-la à jour."},
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert reponse.status_code == 200
+    assert len(mistral_client_factice.appels_reverification_page) == 1
+    assert all(_PAGE_TROP_LONGUE in contenu for contenu in _messages_tool(mistral_client_factice))
+    assert db_session.query(Consommation).filter_by(type_appel="extraction_web").count() == extractions_avant + 1

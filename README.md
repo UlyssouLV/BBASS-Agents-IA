@@ -1,14 +1,29 @@
-# BBASS-Agents-IA
+<p align="center">
+  <img src="docs/img/readme-banniere.jpg" alt="BBASS Agents IA" width="480" />
+</p>
 
-Logiciel d'agents IA pour le cabinet de géomètres-experts BBASS. L'objectif est de mettre à disposition des collaborateurs une interface unique donnant accès à plusieurs agents métiers, capables de les assister sur des tâches courantes du cabinet. Le moteur de langage retenu est Mistral AI, choix du cabinet pour des raisons de souveraineté et de sécurité : ce projet ne consiste pas à entraîner une IA, mais à construire les agents et l'application qui les exploite.
+<!-- sync:stats-commits -->
+<p align="center">
+  <img src="https://img.shields.io/badge/commits_main-19-c8102e?style=for-the-badge" alt="19 commits sur main" />
+  <img src="https://img.shields.io/badge/commits_PR_(historique)-229-1e3a5f?style=for-the-badge" alt="229 commits dans les PR mergées" />
+</p>
+<!-- /sync:stats-commits -->
+
+# Un copilote multi-agents pour le cabinet
+
+**BBASS Agents IA** est un espace de discussion type ChatGPT, branché sur plusieurs agents métiers : ils répondent aux questions du quotidien et peuvent aussi enchaîner des actions (outils, recherches, workflows) à la place du collaborateur. Le moteur de langage est Mistral AI — choix du cabinet pour la souveraineté et la sécurité : on ne forme pas un modèle, on construit les agents et l’application qui les exploitent.
+
+## Documentation fonctionnelle et technique
+
+<p align="center">
+  <a href="https://ulyssoulv.github.io/BBASS-Agents-IA/">
+    <img src="https://img.shields.io/badge/Ouvrir_la_documentation-GitHub_Pages-c8102e?style=for-the-badge" alt="Ouvrir la documentation" />
+  </a>
+</p>
 
 ## État actuel
 
-**V1.4.2** disponible : le contexte en vrais tokens ([#144](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/144)). Le modèle de chat est figé (`mistral-small-2603`, Mistral Small 4) dans une fiche de modèle qui regroupe sa fenêtre (262 144 tokens), son tokenizer et ses tarifs ; le plafond des pages web est compté en vrais tokens par le tokenizer local de Small 4 (la VM refuse de démarrer sans lui). Une page trop longue n'est plus relue en entier : l'IA le dit, et la réponse se termine par une mention fixe. Une jauge de contexte, sous le champ de saisie, montre ce que pesait le dernier envoi au modèle (orange à partir de 80 %). Hérite de la **V1.4.1** : mémoire de la conversation ([#132](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/132)). À chaque appel de chat, la VM envoie au modèle la liste de tout ce qui a été partagé dans la conversation (pièces jointes, recherches web, URL écrites par le collaborateur, marquées comme telles), avec les questions auxquelles chaque élément répond déjà ; l'IA peut relire des pièces jointes (`relire_pieces_jointes`) ou des pages (`lire_pages_web`, y compris une URL envoyée par le collaborateur), avec un besoin précis ; la boucle d'outils passe à 5 appels par message. Hérite de la **V1.4.0** : recherche web dans le chat ([#117](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/117)). L'IA peut appeler l'outil `rechercher_web` ; la VM interroge un SearXNG auto-hébergé ([ADR-0013](docs/adr/0013-recherche-web-searxng-auto-heberge.md)), lit les pages, les fait passer par un appel d'extraction isolé ([ADR-0014](docs/adr/0014-recherche-web-en-deux-temps-extraction-isolee.md)), et n'autorise que les URL et chiffres issus de ces résultats. Les outils du modèle sont centralisés dans `vm_centrale/outils/` ; l'inspecteur montre le déroulé chronologique (Mistral / local, ligne garde-fous). Bug connu à la livraison : quand la recherche ne trouve rien, l'IA invente encore parfois au lieu de le dire ([#131](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/131), correction en **1.4.5**). Hérite de la **V1.3.1** : le chat ne fige plus ses inventions ([#110](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/110)) — pas de lien inventé, faits inventés refusés sans demande explicite, résumé glissant « proposé, non vérifié », profil réécrit en entier, garde-fous URL et chiffres. Hérite de la **V1.3.0** : Mode développeur (`Ctrl+Maj+D`, Clé d'administration VM, [ADR-0012](docs/adr/0012-mode-developpeur-cle-admin-vm-tous-comptes.md)). Hérite aussi de la fluidité 1.2.3, du style 1.2.2 et de l'identité visuelle BBASS. Backend local **poste** (React/TypeScript/Vite) et API **VM centrale** (PostgreSQL, relais Mistral, conversations, pièces jointes, consommation, recherche web). Les agents métiers ne sont pas encore construits.
-
-## Ce qu'on construit
-
-Une application composée d'un backend Python et d'une interface web (HTML/CSS/JS), avec des comptes par collaborateur. L'interface prend la forme d'une fenêtre de discussion (type chatbot) servant de point d'entrée vers les différents agents métiers. Le logiciel est destiné à être déployé et mis à jour de façon centralisée, pour être utilisé directement sur les postes des agences.
+[![Aperçu de la documentation](docs/img/apercu-docs-accueil.png)](https://ulyssoulv.github.io/BBASS-Agents-IA/)
 
 ## Agents prévus
 
@@ -21,8 +36,6 @@ Une application composée d'un backend Python et d'une interface web (HTML/CSS/J
 
 ## Architecture
 
-Le poste n’appelle jamais Mistral directement : tout passe par la VM centrale (réseau interne), qui détient aussi PostgreSQL, la clé API et le moteur de recherche SearXNG. Vue détaillée (fichiers et flux) : [docs/architecture/vue-systeme.md](docs/architecture/vue-systeme.md).
-
 ```mermaid
 flowchart LR
   P["Poste<br/>UI locale"] -->|"jamais Mistral"| VM["VM Castries<br/>réseau interne"]
@@ -31,42 +44,124 @@ flowchart LR
   VM --> S["SearXNG<br/>localhost"]
 ```
 
+<!-- sync:vue-systeme-mermaid -->
+```mermaid
+%% Generated by https://gitdiagram.com/ulyssoulv/bbass-agents-ia
+flowchart TD
+
+subgraph group_interface["Interface collaborateur"]
+  node_webui["Interface web<br/>[App.tsx]"]
+  node_chatui["Chat<br/>[OngletChat.tsx]"]
+  node_adminui["Administration<br/>[OngletComptes.tsx]"]
+  node_inspectui["Inspecteur<br/>[PageInspecteur.tsx]"]
+end
+
+subgraph group_poste["Backend poste"]
+  node_posteapp["API poste<br/>[main.py]"]
+  node_authposte["Session locale<br/>[session.py]"]
+  node_conversationposte["Relais conversations<br/>[conversations.py]"]
+  node_clientvm["Client VM"]
+end
+
+subgraph group_vm["Services VM centrale"]
+  node_vmapp["API VM<br/>[main.py]"]
+  node_authvm["Authentification<br/>[auth.py]"]
+  node_comptes["Gestion comptes<br/>[comptes.py]"]
+  node_conversationvm["Conversations et chat<br/>[conversations.py]"]
+  node_pieces["Analyse pièces jointes"]
+  node_garde["Garde-fous réponse"]
+  node_outils["Outils de recherche"]
+  node_inspecteur["Trace des appels<br/>[inspecteur.py]"]
+  node_consommation["Suivi consommation<br/>[consommation.py]"]
+end
+
+subgraph group_state["Données et intégrations"]
+  node_store[("Base de données<br/>[database.py]")]
+end
+
+node_collaborateur(("Collaborateur"))
+node_mistral{{"Mistral AI"}}
+node_searxng{{"SearXNG"}}
+
+node_collaborateur -->|"utilise"| node_webui
+node_webui -->|"ouvre"| node_chatui
+node_webui -.->|"ouvre"| node_adminui
+node_webui -->|"ouvre"| node_inspectui
+node_chatui -->|"envoie requêtes"| node_posteapp
+node_adminui -.->|"envoie requêtes"| node_posteapp
+node_inspectui -.->|"envoie requêtes"| node_posteapp
+node_posteapp -->|"enregistre route"| node_authposte
+node_posteapp -->|"enregistre route"| node_conversationposte
+node_authposte -->|"appelle"| node_clientvm
+node_conversationposte -->|"appelle"| node_clientvm
+node_clientvm -->|"requêtes HTTP"| node_vmapp
+node_vmapp -->|"enregistre route"| node_authvm
+node_vmapp -->|"enregistre route"| node_comptes
+node_vmapp -->|"enregistre route"| node_conversationvm
+node_authvm -->|"lit comptes"| node_store
+node_comptes -->|"gère comptes"| node_store
+node_conversationvm -->|"persiste échanges"| node_store
+node_conversationvm -->|"relaie appels"| node_mistral
+node_conversationvm -->|"utilise analyse"| node_pieces
+node_conversationvm -->|"applique contrôles"| node_garde
+node_conversationvm -->|"dispatch outils"| node_outils
+node_outils -.->|"recherche web"| node_searxng
+node_conversationvm -->|"trace appels"| node_inspecteur
+node_conversationvm -->|"suit usage"| node_consommation
+node_consommation -->|"enregistre coûts"| node_store
+
+click node_webui "https://github.com/UlyssouLV/BBASS-Agents-IA/blob/main/poste/frontend/src/App.tsx"
+click node_chatui "https://github.com/UlyssouLV/BBASS-Agents-IA/blob/main/poste/frontend/src/onglets/OngletChat.tsx"
+click node_adminui "https://github.com/UlyssouLV/BBASS-Agents-IA/blob/main/poste/frontend/src/onglets/OngletComptes.tsx"
+click node_inspectui "https://github.com/UlyssouLV/BBASS-Agents-IA/blob/main/poste/frontend/src/screens/PageInspecteur.tsx"
+click node_posteapp "https://github.com/UlyssouLV/BBASS-Agents-IA/blob/main/poste/src/poste/main.py"
+click node_authposte "https://github.com/UlyssouLV/BBASS-Agents-IA/blob/main/poste/src/poste/routers/session.py"
+click node_conversationposte "https://github.com/UlyssouLV/BBASS-Agents-IA/blob/main/poste/src/poste/routers/conversations.py"
+click node_clientvm "https://github.com/UlyssouLV/BBASS-Agents-IA/blob/main/poste/src/poste/vm_centrale_client.py"
+click node_vmapp "https://github.com/UlyssouLV/BBASS-Agents-IA/blob/main/vm-centrale/src/vm_centrale/main.py"
+click node_authvm "https://github.com/UlyssouLV/BBASS-Agents-IA/blob/main/vm-centrale/src/vm_centrale/routers/auth.py"
+click node_comptes "https://github.com/UlyssouLV/BBASS-Agents-IA/blob/main/vm-centrale/src/vm_centrale/routers/comptes.py"
+click node_conversationvm "https://github.com/UlyssouLV/BBASS-Agents-IA/blob/main/vm-centrale/src/vm_centrale/routers/conversations.py"
+click node_pieces "https://github.com/UlyssouLV/BBASS-Agents-IA/tree/main/vm-centrale/src/vm_centrale/analyse_pieces_jointes"
+click node_garde "https://github.com/UlyssouLV/BBASS-Agents-IA/tree/main/vm-centrale/src/vm_centrale/garde_fous"
+click node_outils "https://github.com/UlyssouLV/BBASS-Agents-IA/tree/main/vm-centrale/src/vm_centrale/outils"
+click node_inspecteur "https://github.com/UlyssouLV/BBASS-Agents-IA/blob/main/vm-centrale/src/vm_centrale/inspecteur.py"
+click node_consommation "https://github.com/UlyssouLV/BBASS-Agents-IA/blob/main/vm-centrale/src/vm_centrale/consommation.py"
+click node_store "https://github.com/UlyssouLV/BBASS-Agents-IA/blob/main/vm-centrale/src/vm_centrale/database.py"
+
+classDef toneNeutral fill:#f8fafc,stroke:#334155,stroke-width:1.5px,color:#0f172a
+classDef toneBlue fill:#dbeafe,stroke:#2563eb,stroke-width:1.5px,color:#172554
+classDef toneAmber fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#78350f
+classDef toneMint fill:#dcfce7,stroke:#16a34a,stroke-width:1.5px,color:#14532d
+classDef toneRose fill:#ffe4e6,stroke:#e11d48,stroke-width:1.5px,color:#881337
+classDef toneIndigo fill:#e0e7ff,stroke:#4f46e5,stroke-width:1.5px,color:#312e81
+classDef toneTeal fill:#ccfbf1,stroke:#0f766e,stroke-width:1.5px,color:#134e4a
+class node_webui,node_chatui,node_adminui,node_inspectui toneBlue
+class node_posteapp,node_authposte,node_conversationposte,node_clientvm toneAmber
+class node_vmapp,node_authvm,node_comptes,node_conversationvm,node_pieces,node_garde,node_outils,node_inspecteur,node_consommation toneMint
+class node_store toneRose
+class node_collaborateur,node_mistral,node_searxng toneIndigo
+```
+<!-- /sync:vue-systeme-mermaid -->
+
 ## Semaine du 05 au 09 octobre 2026
 
-Point visé jeudi 8 octobre : **V1.5.0** (Moduléo lecture), puis **priorité V1.7.0** (déploiement postes / CI/CD), **V1.8.0** (n8n) si le temps le permet. **V1.4.0** livrée le 06/10 (recherche web ; bug connu [#131](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/131) → **1.4.5**), **V1.4.1** livrée le 06/10 (mémoire de la conversation), **V1.4.2** livrée le 07/10 (contexte en vrais tokens). Vendredi 9 : RTT.
+Point visé jeudi 8 octobre : **V1.5.0** (Moduléo lecture), puis **priorité V1.7.0** (déploiement postes / CI/CD), **V1.8.0** (n8n) si le temps le permet. **V1.4.0** livrée le 06/10 (recherche web ; bug connu [#131](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/131) → **1.4.5**), **V1.4.1** livrée le 06/10 (mémoire de la conversation), **V1.4.2** livrée le 07/10 (contexte en vrais tokens), **V1.4.3** livrée le 07/10 (cache des pages web, relecture forcée). Vendredi 9 : RTT.
 
 ```mermaid
 flowchart LR
   L05["Lundi 5<br/>V1.2.3, V1.3.0 et V1.3.1 livrées"] --> V140["V1.4.0<br/>recherche web<br/>livrée le 06/10"]
   V140 --> V141["V1.4.1<br/>mémoire de la conversation<br/>livrée le 06/10"]
   V141 --> V142["V1.4.2<br/>contexte en vrais tokens<br/>livrée le 07/10"]
-  V142 --> V150["V1.5.0<br/>Moduléo lecture<br/>visé le 07/10"]
+  V142 --> V143["V1.4.3<br/>cache des pages web<br/>livrée le 07/10"]
+  V143 --> V150["V1.5.0<br/>Moduléo lecture<br/>visé le 08/10"]
   V150 --> V170["V1.7.0<br/>déploiement · priorité"]
   V170 --> V180["V1.8.0<br/>n8n<br/>visé le 08/10"]
 ```
 
 ### Travail réalisé
 
-- **Semaine du 14–18 septembre** — socle jusqu’à **V1.2.0** (comptes admin, persistance conversations, pièces jointes, consommation, front React/TypeScript/Vite).
-- **Depuis** — **V1.2.1** (identité visuelle BBASS, disposition type ChatGPT) ; **V1.2.2** (prompt système de style sur le chat principal ; rendu Markdown borné côté poste).
-- **Lundi 5 octobre** — **V1.2.3** (cache TanStack Query, pagination par curseur du détail de conversation, instrumentation de temps légère) ; **V1.3.0** (Mode développeur : inspecteur des échanges avec le modèle) ; **V1.3.1** (le chat ne fige plus ses inventions, [#110](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/110) : consignes, résumé glissant, profil de travail, garde-fous URL et chiffres).
-- **Mardi 6 octobre** — **V1.4.0** (recherche web : SearXNG, `rechercher_web`, extraction isolée, outils centralisés, inspecteur Mistral / local ; bug connu [#131](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/131) → 1.4.5) ; **V1.4.1** (mémoire de la conversation, [#132](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/132) : pièces jointes, recherches et URL du collaborateur listées à chaque appel avec leurs questions couvertes, `relire_pieces_jointes` et `lire_pages_web` avec un besoin, boucle d'outils à 5 appels).
-- **Mercredi 7 octobre** — **V1.4.2** (contexte en vrais tokens, [#144](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/144) : fiche de modèle, `mistral-small-2603` figé, tokenizer Small 4, plafond des pages en tokens sur 262 144, page trop longue non relue, jauge de contexte).
-
-### Reste à implémenter
-
-- **V1.4.5** — dire « pas trouvé » plutôt qu’inventer après une recherche ([#131](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/131)).
-- **V1.5.0** — Moduléo en lecture (outil transverse), premier branchement via l’Agent Administration.
-- **V1.6.0** — documentation : mémoire conversationnelle et souveraineté des données.
-- **V1.7.0** — déploiement postes : CI/CD, conteneurisation, installateur / logiciel d’accès au chat (backend local obligatoire) — **priorité**.
-- **V1.8.0** — workflows n8n, branchés sur Moduléo 1.5.0 — **proposé cette semaine** après la 1.7.0.
-
-### Attendu pour la fin de semaine (V1.7.0 prioritaire, V1.8.0 visé)
-
-- **Déjà en place** — poste + VM Castries, PostgreSQL, chat Mistral, conversations bornées + résumé + profil, pièces jointes, consommation, comptes administrateurs, UI React BBASS, style 1.2.2, fluidité 1.2.3, inspecteur 1.3.0, chat sans inventions figées 1.3.1, **recherche web 1.4.0** (SearXNG), **mémoire de la conversation 1.4.1**, **contexte en vrais tokens 1.4.2**.
-- **V1.5.0** — Q&A lecture Moduléo depuis le chat (pour usage collab pendant l’absence alternance).
-- **V1.7.0** — pouvoir **installer / mettre à jour** le logiciel sur les postes (CI/CD, Docker si retenu, installateur ; UI pywebview et/ou navigateur — à trancher).
-- **V1.8.0** — socle n8n branché sur Moduléo 1.5.0 (on tente de le livrer jeudi ; non bloquant si seule la 1.7.0 passe).
+![Travail réalisé](docs/img/apercu-travail-realise.png)
 
 ## Prérequis
 

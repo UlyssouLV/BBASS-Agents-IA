@@ -1,0 +1,75 @@
+import CarteApercu, {SectionApercu} from '@site/src/components/inspecteur/CarteApercu';
+
+# OCR
+
+## Qu’est-ce que c’est
+
+**OCR** (*Optical Character Recognition*) : reconnaissance optique de caractères. Un PDF n’est souvent qu’une **image de pages** (scan, export) : le modèle de chat ne « lit » pas le fichier binaire. L’OCR transforme ces pages en **texte** (markdown page par page), que le [Chat](./chat.mdx) pourra utiliser.
+
+Ce n’est **pas** un outil demandé par le modèle : c’est une [étape de traitement](/docs/glossaire#etape-de-traitement) imposée par la VM **au moment où** le collaborateur joint un PDF.
+
+## Pourquoi
+
+Sans OCR, le Chat ne verrait que le nom du fichier (« plan.pdf ») et inventerait le contenu. Il faut donc extraire le texte **avant** le premier appel de chat du tour.
+
+On n’utilise **pas** le modèle de chat pour ça :
+
+- endpoint dédié `/v1/ocr` (pas `chat/completions`) ;
+- **autre modèle** : `mistral-ocr-latest`, pas celui du Chat ;
+- facturation **à la page**, pas au token (Consommation `ocr` avec `pages_traitees`).
+
+Le PDF est envoyé **inline** (base64) pour cet appel ponctuel, jamais stocké durablement chez le fournisseur via une Files API ([ADR-0009](/docs/adr/0009-pieces-jointes-jamais-mistral-files-api)). L’original reste sur la VM.
+
+## Où ça se place
+
+Au **tour d’envoi** avec une pièce jointe PDF ([aperçu](./apercu.mdx)) :
+
+1. **OCR** (cette carte) — extraction du texte.
+2. **Chat** — reçoit l’extrait dans un message `system` (« Pièce jointe … »), pas le PDF brut.
+3. Suite habituelle (outils, garde-fous, titrage / résumé selon le cas).
+
+Les tours suivants ne refont **pas** l’OCR : le texte est déjà en base. Pour le relire hors fenêtre, le modèle peut demander l’outil `relire_pieces_jointes` (carte [Outil](./outil.mdx)), sans nouvel appel OCR.
+
+## Exemple concret
+
+Le collaborateur joint un scan du PLU de Castries et demande :
+
+> Quelle est la date d’approbation sur ce document ?
+
+Dans l’inspecteur, **avant** le Chat :
+
+<CarteApercu
+  libelle="OCR"
+  origine="mistral"
+  modele="mistral-ocr-latest"
+  ouvertParDefaut>
+  <SectionApercu titre="Payload envoyé">
+    <p>
+      Modèle <code>mistral-ocr-latest</code> (pas le modèle de chat). Document
+      transmis en <code>document_url</code> base64 — dans la carte, on voit une
+      référence cliquable, pas le fichier en clair :
+    </p>
+    <p>Pièce jointe : PLU-Castries.pdf — voir</p>
+  </SectionApercu>
+  <SectionApercu titre="Réponse brute reçue">
+    <p>Texte reconnu, page par page (markdown). Exemple de début d’extrait :</p>
+    <p>
+      <em>
+        PLAN LOCAL D'URBANISME — Commune de Castries… Approuvé par
+        délibération du conseil municipal du 12 mars 2019…
+      </em>
+    </p>
+    <p>
+      C’est cet extrait qui entre ensuite dans le message système du Chat du
+      même tour. Consommation : N pages traitées.
+    </p>
+  </SectionApercu>
+</CarteApercu>
+
+## Ce qui n’est pas de l’OCR
+
+| Fichier | Traitement | Carte |
+| --- | --- | --- |
+| **PDF** | OCR (modèle dédié) | Cette page |
+| **Image** | [Vision](./vision.mdx) (même modèle que le Chat, multimodal) | Vision |
+| **Word** / **Excel** | Extraction **locale** sur la VM (`python-docx` / `openpyxl`), **aucun** appel au fournisseur | Aucune carte OCR |

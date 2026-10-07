@@ -1,7 +1,7 @@
 import { Ellipsis, SquarePen } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import logoBbass from "@/assets/logo-bbass.png";
+import logoBbassAgentsIa from "@/assets/logo-bbass-agents-ia.jpg";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -159,8 +159,12 @@ export function BarreLaterale({
 
   return (
     <Sidebar>
-      <SidebarHeader className="gap-8">
-        <img src={logoBbass} alt="BBASS Géomètre-Expert" className="h-auto w-full object-contain" />
+      <SidebarHeader className="gap-3 px-2 pt-2 pb-3">
+        <img
+          src={logoBbassAgentsIa}
+          alt="BBASS Agents IA"
+          className="block h-auto w-full scale-105 object-contain object-left"
+        />
         <Button type="button" size="sm" className="w-full" onClick={() => onSelectionnerConversation(null)}>
           <SquarePen aria-hidden="true" />
           Nouvelle conversation

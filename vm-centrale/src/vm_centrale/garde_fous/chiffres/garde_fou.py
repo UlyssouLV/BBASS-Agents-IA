@@ -26,6 +26,11 @@ _MOTIF_UNITE = re.compile(
     r"[ \t]+(ans|an|années|année|semaines|semaine|jours|jour|mois|heures|heure)\b",
     re.IGNORECASE,
 )
+# Fin de phrase : `.`, `!` ou `?` suivis d'un blanc (jamais le point d'un
+# décimal « 1.5 » ni d'un domaine « exemple.fr »).
+_MOTIF_FIN_DE_PHRASE = re.compile(r"[.!?…]+(?=\s|$)")
+_MOTIF_PUCE = re.compile(r"[ \t]*(?:[-*+]|\d+[.)])[ \t]+")
+_MOTIF_PUCE_VIDE = re.compile(r"^[ \t]*(?:[-*+]|\d+[.)])[ \t]*(?:\n|$)", re.MULTILINE)
 
 
 def _cle(correspondance: re.Match[str]) -> str:
@@ -76,6 +81,27 @@ def _dans(position: int, plages: list[tuple[int, int]]) -> bool:
     return any(debut <= position < fin for debut, fin in plages)
 
 
+def chiffres_controles(reponse: str) -> set[str]:
+    # Les chiffres que ce garde-fou contrôle dans la réponse (hors URL),
+    # comparables à chiffres_des_sources : partagé avec le garde-fou
+    # sources (#160), pour la même définition d'un chiffre.
+    plages_des_urls = _plages_des_urls(reponse)
+    nombres = {
+        _cle(correspondance)
+        for correspondance in _MOTIF_NOMBRE.finditer(reponse)
+        if not _dans(correspondance.start(), plages_des_urls) and _est_une_donnee(correspondance, reponse)
+    }
+    return nombres | {
+        _chiffres_seuls(correspondance.group(0))
+        for correspondance in _MOTIF_SEQUENCE.finditer(reponse)
+        if not _dans(correspondance.start(), plages_des_urls)
+    }
+
+
+def chiffres_des_sources(textes_source: Iterable[str]) -> set[str]:
+    return _cles_autorisees(textes_source)
+
+
 def retirer_chiffres_hors_source(reponse: str, textes_source: Iterable[str]) -> str:
     autorisees = _cles_autorisees(textes_source)
     plages_des_urls = _plages_des_urls(reponse)
@@ -113,11 +139,87 @@ def retirer_chiffres_hors_source(reponse: str, textes_source: Iterable[str]) -> 
         if any(debut <= position < fin for position, _ in a_retirer):
             a_retirer.append((debut, fin))
 
+    # Le plus petit bloc qui contient le chiffre part avec lui, jamais un
+    # fragment vide (#160, conversation 103 : « (soit 1,5 à 3 mois) »
+    # devenait « (soit à 3 mois) »).
+    blocs = [_bloc(reponse, debut, fin) for debut, fin in a_retirer]
     nettoyee, curseur = [], 0
-    for debut, fin in sorted(a_retirer):
+    for debut, fin in sorted(blocs):
         if fin <= curseur:
             continue
         nettoyee.append(reponse[curseur:max(debut, curseur)])
         curseur = fin
     nettoyee.append(reponse[curseur:])
-    return re.sub(r"[ 	]{2,}", " ", "".join(nettoyee))
+    texte = re.sub(r"[ 	]{2,}", " ", "".join(nettoyee))
+    # Une puce vidée part avec sa ligne ; une phrase seule sur sa ligne ne
+    # laisse pas de paragraphe vide.
+    texte = _MOTIF_PUCE_VIDE.sub("", texte)
+    return re.sub(r"\n{3,}", "\n\n", texte).strip()
+
+
+def _bloc(texte: str, debut: int, fin: int) -> tuple[int, int]:
+    # La parenthèse qui entoure le chiffre s'il y en a une sur sa ligne,
+    # espaces qui la précèdent compris ; sinon sa phrase.
+    debut_ligne = texte.rfind("\n", 0, debut) + 1
+    fin_ligne = texte.find("\n", fin)
+    if fin_ligne == -1:
+        fin_ligne = len(texte)
+    ouvrante = _parenthese(texte, debut - 1, debut_ligne - 1, -1, "(", ")")
+    fermante = _parenthese(texte, fin, fin_ligne, 1, ")", "(")
+    if ouvrante is not None and fermante is not None:
+        while ouvrante > debut_ligne and texte[ouvrante - 1] in " \t":
+            ouvrante -= 1
+        return ouvrante, fermante + 1
+    return _phrase(texte, debut, fin, debut_ligne, fin_ligne)
+
+
+def _parenthese(texte: str, depart: int, borne: int, pas: int, cherchee: str, inverse: str) -> int | None:
+    # Position de la parenthèse `cherchee` qui ferme le niveau du chiffre,
+    # en sautant les paires complètes (lien Markdown, « (art. 3) »).
+    profondeur = 0
+    for position in range(depart, borne, pas):
+        caractere = texte[position]
+        if caractere == inverse:
+            profondeur += 1
+        elif caractere == cherchee:
+            if profondeur == 0:
+                return position
+            profondeur -= 1
+    return None
+
+
+def _phrase(texte: str, debut: int, fin: int, debut_ligne: int, fin_ligne: int) -> tuple[int, int]:
+    # Jusqu'au `.`, `!`, `?` ou à la fin de la ligne. Dans une ligne de
+    # tableau, la cellule borne la phrase ; dans une puce, la puce reste.
+    dans_un_tableau = texte[debut_ligne:fin_ligne].lstrip().startswith("|")
+    if dans_un_tableau:
+        debut_zone = texte.rfind("|", debut_ligne, debut) + 1
+        fin_zone = texte.find("|", fin, fin_ligne)
+        if fin_zone == -1:
+            fin_zone = fin_ligne
+    else:
+        puce = _MOTIF_PUCE.match(texte, debut_ligne, fin_ligne)
+        debut_zone = puce.end() if puce is not None else debut_ligne
+        fin_zone = fin_ligne
+    debut_phrase = debut_zone
+    for fin_de_phrase in _MOTIF_FIN_DE_PHRASE.finditer(texte, debut_zone, debut):
+        debut_phrase = fin_de_phrase.end()
+    while debut_phrase < debut and texte[debut_phrase] in " \t":
+        debut_phrase += 1
+    suivante = _MOTIF_FIN_DE_PHRASE.search(texte, fin, fin_zone)
+    if suivante is not None and texte[suivante.end():fin_zone].strip():
+        fin_phrase = suivante.end()
+        # Les espaces avant la phrase suivante partent avec la phrase.
+        while fin_phrase < fin_zone and texte[fin_phrase] in " \t":
+            fin_phrase += 1
+        return debut_phrase, fin_phrase
+    fin_phrase = fin_zone
+    if dans_un_tableau:
+        # La cellule garde ses espaces : « | Recours | | ».
+        while fin_phrase > debut_phrase and texte[fin_phrase - 1] in " \t":
+            fin_phrase -= 1
+        return debut_phrase, fin_phrase
+    # Dernière phrase de la ligne : les espaces qui la précèdent partent.
+    while debut_phrase > debut_zone and texte[debut_phrase - 1] in " \t":
+        debut_phrase -= 1
+    return debut_phrase, fin_phrase

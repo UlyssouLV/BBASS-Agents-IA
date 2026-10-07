@@ -20,7 +20,7 @@ from vm_centrale.mistral_client import (
 )
 from vm_centrale.models import Compte, ComptePole
 from vm_centrale.moteur_recherche import MoteurIndisponible, ResultatRecherche, get_moteur_recherche
-from vm_centrale.outils.lire_pages_web import CONSIGNE_LECTURE_PAGE
+from vm_centrale.outils.lire_pages_web import CONSIGNE_LECTURE_PAGE, CONSIGNE_REVERIFICATION_PAGE
 from vm_centrale.outils.piece_jointe import CONSIGNE_RELECTURE_PIECES_JOINTES
 from vm_centrale.outils.recherche_web import CONSIGNE_EXTRACTION
 from vm_centrale.questions_couvertes import CONSIGNE_QUESTIONS_PIECE_JOINTE
@@ -61,9 +61,12 @@ def _sans_init_db_reel(monkeypatch):
 # viendra avec le ticket suivant).
 _USAGE_FACTICE = Usage(tokens_entree=10, tokens_sortie=5, tokens_total=15)
 _PAGES_PROCESSED_FACTICE = 1
-_EXTRAIT_FACTICE = json.dumps({"extrait": "Extrait factice des pages lues.", "questions_couvertes": []})
+_EXTRAIT_FACTICE = json.dumps({"faits": [], "questions_couvertes": []})
 _QUESTIONS_PIECE_JOINTE_FACTICES = json.dumps({"questions_couvertes": []})
 _LECTURE_PAGE_FACTICE = json.dumps({"trouvee": False, "reponse": "", "source": ""})
+# Hors du JSON attendu (aucune question pour des questions envoyées) : sans
+# réponse configurée, une revérification supprime les questions de la page.
+_REVERIFICATION_PAGE_FACTICE = json.dumps({"questions": []})
 
 
 class ClientMistralFactice:
@@ -118,6 +121,11 @@ class ClientMistralFactice:
         self.appels_lecture_page: list = []
         self._reponse_lecture_page = _LECTURE_PAGE_FACTICE
         self._exception_lecture_page: Exception | None = None
+        # Appels de revérification des questions couvertes d'une page relue
+        # de force (spec 1.4.3, #158), reconnus à leur consigne fixe.
+        self.appels_reverification_page: list = []
+        self._reponse_reverification_page = _REVERIFICATION_PAGE_FACTICE
+        self._exception_reverification_page: Exception | None = None
         # Appels d'extraction de relire_pieces_jointes avec un besoin (spec
         # 1.4.1, #141), reconnus à leur consigne fixe.
         self.appels_relecture_pieces_jointes: list = []
@@ -211,13 +219,16 @@ class ClientMistralFactice:
             for demande in demandes
         )
 
-    def repondre_extraction(self, extrait: str, questions: list[tuple[str, str, str]] = ()) -> None:
-        # Sortie JSON de l'appel d'extraction (spec 1.4.1) : l'extrait et
-        # les questions couvertes (question, réponse, source).
+    def repondre_extraction(
+        self, faits: list[tuple[str, str]] = (), questions: list[tuple[str, str, str]] = ()
+    ) -> None:
+        # Sortie JSON de l'appel d'extraction : les faits (texte, source ;
+        # spec 1.4.3, #160) et les questions couvertes (question, réponse,
+        # source ; spec 1.4.1).
         self.repondre_extraction_brute(
             json.dumps(
                 {
-                    "extrait": extrait,
+                    "faits": [{"texte": texte, "source": source} for texte, source in faits],
                     "questions_couvertes": [
                         {"question": question, "reponse": reponse, "source": source}
                         for question, reponse, source in questions
@@ -258,6 +269,22 @@ class ClientMistralFactice:
 
     def echouer_lecture_page(self, exception: Exception) -> None:
         self._exception_lecture_page = exception
+
+    def repondre_reverification_page(
+        self, questions: list[tuple[bool, str]], besoin: tuple[bool, str] | None = None
+    ) -> None:
+        # (trouvee, réponse) par ancienne question, dans l'ordre envoyé.
+        donnees: dict = {"questions": [{"trouvee": t, "reponse": r} for t, r in questions]}
+        if besoin is not None:
+            donnees["besoin"] = {"trouvee": besoin[0], "reponse": besoin[1]}
+        self.repondre_reverification_page_brute(json.dumps(donnees, ensure_ascii=False))
+
+    def repondre_reverification_page_brute(self, texte: str) -> None:
+        self._reponse_reverification_page = texte
+        self._exception_reverification_page = None
+
+    def echouer_reverification_page(self, exception: Exception) -> None:
+        self._exception_reverification_page = exception
 
     def repondre_relecture_pieces_jointes(self, trouvee: bool, reponse: str = "", source: str = "") -> None:
         self.repondre_relecture_pieces_jointes_brute(
@@ -300,6 +327,12 @@ class ClientMistralFactice:
             messages, response_format, self._reponse_lecture_page, self._exception_lecture_page
         )
 
+    def _reverifier_page(self, messages, response_format) -> ReponseChat:
+        self.appels_reverification_page.append(messages)
+        return self._repondre_canal(
+            messages, response_format, self._reponse_reverification_page, self._exception_reverification_page
+        )
+
     def _relire_pieces_jointes(self, messages, response_format) -> ReponseChat:
         self.appels_relecture_pieces_jointes.append(messages)
         return self._repondre_canal(
@@ -333,6 +366,12 @@ class ClientMistralFactice:
                 return self._questions_piece_jointe(messages, response_format)
             if not isinstance(messages, str) and messages and messages[0]["content"] == CONSIGNE_LECTURE_PAGE:
                 return self._lire_page(messages, response_format)
+            if (
+                not isinstance(messages, str)
+                and messages
+                and messages[0]["content"] == CONSIGNE_REVERIFICATION_PAGE
+            ):
+                return self._reverifier_page(messages, response_format)
             if (
                 not isinstance(messages, str)
                 and messages

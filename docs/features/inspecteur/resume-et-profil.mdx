@@ -1,0 +1,77 @@
+import CarteApercu, {
+  JsonApercu,
+  MessageApercu,
+  SectionApercu,
+} from '@site/src/components/inspecteur/CarteApercu';
+
+# Résumé + profil
+
+## Pourquoi
+
+À chaque nouvel envoi, le [Chat](./chat.mdx) ne reçoit **pas** toute la conversation en base. Il reçoit seulement :
+
+- le **style** / date du jour ;
+- le **résumé glissant** de cette conversation (s’il existe) ;
+- le [**profil de travail**](/docs/glossaire#profil-de-travail) du compte (s’il existe) ;
+- la [**mémoire de la conversation**](/docs/glossaire#memoire-de-la-conversation) (pièces jointes, recherches, URL…) ;
+- les **3 derniers messages** déjà enregistrés, **en entier** ;
+- le **nouveau message** du collaborateur.
+
+Sans cette borne, chaque tour renverrait tous les anciens échanges. Le volume de tokens monterait vite (plafond de contexte du modèle, et facturation au token). Au bout de quelques tours, la conversation entière ne tiendrait plus — ou coûterait trop cher pour rien.
+
+Donc : on garde les **3 derniers messages en clair** (le détail récent), et tout ce qui est plus ancien passe dans un **résumé glissant** compressé. Ce résumé est mis à jour par un appel dédié — la carte **Résumé + profil** — dès que des messages **sortent** de cette fenêtre de 3.
+
+Le même appel peut aussi réécrire le **profil de travail** (façon de travailler du compte, partagée entre conversations). Ce n’est **pas** une bulle du fil visible.
+
+## Quand la carte apparaît
+
+- **Création** de conversation (premier message) : pas de résumé + profil — pas encore d’historique à compresser (le [titrage](./titrage.mdx) suffit pour le titre).
+- **Tours suivants** tant qu’il y a moins de 3 messages en base : pas encore de message « sortant » → pas de carte.
+- Dès qu’un nouvel envoi fait **sortir** un ou plusieurs messages de la fenêtre des 3 : Chat **et** Résumé + profil (en parallèle). Badge d’origine fournisseur (aujourd’hui **Mistral**). Compté en Consommation `resume_et_profil`. Pas d’outils sur cet appel.
+
+## Exemple concret
+
+Suite du scénario PLU Castries. Après plusieurs tours, la base contient déjà trois messages (user / assistant / user). Le collaborateur envoie un **4ᵉ** message :
+
+> Et le zonage autour de la mairie ?
+
+Pour le **Chat** de ce tour, la VM envoie encore les **3 derniers** messages **complets**, plus le résumé déjà connu (s’il y en a un), plus le nouveau message — **pas** le tout premier échange en clair.
+
+Les messages trop anciens pour rester dans ces 3 partent dans l’appel **Résumé + profil** :
+
+<CarteApercu
+  libelle="Résumé + profil"
+  origine="mistral"
+  modele="mistral-small-latest"
+  ouvertParDefaut>
+  <SectionApercu titre="Payload envoyé">
+    <MessageApercu role="user">
+      Tu maintiens deux mémoires… un résumé glissant de la conversation en
+      cours, et un profil de travail inter-conversationnel…
+      <br />
+      <br />
+      Résumé glissant actuel : (vide) — ou le texte déjà stocké.
+      <br />
+      Profil de travail actuel : (vide) — ou le profil du compte.
+      <br />
+      <br />
+      Message(s) qui sortent de la fenêtre des derniers messages, à absorber
+      dans le résumé :
+      <br />
+      user : Quelle est la date d'approbation du PLU de Castries ?
+      <br />
+      assistant : Le PLU de Castries a été approuvé le 12 mars 2019.
+    </MessageApercu>
+  </SectionApercu>
+  <SectionApercu titre="Réponse brute reçue">
+    <JsonApercu>{`{
+  "resume_contexte": "Le collaborateur a demandé la date d'approbation du PLU de Castries. L'assistant a proposé le 12 mars 2019 (proposé, non vérifié).",
+  "profil_travail": null
+}`}</JsonApercu>
+  </SectionApercu>
+</CarteApercu>
+
+- **`resume_contexte`** — résumé **de cette conversation**, plafonné (~1 500 caractères). Il revient dans le `system` des Chat suivants. Une affirmation de l’assistant y est notée comme proposée, pas comme un fait du collaborateur.
+- **`profil_travail`** — profil **du compte** (toutes conversations), plafonné (~800 caractères), fondé sur les seuls messages `user`. `null` = rien à changer ; sinon le texte **remplace** l’ancien en entier (pas une concaténation). Jamais de prénom / pôle / agence : l’identité vient du compte.
+
+Aux tours suivants, le Chat voit donc : **résumé + profil + 3 derniers messages en entier + nouveau message** — pas l’historique complet.
