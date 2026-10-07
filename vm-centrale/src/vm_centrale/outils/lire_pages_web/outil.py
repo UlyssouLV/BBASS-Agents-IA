@@ -11,7 +11,7 @@ from vm_centrale.garde_fous import normaliser_url, urls_ecrites
 from vm_centrale.inspecteur import payload_depuis_erreur, reponse_depuis_erreur
 from vm_centrale.models import Message, QuestionCouverte, ResultatRechercheWeb
 from vm_centrale.outils.base import AppelMistralOutil, ContexteTour, Outil, ResultatOutil
-from vm_centrale.outils.recherche_web.outil import PLAFOND_TOKENS_PAGES, lire_page
+from vm_centrale.outils.recherche_web.outil import PLAFOND_TOKENS_PAGES, lire_pages
 from vm_centrale.questions_couvertes import REPONSE_MAX
 
 _NOM = "lire_pages_web"
@@ -226,15 +226,13 @@ def _telecharger_pages_du_compte(
 ) -> list[tuple[ResultatRechercheWeb, dict]]:
     # Au premier appel seulement (#140) : une URL déjà en base n'est jamais
     # retéléchargée dans la conversation, lue ou non. Même chaîne que
-    # rechercher_web (téléchargement, statut, HTML, nettoyage) ; en échec
-    # (PDF, refus, délai), la ligne est enregistrée sans texte.
+    # rechercher_web (cache commun, téléchargement, statut, HTML,
+    # nettoyage) ; en échec (PDF, refus, délai), la ligne est enregistrée
+    # sans texte.
     a_telecharger = list(dict.fromkeys(url for url in urls if _page_de_la_conversation(url, resultats) is None))
     if not a_telecharger:
         return []
-    with ThreadPoolExecutor(max_workers=len(a_telecharger)) as executeur:
-        pages = list(
-            executeur.map(lambda url: lire_page(_avec_schema(url), contexte.telechargeur_pages), a_telecharger)
-        )
+    pages = lire_pages([_avec_schema(url) for url in a_telecharger], contexte)
     maintenant = datetime.now(timezone.utc)
     lignes = [
         ResultatRechercheWeb(

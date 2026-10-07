@@ -1,11 +1,12 @@
 import json
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from dataclasses import asdict, dataclass, replace
+from datetime import datetime, timedelta, timezone
 
 import trafilatura
 
+from vm_centrale.cache_pages import ecrire_copie, lire_copie
 from vm_centrale.compte_tokens import compter_tokens
 from vm_centrale.config import FICHES_MODELES, MODELE_CHAT
 from vm_centrale.inspecteur import payload_depuis_erreur, reponse_depuis_erreur
@@ -146,6 +147,10 @@ class _Page:
     # inconnu. Enregistré pour une URL écrite par le compte, qui n'a pas de
     # titre de moteur (lire_pages_web, #152).
     titre: str = ""
+    # `cache` (copie du cache commun, spec 1.4.3) ou `telechargement`.
+    origine: str = "telechargement"
+    # Âge de la copie servie par le cache, None sinon.
+    age_copie: timedelta | None = None
 
     @property
     def texte_lu(self) -> str:
@@ -154,20 +159,24 @@ class _Page:
         return "" if self.retiree_par_plafond else self.texte
 
     def trace(self) -> dict:
-        return {
+        trace = {
             "url": self.url,
             "statut": self.statut,
             "taille": len(self.texte),
             "tokens": self.tokens,
             "retiree_par_plafond": self.retiree_par_plafond,
             "erreur": self.erreur,
+            "origine": self.origine,
         }
+        if self.age_copie is not None:
+            trace["age_copie_secondes"] = int(self.age_copie.total_seconds())
+        return trace
 
 
-def lire_page(url: str, telechargeur: TelechargeurPages) -> _Page:
+def _telecharger(url: str, telechargeur: TelechargeurPages) -> _Page:
     # Une page en échec (délai, statut HTTP, contenu non HTML, PDF compris)
     # est ignorée : son extrait de moteur reste (spec 1.4.0, étape 2).
-    # Partagée avec lire_pages_web pour une URL écrite par le compte (#140).
+    # Lancée dans un thread : ne touche pas à la session.
     try:
         page = telechargeur.telecharger(url)
     except PageIndisponible as erreur:
@@ -185,12 +194,41 @@ def lire_page(url: str, telechargeur: TelechargeurPages) -> _Page:
     return _Page(url, statut=page.statut, texte=texte, titre=titre)
 
 
-def _lire_pages(resultats: list[ResultatRecherche], telechargeur: TelechargeurPages) -> list[_Page]:
-    urls = [resultat.url for resultat in resultats[:_NOMBRE_PAGES_TELECHARGEES]]
-    # En parallèle : le délai est celui de la page la plus lente, pas la
-    # somme (PAGES_HTTP_TIMEOUT au plus chacune).
-    with ThreadPoolExecutor(max_workers=_NOMBRE_PAGES_TELECHARGEES) as executeur:
-        pages = list(executeur.map(lambda url: lire_page(url, telechargeur), urls))
+def lire_pages(urls: list[str], contexte: ContexteTour) -> list[_Page]:
+    # Une _Page par URL, dans l'ordre. Cache commun d'abord (spec 1.4.3,
+    # ADR-0015) : une copie valide remplace le téléchargement. Une page
+    # téléchargée et lue avec succès (200, HTML, texte principal non vide)
+    # est écrite dans le cache, avant tout plafond ; jamais un échec.
+    # Partagée avec lire_pages_web pour une URL écrite par le compte (#140).
+    maintenant = datetime.now(timezone.utc)
+    copies = {url: lire_copie(contexte.db, url, maintenant) for url in urls}
+    a_telecharger = [url for url, copie in copies.items() if copie is None]
+    telechargees: dict[str, _Page] = {}
+    if a_telecharger:
+        # En parallèle : le délai est celui de la page la plus lente, pas la
+        # somme (PAGES_HTTP_TIMEOUT au plus chacune). La session reste dans
+        # ce thread.
+        with ThreadPoolExecutor(max_workers=len(a_telecharger)) as executeur:
+            lues = executeur.map(lambda url: _telecharger(url, contexte.telechargeur_pages), a_telecharger)
+            telechargees = dict(zip(a_telecharger, lues))
+    for url, page in telechargees.items():
+        if page.texte:
+            ecrire_copie(contexte.db, url, page.texte, page.titre, maintenant)
+    pages = []
+    for url in urls:
+        copie = copies[url]
+        if copie is None:
+            # Une copie par occurrence : le plafond marque chaque page à part.
+            pages.append(replace(telechargees[url]))
+        else:
+            pages.append(
+                _Page(url, statut=200, texte=copie.texte, titre=copie.titre, origine="cache", age_copie=copie.age)
+            )
+    return pages
+
+
+def _lire_pages(resultats: list[ResultatRecherche], contexte: ContexteTour) -> list[_Page]:
+    pages = lire_pages([resultat.url for resultat in resultats[:_NOMBRE_PAGES_TELECHARGEES]], contexte)
     # Plafond global seulement (décision n° 6) : tant que le total le
     # dépasse, la dernière page lue est retirée entière, jamais coupée.
     lues = [page for page in pages if page.texte]
@@ -323,7 +361,7 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
     if not resultats:
         return ResultatOutil(_AUCUN_RESULTAT, trace={"resultats": []})
 
-    pages = _lire_pages(resultats, contexte.telechargeur_pages)
+    pages = _lire_pages(resultats, contexte)
     textes = {page.url: page.texte_lu for page in pages}
     maintenant = datetime.now(timezone.utc)
     lignes = [
