@@ -1,14 +1,83 @@
-import CarteApercu, {SectionApercu} from '@site/src/components/inspecteur/CarteApercu';
+import CarteApercu, {JsonApercu, SectionApercu} from '@site/src/components/inspecteur/CarteApercu';
 
 # Vision
 
-Appel au modèle sur une **image** jointe. Badge d’origine fournisseur (aujourd’hui **Mistral**). L’image est une référence cliquable, pas un base64 affiché en entier.
+## Qu’est-ce que c’est
 
-<CarteApercu libelle="Vision" origine="mistral" modele="pixtral-12b-latest" ouvertParDefaut>
+**Vision** : analyse d’une **image** jointe (photo, capture d’écran, plan scanné en JPG/PNG…). Le modèle regarde l’image, **transcrit le texte visible** et **décrit** ce qui est exploitable (schéma, tableau, photo de terrain…), en français. Le résultat est un texte (`contenu_extrait`) que le [Chat](./chat.mdx) pourra utiliser — pas l’image elle-même dans les tours suivants.
+
+Ce n’est **pas** un outil demandé par le modèle : c’est une [étape de traitement](/docs/glossaire#etape-de-traitement) imposée par la VM **au moment où** le collaborateur joint une image.
+
+## Pourquoi
+
+Sans cette étape, le Chat ne verrait que le nom du fichier (« photo.jpg ») et inventerait ce qu’il contient. Il faut donc une description **avant** le premier appel de chat du tour.
+
+Contrairement à l’[OCR](./ocr.mdx) sur PDF :
+
+| | OCR (PDF) | Vision (image) |
+| --- | --- | --- |
+| Endpoint | `/v1/ocr` dédié | `chat/completions` (comme le Chat) |
+| Modèle | **Autre** : `mistral-ocr-latest` | **Le même** que le Chat (`mistral-small-2603`) |
+| Entrée | document PDF en base64 | consigne texte + `image_url` base64 |
+| Sortie | markdown page par page | JSON structuré (`contenu_extrait`, `echec_analyse`) |
+| Facturation | à la **page** | au **token** (Consommation `vision`) |
+
+Pas de modèle « Pixtral » séparé aujourd’hui : c’est le modèle de chat en multimodal. La carte Inspecteur reste libellée **Vision** (`type_appel = vision`) pour la distinguer du Chat de réponse.
+
+L’image est envoyée **inline** pour cet appel, jamais via une Files API persistante ([ADR-0009](/docs/adr/0009-pieces-jointes-jamais-mistral-files-api)). L’original reste sur la VM. Ce chemin vision est **hors** Zero Data Retention (contrairement à l’OCR / chat texte une fois le ZDR activé côté fournisseur).
+
+## Où ça se place
+
+Au **tour d’envoi** avec une pièce jointe image ([aperçu](./apercu.mdx)) :
+
+1. **Vision** (cette carte) — description / transcription.
+2. **Chat** — reçoit l’extrait dans un message `system` (« Pièce jointe … »), pas l’image brute.
+3. Suite habituelle (outils, garde-fous, titrage / résumé selon le cas).
+
+Les tours suivants ne refont **pas** la vision : le texte est déjà en base. Pour le relire hors fenêtre, le modèle peut demander `relire_pieces_jointes` (carte [Outil](./outil.mdx)), sans nouvel appel vision.
+
+Si l’image est illisible ou sans contenu utile, le modèle peut renvoyer `echec_analyse: true` avec une brève explication dans `contenu_extrait` — ce n’est pas une erreur HTTP : l’échange peut rester en succès, avec un extrait qui dit pourquoi ça ne sert pas.
+
+## Exemple concret
+
+Le collaborateur joint une capture de carte (zone autour de Castries) et demande :
+
+> Qu’est-ce qu’on voit sur cette image ?
+
+Dans l’inspecteur, **avant** le Chat :
+
+<CarteApercu
+  libelle="Vision"
+  origine="mistral"
+  modele="mistral-small-2603"
+  ouvertParDefaut>
   <SectionApercu titre="Payload envoyé">
-    <p>Consigne + Pièce jointe : photo.jpg — voir</p>
+    <p>
+      Même modèle que le Chat, mais contenu multimodal : consigne + image en
+      base64. Dans la carte, l’image apparaît comme une référence cliquable :
+    </p>
+    <p>
+      Consigne : transcrire le texte visible et décrire le contenu exploitable
+      (tableau, schéma, photo de terrain…), en français…
+    </p>
+    <p>Pièce jointe : capture-castries.png — voir</p>
   </SectionApercu>
   <SectionApercu titre="Réponse brute reçue">
-    <p>Description renvoyée par le modèle. Elle peut être injectée dans le tour de chat, comme l’extrait OCR.</p>
+    <JsonApercu>{`{
+  "contenu_extrait": "Vue aérienne d'un outil cartographique. Bâtiments, arbres, routes. Rectangle rouge avec le mot PROJET. Toponymes partiellement lisibles autour de Castries.",
+  "echec_analyse": false
+}`}</JsonApercu>
+    <p>
+      C’est <code>contenu_extrait</code> qui entre ensuite dans le message
+      système du Chat du même tour.
+    </p>
   </SectionApercu>
 </CarteApercu>
+
+## Ce qui n’est pas de la vision
+
+| Fichier | Traitement | Carte |
+| --- | --- | --- |
+| **Image** | Vision (chat multimodal) | Cette page |
+| **PDF** | [OCR](./ocr.mdx) (autre modèle, autre endpoint) | OCR |
+| **Word** / **Excel** | Extraction **locale** sur la VM, **aucun** appel au fournisseur | Aucune carte Vision |

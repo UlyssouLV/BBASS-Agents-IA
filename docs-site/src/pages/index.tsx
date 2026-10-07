@@ -12,8 +12,8 @@ export default function Home(): ReactNode {
         <Heading as="h1">{siteConfig.title}</Heading>
         <p>{siteConfig.tagline}</p>
         <p style={{display: 'flex', gap: '0.75rem', flexWrap: 'wrap'}}>
-          <Link className="button button--primary button--lg" to="/docs/features/inspecteur/">
-            Inspecteur des échanges
+          <Link className="button button--primary button--lg" to="/docs/features/">
+            Features
           </Link>
           <Link className="button button--secondary button--lg" to="/docs/glossaire">
             Glossaire

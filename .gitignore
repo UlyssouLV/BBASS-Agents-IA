@@ -11,6 +11,6 @@ coverage-*.xml
 htmlcov/
 vm-centrale/pieces_jointes/
 node_modules/
-website/node_modules/
-website/build/
-website/.docusaurus/
+docs-site/node_modules/
+docs-site/build/
+docs-site/.docusaurus/

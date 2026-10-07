@@ -1,0 +1,64 @@
+import type {SidebarsConfig} from '@docusaurus/plugin-content-docs';
+
+const sidebars: SidebarsConfig = {
+  glossaireSidebar: ['glossaire'],
+  featuresSidebar: [
+    {
+      type: 'doc',
+      id: 'features/index',
+      label: 'Sommaire',
+    },
+    {
+      type: 'category',
+      label: 'Inspecteur',
+      collapsed: true,
+      link: {type: 'doc', id: 'features/inspecteur/index'},
+      items: [
+        'features/inspecteur/connexion',
+        'features/inspecteur/apercu',
+        {
+          type: 'category',
+          label: 'Étiquettes',
+          collapsed: true,
+          items: [
+            'features/inspecteur/chat',
+            'features/inspecteur/outil',
+            'features/inspecteur/extraction-web',
+            'features/inspecteur/garde-fous',
+            'features/inspecteur/titrage',
+            'features/inspecteur/resume-et-profil',
+            'features/inspecteur/ocr',
+            'features/inspecteur/vision',
+          ],
+        },
+      ],
+    },
+  ],
+  adrSidebar: [
+    {
+      type: 'category',
+      label: 'Architecture Decision Records',
+      collapsed: false,
+      link: {type: 'doc', id: 'adr/index'},
+      items: [
+        {type: 'doc', id: 'adr/0001-backend-local-par-poste', label: '0001 — Backend local par poste'},
+        {type: 'doc', id: 'adr/0002-relais-central-mistral', label: '0002 — Relais central Mistral'},
+        {type: 'doc', id: 'adr/0003-v1-scope-castries-seule', label: '0003 — V1 limitée à Castries'},
+        {type: 'doc', id: 'adr/0004-modele-mistral-decide-par-la-vm', label: '0004 — Modèle décidé par la VM'},
+        {type: 'doc', id: 'adr/0005-compte-administrateur-droit-global', label: '0005 — Droit admin global'},
+        {type: 'doc', id: 'adr/0006-compte-rattache-plusieurs-poles', label: '0006 — Compte multi-pôles'},
+        {type: 'doc', id: 'adr/0007-cle-admin-vm-reutilisee-poste', label: '0007 — Clé admin VM côté poste'},
+        {type: 'doc', id: 'adr/0008-postgresql-vm-centrale', label: '0008 — PostgreSQL sur la VM'},
+        {type: 'doc', id: 'adr/0009-pieces-jointes-jamais-mistral-files-api', label: '0009 — Pièces jointes hors Files API'},
+        {type: 'doc', id: 'adr/0010-front-poste-react-typescript-vite', label: '0010 — Front React / Vite'},
+        {type: 'doc', id: 'adr/0011-gestion-dependances-python-avec-uv', label: '0011 — Dépendances Python avec uv'},
+        {type: 'doc', id: 'adr/0012-mode-developpeur-cle-admin-vm-tous-comptes', label: '0012 — Mode développeur'},
+        {type: 'doc', id: 'adr/0013-recherche-web-searxng-auto-heberge', label: '0013 — SearXNG auto-hébergé'},
+        {type: 'doc', id: 'adr/0014-recherche-web-en-deux-temps-extraction-isolee', label: '0014 — Extraction web isolée'},
+        {type: 'doc', id: 'adr/0015-cache-commun-des-pages-web', label: '0015 — Cache commun des pages web'},
+      ],
+    },
+  ],
+};
+
+export default sidebars;
