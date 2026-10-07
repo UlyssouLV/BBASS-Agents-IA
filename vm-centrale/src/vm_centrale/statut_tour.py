@@ -19,6 +19,7 @@ from vm_centrale.config import LONGUEUR_MAX_DETAIL_STATUT
 REFLEXION = "Réflexion…"
 VERIFICATION = "Vérification de la réponse…"
 TITRAGE = "Titre de la conversation…"
+ATTENTE = "En attente de la réponse en cours dans une autre conversation…"
 
 Publier = Callable[[str], None]
 

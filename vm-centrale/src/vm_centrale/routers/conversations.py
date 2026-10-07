@@ -62,6 +62,7 @@ from vm_centrale.questions_couvertes import (
 )
 from vm_centrale.outils import AppelMistralOutil, ContexteTour, executer_appel, outils_du_tour
 from vm_centrale.statut_tour import (
+    ATTENTE,
     REFLEXION,
     TITRAGE,
     VERIFICATION,
@@ -812,9 +813,15 @@ def _flux_du_tour(
     # Le tour, verrou par compte compris, s'exécute à part avec sa propre
     # session (ADR-0016) : il termine et commite même si personne ne lit
     # plus le flux. Clé relue sous le verrou : une requête rejouée pendant
-    # le premier tour l'attend, puis ne renvoie que sa fin.
+    # le premier tour l'attend, puis ne renvoie que sa fin. Verrou déjà pris
+    # (un tour du même compte, dans une autre conversation) : le statut
+    # l'annonce avant d'attendre.
     def executer(publier: Publier) -> BaseModel:
-        with verrous_comptes.pour(identifiant_compte):
+        verrou = verrous_comptes.pour(identifiant_compte)
+        if not verrou.acquire(blocking=False):
+            publier(ATTENTE)
+            verrou.acquire()
+        try:
             reponse_en_cache = _reponse_en_cache(identifiant_compte, cle_idempotence)
             if reponse_en_cache is not None:
                 return reponse_en_cache
@@ -823,6 +830,8 @@ def _flux_du_tour(
             if cle_idempotence is not None:
                 cache_idempotence.enregistrer(identifiant_compte, cle_idempotence, resultat)
             return resultat
+        finally:
+            verrou.release()
 
     return lancer_tour(executer)
 
