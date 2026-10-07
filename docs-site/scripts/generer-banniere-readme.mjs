@@ -25,28 +25,28 @@ const html = `<!DOCTYPE html>
   html, body {
     background: #ffffff;
     width: 1100px;
-    height: 280px;
+    height: 220px;
   }
   .wrap {
     width: 1100px;
-    height: 280px;
+    height: 220px;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 2.75rem;
-    padding: 1.5rem 2rem;
+    gap: 2rem;
+    padding: 0.35rem 0.5rem;
     background: #ffffff;
     font-family: Outfit, system-ui, sans-serif;
   }
   .logo {
-    height: 168px;
+    height: 190px;
     width: auto;
     display: block;
     background: #ffffff;
   }
   .sep {
     width: 3px;
-    height: 120px;
+    height: 140px;
     border-radius: 2px;
     background: linear-gradient(180deg, #ffffff, #c8102e 18%, #c8102e 82%, #ffffff);
     flex-shrink: 0;
@@ -59,12 +59,12 @@ const html = `<!DOCTYPE html>
     letter-spacing: -0.03em;
   }
   .agents .ligne1 {
-    font-size: 72px;
+    font-size: 84px;
     font-weight: 800;
     color: #1a1a1a;
   }
   .agents .ligne2 {
-    font-size: 72px;
+    font-size: 84px;
     font-weight: 800;
     color: #c8102e;
     font-style: italic;
@@ -90,7 +90,7 @@ async function main() {
   fs.writeFileSync(HTML, html, 'utf8');
   const browser = await chromium.launch({headless: true});
   const page = await browser.newPage({
-    viewport: {width: 1100, height: 280},
+    viewport: {width: 1100, height: 220},
     deviceScaleFactor: 2,
   });
   await page.goto(pathToFileURL(HTML).href, {waitUntil: 'networkidle', timeout: 60_000});

@@ -15,9 +15,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  pages: write
-  id-token: write
+  contents: read
 
 concurrency:
   group: pages
@@ -26,6 +24,9 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -39,7 +40,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: docs-site
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Build
         working-directory: docs-site
@@ -63,6 +64,8 @@ jobs:
   capture-readme:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -76,11 +79,11 @@ jobs:
 
       - name: Install dependencies
         working-directory: docs-site
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Install Playwright Chromium
         working-directory: docs-site
-        run: npx playwright install --with-deps chromium
+        run: node node_modules/playwright/cli.js install --with-deps chromium
 
       - name: Download build
         uses: actions/download-artifact@v4
@@ -91,7 +94,7 @@ jobs:
       - name: Serve and capture homepage
         working-directory: docs-site
         run: |
-          npx docusaurus serve --host 127.0.0.1 --port 4173 &
+          node node_modules/@docusaurus/core/bin/docusaurus.mjs serve --host 127.0.0.1 --port 4173 &
           for i in $(seq 1 60); do
             if curl -sf "http://127.0.0.1:4173/BBASS-Agents-IA/" >/dev/null; then
               break
@@ -129,6 +132,9 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

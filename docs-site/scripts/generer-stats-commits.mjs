@@ -3,14 +3,13 @@
  * (historique des branches squashées), puis met à jour le README
  * entre <!-- sync:stats-commits --> … <!-- /sync:stats-commits -->.
  *
- * Env : GITHUB_TOKEN (optionnel en local via `gh`), GITHUB_REPOSITORY (owner/repo).
+ * Env : GITHUB_TOKEN ou GH_TOKEN, GITHUB_REPOSITORY (owner/repo).
  *
  * Usage : node scripts/generer-stats-commits.mjs
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {execFileSync} from 'node:child_process';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../..');
@@ -21,30 +20,17 @@ const END = '<!-- /sync:stats-commits -->';
 function repoSlug() {
   if (process.env.GITHUB_REPOSITORY) return process.env.GITHUB_REPOSITORY;
   try {
-    const url = execFileSync('git', ['remote', 'get-url', 'origin'], {
-      cwd: REPO_ROOT,
-      encoding: 'utf8',
-    }).trim();
-    const m = url.match(/github\.com[:/](.+?)(?:\.git)?$/i);
-    if (m) return m[1].replace(/\\/g, '/');
+    const config = fs.readFileSync(path.join(REPO_ROOT, '.git', 'config'), 'utf8');
+    const m = config.match(/^\s*url\s*=\s*.*github\.com[:/](.+?)(?:\.git)?\s*$/im);
+    if (m) return m[1].replaceAll('\\', '/');
   } catch {
-    /* ignore */
+    /* dépôt sans .git/config lisible */
   }
   return 'UlyssouLV/BBASS-Agents-IA';
 }
 
 function token() {
-  if (process.env.GITHUB_TOKEN || process.env.GH_TOKEN) {
-    return process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
-  }
-  try {
-    return execFileSync('gh', ['auth', 'token'], {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    }).trim();
-  } catch {
-    return '';
-  }
+  return process.env.GITHUB_TOKEN || process.env.GH_TOKEN || '';
 }
 
 async function ghJson(pathname, {raw = false} = {}) {

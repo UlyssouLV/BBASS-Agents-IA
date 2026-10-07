@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import type { UseMutationResult } from "@tanstack/react-query";
 
-import logoBbass from "@/assets/logo-bbass.png";
+import logoBbassAgentsIa from "@/assets/logo-bbass-agents-ia.jpg";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,7 +25,11 @@ export function EcranConnexion({ connexion }: Readonly<EcranConnexionProps>) {
 
   return (
     <main className="mx-auto mt-24 w-full max-w-sm">
-      <img src={logoBbass} alt="BBASS Géomètre-Expert" className="mb-8 h-10 w-auto" />
+      <img
+        src={logoBbassAgentsIa}
+        alt="BBASS Agents IA"
+        className="mb-8 h-16 w-auto max-w-full object-contain"
+      />
       <h1 className="mb-6 text-xl font-semibold">Connexion</h1>
       <form onSubmit={gererEnvoi} className="flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">

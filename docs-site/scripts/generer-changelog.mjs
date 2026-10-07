@@ -316,8 +316,8 @@ async function main() {
   let releases;
   try {
     releases = await fetchReleases();
-  } catch (erreur) {
-    console.error('[changelog] Impossible de lire les releases GitHub:', erreur.message);
+  } catch {
+    console.error('[changelog] Impossible de lire les releases GitHub.');
     writeIndex();
     writeAccueilJson([]);
     process.exitCode = 0;
@@ -354,4 +354,4 @@ async function main() {
   );
 }
 
-main();
+await main();
