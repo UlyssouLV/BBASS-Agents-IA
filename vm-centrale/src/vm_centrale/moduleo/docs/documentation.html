@@ -1,0 +1,2464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>API Moduleo : Documentation</title>
+    
+</head>
+<body>
+    
+
+<link type="text/css" href="/Content/css/HelpPage.css" rel="stylesheet" />
+<header class="help-page">
+    <div class="content-wrapper">
+        <div class="float-left">
+            <h1>API Moduleo : Documentation</h1>
+            <h3><a target="_blank" href="/api/releasenotes/">Release notes</a></h3>
+            <h3><a target="_blank" href="/api/webhook-help/">Connecter un webhook</a></h3>
+        </div>
+    </div>
+</header>
+<div id="body" class="help-page">
+    <section class="featured">
+        <div class="content-wrapper">
+            <h2>Introduction</h2>
+            <p>
+                L�API Moduleo est une interface de programmation qui permet de connecter des applications tierces au serveur Moduleo pour �changer des donn�es.<br />
+                Cette page pr�sente la description des m�thodes d'API propos�es par le serveur Moduleo.
+                Les informations n�cessaires pour utiliser l�API Moduleo sont disponibles � l�adresse <a href="https://support.kipaware.fr/categories-moduleo/api-moduleo/">https://support.kipaware.fr/categories-moduleo/api-moduleo/</a>
+
+            </p>
+        </div>
+    </section>
+    <section class="content-wrapper main-content clear-fix">
+
+
+<h2 id="Activite">Activite</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-planning-activite-idActivite">GET api/planning/activite/{idActivite}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re une activit&#233; en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-planning-activite">GET api/planning/activite</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re l&#39;ensemble des activit&#233;s.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-planning-activite-idActivite-etatsactivite">GET api/planning/activite/{idActivite}/etatsactivite</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un ensemble d&#39;identifiants uniques d&#39;&#233;tats activit&#233; en fonction de l&#39;identifiant unique de l&#39;activit&#233;.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="ActiviteEtat">ActiviteEtat</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-planning-activiteetat-idActiviteEtat">GET api/planning/activiteetat/{idActiviteEtat}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un etat activit&#233; en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-planning-activiteetat-multi_ids">GET api/planning/activiteetat/multi?ids={ids}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un ensemble d&#39;&#233;tats activit&#233; en fonction d&#39;un ensemble identifiants unique. S&#233;parateur entre les ids : &#39;,&#39; (virgule). Limite de 200 &#233;l&#233;ments.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="Adresse">Adresse</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-moduleo-adresse-idAdresse">GET api/moduleo/adresse/{idAdresse}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re l&#39;adresse postale en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/POST-api-moduleo-adresse">POST api/moduleo/adresse</a></td>
+            <td class="api-documentation">
+                <p>Cr&#233;e une adresse postale.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/PUT-api-moduleo-adresse-idAdresse">PUT api/moduleo/adresse/{idAdresse}</a></td>
+            <td class="api-documentation">
+                <p>Met &#224; jour une adresse postale en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/DELETE-api-moduleo-adresse-idAdresse">DELETE api/moduleo/adresse/{idAdresse}</a></td>
+            <td class="api-documentation">
+                <p>Supprime une adresse postale en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="Affaire">Affaire</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-affaire-numeroAffaire-numAffaire">GET api/cogeo/affaire/numeroAffaire/{numAffaire}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re l&#39; identifiant unique d&#39;une affaire en fonction du num&#233;ro de l&#39;affaire.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-affaire-numeroAffaire_numAffaire">GET api/cogeo/affaire/numeroAffaire?numAffaire={numAffaire}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re l&#39; identifiant unique d&#39;une affaire en fonction du num&#233;ro de l&#39;affaire.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-affaire_texte_idDossierProduction_etatAffaire_dateCreationMin_dateCreationMax_dateOuvertureMin_dateOuvertureMax_dateLivraisonMin_dateLivraisonMax_dateClotureMin_dateClotureMax_idsSite_idsService_idsResponsable_idsActeurEnCharge_nbMaxResultats">GET api/cogeo/affaire?texte={texte}&amp;idDossierProduction={idDossierProduction}&amp;etatAffaire={etatAffaire}&amp;dateCreationMin={dateCreationMin}&amp;dateCreationMax={dateCreationMax}&amp;dateOuvertureMin={dateOuvertureMin}&amp;dateOuvertureMax={dateOuvertureMax}&amp;dateLivraisonMin={dateLivraisonMin}&amp;dateLivraisonMax={dateLivraisonMax}&amp;dateClotureMin={dateClotureMin}&amp;dateClotureMax={dateClotureMax}&amp;idsSite={idsSite}&amp;idsService={idsService}&amp;idsResponsable={idsResponsable}&amp;idsActeurEnCharge={idsActeurEnCharge}&amp;nbMaxResultats={nbMaxResultats}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les identifiants uniques d&#39;un ensemble d&#39;affaires en fonction des param&#232;tres.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-affaire-idAffaire">GET api/cogeo/affaire/{idAffaire}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re une affaire en fonction son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-affaire-multi_ids">GET api/cogeo/affaire/multi?ids={ids}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un ensemble d&#39;affaires en fonction d&#39;un ensemble identifiants unique. S&#233;parateur entre les ids : &#39;,&#39; (virgule). Limite de 200 &#233;l&#233;ments.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-affaire-idAffaire-parcelles">GET api/cogeo/affaire/{idAffaire}/parcelles</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les identifiants uniques des parcelles d&#39;une affaire.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-affaire-idAffaire-intervenants">GET api/cogeo/affaire/{idAffaire}/intervenants</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les intervenants d&#39;une affaire.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-affaire-idAffaire-tempspasses">GET api/cogeo/affaire/{idAffaire}/tempspasses</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les identifiants uniques des temps pass&#233;s d&#39;une affaire.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-affaire-idAffaire-frais">GET api/cogeo/affaire/{idAffaire}/frais</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les identifiants uniques des frais d&#39;une affaire.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-affaire-idAffaire-devis">GET api/cogeo/affaire/{idAffaire}/devis</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les identifiants uniques des devis d&#39;une affaire.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-affaire-idAffaire-factures">GET api/cogeo/affaire/{idAffaire}/factures</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les identifiants uniques des factures d&#39;une affaire.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-affaire-idAffaire-avoirs">GET api/cogeo/affaire/{idAffaire}/avoirs</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les identifiants uniques des avoirs d&#39;une affaire.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-affaire-idAffaire-centroide">GET api/cogeo/affaire/{idAffaire}/centroide</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re l&#39;identifiant unique du localisant centro&#239;de d&#39;une affaire.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-affaire-idAffaire-localisantsadditionnels">GET api/cogeo/affaire/{idAffaire}/localisantsadditionnels</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les identifiants uniques des localisants additionnels d&#39;une affaire.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-affaire-idAffaire-champsspecifiques">GET api/cogeo/affaire/{idAffaire}/champsspecifiques</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les identifiants uniques des champs sp&#233;cifiques d&#39;une affaire.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-affaire-idAffaire-elementsged">GET api/cogeo/affaire/{idAffaire}/elementsged</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les identifiants uniques des fichiers GED d&#39;une affaire.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-affaire-idAffaire-procedureapplication">GET api/cogeo/affaire/{idAffaire}/procedureapplication</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re la proc&#233;dure application de l&#39;affaire.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-affaire-idAffaire-operations">GET api/cogeo/affaire/{idAffaire}/operations</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les op&#233;rations d&#39;une affaire.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-affaire-idAffaire-polygones">GET api/cogeo/affaire/{idAffaire}/polygones</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les polygones d&#39;emprise d&#39;une affaire selon son identifiant unique au format LT93.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-affaire-idAffaire-groupesutilisateur">GET api/cogeo/affaire/{idAffaire}/groupesutilisateur</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les identifiants uniques des groupes utilisateurs d&#39;une affaire selon son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/POST-api-cogeo-affaire">POST api/cogeo/affaire</a></td>
+            <td class="api-documentation">
+                <p>Cr&#233;e une affaire.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/POST-api-cogeo-affaire-polygones">POST api/cogeo/affaire/polygones</a></td>
+            <td class="api-documentation">
+                <p>Cr&#233;e un polygone d&#39;emprise li&#233; &#224; une affaire. ATTENTION : les coordonn&#233;es doivent &#234;tre au format LT93.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/PUT-api-cogeo-affaire-idAffaire">PUT api/cogeo/affaire/{idAffaire}</a></td>
+            <td class="api-documentation">
+                <p>Modifie une affaire</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/PUT-api-cogeo-affaire-polygones">PUT api/cogeo/affaire/polygones</a></td>
+            <td class="api-documentation">
+                <p>Remplace un polygone d&#39;emprise li&#233; &#224; une affaire. ATTENTION : les coordonn&#233;es doivent &#234;tre au format LT93.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="Arborescence">Arborescence</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-fileo-arborescence">GET api/fileo/arborescence</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re l&#39;ensemble des identifiants uniques des arborescences.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-fileo-arborescence-idArborescence">GET api/fileo/arborescence/{idArborescence}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re une arborescence en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-fileo-arborescence-multi_ids">GET api/fileo/arborescence/multi?ids={ids}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un ensemble d&#39;arborescences en fonction d&#39;une liste d&#39;identifiants unique. S&#233;parateur entre les ids : &#39;,&#39; (virgule). Limite de 200 &#233;l&#233;ments.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="Archive">Archive</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-archive-idArchive">GET api/cogeo/archive/{idArchive}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re une archive en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/POST-api-cogeo-archive">POST api/cogeo/archive</a></td>
+            <td class="api-documentation">
+                <p>Cr&#233;e une archive.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/PUT-api-cogeo-archive_idArchive_idAffaire">PUT api/cogeo/archive?idArchive={idArchive}&amp;idAffaire={idAffaire}</a></td>
+            <td class="api-documentation">
+                <p>Affecte une affaire &#224; une archive</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="Article">Article</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-article-idArticle">GET api/cogeo/article/{idArticle}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un article en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-article-multi_ids">GET api/cogeo/article/multi?ids={ids}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un ensemble d&#39;articles en fonction d&#39;une liste d&#39;identifiants unique. S&#233;parateur entre les ids : &#39;,&#39; (virgule). Limite de 200 &#233;l&#233;ments.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-article_texte_idsFamilleArticle_modeFiltrationFamille_idsMarche_modeFiltrationMarche_nombreMaxResultats">GET api/cogeo/article?texte={texte}&amp;idsFamilleArticle={idsFamilleArticle}&amp;modeFiltrationFamille={modeFiltrationFamille}&amp;idsMarche={idsMarche}&amp;modeFiltrationMarche={modeFiltrationMarche}&amp;nombreMaxResultats={nombreMaxResultats}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les identifiants uniques d&#39;un ensemble d&#39;articles en fonction des param&#232;tres.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="Auth">Auth</h2>
+    <p>Outil de gestion des cl&#233;s d&#39;API</p>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-moduleo-auth-validite-key-codeTmp">GET api/moduleo/auth/validite/{key}/{codeTmp}</a></td>
+            <td class="api-documentation">
+                <p>Permet de tester la validit&#233; d&#39;une cl&#233; d&#39;API.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-moduleo-auth-identification-login-password">GET api/moduleo/auth/identification/{login}/{password}</a></td>
+            <td class="api-documentation">
+                <p>Obtient le code personnel li&#233; &#224; la cl&#233; d&#39;API en utilisant son identifant Moduleo ou lance la demande d&#39;indentification en cas d&#39;authentification double facteurs</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-moduleo-auth-identification_login_password">GET api/moduleo/auth/identification?login={login}&amp;password={password}</a></td>
+            <td class="api-documentation">
+                <p>Obtient le code personnel li&#233; &#224; la cl&#233; d&#39;API en utilisant son identifant Moduleo ou lance la demande d&#39;indentification en cas d&#39;authentification double facteurs</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-moduleo-auth-login">GET api/moduleo/auth/login</a></td>
+            <td class="api-documentation">
+                <p>Obtient le code personnel li&#233; &#224; la cl&#233; d&#39;API en utilisant son identifiant Moduleo ou lance la demande d&#39;identification en cas d&#39;authentification double facteurs.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-moduleo-auth-identificationdoubleauth-login-password-code">GET api/moduleo/auth/identificationdoubleauth/{login}/{password}/{code}</a></td>
+            <td class="api-documentation">
+                <p></p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-moduleo-auth-identificationdoubleauth_login_password_code">GET api/moduleo/auth/identificationdoubleauth?login={login}&amp;password={password}&amp;code={code}</a></td>
+            <td class="api-documentation">
+                <p></p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-moduleo-auth-droits">GET api/moduleo/auth/droits</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les droits li&#233;s &#224; la cl&#233; d&#39;API en cours d&#39;utilisation.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="Avoir">Avoir</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-avoir_texte_emise_dateEmissionMin_dateEmissionMax_idsService_idsResponsable_idsRedacteur">GET api/cogeo/avoir?texte={texte}&amp;emise={emise}&amp;dateEmissionMin={dateEmissionMin}&amp;dateEmissionMax={dateEmissionMax}&amp;idsService={idsService}&amp;idsResponsable={idsResponsable}&amp;idsRedacteur={idsRedacteur}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les identifiants uniques d&#39;un ensemble d&#39;avoirs en fonction des param&#232;tres.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-avoir-idAvoir">GET api/cogeo/avoir/{idAvoir}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un avoir en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-avoir-facture_idFacture">GET api/cogeo/avoir/facture?idFacture={idFacture}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les identifiants uniques d&#39;un ensemble d&#39;avoirs en fonction de l&#39;identifiant unique d&#39;une facture.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-avoir-multi_ids">GET api/cogeo/avoir/multi?ids={ids}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un ensemble d&#39;avoirs en fonction d&#39;un ensemble d&#39;identifiants unique. S&#233;parateur entre les ids : &#39;,&#39; (virgule). Limite de 200 &#233;l&#233;ments.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="Banque">Banque</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-banque-idBanque">GET api/cogeo/banque/{idBanque}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re une banque en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="CategorieNote">CategorieNote</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-categorienote-idCategorieNote">GET api/cogeo/categorienote/{idCategorieNote}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re la cat&#233;gorie de note en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="CategorieTacheAFaire">CategorieTacheAFaire</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-moduleo-categorietacheafaire-idCategorieTacheAFaire">GET api/moduleo/categorietacheafaire/{idCategorieTacheAFaire}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re la cat&#233;gorie de t&#226;che &#224; faire en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="ChampSpecifique">ChampSpecifique</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-champspecifique-idChampSpecifique">GET api/cogeo/champspecifique/{idChampSpecifique}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un champ sp&#233;cifique en fonction son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-champspecifique-multi_ids">GET api/cogeo/champspecifique/multi?ids={ids}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un ensemble de champ sp&#233;cifique en fonction d&#39;un ensemble d&#39;identifiants unique. S&#233;parateur entre les ids : &#39;,&#39; (virgule). Limite de 200 &#233;l&#233;ments.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/PUT-api-cogeo-champspecifique-idChampSpecifique">PUT api/cogeo/champspecifique/{idChampSpecifique}</a></td>
+            <td class="api-documentation">
+                <p>Met &#224; jour un champ sp&#233;cifique en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="ChampSpecifiqueDefinition">ChampSpecifiqueDefinition</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-champspecifiquedefinition">GET api/cogeo/champspecifiquedefinition</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re la liste des identifiants uniques des d&#233;finitions des champs sp&#233;cifiques.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-champspecifiquedefinition-idDefinition">GET api/cogeo/champspecifiquedefinition/{idDefinition}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re une d&#233;finition de champ sp&#233;cifique en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-champspecifiquedefinition-idDefinition-services">GET api/cogeo/champspecifiquedefinition/{idDefinition}/services</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les identifiants uniques des services d&#39;une d&#233;finition du champ sp&#233;cifique.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="CodeActivite">CodeActivite</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-codeactivite">GET api/cogeo/codeactivite</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re l&#39;ensemble des identifiants uniques des codes activit&#233;s.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-codeactivite-idCodeActivite">GET api/cogeo/codeactivite/{idCodeActivite}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un code activit&#233; en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="CoefficientActualisation">CoefficientActualisation</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-coefactualisation-idCoefficientActualisation">GET api/cogeo/coefactualisation/{idCoefficientActualisation}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un coefficiant d&#39;actualisation en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="Commune">Commune</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-moduleo-commune-idCommune">GET api/moduleo/commune/{idCommune}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re une commune en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-moduleo-commune-multi_ids">GET api/moduleo/commune/multi?ids={ids}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un ensemble de communes en fonction d&#39;un ensemble identifiants unique. S&#233;parateur entre les ids : &#39;,&#39; (virgule). Limite de 200 &#233;l&#233;ments.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-moduleo-commune_nom_codePostal_codeInsee_nbMaxResultat">GET api/moduleo/commune?nom={nom}&amp;codePostal={codePostal}&amp;codeInsee={codeInsee}&amp;nbMaxResultat={nbMaxResultat}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les identifiants uniques d&#39;un ensemble de communes en fonction des param&#232;tres.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="Contact">Contact</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-contact_texte_typeContact_typeDonneurOrdreGE_idsQualifications_nbMaxResultat">GET api/cogeo/contact?texte={texte}&amp;typeContact={typeContact}&amp;typeDonneurOrdreGE={typeDonneurOrdreGE}&amp;idsQualifications={idsQualifications}&amp;nbMaxResultat={nbMaxResultat}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les identifiants uniques d&#39;un ensemble de contacts en fonction des param&#232;tres.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-contact-idContact">GET api/cogeo/contact/{idContact}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un contact en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-contact-multi_ids">GET api/cogeo/contact/multi?ids={ids}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un ensemble de contact en fonction d&#39;un ensemble identifiants unique. S&#233;parateur entre les ids : &#39;,&#39; (virgule). Limite de 200 &#233;l&#233;ments.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-contact-idContact-affaireintervenant">GET api/cogeo/contact/{idContact}/affaireintervenant</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un ensemble d&#39;identifiants uniques d&#39;affaires dont le contact pass&#233; en param&#232;tre est intervenant.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-contact-idContact-affaires">GET api/cogeo/contact/{idContact}/affaires</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un ensemble d&#39;identifiants uniques d&#39;affaires dont le contact pass&#233; en param&#232;tre est client.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-contact-personne-idContact">GET api/cogeo/contact/personne/{idContact}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re une personne en fonction de l&#39;identifiant unique du contact.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-contact-personnemorale-idContact">GET api/cogeo/contact/personnemorale/{idContact}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re une personne morale en fonction de l&#39;identifiant unique du contact.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-contact-societe-idContact">GET api/cogeo/contact/societe/{idContact}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re une soci&#233;t&#233; en fonction de l&#39;identifiant unique du contact.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-contact-collectivite-idContact">GET api/cogeo/contact/collectivite/{idContact}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re une collectivit&#233; en fonction de l&#39;identifiant unique du contact.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-contact-groupecontacts-idContact">GET api/cogeo/contact/groupecontacts/{idContact}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un groupe de contacts en fonction de l&#39;identifiant unique du contact.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-contact-contactlie-idContactLie">GET api/cogeo/contact/contactlie/{idContactLie}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un contact li&#233; en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-contact-contactlie-multi_ids">GET api/cogeo/contact/contactlie/multi?ids={ids}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un contact li&#233; en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-contact-idContact-notes">GET api/cogeo/contact/{idContact}/notes</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re l&#39;ensemble des identifiants uniques des notes du contact.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-contact-idContact-telephones">GET api/cogeo/contact/{idContact}/telephones</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re l&#39;ensemble des identifiants uniques des num&#233;ros de t&#233;l&#233;phone du contact.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-contact-idContact-adresses">GET api/cogeo/contact/{idContact}/adresses</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re l&#39;ensemble des identifiants uniques des adresses postales du contact.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-contact-idContact-emails">GET api/cogeo/contact/{idContact}/emails</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re l&#39;ensemble des identifiants uniques des adresses email du contact.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/POST-api-cogeo-contact-personne">POST api/cogeo/contact/personne</a></td>
+            <td class="api-documentation">
+                <p>Cr&#233;e un contact de type &#39;Personne&#39;.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/POST-api-cogeo-contact-societe">POST api/cogeo/contact/societe</a></td>
+            <td class="api-documentation">
+                <p>Cr&#233;e un contact de type &#39;Soci&#233;t&#233;&#39;.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/POST-api-cogeo-contact-collectivite">POST api/cogeo/contact/collectivite</a></td>
+            <td class="api-documentation">
+                <p>Cr&#233;e un contact de type &#39;Collectivit&#233;&#39;.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/POST-api-cogeo-contact-groupecontacts">POST api/cogeo/contact/groupecontacts</a></td>
+            <td class="api-documentation">
+                <p>Cr&#233;e un contact de type &#39;Groupe de contacts&#39;.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/POST-api-cogeo-contact-contactlie">POST api/cogeo/contact/contactlie</a></td>
+            <td class="api-documentation">
+                <p>Ajoute un contact li&#233; &#224; une personne morale.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/PUT-api-cogeo-contact-personne-idPersonne">PUT api/cogeo/contact/personne/{idPersonne}</a></td>
+            <td class="api-documentation">
+                <p>Met &#224; jour une personne en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/PUT-api-cogeo-contact-societe-idSociete">PUT api/cogeo/contact/societe/{idSociete}</a></td>
+            <td class="api-documentation">
+                <p>Met &#224; jour une soci&#233;t&#233; en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/PUT-api-cogeo-contact-collectivite-idCollectivite">PUT api/cogeo/contact/collectivite/{idCollectivite}</a></td>
+            <td class="api-documentation">
+                <p>Met &#224; jour une collectivit&#233; en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/PUT-api-cogeo-contact-groupecontacts-idGroupeContacts">PUT api/cogeo/contact/groupecontacts/{idGroupeContacts}</a></td>
+            <td class="api-documentation">
+                <p>Met &#224; jour un groupe de contacts en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="Destinataire">Destinataire</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-destinataire-idDestinataire">GET api/cogeo/destinataire/{idDestinataire}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un destinataire en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-destinataire-multi_ids">GET api/cogeo/destinataire/multi?ids={ids}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un ensemble de destinataires en fonction d&#39;une liste d&#39;identifiants unique. S&#233;parateur entre les ids : &#39;,&#39; (virgule). Limite de 200 &#233;l&#233;ments.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="Devis">Devis</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-devis_texte_emis_dateEmissionMin_dateEmissionMax_idsService_idsResponsable_idsRedacteur_dateReponseMin_dateReponseMax_etat">GET api/cogeo/devis?texte={texte}&amp;emis={emis}&amp;dateEmissionMin={dateEmissionMin}&amp;dateEmissionMax={dateEmissionMax}&amp;idsService={idsService}&amp;idsResponsable={idsResponsable}&amp;idsRedacteur={idsRedacteur}&amp;dateReponseMin={dateReponseMin}&amp;dateReponseMax={dateReponseMax}&amp;etat={etat}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les identifiants uniques d&#39;un ensemble de devis / contrat en fonction des param&#232;tres.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-devis-idDevis">GET api/cogeo/devis/{idDevis}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un devis / contrat en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-devis-multi_ids">GET api/cogeo/devis/multi?ids={ids}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un ensemble de devis / contrat en fonction d&#39;un ensemble d&#39;identifiants unique. S&#233;parateur entre les ids : &#39;,&#39; (virgule). Limite de 200 &#233;l&#233;ments.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-devis-idDevis-factures">GET api/cogeo/devis/{idDevis}/factures</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les identifiants uniques d&#39;un ensemble de facture en fonction de l&#39;identifiant unique d&#39;un devis / contrat.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/POST-api-cogeo-devis">POST api/cogeo/devis</a></td>
+            <td class="api-documentation">
+                <p>Cr&#233;e un devis ou un contrat MO.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/PUT-api-cogeo-devis-idDevis">PUT api/cogeo/devis/{idDevis}</a></td>
+            <td class="api-documentation">
+                <p>Modifie un devis</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/PUT-api-cogeo-devis-idDevis-emettre">PUT api/cogeo/devis/{idDevis}/emettre</a></td>
+            <td class="api-documentation">
+                <p>Met &#224; jour le devis / contrat en le passant en &quot;&#201;mis&quot;.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/PUT-api-cogeo-devis-idDevis-accepter">PUT api/cogeo/devis/{idDevis}/accepter</a></td>
+            <td class="api-documentation">
+                <p>Met &#224; jour le devis / contrat en le passant en &quot;Accept&#233;&quot;.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/PUT-api-cogeo-devis-idDevis-refuser">PUT api/cogeo/devis/{idDevis}/refuser</a></td>
+            <td class="api-documentation">
+                <p>Met &#224; jour le devis / contrat en le passant en &quot;Refus&#233;&quot;.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="Dossier">Dossier</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-fileo-dossier-idDossier">GET api/fileo/dossier/{idDossier}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un dossier en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-fileo-dossier-idDossier-dossiersenfants">GET api/fileo/dossier/{idDossier}/dossiersenfants</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les identifiants uniques des sous-dossiers selon l&#39;identifiant unique du dossier.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-fileo-dossier-idDossier-fichiersenfants">GET api/fileo/dossier/{idDossier}/fichiersenfants</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les identifiants uniques des fichiers selon l&#39;identifiant unique du dossier.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/POST-api-fileo-dossier">POST api/fileo/dossier</a></td>
+            <td class="api-documentation">
+                <p>Cr&#233;e un dossier.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/DELETE-api-fileo-dossier-idDossier">DELETE api/fileo/dossier/{idDossier}</a></td>
+            <td class="api-documentation">
+                <p>Supprime un dossier.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="DossierPartage">DossierPartage</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-fileo-dossierpartage-idDossierPartage">GET api/fileo/dossierpartage/{idDossierPartage}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un dossier partag&#233; en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="DossierProduction">DossierProduction</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-fileo-dossierproduction_texteRecherche">GET api/fileo/dossierproduction?texteRecherche={texteRecherche}</a></td>
+            <td class="api-documentation">
+                <p>Recherche un ou des dossiers de production &#224; partir d&#39;un texte</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-fileo-dossierproduction-numero_numero">GET api/fileo/dossierproduction/numero?numero={numero}</a></td>
+            <td class="api-documentation">
+                <p>Recherche un dossier de production &#224; partir de son num&#233;ro</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-fileo-dossierproduction-idDossierProduction">GET api/fileo/dossierproduction/{idDossierProduction}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un dossier de production en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-fileo-dossierproduction-idDossierProduction-dossiersenfants">GET api/fileo/dossierproduction/{idDossierProduction}/dossiersenfants</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les identifiants uniques des dossiers enfants en fonction de l&#39;identifiant unique du dossier de production.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-fileo-dossierproduction-idDossierProduction-fichiersenfants">GET api/fileo/dossierproduction/{idDossierProduction}/fichiersenfants</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les identifiants uniques des fichiers enfants en fonction de l&#39;identifiant unique du dossier de production.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/POST-api-fileo-dossierproduction_idAffaire_idArborescence">POST api/fileo/dossierproduction?idAffaire={idAffaire}&amp;idArborescence={idArborescence}</a></td>
+            <td class="api-documentation">
+                <p>Cr&#233;e le dossier de production pour l&#39;identifiant unique de l&#39;affaire, &#224; partir de l&#39;identifiant unique de l&#39;arborescence type.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/PUT-api-fileo-dossierproduction_ids_status">PUT api/fileo/dossierproduction?ids={ids}&amp;status={status}</a></td>
+            <td class="api-documentation">
+                <p>Permet de modifier le status d&#39;un ensemble de dossiers de production. S&#233;parateur entre les ids : &#39;,&#39; (virgule). Limite de 100 &#233;l&#233;ments.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="Echeance">Echeance</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-echeance-idEcheance">GET api/cogeo/echeance/{idEcheance}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re une &#233;ch&#233;ance de facturation en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="ElementGed">ElementGed</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-elementged-idElementGed">GET api/cogeo/elementged/{idElementGed}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un &#233;l&#233;ment de la GED en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-elementged-courrier-idCourrier">GET api/cogeo/elementged/courrier/{idCourrier}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un courrier de la GED en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-elementged-email-idEmail">GET api/cogeo/elementged/email/{idEmail}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un email de la GED en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-elementged-document-idDocument">GET api/cogeo/elementged/document/{idDocument}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un document de la GED en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-elementged-plan-idPlan">GET api/cogeo/elementged/plan/{idPlan}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un plan de la GED en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-elementged-idElementGed-download">GET api/cogeo/elementged/{idElementGed}/download</a></td>
+            <td class="api-documentation">
+                <p>T&#233;l&#233;charge un fichier de la GED en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/POST-api-cogeo-elementged-plan">POST api/cogeo/elementged/plan</a></td>
+            <td class="api-documentation">
+                <p>Cr&#233;e un plan dans la GED.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/POST-api-cogeo-elementged-document">POST api/cogeo/elementged/document</a></td>
+            <td class="api-documentation">
+                <p>Cr&#233;e un document dans la GED.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/POST-api-cogeo-elementged-email">POST api/cogeo/elementged/email</a></td>
+            <td class="api-documentation">
+                <p>Cr&#233;e un email dans la GED.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/PUT-api-cogeo-elementged-email">PUT api/cogeo/elementged/email</a></td>
+            <td class="api-documentation">
+                <p>Met &#224; jour les informations d&#39;un email dans la GED. (Le fichier ne peut &#234;tre mis &#224; jour)</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/PUT-api-cogeo-elementged-document">PUT api/cogeo/elementged/document</a></td>
+            <td class="api-documentation">
+                <p>Met &#224; jour les informations d&#39;un document dans la GED. (Le fichier ne peut &#234;tre mis &#224; jour)</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/PUT-api-cogeo-elementged-plan">PUT api/cogeo/elementged/plan</a></td>
+            <td class="api-documentation">
+                <p>Met &#224; jour les informations d&#39;un plan dans la GED. (Le fichier ne peut &#234;tre mis &#224; jour)</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/DELETE-api-cogeo-elementged-plan-idPlan">DELETE api/cogeo/elementged/plan/{idPlan}</a></td>
+            <td class="api-documentation">
+                <p>Supprime un plan en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/DELETE-api-cogeo-elementged-email-idEmail">DELETE api/cogeo/elementged/email/{idEmail}</a></td>
+            <td class="api-documentation">
+                <p>Supprime un email en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/DELETE-api-cogeo-elementged-document-idDocument">DELETE api/cogeo/elementged/document/{idDocument}</a></td>
+            <td class="api-documentation">
+                <p>Supprime un document en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="Email">Email</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-email-idEmail">GET api/cogeo/email/{idEmail}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un email en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/POST-api-cogeo-email">POST api/cogeo/email</a></td>
+            <td class="api-documentation">
+                <p>Cr&#233;e une adresse email.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/PUT-api-cogeo-email-idEmail">PUT api/cogeo/email/{idEmail}</a></td>
+            <td class="api-documentation">
+                <p>Met &#224; jour un email en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/DELETE-api-cogeo-email-idEmail">DELETE api/cogeo/email/{idEmail}</a></td>
+            <td class="api-documentation">
+                <p>Supprime un email en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="Enveloppe">Enveloppe</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-enveloppe-idEnveloppePrevisionnelle">GET api/cogeo/enveloppe/{idEnveloppePrevisionnelle}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re une enveloppe pr&#233;visionnelle en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/POST-api-cogeo-enveloppe">POST api/cogeo/enveloppe</a></td>
+            <td class="api-documentation">
+                <p>Cr&#233;e une enveloppe pr&#233;visionnelle.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/PUT-api-cogeo-enveloppe-idEnveloppePrevisionnelle">PUT api/cogeo/enveloppe/{idEnveloppePrevisionnelle}</a></td>
+            <td class="api-documentation">
+                <p>Met &#224; jour une enveloppe pr&#233;visionnelle en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/DELETE-api-cogeo-enveloppe-idAffaire">DELETE api/cogeo/enveloppe/{idAffaire}</a></td>
+            <td class="api-documentation">
+                <p>Supprime une enveloppe pr&#233;visionnelle en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="Equipement">Equipement</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-moduleo-equipement-idEquipement">GET api/moduleo/equipement/{idEquipement}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un &#233;quipement en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-moduleo-equipement">GET api/moduleo/equipement</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re l&#39;ensemble des identifiants uniques des &#233;quipements.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="EtatPresence">EtatPresence</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-etatpresence-idEtatPresence">GET api/cogeo/etatpresence/{idEtatPresence}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re l&#39;&#233;tat de pr&#233;sence en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-etatpresence-multi_ids">GET api/cogeo/etatpresence/multi?ids={ids}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un enssemble d&#39;&#233;tats de pr&#233;sence en fonction d&#39;un ensemble d&#39;dentifiants unique. S&#233;parateur entre les ids : &#39;,&#39; (virgule). Limite de 200 &#233;l&#233;ments.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="ExpressionNumeroAutoArchive">ExpressionNumeroAutoArchive</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-numautoarchive-idExpressionNumeroAutoArchive">GET api/cogeo/numautoarchive/{idExpressionNumeroAutoArchive}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un modele de num&#233;rotation des archives en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="Facture">Facture</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-facture_texte_emise_dateEmissionMin_dateEmissionMax_idsService_idsResponsable_idsRedacteur">GET api/cogeo/facture?texte={texte}&amp;emise={emise}&amp;dateEmissionMin={dateEmissionMin}&amp;dateEmissionMax={dateEmissionMax}&amp;idsService={idsService}&amp;idsResponsable={idsResponsable}&amp;idsRedacteur={idsRedacteur}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les identifiants uniques d&#39;un ensemble de factures en fonction des param&#232;tres.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-facture-idFacture">GET api/cogeo/facture/{idFacture}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re une facture en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-facture-multi_ids">GET api/cogeo/facture/multi?ids={ids}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un ensemble de factures en fonction d&#39;un ensemble d&#39;identifiants unique. S&#233;parateur entre les ids : &#39;,&#39; (virgule). Limite de 200 &#233;l&#233;ments.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-facture-idFacture-tempspasses">GET api/cogeo/facture/{idFacture}/tempspasses</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un ensemble d&#39;identifiants uniques de temps pass&#233;s en fonction de l&#39;identifiant unique d&#39;une facture.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-facture-idFacture-frais">GET api/cogeo/facture/{idFacture}/frais</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un ensemble d&#39;identifiants uniques de frais en fonction de l&#39;identifiant unique d&#39;une facture.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-facture-idFacture-devis">GET api/cogeo/facture/{idFacture}/devis</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un ensemble d&#39;identifiants uniques de devis en fonction de l&#39;identifiant unique d&#39;une facture.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="FamilleArticles">FamilleArticles</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-famillearticles-idFamilleArticles">GET api/cogeo/famillearticles/{idFamilleArticles}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re la famille d&#39;articles en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-famillearticles">GET api/cogeo/famillearticles</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re l&#39;ensemble des identifiants uniques des familles d&#39;articles</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-famillearticles-multi_ids">GET api/cogeo/famillearticles/multi?ids={ids}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un ensemble de familles d&#39;articles &#224; partir d&#39;un ensemble d&#39;identifiants unique. S&#233;parateur entre les ids : &#39;,&#39; (virgule). Limite de 200 &#233;l&#233;ments.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="Fichier">Fichier</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-fileo-fichier-idFichier">GET api/fileo/fichier/{idFichier}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un fichier en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-fileo-fichier-multi_ids">GET api/fileo/fichier/multi?ids={ids}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un ensemble de fichiers en fonction de son identifiant unique. S&#233;parateur entre les ids : &#39;,&#39; (virgule). Limite de 200 &#233;l&#233;ments.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-fileo-fichier-idFichier-download">GET api/fileo/fichier/{idFichier}/download</a></td>
+            <td class="api-documentation">
+                <p>T&#233;l&#233;charge un fichier en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-fileo-fichier-multi-download_ids">GET api/fileo/fichier/multi/download?ids={ids}</a></td>
+            <td class="api-documentation">
+                <p>T&#233;l&#233;charge un ensemble de fichiers en fonction d&#39;un ensemble d&#39;identifiant unique. S&#233;parateur entre les ids : &#39;,&#39; (virgule). Limite de 200 &#233;l&#233;ments.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/POST-api-fileo-fichier">POST api/fileo/fichier</a></td>
+            <td class="api-documentation">
+                <p>Cr&#233;e un fichier.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/POST-api-fileo-fichier-upload">POST api/fileo/fichier/upload</a></td>
+            <td class="api-documentation">
+                <p>Cr&#233;e un fichier.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/PUT-api-fileo-fichier-idFichier">PUT api/fileo/fichier/{idFichier}</a></td>
+            <td class="api-documentation">
+                <p>Met &#224; jour un fichier.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/DELETE-api-fileo-fichier-idFichier">DELETE api/fileo/fichier/{idFichier}</a></td>
+            <td class="api-documentation">
+                <p>Supprime un fichier en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="Frais">Frais</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-frais_dateMin_dateMax_idsUtilisateurs_idTypeFrais_idAffaire_nbMaxResultat">GET api/cogeo/frais?dateMin={dateMin}&amp;dateMax={dateMax}&amp;idsUtilisateurs={idsUtilisateurs}&amp;idTypeFrais={idTypeFrais}&amp;idAffaire={idAffaire}&amp;nbMaxResultat={nbMaxResultat}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les identifiants uniques d&#39;un ensemble de frais en fonction des param&#232;tres.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-frais-idFrais">GET api/cogeo/frais/{idFrais}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un frais en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/POST-api-cogeo-frais">POST api/cogeo/frais</a></td>
+            <td class="api-documentation">
+                <p>Cr&#233;e un frais.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/PUT-api-cogeo-frais-idFrais">PUT api/cogeo/frais/{idFrais}</a></td>
+            <td class="api-documentation">
+                <p>Met &#224; jour un frais en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/DELETE-api-cogeo-frais-IdFrais">DELETE api/cogeo/frais/{IdFrais}</a></td>
+            <td class="api-documentation">
+                <p>Supprime un frais en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="Gabarit">Gabarit</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-gabarit-devis">GET api/cogeo/gabarit/devis</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re l&#39;ensemble des identifiants uniques des gabarits de devis.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-gabarit-devis-defaut">GET api/cogeo/gabarit/devis/defaut</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re l&#39;identifiant unique du gabarits de devis par d&#233;faut.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-gabarit-idGabarit">GET api/cogeo/gabarit/{idGabarit}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un gabarit en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-gabarit-multi_ids">GET api/cogeo/gabarit/multi?ids={ids}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un ensemble de gabarits en fonction d&#39;un ensemble d&#39;identifiants unique. S&#233;parateur entre les ids : &#39;,&#39; (virgule). Limite de 200 &#233;l&#233;ments.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="Groupe">Groupe</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-groupe_texte">GET api/cogeo/groupe?texte={texte}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les identifiants uniques d&#39;un ensemble de groupes d&#39;affaires en fonction des param&#232;tres.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-groupe-idGroupe">GET api/cogeo/groupe/{idGroupe}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un groupe d&#39;affaires en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-groupe-multi_ids">GET api/cogeo/groupe/multi?ids={ids}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un ensemble de groupes d&#39;affaires en fonction d&#39;un ensemble identifiants unique. S&#233;parateur entre les ids : &#39;,&#39; (virgule). Limite de 200 &#233;l&#233;ments.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-groupe-idGroupe-affaires">GET api/cogeo/groupe/{idGroupe}/affaires</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re la liste des identifiants uniques des affaires d&#39;un groupe en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/POST-api-cogeo-groupe">POST api/cogeo/groupe</a></td>
+            <td class="api-documentation">
+                <p>Cr&#233;e un groupe d&#39;affaire.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/PUT-api-cogeo-groupe-idGroupe">PUT api/cogeo/groupe/{idGroupe}</a></td>
+            <td class="api-documentation">
+                <p>Met &#224; jour un groupe d&#39;affaire en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="GroupeUtilisateur">GroupeUtilisateur</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-moduleo-groupeutilisateur-idGroupeUtilisateur">GET api/moduleo/groupeutilisateur/{idGroupeUtilisateur}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un groupe utilisateur en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="Intervenant">Intervenant</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-intervenant-idIntervenant">GET api/cogeo/intervenant/{idIntervenant}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un intervenant en fonction son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-intervenant-multi_ids">GET api/cogeo/intervenant/multi?ids={ids}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un ensemble d&#39;intervenants en fonction d&#39;un ensemble identifiants unique. S&#233;parateur entre les ids : &#39;,&#39; (virgule). Limite de 200 &#233;l&#233;ments.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/POST-api-cogeo-intervenant">POST api/cogeo/intervenant</a></td>
+            <td class="api-documentation">
+                <p>Ajoute un intervenant &#224; une affaire.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="JourFerie">JourFerie</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-planning-jourferie">GET api/planning/jourferie</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re l&#39;ensemble des identifiants uniques des jours f&#233;ri&#233;s</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-planning-jourferie-multi_ids">GET api/planning/jourferie/multi?ids={ids}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un ensemble de jours f&#233;ri&#233;s &#224; partir d&#39;un ensemble d&#39;identifiants unique. S&#233;parateur entre les ids : &#39;,&#39; (virgule). Limite de 200 &#233;l&#233;ments.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-planning-jourferie-idJourFerie">GET api/planning/jourferie/{idJourFerie}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un jour f&#233;ri&#233; &#224; partir de son identifiant unique</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="Licence">Licence</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-moduleo-licence-location">GET api/moduleo/licence/location</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re l&#39;ensemble des licences.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-moduleo-licence-achat">GET api/moduleo/licence/achat</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re l&#39;ensemble des licences.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="Lieu">Lieu</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-lieu-idLieu">GET api/cogeo/lieu/{idLieu}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un lieu en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-lieu">GET api/cogeo/lieu</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re l&#39;ensemble des identifiants uniques des lieux.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="LigneArticle">LigneArticle</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-lignearticle-idLigneArticle">GET api/cogeo/lignearticle/{idLigneArticle}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re une ligne article en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-lignearticle-multi_ids">GET api/cogeo/lignearticle/multi?ids={ids}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un ensemble de lignes article en fonction d&#39;une liste d&#39;identifiants unique. S&#233;parateur entre les ids : &#39;,&#39; (virgule). Limite de 200 &#233;l&#233;ments.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-lignearticle-idLigneArticle-standard">GET api/cogeo/lignearticle/{idLigneArticle}/standard</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re une ligne article standard en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-lignearticle-idLigneArticle-mo">GET api/cogeo/lignearticle/{idLigneArticle}/mo</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re une ligne article MO en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-lignearticle-multi-standard_ids">GET api/cogeo/lignearticle/multi/standard?ids={ids}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un ensemble de lignes article standard en fonction d&#39;une liste d&#39;identifiants unique. S&#233;parateur entre les ids : &#39;,&#39; (virgule). Limite de 200 &#233;l&#233;ments.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-lignearticle-multi-mo_ids">GET api/cogeo/lignearticle/multi/mo?ids={ids}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un ensemble de lignes article MO en fonction d&#39;une liste d&#39;identifiants unique. S&#233;parateur entre les ids : &#39;,&#39; (virgule). Limite de 200 &#233;l&#233;ments.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/POST-api-cogeo-lignearticle-standard">POST api/cogeo/lignearticle/standard</a></td>
+            <td class="api-documentation">
+                <p>Cr&#233;e une ligne article.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/POST-api-cogeo-lignearticle-mo">POST api/cogeo/lignearticle/mo</a></td>
+            <td class="api-documentation">
+                <p>Cr&#233;e une ligne article de type MO.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="Localisant">Localisant</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-localisant-idLocalisant">GET api/cogeo/localisant/{idLocalisant}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un localisant en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-localisant-multi_ids">GET api/cogeo/localisant/multi?ids={ids}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un ensemble de localisants en fonction d&#39;une liste d&#39;identifiants unique. S&#233;parateur entre les ids : &#39;,&#39; (virgule). Limite de 200 &#233;l&#233;ments.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/POST-api-cogeo-localisant_idAffaire">POST api/cogeo/localisant?idAffaire={idAffaire}</a></td>
+            <td class="api-documentation">
+                <p>Cr&#233;e un localisant.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/PUT-api-cogeo-localisant-idLocalisant">PUT api/cogeo/localisant/{idLocalisant}</a></td>
+            <td class="api-documentation">
+                <p>Met &#224; jour un localisant en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="Marche">Marche</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-marche-idMarche">GET api/cogeo/marche/{idMarche}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un march&#233; en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="ModeReglement">ModeReglement</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-modeReglement-idModeReglement">GET api/cogeo/modeReglement/{idModeReglement}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un mode de r&#232;glement en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="Note">Note</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-note-idNote">GET api/cogeo/note/{idNote}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re une note en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/POST-api-cogeo-note">POST api/cogeo/note</a></td>
+            <td class="api-documentation">
+                <p>Cr&#233;e une note.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/PUT-api-cogeo-note-idNote">PUT api/cogeo/note/{idNote}</a></td>
+            <td class="api-documentation">
+                <p>Met &#224; jour une note en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/DELETE-api-cogeo-note-idNote">DELETE api/cogeo/note/{idNote}</a></td>
+            <td class="api-documentation">
+                <p>Supprime une note en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="Operation">Operation</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-operation-idOperation">GET api/cogeo/operation/{idOperation}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re l&#39;op&#233;ration li&#233;e d&#39;une parcelle en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-operation-idOperation-parcellescibles">GET api/cogeo/operation/{idOperation}/parcellescibles</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les identifiants uniques de parcelles cibles de l&#39;op&#233;ration.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-operation-idOperation-parcellesliees">GET api/cogeo/operation/{idOperation}/parcellesliees</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les identifiants uniques de parcelles li&#233;es de l&#39;op&#233;ration.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-operation-idOperation-etatspresence">GET api/cogeo/operation/{idOperation}/etatspresence</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les identifiants uniques de &#233;tats de pr&#233;sence li&#233;es de l&#39;op&#233;ration.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="Parcelle">Parcelle</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-parcelle-idParcelle">GET api/cogeo/parcelle/{idParcelle}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re une parcelle en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-parcelle-idParcelle-proprietaires">GET api/cogeo/parcelle/{idParcelle}/proprietaires</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les identifiants uniques d&#39;un ensemble de propri&#233;taires d&#39;une parcelle en fonction de l&#39;identifiant unique de la parcelle.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-parcelle-idParcelle-operationsliees">GET api/cogeo/parcelle/{idParcelle}/operationsliees</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les identifiants uniques d&#39;un ensemble d&#39;op&#233;rations li&#233;es d&#39;une parcelle en fonction de l&#39;identifiant unique de la parcelle.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-parcelle-idParcelle-operationscibles">GET api/cogeo/parcelle/{idParcelle}/operationscibles</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les identifiants uniques d&#39;un ensemble d&#39;op&#233;rations dont la parcelle est cible en fonction de l&#39;identifiant unique de la parcelle.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-parcelle-idParcelle-parcellesfille">GET api/cogeo/parcelle/{idParcelle}/parcellesfille</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les identifiants uniques d&#39;un ensemble de parcelles filles d&#39;une parcelle en fonction l&#39;identifiant unique de la parcelle m&#232;re.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-parcelle-idParcelle-titres">GET api/cogeo/parcelle/{idParcelle}/titres</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les identifiants uniques d&#39;un ensemble de titre d&#39;une parcelle en fonction de l&#39;identifiant unique de la parcelle.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="Phase">Phase</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-phase-idPhase">GET api/cogeo/phase/{idPhase}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re une phase en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="ProcedureApplication">ProcedureApplication</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-procedureapplication-idProcedureApplication">GET api/cogeo/procedureapplication/{idProcedureApplication}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re une proc&#233;dure application en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-procedureapplication-idProcedureApplication-tachesapplication">GET api/cogeo/procedureapplication/{idProcedureApplication}/tachesapplication</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les identifiants uniques des t&#226;ches application d&#39;une proc&#233;dure application.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/POST-api-cogeo-procedureapplication">POST api/cogeo/procedureapplication</a></td>
+            <td class="api-documentation">
+                <p>Cr&#233;e une proc&#233;dure pour l&#39;affaire voulue.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="ProcedureDefinition">ProcedureDefinition</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-proceduredefinition-idProcedureDefinition">GET api/cogeo/proceduredefinition/{idProcedureDefinition}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re une proc&#233;dure d&#233;finition en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-proceduredefinition-idProcedureDefinition-tachesdefinition">GET api/cogeo/proceduredefinition/{idProcedureDefinition}/tachesdefinition</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les identifiants uniques des t&#226;ches d&#233;finition d&#39;une proc&#233;dure d&#233;finition.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="ProcedureDefinitionDocument">ProcedureDefinitionDocument</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-document-idDocument">GET api/cogeo/document/{idDocument}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un document en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="ProcedureTacheApplication">ProcedureTacheApplication</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-proceduretacheapplication-idTacheApplication">GET api/cogeo/proceduretacheapplication/{idTacheApplication}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re une t&#226;che application en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-proceduretacheapplication-idTacheApplication-tachesapplications">GET api/cogeo/proceduretacheapplication/{idTacheApplication}/tachesapplications</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re la liste des sous-t&#226;ches application en fonction de l&#39;identifiant unique de la t&#226;che application.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="ProcedureTacheDefinition">ProcedureTacheDefinition</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-proceduretachedefinition-idTacheDefinition">GET api/cogeo/proceduretachedefinition/{idTacheDefinition}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re une t&#226;che d&#233;finition en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-proceduretachedefinition-idTacheDefinition-tachesdefinitions">GET api/cogeo/proceduretachedefinition/{idTacheDefinition}/tachesdefinitions</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re la liste des sous-t&#226;che d&#233;finition en fonction de l&#39;identifiant unique de la t&#226;che application.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="Proprietaire">Proprietaire</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-proprietaire-idProprietaire">GET api/cogeo/proprietaire/{idProprietaire}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re le propri&#233;taire d&#39;une parcelle en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="Qualification">Qualification</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-qualification-idQualification">GET api/cogeo/qualification/{idQualification}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re une qualification de contact en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-qualification-multi_ids">GET api/cogeo/qualification/multi?ids={ids}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un ensemble de qualifications en fonction d&#39;un ensemble identifiants unique. S&#233;parateur entre les ids : &#39;,&#39; (virgule). Limite de 200 &#233;l&#233;ments.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-qualification-all">GET api/cogeo/qualification/all</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re l&#39;ensemble des qualifications.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="Recurrence">Recurrence</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-planning-recurrence-idRecurrenceGroupeTache">GET api/planning/recurrence/{idRecurrenceGroupeTache}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re une r&#233;currence de groupe de t&#226;che en fonction son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/POST-api-planning-recurrence">POST api/planning/recurrence</a></td>
+            <td class="api-documentation">
+                <p>Cr&#233;e un mod&#232;le de r&#233;currence pour une t&#226;che du planning.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/PUT-api-planning-recurrence-idRecurrence">PUT api/planning/recurrence/{idRecurrence}</a></td>
+            <td class="api-documentation">
+                <p>Met &#224; jour un mod&#232;le de r&#233;currence en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/DELETE-api-planning-recurrence-idRecurrence">DELETE api/planning/recurrence/{idRecurrence}</a></td>
+            <td class="api-documentation">
+                <p>Supprime un mod&#232;le de r&#233;currence en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="Reglement">Reglement</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-reglement-idReglement">GET api/cogeo/reglement/{idReglement}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un r&#232;glement en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="RH">RH</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-ressourceshumaines-idUtilisateur">GET api/cogeo/ressourceshumaines/{idUtilisateur}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les informations personnelles d&#39;un utilisateur en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="Service">Service</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-moduleo-service_nom_actifSeulement">GET api/moduleo/service?nom={nom}&amp;actifSeulement={actifSeulement}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les identifiants uniques d&#39;un ensemble de services en fonction des param&#232;tres.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-moduleo-service-idService">GET api/moduleo/service/{idService}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un service en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="Site">Site</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-moduleo-site_nom_actifSeulement">GET api/moduleo/site?nom={nom}&amp;actifSeulement={actifSeulement}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les identifiants uniques d&#39;un ensemble de sites en fonction des param&#232;tres.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-moduleo-site-idSite">GET api/moduleo/site/{idSite}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un site en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="TacheAFaire">TacheAFaire</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-moduleo-tacheafaire-idTacheAFaire">GET api/moduleo/tacheafaire/{idTacheAFaire}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re une t&#226;che &#224; faire en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-moduleo-tacheafaire-user-idUser">GET api/moduleo/tacheafaire/user/{idUser}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les identifiants uniques d&#39;un ensemble de t&#226;ches &#224; faire en fonction de l&#39;identifiant unique de l&#39;utilisateur.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/POST-api-moduleo-tacheafaire">POST api/moduleo/tacheafaire</a></td>
+            <td class="api-documentation">
+                <p>Cr&#233;e une t&#226;che &#224; faire.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/PUT-api-moduleo-tacheafaire-idTacheAFaire">PUT api/moduleo/tacheafaire/{idTacheAFaire}</a></td>
+            <td class="api-documentation">
+                <p>Met &#224; jour une t&#226;che &#224; faire en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="TachePlanning">TachePlanning</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-planning-tacheplanning-idTachePlanning">GET api/planning/tacheplanning/{idTachePlanning}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re une t&#226;che du planning en fonction son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-planning-tacheplanning-multi_ids">GET api/planning/tacheplanning/multi?ids={ids}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un ensemble de t&#226;ches planning en fonction d&#39;un ensemble identifiants unique. S&#233;parateur entre les ids : &#39;,&#39; (virgule). Limite de 200 &#233;l&#233;ments.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-planning-tacheplanning_libelle_remarque_idActivite_idsParticipants_idsMateriels_dateDebut_dateFin_aUneHeureDebut_aUneHeureFin_idsSites_dateCreationDebut_dateCreationFin_dateModificationDebut_dateModificationFin_recupererTachesSupprimees">GET api/planning/tacheplanning?libelle={libelle}&amp;remarque={remarque}&amp;idActivite={idActivite}&amp;idsParticipants={idsParticipants}&amp;idsMateriels={idsMateriels}&amp;dateDebut={dateDebut}&amp;dateFin={dateFin}&amp;aUneHeureDebut={aUneHeureDebut}&amp;aUneHeureFin={aUneHeureFin}&amp;idsSites={idsSites}&amp;dateCreationDebut={dateCreationDebut}&amp;dateCreationFin={dateCreationFin}&amp;dateModificationDebut={dateModificationDebut}&amp;dateModificationFin={dateModificationFin}&amp;recupererTachesSupprimees={recupererTachesSupprimees}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les identifiants uniques d&#39;un ensemble de t&#226;ches du planning en fonction des param&#232;tres.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/POST-api-planning-tacheplanning">POST api/planning/tacheplanning</a></td>
+            <td class="api-documentation">
+                <p>Cr&#233;e une t&#226;che du planning.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/PUT-api-planning-tacheplanning-idTachePlanning">PUT api/planning/tacheplanning/{idTachePlanning}</a></td>
+            <td class="api-documentation">
+                <p>Met &#224; jour t&#226;che du planning en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/DELETE-api-planning-tacheplanning-idTachePlanning">DELETE api/planning/tacheplanning/{idTachePlanning}</a></td>
+            <td class="api-documentation">
+                <p>Supprime une t&#226;che du planning en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="TacheRemplacement">TacheRemplacement</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-planning-tacheremplacement-idTacheRemplacement">GET api/planning/tacheremplacement/{idTacheRemplacement}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re une t&#226;che de remplacement en fonction son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-planning-tacheremplacement-multi_ids">GET api/planning/tacheremplacement/multi?ids={ids}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un ensemble de t&#226;ches remplacement en fonction d&#39;un ensemble identifiants unique.  S&#233;parateur entre les ids : &#39;,&#39; (virgule). Limite de 200 &#233;l&#233;ments.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/POST-api-planning-tacheremplacement">POST api/planning/tacheremplacement</a></td>
+            <td class="api-documentation">
+                <p>Cr&#233;e une .</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="Telephone">Telephone</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-moduleo-telephone-idTelephone">GET api/moduleo/telephone/{idTelephone}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un num&#233;ro de t&#233;l&#233;phone en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/POST-api-moduleo-telephone">POST api/moduleo/telephone</a></td>
+            <td class="api-documentation">
+                <p>Cr&#233;e un num&#233;ro de t&#233;l&#233;phone.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/PUT-api-moduleo-telephone-idTelephone">PUT api/moduleo/telephone/{idTelephone}</a></td>
+            <td class="api-documentation">
+                <p>Met &#224; jour un num&#233;ro de t&#233;l&#233;phone en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/DELETE-api-moduleo-telephone-idTelephone">DELETE api/moduleo/telephone/{idTelephone}</a></td>
+            <td class="api-documentation">
+                <p>Supprime un num&#233;ro de t&#233;l&#233;phone en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="TempsPasse">TempsPasse</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-tempspasse_dateMin_dateMax_idsUtilisateurs_idCodeActivite_idAffaire_nbMaxResultat">GET api/cogeo/tempspasse?dateMin={dateMin}&amp;dateMax={dateMax}&amp;idsUtilisateurs={idsUtilisateurs}&amp;idCodeActivite={idCodeActivite}&amp;idAffaire={idAffaire}&amp;nbMaxResultat={nbMaxResultat}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les identifiants uniques d&#39;un ensemble de temps pass&#233;s en fonction des param&#232;tres.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-tempspasse-idTempsPasse">GET api/cogeo/tempspasse/{idTempsPasse}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un temps pass&#233; en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-tempspasse-multi_ids">GET api/cogeo/tempspasse/multi?ids={ids}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un ensemble de temps pass&#233; en fonction d&#39;un ensemble d&#39;identifiants unique. S&#233;parateur entre les ids : &#39;,&#39; (virgule). Limite de 200 &#233;l&#233;ments.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/POST-api-cogeo-tempspasse">POST api/cogeo/tempspasse</a></td>
+            <td class="api-documentation">
+                <p>Cr&#233;e un temps pass&#233;.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/POST-api-cogeo-tempspasse-signer">POST api/cogeo/tempspasse/signer</a></td>
+            <td class="api-documentation">
+                <p>Signe une semaine de temps pass&#233;.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/POST-api-cogeo-tempspasse-annulersignature">POST api/cogeo/tempspasse/annulersignature</a></td>
+            <td class="api-documentation">
+                <p>Annule la signature d&#39;une semaine de temps pass&#233;.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/POST-api-cogeo-tempspasse-valider">POST api/cogeo/tempspasse/valider</a></td>
+            <td class="api-documentation">
+                <p>Valide une semaine de temps pass&#233;.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/POST-api-cogeo-tempspasse-annulervalidation">POST api/cogeo/tempspasse/annulervalidation</a></td>
+            <td class="api-documentation">
+                <p>Annule la validation d&#39;une semaine de temps pass&#233;.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/PUT-api-cogeo-tempspasse-idTempsPasse">PUT api/cogeo/tempspasse/{idTempsPasse}</a></td>
+            <td class="api-documentation">
+                <p>Met &#224; jour un temps pass&#233; en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/DELETE-api-cogeo-tempspasse-idTempsPasse">DELETE api/cogeo/tempspasse/{idTempsPasse}</a></td>
+            <td class="api-documentation">
+                <p>Supprime un temps pass&#233; en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="Titre">Titre</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-titre-idTitre">GET api/cogeo/titre/{idTitre}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un titre en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-titre-multi_ids">GET api/cogeo/titre/multi?ids={ids}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un ensemble de titre en fonction d&#39;un ensemble d&#39;identifiants unique. S&#233;parateur entre les ids : &#39;,&#39; (virgule). Limite de 200 &#233;l&#233;ments.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/POST-api-cogeo-titre">POST api/cogeo/titre</a></td>
+            <td class="api-documentation">
+                <p>Cr&#233;e un titre.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/PUT-api-cogeo-titre-idTitre">PUT api/cogeo/titre/{idTitre}</a></td>
+            <td class="api-documentation">
+                <p>Met &#224; jour un titre en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/PUT-api-cogeo-titre-ajoutparcelle_idTitre_idsParcelle">PUT api/cogeo/titre/ajoutparcelle?idTitre={idTitre}&amp;idsParcelle={idsParcelle}</a></td>
+            <td class="api-documentation">
+                <p>Ajoute une ou des parcelles &#224; un titre</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/PUT-api-cogeo-titre-enleverparcelle_idTitre_idsParcelle">PUT api/cogeo/titre/enleverparcelle?idTitre={idTitre}&amp;idsParcelle={idsParcelle}</a></td>
+            <td class="api-documentation">
+                <p>Enleve une ou des parcelles d&#39;un titre</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="Tva">Tva</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-tva">GET api/cogeo/tva</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re l&#39;ensemble des identifiants uniques des TVA.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-tva-idTva">GET api/cogeo/tva/{idTva}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re une TVA en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-tva-multi_ids">GET api/cogeo/tva/multi?ids={ids}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un ensemble de TVA en fonction d&#39;une liste d&#39;identifiants unique. S&#233;parateur entre les ids : &#39;,&#39; (virgule). Limite de 200 &#233;l&#233;ments.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="TypeFrais">TypeFrais</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-typefrais-idTypeFrais">GET api/cogeo/typefrais/{idTypeFrais}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un type de frais en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-typefrais">GET api/cogeo/typefrais</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re l&#39;ensemble des identifiants uniques des types de frais.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="Utilisateur">Utilisateur</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-moduleo-utilisateur_nom_prenom_actifSeulement">GET api/moduleo/utilisateur?nom={nom}&amp;prenom={prenom}&amp;actifSeulement={actifSeulement}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les identifiants uniques d&#39;un ensemble d&#39;utilisateurs en fonction des param&#232;tres.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-moduleo-utilisateur-idUtilisateur">GET api/moduleo/utilisateur/{idUtilisateur}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un utilisateur par son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-moduleo-utilisateur-utilisateurencours">GET api/moduleo/utilisateur/utilisateurencours</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re l&#39;utilisateur en cours en fonction de sa cl&#233; d&#39;API et de son code</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-moduleo-utilisateur-idUtilisateur-groupes">GET api/moduleo/utilisateur/{idUtilisateur}/groupes</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les identifiants uniques des groupes dont l&#39;utilisateur fait partie.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="UtilisateurCogeo">UtilisateurCogeo</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-utilisateurcogeo-idUtilisateurCogeo">GET api/cogeo/utilisateurcogeo/{idUtilisateurCogeo}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re une utilisateur cogeo en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-cogeo-utilisateurcogeo-utilisateur-idUtilisateur">GET api/cogeo/utilisateurcogeo/utilisateur/{idUtilisateur}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re une utilisateur cogeo en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="UtilisateurPlanning">UtilisateurPlanning</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-planning-utilisateurplanning-idUtilisateurPlanning">GET api/planning/utilisateurplanning/{idUtilisateurPlanning}</a></td>
+            <td class="api-documentation">
+                <p>No documentation available.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-planning-utilisateurplanning-utilisateur-idUtilisateur">GET api/planning/utilisateurplanning/utilisateur/{idUtilisateur}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re une utilisateur planning en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="Vehicule">Vehicule</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-moduleo-vehicule-idVehicule">GET api/moduleo/vehicule/{idVehicule}</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re un v&#233;hicule en fonction de son identifiant unique.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-moduleo-vehicule">GET api/moduleo/vehicule</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re l&#39;ensemble des identifiants uniques des v&#233;hicules.</p>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<h2 id="Webhook">Webhook</h2>
+<table class="help-page-table">
+    <thead>
+        <tr><th>API</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/GET-api-webhook">GET api/webhook</a></td>
+            <td class="api-documentation">
+                <p>R&#233;cup&#232;re les informations de connexion avec le webhook.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/POST-api-webhook">POST api/webhook</a></td>
+            <td class="api-documentation">
+                <p>Configure l&#39;acc&#233;s au webhook.</p>
+            </td>
+        </tr>
+        <tr>
+            <td class="api-name"><a href="/api/documentation/Api/DELETE-api-webhook">DELETE api/webhook</a></td>
+            <td class="api-documentation">
+                <p>Supprime les informations de connexion avec le webhook</p>
+            </td>
+        </tr>
+    </tbody>
+</table>    </section>
+</div>
+
+</body>
+</html>

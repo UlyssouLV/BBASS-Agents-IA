@@ -24,6 +24,13 @@ SEARXNG_HTTP_TIMEOUT = float(os.environ.get("SEARXNG_HTTP_TIMEOUT", "10"))
 # Délai par page trouvée par le moteur (spec 1.4.0, étape 2) : au-delà, la
 # page est ignorée et son extrait de moteur reste.
 PAGES_HTTP_TIMEOUT = float(os.environ.get("PAGES_HTTP_TIMEOUT", "10"))
+# API Moduléo du cabinet (spec 1.5.0, ADR-0017) : changer de serveur est une
+# ligne de .env. Les routes de vm_centrale/moduleo/routes.py s'ajoutent à
+# cette base ; la doc du serveur est sous <MODULEO_URL>/documentation.
+MODULEO_URL = os.environ.get("MODULEO_URL", "https://mwa-bbass.kipaware.fr/api")
+# Délai d'une lecture Moduléo : au-delà, Moduléo est tenu pour indisponible
+# (panne), sans nouvelle tentative.
+MODULEO_HTTP_TIMEOUT = 10.0
 # Validité d'une copie du cache commun des pages web (spec 1.4.3,
 # ADR-0015) : au-delà, la copie est ignorée et la page retéléchargée.
 VALIDITE_CACHE_PAGES = timedelta(hours=24)
