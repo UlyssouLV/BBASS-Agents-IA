@@ -10,6 +10,6 @@
 
 **Appelant.** `routers/conversations.py`, `_reponse_visible`, après les garde-fous URL et chiffres (ajoutée par le code, elle n'est jamais contrôlée comme un texte du modèle), sur la réponse finale de chat de `creer_conversation` et `envoyer_message`, avant titrage, persistance et réponse au poste. L'échange `garde_fous` de l'inspecteur montre la réponse brute sans la mention et la réponse visible avec.
 
-**Depuis.** 1.4.2 (#151). Origine : test humain 1.4.2, conversation 100 : « Résume moi ce livre » sur une page de 745 692 tokens. Après le refus, le modèle a relu la page sans besoin, reçu un aperçu de 8 000 caractères, puis résumé le roman de mémoire en le présentant comme lu à l'URL fournie. La consigne du refus (`lire_pages_web`) demande désormais de le dire ; ce garde-fou le garantit.
+**Depuis.** 1.4.2 (#151). Origine : test humain 1.4.2, conversation 100 : « Résume moi ce livre » sur une page de 745 692 tokens. Après le refus, le modèle a relu la page sans besoin, reçu un aperçu de 8 000 caractères, puis résumé le roman de mémoire en le présentant comme lu à l'URL fournie. La consigne du refus (`lire_pages_web`) demande désormais de le dire ; ce garde-fou le garantit. Au test suivant, le modèle a deviné le livre à partir de l'URL (*Les Trois Mousquetaires* pour *Les Misérables*) : le refus porte depuis le titre de la page (#152).
 
 Code : `garde_fou.py`.

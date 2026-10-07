@@ -142,6 +142,10 @@ class _Page:
     erreur: str | None = None
     retiree_par_plafond: bool = False
     tokens: int = 0
+    # `<title>` de la page (ou, à défaut, son titre principal), vide si
+    # inconnu. Enregistré pour une URL écrite par le compte, qui n'a pas de
+    # titre de moteur (lire_pages_web, #152).
+    titre: str = ""
 
     @property
     def texte_lu(self) -> str:
@@ -176,7 +180,9 @@ def lire_page(url: str, telechargeur: TelechargeurPages) -> _Page:
     texte = (trafilatura.extract(page.corps) or "").strip()
     if not texte:
         return _Page(url, statut=page.statut, erreur="aucun texte principal")
-    return _Page(url, statut=page.statut, texte=texte)
+    metadonnees = trafilatura.extract_metadata(page.corps)
+    titre = ((metadonnees.title if metadonnees is not None else None) or "").strip()
+    return _Page(url, statut=page.statut, texte=texte, titre=titre)
 
 
 def _lire_pages(resultats: list[ResultatRecherche], telechargeur: TelechargeurPages) -> list[_Page]:

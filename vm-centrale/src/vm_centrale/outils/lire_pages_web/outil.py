@@ -22,11 +22,14 @@ _NON_TROUVE = "Non trouvé dans cette page pour ce besoin."
 # n'est ni coupée ni relue : un « non trouvé » sur une page coupée passerait
 # pour un « non trouvé » sur la page entière. Consigne de réponse honnête
 # (#151) : le modèle a résumé de mémoire une page qu'il n'avait pas lue.
+# Durcie en #152 : sans rien de la page, il en devinait le sujet.
 _PAGE_TROP_LONGUE = (
     "Page trop longue pour être lue : son contenu ne t'a pas été transmis. "
-    "Dis au collaborateur que la page était trop longue pour être lue. Tu peux "
-    "répondre avec ce que tu sais du sujet, en précisant que cela vient de tes "
-    "connaissances et non de la page."
+    "Dis au collaborateur que la page était trop longue pour être lue. Tu ne "
+    "connais de cette page que son URL et, s'il est donné, son titre : "
+    "n'affirme rien d'autre sur ce qu'elle contient. Réponds sur le sujet "
+    "seulement s'il est connu (titre de la page ou message du collaborateur), "
+    "en précisant que cela vient de tes connaissances et non de la page."
 )
 # Sans besoin, le texte nettoyé de chaque page part au modèle, coupé à ce
 # plafond : de quoi découvrir de quoi parle une page, pas la relire entière.
@@ -239,7 +242,9 @@ def _telecharger_pages_du_compte(
             requete="",
             # Telle qu'écrite par le compte, sans le schéma ajouté.
             url=url,
-            titre="",
+            # `<title>` de la page : seul indice donné au modèle sur une
+            # page trop longue (#152).
+            titre=page.titre,
             extrait_moteur="",
             # Source du garde-fou chiffres, comme une page trouvée.
             texte_nettoye=page.texte,
@@ -265,6 +270,14 @@ def _trace_telechargee(ligne: ResultatRechercheWeb, trace: dict, tokens: dict[in
     if ligne.id in tokens:
         trace["tokens"] = tokens[ligne.id][1]
     return trace
+
+
+def _refus_page_trop_longue(page: ResultatRechercheWeb) -> str:
+    # Le titre (du moteur, ou `<title>` d'une page du compte), jamais une
+    # ligne du texte : sans lui, le modèle devinait le sujet de la page à
+    # partir de son URL (#152, Les Trois Mousquetaires pour Les Misérables).
+    bloc = f"Page {page.url} : {_PAGE_TROP_LONGUE}"
+    return f"{bloc}\nTitre de la page : {page.titre.strip()}" if page.titre.strip() else bloc
 
 
 def _texte_sans_besoin(texte: str) -> str:
@@ -327,13 +340,13 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
             blocs.append(f"Page {page.url} : non lue, seul l'extrait du moteur est disponible.\n{page.extrait_moteur}")
             continue
         if page.id in refusees:
-            blocs.append(f"Page {page.url} : {_PAGE_TROP_LONGUE}")
+            blocs.append(_refus_page_trop_longue(page))
             continue
         if not besoin:
             blocs.append(f"Page {page.url} :\n{_texte_sans_besoin(page.texte_nettoye)}")
             continue
         if page.id not in extractions:
-            blocs.append(f"Page {page.url} : {_PAGE_TROP_LONGUE}")
+            blocs.append(_refus_page_trop_longue(page))
             continue
         lecture, _ = extractions[page.id]
         if lecture is None:
