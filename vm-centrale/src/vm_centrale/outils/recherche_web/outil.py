@@ -21,10 +21,11 @@ _NOMBRE_RESULTATS = 5
 _NOMBRE_PAGES_TELECHARGEES = 3
 # Plafond global des pages nettoyées (spec 1.4.0, étape 4) : 80 % de la
 # fenêtre du modèle d'extraction (fiche MODELE_CHAT), en vrais tokens depuis
-# la 1.4.2 (tokenizer de la fiche, compte_tokens.py).
+# la 1.4.2 (tokenizer de la fiche, compte_tokens.py). Aussi celui d'une page
+# relue avec un besoin par lire_pages_web.
 _FENETRE_EXTRACTION_TOKENS = FICHES_MODELES[MODELE_CHAT].fenetre_tokens
 assert _FENETRE_EXTRACTION_TOKENS is not None
-_PLAFOND_TOKENS_PAGES = int(_FENETRE_EXTRACTION_TOKENS * 0.8)
+PLAFOND_TOKENS_PAGES = int(_FENETRE_EXTRACTION_TOKENS * 0.8)
 _RECHERCHE_INDISPONIBLE = (
     "Recherche indisponible : le moteur de recherche ne répond pas. Réponds sans "
     "résultat de recherche et sans lien."
@@ -189,7 +190,7 @@ def _lire_pages(resultats: list[ResultatRecherche], telechargeur: TelechargeurPa
     lues = [page for page in pages if page.texte]
     for page in lues:
         page.tokens = compter_tokens(page.texte, MODELE_CHAT)
-    while lues and sum(page.tokens for page in lues) > _PLAFOND_TOKENS_PAGES:
+    while lues and sum(page.tokens for page in lues) > PLAFOND_TOKENS_PAGES:
         lues.pop().retiree_par_plafond = True
     return pages
 

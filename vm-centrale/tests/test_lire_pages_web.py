@@ -620,3 +620,85 @@ def test_sans_besoin_un_long_texte_est_coupe_et_signale(
     assert "FIN-DE-PAGE-UNIQUE" not in contenu
     assert "texte coupé" in contenu
     assert len(contenu) < 12_000
+
+
+# Plafond en tokens de la page relue avec un besoin (spec 1.4.2, #147) : le
+# même que rechercher_web, 80 % de la fenêtre de la fiche MODELE_CHAT.
+_PLAFOND_TOKENS = int(262_144 * 0.8)
+_PAGE_TROP_LONGUE = "Page trop longue pour être relue en entier."
+
+
+def _page_dense(nombre_paragraphes: int) -> str:
+    # Des chiffres : environ un token par caractère. Paragraphes tous
+    # différents : trafilatura retire les doublons.
+    return _page_html(*(f"Ligne {numero} : " + "0123456789" * 100 for numero in range(nombre_paragraphes)))
+
+
+def _echange_local(client, conversation_id: int, jeton: str, monkeypatch) -> dict:
+    monkeypatch.setenv("VM_ADMIN_KEY", "cle-admin-de-test")
+    entetes_admin = {**_autorisation(jeton), "X-Admin-Key": "cle-admin-de-test"}
+    echanges = client.get(
+        f"/inspecteur/conversations/{conversation_id}/echanges", headers=entetes_admin
+    ).json()
+    *_, outil = [e for e in echanges if e["type_appel"] == f"outil:{_OUTIL}"]
+    return client.get(f"/inspecteur/echanges/{outil['id']}", headers=entetes_admin).json()
+
+
+def test_avec_besoin_une_page_au_dela_du_plafond_nest_ni_coupee_ni_relue(
+    client, mistral_client_factice, telechargeur_pages_factice, jeton_valide, db_session, monkeypatch
+):
+    conversation_id = _conversation_avec_url_du_compte(client, mistral_client_factice, jeton_valide)
+    telechargeur_pages_factice.servir(_URL_COMPTE, _page_dense(220))
+    extractions_avant = db_session.query(Consommation).filter_by(type_appel="extraction_web").count()
+
+    _lire(client, mistral_client_factice, jeton_valide, conversation_id, [_URL_COMPTE])
+
+    assert mistral_client_factice.appels_lecture_page == []
+    assert db_session.query(Consommation).filter_by(type_appel="extraction_web").count() == extractions_avant
+    assert _questions_besoin(db_session, conversation_id) == []
+    contenu = _message_tool(mistral_client_factice)
+    assert contenu == f"Page {_URL_COMPTE} : {_PAGE_TROP_LONGUE}"
+    reponse = _echange_local(client, conversation_id, jeton_valide, monkeypatch)["reponse_payload"]
+    assert reponse["plafond_tokens"] == _PLAFOND_TOKENS
+    (page,) = reponse["pages_relues"]
+    assert page["url"] == _URL_COMPTE and page["trop_longue"] is True
+    assert page["tokens"] > _PLAFOND_TOKENS
+
+
+def test_avec_besoin_une_page_sous_le_plafond_est_relue_et_linspecteur_montre_ses_tokens(
+    client,
+    mistral_client_factice,
+    moteur_recherche_factice,
+    telechargeur_pages_factice,
+    jeton_valide,
+    db_session,
+    monkeypatch,
+):
+    conversation_id = _conversation_avec_recherche(
+        client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide
+    )
+    mistral_client_factice.repondre_lecture_page(True, "Trois mois en moyenne.", _URL_LUE)
+
+    _lire(client, mistral_client_factice, jeton_valide, conversation_id, [_URL_LUE])
+
+    assert len(mistral_client_factice.appels_lecture_page) == 1
+    assert "Trois mois en moyenne." in _message_tool(mistral_client_factice)
+    assert len(_questions_besoin(db_session, conversation_id)) == 1
+    reponse = _echange_local(client, conversation_id, jeton_valide, monkeypatch)["reponse_payload"]
+    assert reponse["plafond_tokens"] == _PLAFOND_TOKENS
+    (page,) = reponse["pages_relues"]
+    assert page["url"] == _URL_LUE and page["trop_longue"] is False
+    assert 0 < page["tokens"] <= _PLAFOND_TOKENS
+
+
+def test_sans_besoin_une_page_au_dela_du_plafond_est_coupee_a_8000_caracteres(
+    client, mistral_client_factice, telechargeur_pages_factice, jeton_valide
+):
+    conversation_id = _conversation_avec_url_du_compte(client, mistral_client_factice, jeton_valide)
+    telechargeur_pages_factice.servir(_URL_COMPTE, _page_dense(220))
+
+    _lire_sans_besoin(client, mistral_client_factice, jeton_valide, conversation_id, [_URL_COMPTE])
+
+    contenu = _message_tool(mistral_client_factice)
+    assert _PAGE_TROP_LONGUE not in contenu
+    assert "texte coupé" in contenu and len(contenu) < 12_000

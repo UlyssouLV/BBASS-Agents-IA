@@ -5,18 +5,23 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
+from vm_centrale.compte_tokens import compter_tokens
 from vm_centrale.config import MODELE_CHAT
 from vm_centrale.garde_fous import normaliser_url, urls_ecrites
 from vm_centrale.inspecteur import payload_depuis_erreur, reponse_depuis_erreur
 from vm_centrale.models import Message, QuestionCouverte, ResultatRechercheWeb
 from vm_centrale.outils.base import AppelMistralOutil, ContexteTour, Outil, ResultatOutil
-from vm_centrale.outils.recherche_web.outil import lire_page
+from vm_centrale.outils.recherche_web.outil import PLAFOND_TOKENS_PAGES, lire_page
 from vm_centrale.questions_couvertes import REPONSE_MAX
 
 _NOM = "lire_pages_web"
 _PAGE_INTROUVABLE = "Page introuvable."
 _EXTRACTION_INDISPONIBLE = "Extraction indisponible : la page n'a pas pu être relue."
 _NON_TROUVE = "Non trouvé dans cette page pour ce besoin."
+# Avec un besoin, une page au-delà du plafond de rechercher_web (spec 1.4.2)
+# n'est ni coupée ni relue : un « non trouvé » sur une page coupée passerait
+# pour un « non trouvé » sur la page entière.
+_PAGE_TROP_LONGUE = "Page trop longue pour être relue en entier."
 # Sans besoin, le texte nettoyé de chaque page part au modèle, coupé à ce
 # plafond : de quoi découvrir de quoi parle une page, pas la relire entière.
 _TEXTE_SANS_BESOIN_MAX = 8_000
@@ -263,11 +268,17 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
     pages = [_page_de_la_conversation(url, resultats) if url is not None else None for url in cibles]
     # Jamais de retéléchargement : seules les pages déjà lues (texte nettoyé
     # en base) passent à l'appel d'extraction, une fois chacune, en
-    # parallèle. Sans besoin, aucun appel : le texte part tel quel.
+    # parallèle. Sans besoin, aucun appel : le texte part tel quel. Avec un
+    # besoin, une page au-delà du plafond n'est pas relue.
+    tokens = {
+        page.id: (page.url, compter_tokens(page.texte_nettoye, MODELE_CHAT))
+        for page in pages
+        if besoin and page is not None and page.texte_nettoye
+    }
     a_lire = {
         page.id: (page.url, page.texte_nettoye)
         for page in pages
-        if besoin and page is not None and page.texte_nettoye
+        if page is not None and page.id in tokens and tokens[page.id][1] <= PLAFOND_TOKENS_PAGES
     }
     with ThreadPoolExecutor(max_workers=max(len(a_lire), 1)) as executeur:
         extractions = dict(
@@ -291,6 +302,9 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
             continue
         if not besoin:
             blocs.append(f"Page {page.url} :\n{_texte_sans_besoin(page.texte_nettoye)}")
+            continue
+        if page.id not in extractions:
+            blocs.append(f"Page {page.url} : {_PAGE_TROP_LONGUE}")
             continue
         lecture, _ = extractions[page.id]
         if lecture is None:
@@ -318,6 +332,12 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
     contexte.db.flush()
     appels = tuple(appel for _, appel in extractions.values())
     trace = {"pages_telechargees": telechargees} if telechargees else {}
+    if tokens:
+        trace["plafond_tokens"] = PLAFOND_TOKENS_PAGES
+        trace["pages_relues"] = [
+            {"url": url, "tokens": nombre, "trop_longue": nombre > PLAFOND_TOKENS_PAGES}
+            for url, nombre in tokens.values()
+        ]
     return ResultatOutil("\n\n".join(blocs), trace=trace, appels_mistral=appels)
 
 
