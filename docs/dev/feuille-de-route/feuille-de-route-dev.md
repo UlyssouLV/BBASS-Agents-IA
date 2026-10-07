@@ -173,6 +173,22 @@ Corriger le bug [#131](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/131),
 
 **Suivi :** [#161](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/161) (`bug`). Trouvé dans : 1.4.3 · Contexte : test humain · Date : 2026-10-07 · Priorité : non prioritaire en dev.
 
+### Bug — Markdown brut pendant l'animation de frappe (#170)
+
+**Constat :** pendant l'animation de frappe d'une réponse, le Markdown s'affiche brut : les balises (`**`, `#`, `-`, `|` des tableaux…) sont visibles et le texte ne se met en forme qu'à la fin de l'animation, d'un coup.
+
+**Reproductibilité :** poser une question dont la réponse contient du gras, des titres, des listes ou un tableau (ex. « Compare ces aides dans un tableau ») et regarder la réponse s'écrire : balises visibles pendant toute la frappe, mise en forme à la dernière étape.
+
+**Impact :** rendu peu lisible pendant la frappe, puis « saut » visuel à la fin ; tous les comptes, sur chaque réponse mise en forme.
+
+**Cause probable :** choix volontaire de `TexteAnimeReponse` (`poste/frontend/src/onglets/OngletChat.tsx`, suite #99) : tant que le texte révélé est tronqué, il est affiché en texte brut ; le rendu Markdown (remark-gfm, Prism) n'est fait qu'une fois, à la fin, pour éviter une syntaxe incomplète cassée à chaque étape.
+
+**À corriger :** la réponse se met en forme au fur et à mesure de la frappe, sans balises Markdown visibles ni syntaxe incomplète cassée (lien, tableau, bloc de code non refermé).
+
+**Hors périmètre :** pas dans la V1.4.4. Streaming du texte de la réponse depuis la VM (les garde-fous s'appliquent au texte complet).
+
+**Suivi :** [#170](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/170) (`bug`). Trouvé dans : 1.4.4 · Contexte : test humain · Date : 2026-10-07 · Priorité : non prioritaire en dev.
+
 ### Agent IA de continuation du développement, validation par compte administrateur
 
 Constat (grilling 1.2.0) : à terme, plus aucune personne qualifiée ne sera sur place pour faire évoluer le logiciel elle-même. L'évolution du code (nouvelles versions, corrections, nouveaux Agents métier) serait alors portée par un agent IA dédié à la continuation du développement, avec un compte administrateur qui ne fait que **valider** (approuver/refuser) les changements proposés, sans avoir à coder ni à relire le code en détail.
