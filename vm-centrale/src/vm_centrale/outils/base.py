@@ -24,6 +24,10 @@ class ContexteTour:
     # longues pendant ce tour (#151) : refusées à tout appel suivant du
     # tour, et mentionnées par le garde-fou à la fin de la réponse visible.
     pages_trop_longues: dict[str, str] = field(default_factory=dict)
+    # Lignes `resultats_recherche_web` sans texte que lire_pages_web a
+    # retentées pendant ce tour (#156) : un seul essai par tour, même en
+    # échec.
+    pages_retentees: set[int] = field(default_factory=set)
 
 
 @dataclass(frozen=True)

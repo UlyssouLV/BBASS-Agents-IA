@@ -221,18 +221,46 @@ def _avec_schema(url: str) -> str:
     return url if re.match(r"https?://", url, re.IGNORECASE) else f"https://{url}"
 
 
-def _telecharger_pages_du_compte(
+def _a_retenter(page: ResultatRechercheWeb | None, contexte: ContexteTour) -> bool:
+    # Page sans texte (échec, non téléchargée ou retirée par le plafond)
+    # enregistrée à un tour antérieur (#156) : `message_id` n'est rattaché
+    # qu'à la fin de son tour. Au même tour, ou déjà retentée dans ce tour,
+    # pas de nouvel essai en boucle.
+    return (
+        page is not None
+        and not page.texte_nettoye
+        and page.message_id is not None
+        and page.id not in contexte.pages_retentees
+    )
+
+
+def _lire_pages_sans_texte(
     urls: list[str], resultats: list[ResultatRechercheWeb], contexte: ContexteTour
 ) -> list[tuple[ResultatRechercheWeb, dict]]:
-    # Au premier appel seulement (#140) : une URL déjà en base n'est jamais
-    # retéléchargée dans la conversation, lue ou non. Même chaîne que
-    # rechercher_web (cache commun, téléchargement, statut, HTML,
-    # nettoyage) ; en échec (PDF, refus, délai), la ligne est enregistrée
-    # sans texte.
-    a_telecharger = list(dict.fromkeys(url for url in urls if _page_de_la_conversation(url, resultats) is None))
-    if not a_telecharger:
+    # Même chaîne que rechercher_web (cache commun, téléchargement, statut,
+    # HTML, nettoyage) pour une URL du compte pas encore en base (#140) et
+    # pour une page sans texte d'un tour antérieur (#156). Une URL du compte
+    # en échec (PDF, refus, délai) est enregistrée sans texte ; une page
+    # retentée en échec ne change pas.
+    nouvelles = list(dict.fromkeys(url for url in urls if _page_de_la_conversation(url, resultats) is None))
+    retentees = list(
+        {
+            page.id: page
+            for page in (_page_de_la_conversation(url, resultats) for url in urls)
+            if _a_retenter(page, contexte)
+        }.values()
+    )
+    if not nouvelles and not retentees:
         return []
-    pages = lire_pages([_avec_schema(url) for url in a_telecharger], contexte)
+    pages = lire_pages([_avec_schema(url) for url in [*nouvelles, *(page.url for page in retentees)]], contexte)
+    pages_nouvelles, pages_retentees = pages[: len(nouvelles)], pages[len(nouvelles) :]
+    for ligne, page in zip(retentees, pages_retentees):
+        contexte.pages_retentees.add(ligne.id)
+        if page.texte:
+            # Source du garde-fou chiffres dès ce tour. Le titre du moteur
+            # reste si la page n'en donne pas.
+            ligne.texte_nettoye = page.texte
+            ligne.titre = page.titre or ligne.titre
     maintenant = datetime.now(timezone.utc)
     lignes = [
         ResultatRechercheWeb(
@@ -249,7 +277,7 @@ def _telecharger_pages_du_compte(
             provenance="utilisateur",
             date_creation=maintenant,
         )
-        for url, page in zip(a_telecharger, pages)
+        for url, page in zip(nouvelles, pages_nouvelles)
     ]
     contexte.db.add_all(lignes)
     # Flush (jamais commit), comme rechercher_web : rattachée au message à
@@ -258,7 +286,7 @@ def _telecharger_pages_du_compte(
     resultats.extend(lignes)
     # Ligne enregistrée et trace de son téléchargement : la page n'est
     # comptée en tokens qu'avec un besoin (voir _trace_telechargee).
-    return [(ligne, page.trace()) for ligne, page in zip(lignes, pages)]
+    return [(ligne, page.trace()) for ligne, page in zip([*lignes, *retentees], [*pages_nouvelles, *pages_retentees])]
 
 
 def _trace_telechargee(ligne: ResultatRechercheWeb, trace: dict, tokens: dict[int, tuple[str, int]]) -> dict:
@@ -292,7 +320,7 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
     resultats = _resultats_de_la_conversation(contexte)
     urls_du_compte = _urls_du_compte(contexte)
     cibles = [_url_de_la_conversation(url, resultats, urls_du_compte) for url in urls]
-    telechargees = _telecharger_pages_du_compte([url for url in cibles if url is not None], resultats, contexte)
+    telechargees = _lire_pages_sans_texte([url for url in cibles if url is not None], resultats, contexte)
     pages = [_page_de_la_conversation(url, resultats) if url is not None else None for url in cibles]
     # Une page jugée trop longue plus tôt dans ce tour (#151) est refusée,
     # avec ou sans besoin, sans être recomptée : sans besoin, son aperçu
@@ -300,10 +328,10 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
     refusees = {
         page.id for page in pages if page is not None and normaliser_url(page.url) in contexte.pages_trop_longues
     }
-    # Jamais de retéléchargement : seules les pages déjà lues (texte nettoyé
-    # en base) passent à l'appel d'extraction, une fois chacune, en
-    # parallèle. Sans besoin, aucun appel : le texte part tel quel. Avec un
-    # besoin, une page au-delà du plafond n'est pas relue.
+    # Seules les pages lues (texte nettoyé en base, page retentée comprise)
+    # passent à l'appel d'extraction, une fois chacune, en parallèle. Sans
+    # besoin, aucun appel : le texte part tel quel. Avec un besoin, une page
+    # au-delà du plafond n'est pas relue.
     tokens = {
         page.id: (page.url, compter_tokens(page.texte_nettoye, MODELE_CHAT))
         for page in pages
@@ -333,8 +361,9 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
             blocs.append(f"Page {page.url} : {_PAGE_DU_COMPTE_NON_LUE}")
             continue
         if not page.texte_nettoye:
-            # Page non lue à la recherche (PDF, refus, délai) : jamais
-            # retéléchargée, le modèle garde l'extrait du moteur.
+            # Page non lue à la recherche (PDF, refus, délai), au même tour
+            # ou en échec au nouvel essai : le modèle garde l'extrait du
+            # moteur.
             blocs.append(f"Page {page.url} : non lue, seul l'extrait du moteur est disponible.\n{page.extrait_moteur}")
             continue
         if page.id in refusees:
