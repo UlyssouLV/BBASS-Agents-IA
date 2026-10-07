@@ -1,0 +1,85 @@
+import CarteApercu, {
+  JsonApercu,
+  MessageApercu,
+  SectionApercu,
+} from '@site/src/components/inspecteur/CarteApercu';
+
+# Extraction web
+
+Cet appel n’apparaît **pas seul** : il est la 2ᵉ moitié d’une [Recherche web](/docs/glossaire#recherche-web). Voici un tour concret, tel qu’il se lit dans l’inspecteur.
+
+## Scénario
+
+Le collaborateur envoie :
+
+> Quelle est la date d’approbation du PLU de Castries ?
+
+1. **Chat** — le modèle décide d’appeler `rechercher_web` avec par exemple :
+   - `requete` : `PLU Castries date approbation`
+   - `besoin` : `date d’approbation du PLU de Castries`
+2. **Outil : rechercher_web** (Local) — la VM interroge SearXNG, télécharge et nettoie les pages trouvées (ex. une page `castries.fr` sur le PLU).
+3. **Extraction web** (cette carte) — **seulement s’il y a au moins une page lue**. Appel au modèle **isolé** : besoin + pages nettoyées, **jamais** l’historique du chat.
+4. **Chat** — le modèle reçoit l’extrait (pas les pages entières) et rédige la réponse.
+5. **Garde-fous** — vérifient la réponse affichée contre les pages / URL réelles, pas contre l’extrait (qui peut inventer).
+
+Badge d’origine fournisseur (aujourd’hui **Mistral**). Compté en Consommation `extraction_web`.
+
+## Carte telle qu’on la voit
+
+<CarteApercu
+  libelle="Extraction web"
+  origine="mistral"
+  modele="mistral-small-latest"
+  ouvertParDefaut>
+  <SectionApercu titre="Payload envoyé">
+    <MessageApercu role="system">
+      À partir de ces pages, extrais seulement ce qui répond au besoin. Indique
+      l’URL de chaque information. N’ajoute rien qui ne soit pas écrit dans les
+      pages. Si rien ne répond au besoin, dis-le. … Réponds en JSON : `extrait` ;
+      `questions_couvertes`…
+    </MessageApercu>
+    <MessageApercu role="user">
+      {`Besoin : date d’approbation du PLU de Castries
+
+Pages :
+
+--- Page : https://www.castries.fr/urbanisme/plu ---
+… Le plan local d’urbanisme de Castries a été approuvé le 12 mars 2019
+par délibération du conseil municipal. …`}
+    </MessageApercu>
+    <p>
+      Pas de messages de la conversation, pas de résumé, pas de profil : uniquement
+      la consigne fixe + le besoin + le texte des pages.
+    </p>
+    <JsonApercu>{`{
+  "model": "mistral-small-latest",
+  "response_format": { "type": "json_schema", "json_schema": { "name": "extraction_web" } }
+}`}</JsonApercu>
+  </SectionApercu>
+  <SectionApercu titre="Réponse brute reçue">
+    <p>
+      Corps fournisseur habituel (<code>choices</code>, <code>usage</code>). Le
+      champ utile est <code>choices[0].message.content</code>, un JSON d’extraction :
+    </p>
+    <JsonApercu>{`{
+  "extrait": "Le PLU de Castries a été approuvé le 12 mars 2019 (https://www.castries.fr/urbanisme/plu).",
+  "questions_couvertes": [
+    {
+      "question": "Quand le PLU de Castries a-t-il été approuvé ?",
+      "reponse": "Le 12 mars 2019.",
+      "source": "https://www.castries.fr/urbanisme/plu"
+    }
+  ]
+}`}</JsonApercu>
+    <p>
+      L’<code>extrait</code> est ce que le Chat suivant lit (pas les pages
+      entières). Les <code>questions_couvertes</code> partent dans la mémoire de
+      la conversation. Ce n’est <strong>pas</strong> la bulle affichée au
+      collaborateur — celle-ci vient du Chat suivant, après les garde-fous.
+    </p>
+  </SectionApercu>
+</CarteApercu>
+
+## Si aucune page n’a été lue
+
+Pas de carte Extraction web : l’outil renvoie seulement les résultats du moteur (titres, URL, snippets), sans cet appel.

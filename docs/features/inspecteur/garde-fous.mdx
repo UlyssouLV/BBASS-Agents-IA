@@ -1,0 +1,38 @@
+import CarteApercu, {SectionApercu} from '@site/src/components/inspecteur/CarteApercu';
+
+# Garde-fous
+
+## Pourquoi
+
+La consigne dit déjà au modèle de ne pas inventer (pas d’URL inventée, pas de chiffre hors source). **Une consigne seule ne suffit pas** : le modèle peut quand même le faire. Les garde-fous sont du **code sur la VM**, après la réponse : ils corrigent ce qui part vers le collaborateur. Badge **Local**. Pas d’appel au modèle.
+
+L’inspecteur montre les deux textes côte à côte : ce que le modèle a écrit, et ce qui est réellement affiché.
+
+## Exemple concret
+
+Suite du scénario [Extraction web](./extraction-web.mdx) : le collaborateur a demandé la date d’approbation du PLU de Castries. Les pages lues disent **12 mars 2019**. Le Chat suivant répond correctement… puis **ajoute une URL inventée** :
+
+> Le PLU de Castries a été approuvé le 12 mars 2019.  
+> Détail : https://plu-castries-officiel.fr/deliberation-2019
+
+Le garde-fou **URL** ne garde une adresse que si elle a été **écrite par le compte** ou **ramenée par une recherche** de la conversation (`rechercher_web` / pages lues). Ici, ni l’un ni l’autre : le lien disparaît de la bulle. La date, elle, reste — elle était dans les pages. Dans l’inspecteur :
+
+<CarteApercu libelle="Garde-fous" origine="local" ouvertParDefaut>
+  <p>Les garde-fous ont modifié la réponse.</p>
+  <SectionApercu titre="Réponse brute du modèle">
+    <p>
+      Le PLU de Castries a été approuvé le 12 mars 2019.
+      <br />
+      Détail : https://plu-castries-officiel.fr/deliberation-2019
+    </p>
+  </SectionApercu>
+  <SectionApercu titre="Réponse visible">
+    <p>Le PLU de Castries a été approuvé le 12 mars 2019.</p>
+  </SectionApercu>
+</CarteApercu>
+
+Même idée pour les **chiffres** : si le modèle écrit « approuvé le **15 juin 2018** » alors que ni les messages, ni les pièces jointes, ni le texte des pages lues ne portent cette date, le garde-fou chiffres retire (ou neutralise) ce nombre avant affichage. L’extrait d’extraction web **n’est pas** une source : il est lui-même produit par un modèle.
+
+## Quand rien n’est retiré
+
+Si les deux textes sont identiques, la carte l’indique : aucun retrait, la réponse est affichée telle quelle.

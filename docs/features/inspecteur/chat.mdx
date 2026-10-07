@@ -1,0 +1,84 @@
+import CarteApercu, {JsonApercu, MessageApercu, SectionApercu} from '@site/src/components/inspecteur/CarteApercu';
+
+# Chat
+
+Appel principal vers le modèle (`chat/completions`). Un tour de réponse peut en produire **plusieurs** : un par aller-retour tant que le modèle demande des outils (3 au plus).
+
+Badge d’origine fournisseur (aujourd’hui **Mistral**). Le modèle appelé est affiché au dépliage.
+
+<CarteApercu libelle="Chat" origine="mistral" modele="mistral-small-latest" ouvertParDefaut>
+  <SectionApercu titre="Payload envoyé">
+    <MessageApercu role="system">
+      Style de réponse et date du jour. Puis, s’ils existent : résumé glissant, profil de travail, mémoire de la conversation, extrait de la pièce jointe du tour.
+    </MessageApercu>
+    <MessageApercu role="assistant">
+      Ancienne réponse encore dans la fenêtre des derniers messages (exemple).
+    </MessageApercu>
+    <MessageApercu role="user">
+      Message précédent du compte, encore dans la fenêtre.
+    </MessageApercu>
+    <MessageApercu role="tool">
+      Résultat d’un outil du tour précédent — seulement à partir du 2ᵉ Chat du même tour (ex. sortie de `rechercher_web`).
+    </MessageApercu>
+    <MessageApercu role="user">
+      Le message que le compte vient d’envoyer (premier Chat du tour seulement ; les suivants réutilisent l’historique déjà augmenté).
+    </MessageApercu>
+    <p>
+      Le bloc JSON ci-dessous <strong>n’est pas un second appel</strong> : c’est le reste du même envoi
+      (<code>model</code>, <code>tools</code>…). <code>tools</code> est absent sur le dernier tour (plafond de 3).
+    </p>
+    <JsonApercu>{`{
+  "model": "mistral-small-latest",
+  "tools": [
+    { "type": "function", "function": { "name": "rechercher_web" } }
+  ]
+}`}</JsonApercu>
+  </SectionApercu>
+  <SectionApercu titre="Réponse brute reçue">
+    <p>Corps JSON renvoyé par le fournisseur.</p>
+    <JsonApercu>{`{
+  "choices": [{
+    "message": {
+      "content": "Selon le PLU…",
+      "tool_calls": null
+    }
+  }],
+  "usage": { "total_tokens": 420 }
+}`}</JsonApercu>
+    <ul>
+      <li>Réponse finale : <code>choices[0].message.content</code>.</li>
+      <li>Demande d’outil : <code>choices[0].message.tool_calls</code> — le Chat suivant reçoit le résultat en message <code>tool</code>.</li>
+      <li><code>usage</code> : tokens facturés (ligne Consommation <code>chat</code>).</li>
+    </ul>
+  </SectionApercu>
+</CarteApercu>
+
+## Les cartes `role` du payload
+
+Chaque entrée de `messages` s’affiche comme une petite carte **role** + texte. Exemples :
+
+<MessageApercu role="system">
+  Vous êtes l’assistant du cabinet… Date du jour : 6 octobre 2026. Résumé glissant : …
+</MessageApercu>
+
+<MessageApercu role="user">
+  Peux-tu me résumer le PLU de Castries ?
+</MessageApercu>
+
+<MessageApercu role="assistant">
+  Je vais chercher les informations à jour…
+</MessageApercu>
+
+<MessageApercu role="tool">
+  {`{ "resultats": [{ "titre": "PLU Castries", "url": "https://…" }] }`}
+</MessageApercu>
+
+Ordre typique dans un **premier** Chat du tour : `system`, puis la fenêtre (`user` / `assistant`), puis le `user` du message courant. Un `tool` n’apparaît qu’à partir du Chat suivant, une fois l’outil exécuté.
+
+## Échec
+
+<CarteApercu libelle="Chat" origine="mistral" statut="echec" modele="mistral-small-latest">
+  <SectionApercu titre="Erreur">
+    <p>Timeout ou HTTP en erreur. La réponse brute peut manquer ; le texte d’erreur est affiché au-dessus des sections.</p>
+  </SectionApercu>
+</CarteApercu>

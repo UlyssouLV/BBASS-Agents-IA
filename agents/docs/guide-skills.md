@@ -156,6 +156,25 @@ Fixes #12
 Fixes #13
 ```
 
+### Créer un ticket
+
+**Commande :** `/ct`
+
+**Options :** aucune.
+
+**Corps :** titre + ce que le ticket livre ; `#parent` si besoin ; éventuellement `Blocked by #n`.
+
+Crée **un** enfant GitHub (`Part of`, sub-issue, parent bloqué par l’enfant). Avant : la spec `docs/specs/vX.Y.Z-*.md` est inchangée depuis son commit d’ajout sur la branche, et le ticket tient dans cette spec. Si une PR ouverte cite déjà le parent : ajoute les `Fixes #n` manquants. Pas de nouvelle PR. Équivalent : « crée un ticket ». Skill `creer-ticket`.
+
+**Exemple :**
+
+```
+/ct #12
+Titre : garde-fou chiffres manquants après reverse
+Le reverse d’un message avec chiffres doit rejouer le garde-fou avant envoi.
+Blocked by #40
+```
+
 ### Créer une release
 
 **Commande :** `/crel`

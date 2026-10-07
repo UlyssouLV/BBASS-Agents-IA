@@ -1,0 +1,13 @@
+import ApercuCle from '@site/src/components/inspecteur/ApercuCle';
+
+# Saisie de la clé
+
+Avant tout chargement, l’onglet demande la **Clé d’administration VM** (`VM_ADMIN_KEY`).
+
+Ce n’est **pas** le mot de passe du compte collaborateur, et ce n’est **pas** le fait d’être compte administrateur (`est_admin`). C’est le secret déjà utilisé pour les actions sensibles de la VM (gestion des comptes). Sans cette clé, la page reste sur cet écran : aucun compte, aucune conversation.
+
+<ApercuCle />
+
+La clé reste **en mémoire de cet onglet** seulement. Elle n’est pas écrite dans `localStorage`. Fermer l’onglet oblige à la ressaisir.
+
+Chaque appel part avec le jeton du compte connecté **et** l’en-tête `X-Admin-Key`. Une clé refusée (401) renvoie à cet écran et vide ce qui avait été chargé.

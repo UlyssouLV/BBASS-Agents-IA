@@ -1,0 +1,16 @@
+import CarteApercu, {SectionApercu} from '@site/src/components/inspecteur/CarteApercu';
+
+# OCR
+
+Appel au modèle sur un **PDF** joint. Badge d’origine fournisseur (aujourd’hui **Mistral**). Le document n’est pas recopié en clair dans la carte : une référence **Pièce jointe : … — voir** ouvre le fichier.
+
+<CarteApercu libelle="OCR" origine="mistral" modele="mistral-ocr-latest" ouvertParDefaut>
+  <SectionApercu titre="Payload envoyé">
+    <p>Pièce jointe : plan.pdf — voir</p>
+  </SectionApercu>
+  <SectionApercu titre="Réponse brute reçue">
+    <p>Texte reconnu par l’OCR, page par page. C’est cet extrait qui peut ensuite entrer dans le message système du Chat.</p>
+  </SectionApercu>
+</CarteApercu>
+
+Word et Excel ne passent pas par cette carte : leur texte est extrait en local, sans appel au modèle.

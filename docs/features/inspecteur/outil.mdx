@@ -1,0 +1,23 @@
+import CarteApercu, {JsonApercu, SectionApercu} from '@site/src/components/inspecteur/CarteApercu';
+
+# Outil
+
+La VM exécute un outil demandé par le modèle. Ce n’est **pas** un appel au fournisseur : badge **Local**, pas de modèle.
+
+Le libellé reprend le nom : `Outil : rechercher_web`, `Outil : obtenir_contenu_piece_jointe`, etc. (`type_appel` = `outil:<nom>`).
+
+<CarteApercu libelle="Outil : rechercher_web" origine="local" ouvertParDefaut>
+  <SectionApercu titre="Entrée">
+    <JsonApercu>{`{ "requete": "PLU Castries" }`}</JsonApercu>
+  </SectionApercu>
+  <SectionApercu titre="Sortie">
+    <JsonApercu>{`{ "resultats": ["…"] }`}</JsonApercu>
+  </SectionApercu>
+</CarteApercu>
+
+## Au dépliage
+
+- **Entrée** — arguments reçus du modèle.
+- **Sortie** — ce que la VM renvoie. Ce texte repart ensuite dans le Chat suivant, en message `tool`.
+
+Si l’outil a relu une pièce jointe, le contenu extrait s’affiche comme une référence **voir / masquer**, pas en mur de texte.

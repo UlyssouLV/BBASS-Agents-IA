@@ -1,0 +1,14 @@
+import CarteApercu, {SectionApercu} from '@site/src/components/inspecteur/CarteApercu';
+
+# Vision
+
+Appel au modèle sur une **image** jointe. Badge d’origine fournisseur (aujourd’hui **Mistral**). L’image est une référence cliquable, pas un base64 affiché en entier.
+
+<CarteApercu libelle="Vision" origine="mistral" modele="pixtral-12b-latest" ouvertParDefaut>
+  <SectionApercu titre="Payload envoyé">
+    <p>Consigne + Pièce jointe : photo.jpg — voir</p>
+  </SectionApercu>
+  <SectionApercu titre="Réponse brute reçue">
+    <p>Description renvoyée par le modèle. Elle peut être injectée dans le tour de chat, comme l’extrait OCR.</p>
+  </SectionApercu>
+</CarteApercu>

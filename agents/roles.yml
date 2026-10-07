@@ -13,7 +13,7 @@ roles:
       - docs/dev/feuille-de-route-dev.md
   glossary:
     paths:
-      - CONTEXT.md
+      - docs/glossaire.md
   spec:
     paths:
       - docs/specs/
