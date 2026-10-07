@@ -3,6 +3,8 @@ from pathlib import Path
 
 import pytest
 
+from flux_sse import erreur, fin
+
 from vm_centrale.models import PieceJointe
 
 _PDF = ("document.pdf", b"%PDF-1.4 contenu factice", "application/pdf")
@@ -29,7 +31,7 @@ def _creer_conversation(client, mistral_client_factice, jeton: str, message: str
     reponse = client.post(
         "/conversations", json={"message": message}, headers=_autorisation(jeton)
     )
-    return reponse.json()["conversation"]["id"]
+    return fin(reponse)["conversation"]["id"]
 
 
 def _jeton_admin(client, seed_compte, identifiant: str = "a.martin") -> str:
@@ -101,7 +103,7 @@ def test_creer_conversation_avec_piece_jointe_injecte_le_contenu_extrait_et_la_r
     )
 
     assert reponse.status_code == 200
-    conversation_id = reponse.json()["conversation"]["id"]
+    conversation_id = fin(reponse)["conversation"]["id"]
 
     # Le premier appel .chat() de ce tour est celui de la réponse de chat
     # (le second, le titrage, ne reçoit pas la pièce jointe).
@@ -194,7 +196,7 @@ def test_creer_conversation_echec_mistral_ne_rattache_pas_la_piece_jointe(
         headers=_autorisation(jeton_valide),
     )
 
-    assert reponse.status_code == 502
+    assert erreur(reponse)["status"] == 502
     piece_jointe = db_session.get(PieceJointe, piece_jointe_id)
     assert piece_jointe.conversation_id is None
     assert piece_jointe.message_id is None

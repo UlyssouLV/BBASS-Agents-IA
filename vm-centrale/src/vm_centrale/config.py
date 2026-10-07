@@ -27,6 +27,14 @@ PAGES_HTTP_TIMEOUT = float(os.environ.get("PAGES_HTTP_TIMEOUT", "10"))
 # Validité d'une copie du cache commun des pages web (spec 1.4.3,
 # ADR-0015) : au-delà, la copie est ignorée et la page retéléchargée.
 VALIDITE_CACHE_PAGES = timedelta(hours=24)
+# Longueur au-delà de laquelle la requête d'une recherche web ou le nom de
+# fichier d'une pièce jointe relue est tronqué dans le statut du tour (spec
+# 1.4.4, #165) : le statut tient sur une ligne du fil.
+LONGUEUR_MAX_DETAIL_STATUT = 60
+# Un tour qui attend le verrou de son compte republie son statut à cet
+# intervalle : le poste borne le silence entre deux lectures du flux
+# (POSTE_HTTP_TIMEOUT), et l'attente peut durer tout un autre tour.
+INTERVALLE_STATUT_ATTENTE_SECONDES = 15.0
 
 # Tags de modèle centralisés par fonction (spec V1.1.2), pas par valeur : tout
 # code appelant Mistral référence l'une de ces constantes plutôt qu'une
@@ -54,7 +62,7 @@ class FicheModele:
 
 # Une fiche par modèle (spec 1.4.2), liée au code et non au .env. Tarifs en
 # dur et datés (Mistral n'expose aucune API de tarification programmable —
-# voir docs/dev/recherche-v1.1.3-usage-tarification-mistral.md).
+# voir docs/dev/recherches/recherche-v1.1.3-usage-tarification-mistral.md).
 # - Chat : fenêtre de 262 144 tokens relevée sur GET /v1/models le
 #   2026-10-06. Mistral Small 4 : 0,15 $/M tokens entrée, 0,60 $/M tokens
 #   sortie, revérifié le 2026-10-06 (inchangé depuis le relevé du

@@ -1,4 +1,4 @@
-import { Ellipsis, SquarePen } from "lucide-react";
+import { Ellipsis, Loader2, SquarePen } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import logoBbassAgentsIa from "@/assets/logo-bbass-agents-ia.jpg";
@@ -36,6 +36,7 @@ interface BarreLateraleProps {
   onOuvrirPanelAdministration: () => void;
   conversationRecenteId: number | null;
   onAnimationTitreTerminee: () => void;
+  conversationsEnAttente: ReadonlySet<number>;
 }
 
 function initiales(compte: Compte): string {
@@ -90,6 +91,7 @@ export function BarreLaterale({
   onOuvrirPanelAdministration,
   conversationRecenteId,
   onAnimationTitreTerminee,
+  conversationsEnAttente,
 }: Readonly<BarreLateraleProps>) {
   const conversationsQuery = useConversationsQuery();
   const renommerConversationMutation = useRenommerConversationMutation();
@@ -229,6 +231,14 @@ export function BarreLaterale({
                       conversation.titre
                     )}
                   </button>
+                )}
+                {/* Issue #166 : tour en cours dans cette conversation. */}
+                {conversationsEnAttente.has(conversation.id) && (
+                  <Loader2
+                    className="size-3.5 shrink-0 animate-spin text-muted-foreground"
+                    role="status"
+                    aria-label="Réponse en cours"
+                  />
                 )}
                 <DropdownMenu onOpenChange={(ouvert) => setMenuOuvertId(ouvert ? conversation.id : null)}>
                   <DropdownMenuTrigger asChild>

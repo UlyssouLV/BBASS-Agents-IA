@@ -37,7 +37,7 @@ Purpose = the rest of the user / caller message after the tag, else the PR title
 
 ## 4. Notes (body)
 
-`--notes` are for a human who did **not** watch the PR. **French** (unless this repo’s user-facing docs are English). Not a dump of `git log` subjects. **Keep this layout** — never invent new top-level headings for a commit sweep.
+`--notes` are for a human who did **not** watch the PR. **French** (unless this repo’s user-facing docs are English). Not a dump of `git log` subjects. **Keep this layout** — never invent new top-level headings for a commit sweep. Canonical copy also in `agents/issue-tracker.md` (*Release notes*). Later annotations (`finaliser-la-version`) must keep blank lines before `## Pourquoi` (Critical rules in that file) or the docs changelog empties.
 
 Always this layout (omit a section only if it would be empty **and** you said so in **Hors périmètre**):
 
@@ -55,7 +55,7 @@ Always this layout (omit a section only if it would be empty **and** you said so
 - PR : https://github.com/<owner>/<repo>/pull/<n>
 - Commits : https://github.com/<owner>/<repo>/pull/<n>/commits
 
-Tickets (`Fixes`) : #… #…
+Tickets (`Fixes`) : #<parent> #<enfant> …
 
 ## Hors périmètre
 

@@ -466,6 +466,7 @@
       <ul>
         <li><strong>Livraison de la V1.4.2</strong> : les pages web trop longues sont mesurées avec le vrai compteur du modèle, et une jauge sous le champ de saisie indique à quel point la conversation remplit la fenêtre.</li>
         <li><strong>Livraison de la V1.4.3</strong> : une page déjà lue dans la journée est réutilisée pendant 24 heures, y compris dans une autre conversation. Une page qui n’avait pas pu être lue est retentée plus tard. Si le collaborateur dit que la page a changé, elle est relue ; ce que l’on en savait déjà est revérifié. Si la relecture échoue, l’assistant le dit et répond d’après la version datée.</li>
+        <li><strong>Livraison de la V1.4.4</strong> : pendant que l’assistant prépare sa réponse, le fil montre ce qu’il est en train de faire (recherche sur le web avec la question posée, site en cours de lecture, document relu, vérification de la réponse) au lieu d’un « Réflexion… » figé. On peut changer de conversation pendant une réponse et y revenir ; la conversation en attente est signalée dans la liste. On peut écrire dans une autre conversation en même temps : l’assistant indique qu’il termine d’abord la réponse en cours. Une réponse n’est plus perdue si l’onglet est fermé : on la retrouve en rouvrant la conversation.</li>
       </ul>
     </div>
 
@@ -488,7 +489,6 @@
     <section class="bloc" id="reste-a-implementer">
     <h2>Reste à implémenter</h2>
     <ul>
-      <li><strong>V1.4.4</strong> — statut d’attente dynamique pendant une réponse.</li>
       <li><strong>V1.5.0</strong> — Moduléo en lecture seule depuis le chat, via le premier Agent métier (pôle Administration).</li>
       <li><strong>V1.6.0</strong> — documentation : mémoire conversationnelle et souveraineté des données.</li>
       <li><strong>V1.7.0</strong> — déploiement postes (CI/CD, conteneurisation, installateur) — priorité avant l’absence à l’école.</li>
@@ -501,11 +501,12 @@
     <section class="bloc" id="livre-pour">
     <h2>Livré pour le 08/10/2026</h2>
     <div class="recap">
-      <p><strong>Point jeudi 8 octobre — visé : V1.5.0 puis V1.7.0 · livré : V1.4.3</strong></p>
+      <p><strong>Point jeudi 8 octobre — visé : V1.5.0 puis V1.7.0 · livré : V1.4.4</strong></p>
       <h3>Chat</h3>
       <ul>
         <li>Ton professionnel et affichage structuré (V1.2.2) : vouvoiement, sans remplissage ni relance systématique ; mise en forme, blocs de code colorés, liens cliquables vers les sources.</li>
         <li>Fluidité (V1.2.3) : retour immédiat sur une conversation déjà ouverte ; historique long chargé au défilement ; mesures de temps optionnelles (désactivées par défaut).</li>
+        <li>Statut en direct (V1.4.4) : pendant une réponse, le fil montre l’étape en cours (recherche, site lu, document relu, vérification) ; changement de conversation possible pendant une réponse, conversation en attente signalée dans la liste ; envoi dans une autre conversation mis en attente et annoncé ; réponse retrouvée même si l’onglet a été fermé.</li>
         <li>Fiabilité (V1.3.1) : plus de liens inventés (seule une URL écrite par le compte peut ressortir) ; faits inventés refusés sans demande explicite ; résumé glissant qui note « proposé, non vérifié » ; garde-fous URL et chiffres côté VM.</li>
       </ul>
       <h3>Recherche web et mémoire</h3>
@@ -588,6 +589,17 @@
         <div class="version-body">
         <p>Jusqu’ici, une pièce jointe disparaissait dès le tour suivant, une recherche ne laissait que sa requête, et une URL envoyée par le collaborateur ne survait que si le résumé la gardait. Cette version envoie à chaque appel de chat la liste de tout ce qui a été partagé dans le fil — pièces jointes, recherches, URL du collaborateur — avec un aperçu de questions couvertes.</p>
         <p>L’IA peut relire une ou plusieurs pièces jointes, relire une page déjà trouvée sans la retélécharger, ou lire une URL que le collaborateur a envoyée. La boucle d’outils passe à cinq appels par message. Aucun changement d’interface côté poste.</p>
+        </div>
+      </div>
+
+      <div class="version" id="version-1-4-4">
+        <div class="version-head">
+          <h3>V1.4.4 — Statut d’attente en direct pendant une réponse</h3>
+          <span class="deploye">Déployé le 07/10/2026</span>
+        </div>
+        <div class="version-body">
+        <p>Jusqu’ici, le fil affichait « Réflexion… » pendant toute la préparation de la réponse, alors qu’un tour peut comprendre plusieurs recherches, des pages lues et des documents relus. Le collaborateur ne savait pas si l’assistant avançait ou était bloqué. Désormais, le fil affiche l’étape en cours : « Recherche sur le web : “…” », « Lecture de &lt;site&gt; », « Relecture de &lt;document&gt; », « Vérification de la réponse… ». La réponse finale reste vérifiée avant de s’afficher.</p>
+        <p>Changer de conversation pendant une réponse affiche bien la conversation choisie ; on retrouve l’étape en cours en revenant, et la conversation en attente est signalée dans la liste. Un message envoyé ailleurs pendant ce temps est mis en attente, et l’assistant l’annonce. Si l’onglet est fermé, la réponse se termine quand même et se retrouve en rouvrant la conversation.</p>
         </div>
       </div>
 

@@ -12,16 +12,19 @@ Triggered by **« Ouvre la version »**. The user **must** give a semver **`X.Y.
 
 Do **not** `/implement` here. Do **not** merge. Do **not** `git commit` on **`main`**. Git branch / commit / PR go through the skills below, not inline.
 
-Paths: **`agents/roles.yml`**.
+Paths: **`agents/roles.yml`**. Roadmap writing standards: **`docs/dev/feuille-de-route/README.md`** (this skill does **not** edit the roadmap — adding / renumbering versions is **`/afr`**).
 
 ## 1. Purpose
 
-Read role **`roadmap`**. If that file already describes version **`X.Y.Z`**:
+Read role **`roadmap`**. Look for **`X.Y.Z`** as **`## Prochaine : X.Y.Z — …`** or **`## Ensuite : X.Y.Z — …`** (or a **Déjà livré** bullet — then stop: already shipped).
 
-- That section **is** the purpose (one job, product language). State it back in one sentence, then go to step 2. Do **not** ask « what is this version for? ».
+If that file already describes version **`X.Y.Z`**:
+
+- That section **is** the purpose: take **`Objectif.`** (one job, product language). State it back in one sentence, then go to step 2. Do **not** ask « what is this version for? ».
 - The file is a roadmap, not a spec: grilling may still refine it. Do not invent a different job.
+- Prefer opening the current **Prochaine**. If the user names an **Ensuite**, say so in one line and continue only if they confirm.
 
-If **`X.Y.Z` is absent** from that file: ask **what is this version for?** (one job, in product language) and **wait**.
+If **`X.Y.Z` is absent** from that file: tell them to add it with **`/afr`** (standards in the README), **or** ask **what is this version for?** (one job, product language) and **wait** — do not invent a number or rewrite the feuille here.
 
 ## 2. `/grill-with-docs` (conversation only if you are on `main`)
 
@@ -54,7 +57,7 @@ Show the **implementation order**: tickets with no open blockers first (lowest n
 
 **Wait for an explicit yes** on that list. Then for **each** child, in order:
 
-1. `gh issue create` (`Part of #<parent>` at the top of the body, `ready-for-agent`).
+1. `gh issue create` with label `ready-for-agent` and body in the **canonical Matt shape** from `agents/issue-tracker.md` (*Child ticket body*): first line `Part of #<parent>`, then `## What to build`, `## Acceptance criteria` (checkboxes), `## Blocked by` (`- Aucun` or `- #<n>`). If `/to-tickets` drafted French or free-form headings, **reshape** to those English headings before create. Do not use `Ce qu'il livre` / `Critères d'acceptation` / `Tests attendus` for new tickets.
 2. Attach it as a **GitHub sub-issue** of the parent (POST `issues/<parent>/sub_issues`, JSON integer `sub_issue_id` = the child’s **database id**) — this is what shows **Y/Z** on the parent. See `agents/issue-tracker.md` (*Version parent and children*).
 3. Set **GitHub native** blocked-by (POST `issues/<n>/dependencies/blocked_by`, JSON integer `issue_id` = the blocker’s **database id`):
    - **Between children**, as the quiz said.
@@ -62,7 +65,7 @@ Show the **implementation order**: tickets with no open blockers first (lowest n
 
 Then `gh issue edit <parent> --remove-label "ready-for-agent"`. Confirm the parent’s `sub_issues_summary.total` equals the number of children just created. The parent is never an `/implement` ticket.
 
-A body `Part of` line alone does **not** create the sub-issue link. A body `Blocked by: #n` line is only a fallback for dependencies. Do not create tickets before that yes. Do not `/implement`.
+A body `Part of` line alone does **not** create the sub-issue link. The `## Blocked by` section mirrors native deps (fallback if the API is unavailable). Do not create tickets before that yes. Do not `/implement`.
 
 ## 6. Pull request
 
@@ -71,6 +74,7 @@ Run skill **`ouvrir-pr`** as if the user had typed **`/opr -draft`** with:
 - Title: `VX.Y.Z — <purpose in one line>`
 - `## Summary` (what this version is)
 - `Fixes #<parent>` and `Fixes #<child>` **one keyword per issue**
+- If this version **fixes** known roadmap bugs: also `Fixes #<bug>` for each GitHub issue with label **`bug`** that this version closes (so `finaliser-la-version` can remove them from **Plus tard** and close them)
 - `## Test plan` (checkboxes)
 
 ## 7. Hand off to implement

@@ -167,3 +167,9 @@ Le texte nettoyé et le titre des pages web lues avec succès, gardés 24 h par 
 Le nouveau téléchargement d'une page déjà lue dans une Conversation, demandé par le collaborateur parce qu'elle a changé (`lire_pages_web` avec `retelecharger`). Contourne le Cache des pages web, remplace la copie de la Conversation et revérifie ses Questions couvertes.
 
 À éviter : rafraîchissement, actualisation.
+
+## Statut du tour {#statut-du-tour}
+
+L'étape en cours d'un tour de chat, publiée en direct par la VM centrale et affichée dans le fil à la place de « Réflexion… » (« Recherche sur le web : “…” », « Lecture de &lt;domaine&gt; », « Relecture de &lt;fichier&gt; »…). Une étape à la fois, jamais persistée ni visible dans l'inspecteur ([ADR-0016](./adr/0016-envoi-de-message-en-flux-sse.md)).
+
+À éviter : progression, log, raisonnement (le modèle ne montre pas sa réflexion).

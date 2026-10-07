@@ -10,7 +10,7 @@
 roles:
   roadmap:
     paths:
-      - docs/dev/feuille-de-route-dev.md
+      - docs/dev/feuille-de-route/feuille-de-route-dev.md
   suivi-avancement:
     paths:
       - docs/suivi-avancement/

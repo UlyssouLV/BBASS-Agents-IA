@@ -25,7 +25,7 @@ async function main() {
     deviceScaleFactor: 2,
   });
   await page.goto(URL, {waitUntil: 'networkidle', timeout: 120_000});
-  // Masque chrome / intro pour un aperçu « état du produit » (README uniquement)
+  // Masque chrome / intro / bugs (section Bugs = capture séparée)
   await page.addStyleTag({
     content: `
       .navbar { display: none !important; }
@@ -33,6 +33,7 @@ async function main() {
       main h1 + p { display: none !important; }
       main p:has(a.button) { display: none !important; }
       main p:has(a[href*="/docs/changelog"]) { display: none !important; }
+      [data-readme="bugs"] { display: none !important; }
     `,
   });
   await page.waitForTimeout(400);

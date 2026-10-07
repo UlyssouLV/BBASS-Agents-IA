@@ -23,3 +23,4 @@ Ce n’est ni une spec produit, ni un tutoriel. C’est le journal des choix str
 | [0013](./0013-recherche-web-searxng-auto-heberge.md) | SearXNG auto-hébergé |
 | [0014](./0014-recherche-web-en-deux-temps-extraction-isolee.md) | Extraction web isolée |
 | [0015](./0015-cache-commun-des-pages-web.md) | Cache commun des pages web |
+| [0016](./0016-envoi-de-message-en-flux-sse.md) | Envoi de message en flux SSE |

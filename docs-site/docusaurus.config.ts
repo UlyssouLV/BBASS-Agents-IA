@@ -63,6 +63,7 @@ const config: Config = {
             'architecture/**',
             'changelog/README.md',
             'feuille-de-route/README.md',
+            'bugs/README.md',
           ],
         },
         blog: false,
@@ -80,12 +81,18 @@ const config: Config = {
       respectPrefersColorScheme: false,
     },
     navbar: {
-      title: 'BBASS Agents IA',
+      title: '',
       logo: {
-        alt: 'BBASS',
-        src: 'img/logo-bbass.png',
+        alt: 'BBASS Agents IA',
+        src: 'img/logo-bbass-agents-ia.jpg',
       },
       items: [
+        {
+          to: '/',
+          label: 'Accueil',
+          position: 'left',
+          className: 'navbar-accueil',
+        },
         {
           type: 'docSidebar',
           sidebarId: 'featuresSidebar',
@@ -97,6 +104,12 @@ const config: Config = {
           sidebarId: 'changelogSidebar',
           position: 'left',
           label: 'Changelog',
+        },
+        {
+          type: 'docSidebar',
+          sidebarId: 'bugsSidebar',
+          position: 'left',
+          label: 'Bugs',
         },
         {
           type: 'docSidebar',

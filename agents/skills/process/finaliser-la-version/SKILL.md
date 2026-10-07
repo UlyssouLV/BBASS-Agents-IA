@@ -45,10 +45,15 @@ Read each role below (paths from `agents/roles.yml`), against the parent spec / 
 - **`agent-adapter`** — adapter still valid (hook, `/implement` close, Standards pointer); skills named there exist under `agents/skills/` (synced to the IDE adapters); implement / finalise cycle matches those skills; process docs still match (tracker, labels, domain).
 - **`spec`** — spec for this version exists there.
 - **`adr`** — new ADRs if decisions changed.
-- **`roadmap`** — **`X.Y.Z`** is recorded as delivered; upcoming versions stay listed; drop claims this version has **not** delivered. Do not invent new versions; only reshuffle what is already listed.
+- **`roadmap`** — follow **`docs/dev/feuille-de-route/README.md`**: move **`X.Y.Z`** into **Déjà livré** (one bullet `**X.Y.Z** — titre : résumé…`); drop it from **Prochaine** / **Ensuite**; the first remaining **Ensuite** becomes the sole **Prochaine** (keep its Objectif / Hors périmètre). Drop claims this version has **not** delivered. Do not invent new versions; only reshuffle what is already listed. New version ideas → leave for **`/afr`**.
+- **Bugs fixed by this version** (same docs commit as roadmap):
+  1. From the open PR body, collect every `Fixes #<n>` / `Fix #<n>` / `Closes #<n>`.
+  2. Keep only issues that still have label **`bug`** (`gh issue view <n> --json labels`). Also include any `#n` the parent **spec** / version narrative explicitly says this version closes, if it has label `bug` and is missing from the PR — then **edit the PR body** to add `Fixes #<n>` (same rule as step 1 for the parent).
+  3. On role **`roadmap`**: delete each matching `### Bug — … (#n)` block under **Plus tard** (from that heading through the line before the next `###` / `##`). Already absent → OK.
+  4. For each such `#n` still **Open**: `gh issue close <n> --comment "Corrigé en VX.Y.Z."` (use this version’s semver). Already Closed → one line, continue.
 - **`suivi-avancement`** — HTML bilan for the **current calendar week** under that role (folder `semaine-…` that covers today’s date). None → one line, do **not** stop. Found → update that HTML for **`X.Y.Z`** (what shipped, **functional** language for a cabinet reader — no tool names, stack, or ticket ids in the day bullets), then regenerate the sibling `.pdf` next to the HTML (headless Chrome or Edge: `--print-to-pdf`, no header/footer). Do not create a week folder. Do not edit other weeks.
 
-If anything is stale (except soft-skip on missing week HTML): **stop the release**. Update those files on the **feature branch**, then run skill **`commit`** as if the user had typed **`/c -a -p`**. Then re-read this section. Do **not** `/crel` or `/mpr` until this gate is green — the tag must include the docs (HTML + PDF when updated).
+If anything is stale (except soft-skip on missing week HTML): **stop the release**. Update those files on the **feature branch**, then run skill **`commit`** as if the user had typed **`/c -a -p`**. Then re-read this section. Do **not** `/crel` or `/mpr` until this gate is green — the tag must include the docs (HTML + PDF when updated). Bug issue closes (step above) may run in that same docs turn; they do not require a second commit.
 
 ## 3. Quality gate
 
@@ -72,7 +77,14 @@ Then run skill **`fusionner-pr`** as if the user had typed **`/mpr`**.
 
 ## 5. Annotate earlier versions
 
-Read the spec section **Changements apportés aux versions antérieures** (format and blocks: `agents/issue-tracker.md`, *Changes to earlier versions*). `Aucun.` or no section → one line, go to step 6. Otherwise annotate each row's targets. Never stop the version on this step: a target that fails is listed in the final reply.
+Read the spec section **Changements apportés aux versions antérieures** (format and blocks: `agents/issue-tracker.md`, *Changes to earlier versions* **and** the Critical newline rules there). `Aucun.` or no section → one line, go to step 6. Otherwise annotate each row's targets:
+
+1. `gh release view <tag> --json body` — keep the existing notes.
+2. Prepend each new `> **Modifié en VX.Y.Z** …` blockquote **with blank lines between blocks**, then a blank line, then the previous body starting at `## Pourquoi` (or whatever already headed the notes).
+3. Write with `gh release edit <tag> --notes-file` (UTF-8 file). Never collapse the body to a single line.
+4. Same block as a comment on each listed issue.
+
+Never stop the version on this step: a target that fails is listed in the final reply.
 
 ## 6. Stop
 

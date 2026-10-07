@@ -1,6 +1,8 @@
 import {
   createContext,
+  Fragment,
   memo,
+  useCallback,
   useContext,
   useEffect,
   useLayoutEffect,
@@ -35,12 +37,8 @@ import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  useConversationQuery,
-  useCreerConversationMutation,
-  useEnvoyerMessageMutation,
-  type Message,
-} from "@/hooks/useConversations";
+import { useConversationQuery, type Message } from "@/hooks/useConversations";
+import { cleEnvoi, type CleEnvoi, type EnvoisEnCours } from "@/hooks/useEnvoisEnCours";
 import { messageErreur } from "@/lib/api";
 import { usePerfChargementParCle } from "@/lib/instrumentationTemps";
 import { cn } from "@/lib/utils";
@@ -86,7 +84,7 @@ function IconePieceJointe({ fichier, className }: Readonly<{ fichier: File; clas
 
 interface OngletChatProps {
   conversationOuverteId: number | null;
-  onConversationCreee: (id: number) => void;
+  envois: EnvoisEnCours;
 }
 
 // Issue #77 : la pièce jointe (optionnelle) n'est plus déposée via un champ
@@ -695,8 +693,16 @@ const _INTERVALLE_ANIMATION_FRAPPE_MS = 20;
 const _NB_ETAPES_ANIMATION_FRAPPE = 60;
 
 // Écrit `texte` progressivement, comme si l'Agent tapait sa réponse.
-function TexteAnimeReponse({ texte, onTermine }: Readonly<{ texte: string; onTermine: () => void }>) {
-  const [longueurAffichee, setLongueurAffichee] = useState(0);
+// `animer` à faux (issue #166 : réponse arrivée ou frappe quittée pendant
+// qu'on regardait une autre conversation) : texte complet d'emblée. Même
+// composant dans les deux cas, pour ne pas remonter le rendu Markdown à la
+// fin de la frappe.
+function TexteAnimeReponse({
+  texte,
+  animer,
+  onTermine,
+}: Readonly<{ texte: string; animer: boolean; onTermine: () => void }>) {
+  const [longueurAffichee, setLongueurAffichee] = useState(animer ? 0 : texte.length);
   const animationTermineeRef = useRef(false);
   const caracteresParEtape = Math.max(1, Math.ceil(texte.length / _NB_ETAPES_ANIMATION_FRAPPE));
 
@@ -739,28 +745,12 @@ function TexteAnimeReponse({ texte, onTermine }: Readonly<{ texte: string; onTer
 // les mutations TanStack Query restent inchangées.
 //
 // Issue #84 : le premier envoi et les envois suivants ne doivent plus
-// attendre la réponse d'un bloc. `envoiEnCours` porte l'état visuel de la
-// conversation pendant qu'une réponse est en vol, indépendamment de l'accroche ou de la
-// conversation ouverte :
-// - "attente" : la VM n'a pas encore répondu (indicateur « Réflexion… »).
-// - "frappe"  : la réponse est connue et s'écrit progressivement (voir
-//   TexteAnimeReponse ci-dessus).
-// - "termine" : la frappe est finie ; on attend que `conversationQuery`
-//   (invalidée par la mutation) rattrape le nouveau tour avant de rebasculer
-//   sur ses données, pour ne jamais faire disparaître puis réapparaître le
-//   message pendant que la requête de fond est encore en vol.
-// `messagesAvantEnvoiRef` fige la liste affichée avant cet envoi (vide pour
-// une toute nouvelle conversation) : tant qu'`envoiEnCours` n'est pas nul,
-// la conversation se construit à partir de ce figé + des bulles optimistes plutôt
-// que des données live, qui peuvent se mettre à jour avant la fin de
-// l'animation.
-type PhaseEnvoi = "attente" | "frappe" | "termine";
-
-interface EnvoiEnCours {
-  message: string;
-  phase: PhaseEnvoi;
-  reponse: string;
-}
+// attendre la réponse d'un bloc. L'envoi en cours de la conversation ouverte
+// (`envoiOuvert`, voir useEnvoisEnCours.ts pour ses phases) porte son état
+// visuel pendant qu'une réponse est en vol. Issue #166 : cet état est tenu
+// par conversation hors de l'onglet ; le fil affiché est toujours celui de la
+// conversation sélectionnée, et on retrouve sa bulle et son statut en y
+// revenant.
 
 // Issue #103 : distance au bord haut du fil (en px) sous laquelle un
 // défilement déclenche le chargement de la page précédente — façon ChatGPT
@@ -769,19 +759,28 @@ interface EnvoiEnCours {
 // collaborateur n'atteigne réellement le haut du fil.
 const _SEUIL_DECLENCHEMENT_HISTORIQUE_PX = 150;
 
-export function OngletChat({ conversationOuverteId, onConversationCreee }: Readonly<OngletChatProps>) {
-  const [champNouveauMessage, setChampNouveauMessage] = useState("");
-  const [champMessage, setChampMessage] = useState("");
-  const [fichierNouvelleConversation, setFichierNouvelleConversation] = useState<File | null>(null);
-  const [fichierMessage, setFichierMessage] = useState<File | null>(null);
-  const [envoiEnCours, setEnvoiEnCours] = useState<EnvoiEnCours | null>(null);
-  const messagesAvantEnvoiRef = useRef<Message[]>([]);
+// Message en cours de saisie et pièce jointe choisie, gardés par
+// conversation (« nouvelle » pour l'écran de composition).
+type Brouillon = { message: string; fichier: File | null };
+const _BROUILLON_VIDE: Brouillon = { message: "", fichier: null };
+
+export function OngletChat({ conversationOuverteId, envois }: Readonly<OngletChatProps>) {
+  const [brouillons, setBrouillons] = useState<ReadonlyMap<CleEnvoi, Brouillon>>(new Map());
   const refFilMessages = useRef<HTMLDivElement>(null);
   const hauteurScrollAvantChargementRef = useRef<number | null>(null);
 
   const conversationQuery = useConversationQuery(conversationOuverteId);
-  const creerConversationMutation = useCreerConversationMutation();
-  const envoyerMessageMutation = useEnvoyerMessageMutation();
+  const cleOuverte = cleEnvoi(conversationOuverteId);
+  const envoiOuvert = envois.envois.get(cleOuverte);
+  const retourOuvert = envois.retours.get(cleOuverte);
+  const { consommerRestauration, oublierEnvoi } = envois;
+  const brouillon = brouillons.get(cleOuverte) ?? _BROUILLON_VIDE;
+
+  const modifierBrouillon = useCallback((cle: CleEnvoi, modification: Partial<Brouillon>) => {
+    setBrouillons((precedents) =>
+      new Map(precedents).set(cle, { ...(precedents.get(cle) ?? _BROUILLON_VIDE), ...modification })
+    );
+  }, []);
 
   // Issue #103 : pages[0] est toujours la fenêtre la plus récente (titre et
   // dates lus sur elle, voir useConversationQuery) ; chaque page suivante
@@ -824,13 +823,26 @@ export function OngletChat({ conversationOuverteId, onConversationCreee }: Reado
   // Jamais sur un placeholder (issue #127) : les messages d'une autre
   // conversation suffiraient sinon à passer le test de longueur.
   useEffect(() => {
-    if (envoiEnCours?.phase !== "termine" || !donneesConversationOuverte) {
+    if (envoiOuvert?.phase !== "termine" || !donneesConversationOuverte) {
       return;
     }
-    if (messagesConversation.length >= messagesAvantEnvoiRef.current.length + 2) {
-      setEnvoiEnCours(null);
+    if (messagesConversation.length >= envoiOuvert.messagesAvant.length + 2) {
+      oublierEnvoi(cleOuverte);
     }
-  }, [envoiEnCours, donneesConversationOuverte, messagesConversation]);
+  }, [envoiOuvert, donneesConversationOuverte, messagesConversation, oublierEnvoi, cleOuverte]);
+
+  // Un envoi échoué rend son message (et sa pièce jointe) au brouillon de sa
+  // conversation — dès qu'elle est ouverte, si l'échec est arrivé ailleurs.
+  // Un brouillon par conversation : celui qu'on tape ailleurs n'est pas
+  // écrasé.
+  useEffect(() => {
+    const aRestaurer = retourOuvert?.aRestaurer;
+    if (!aRestaurer) {
+      return;
+    }
+    modifierBrouillon(cleOuverte, aRestaurer);
+    consommerRestauration(cleOuverte);
+  }, [retourOuvert, cleOuverte, consommerRestauration, modifierBrouillon]);
 
   // Préserve la position de lecture quand une page plus ancienne vient
   // d'être insérée au-dessus du contenu déjà affiché (issue #103) : la
@@ -860,98 +872,51 @@ export function OngletChat({ conversationOuverteId, onConversationCreee }: Reado
     conversationQuery.fetchNextPage();
   }
 
+  // Champ et pièce jointe vidés dès la soumission : la conversation ouverte
+  // peut changer avant la réponse (issue #166) ; un échec les restaure
+  // (voir l'effet ci-dessus).
   function gererEnvoiNouvelleConversation(evenement: FormEvent<HTMLFormElement>) {
     evenement.preventDefault();
 
-    const message = champNouveauMessage;
-    const fichier = fichierNouvelleConversation;
-    if (!message.trim() || creerConversationMutation.isPending) {
+    const { message, fichier } = brouillon;
+    if (!message.trim() || envoiOuvert) {
       return;
     }
-    creerConversationMutation.reset();
-
-    messagesAvantEnvoiRef.current = [];
-    setEnvoiEnCours({ message, phase: "attente", reponse: "" });
-    setChampNouveauMessage("");
-
-    creerConversationMutation.mutate(
-      {
-        message,
-        fichier,
-        cleIdempotence: crypto.randomUUID(),
-      },
-      {
-        onSuccess: (donnees) => {
-          setFichierNouvelleConversation(null);
-          setEnvoiEnCours({ message, phase: "frappe", reponse: donnees.reponse });
-          onConversationCreee(donnees.conversation.id);
-        },
-        onError: () => {
-          setEnvoiEnCours(null);
-          setChampNouveauMessage(message);
-        },
-      }
-    );
+    modifierBrouillon(cleOuverte, _BROUILLON_VIDE);
+    void envois.envoyerPremierMessage(message, fichier);
   }
 
   function gererEnvoiMessage(evenement: FormEvent<HTMLFormElement>) {
     evenement.preventDefault();
 
-    const message = champMessage;
-    const fichier = fichierMessage;
-    if (!message.trim() || conversationOuverteId === null || envoyerMessageMutation.isPending) {
+    const { message, fichier } = brouillon;
+    if (!message.trim() || conversationOuverteId === null || envoiOuvert) {
       return;
     }
-    envoyerMessageMutation.reset();
-
-    messagesAvantEnvoiRef.current = messagesConversation;
-    setEnvoiEnCours({ message, phase: "attente", reponse: "" });
-    setChampMessage("");
-
-    envoyerMessageMutation.mutate(
-      {
-        conversationId: conversationOuverteId,
-        message,
-        fichier,
-        cleIdempotence: crypto.randomUUID(),
-      },
-      {
-        onSuccess: (donnees) => {
-          setFichierMessage(null);
-          setEnvoiEnCours({ message, phase: "frappe", reponse: donnees.reponse });
-        },
-        onError: () => {
-          setEnvoiEnCours(null);
-          setChampMessage(message);
-        },
-      }
-    );
+    modifierBrouillon(cleOuverte, _BROUILLON_VIDE);
+    void envois.envoyerMessage(conversationOuverteId, message, fichier, messagesConversation);
   }
 
   // Issue #84 : l'accroche ne s'affiche que si rien n'a encore été envoyé —
   // dès la soumission du premier message, on bascule sur le fil (avec les
   // bulles optimistes ci-dessous) sans attendre la réponse de la VM.
-  const brouillonActif = conversationOuverteId === null && envoiEnCours === null;
-  const messagesAffiches: Message[] =
-    envoiEnCours !== null ? messagesAvantEnvoiRef.current : messagesConversation;
+  const brouillonActif = conversationOuverteId === null && !envoiOuvert;
+  const messagesAffiches: Message[] = envoiOuvert ? envoiOuvert.messagesAvant : messagesConversation;
   // Pendant un envoi, le titre d'un placeholder serait celui de la
   // conversation quittée (issue #127) : on lui préfère celui que la création
   // vient de renvoyer, ou rien tant qu'il n'est pas connu.
-  const titreAffiche =
-    envoiEnCours !== null && !donneesConversationOuverte
-      ? creerConversationMutation.data?.conversation.titre
-      : titreConversation;
+  const titreAffiche = envoiOuvert && !donneesConversationOuverte ? envoiOuvert.titre : titreConversation;
 
   const erreurConversationOuverte = messageErreur(
     conversationQuery.error,
     "L'ouverture de la conversation a échoué. Réessayez plus tard."
   );
   const erreurNouvelleConversation = messageErreur(
-    creerConversationMutation.error,
+    brouillonActif ? retourOuvert?.erreur : null,
     "La création de la conversation a échoué. Réessayez plus tard."
   );
   const erreurEnvoiMessage = messageErreur(
-    envoyerMessageMutation.error,
+    brouillonActif ? null : retourOuvert?.erreur,
     "L'envoi du message a échoué. Réessayez plus tard."
   );
 
@@ -965,17 +930,12 @@ export function OngletChat({ conversationOuverteId, onConversationCreee }: Reado
               <ChampMessageAvecPieceJointe
                 id="nouveau-message-conversation"
                 label="Premier message"
-                valeur={champNouveauMessage}
-                onChange={setChampNouveauMessage}
-                fichier={fichierNouvelleConversation}
-                onFichierChange={setFichierNouvelleConversation}
-                disabled={creerConversationMutation.isPending}
+                valeur={brouillon.message}
+                onChange={(message) => modifierBrouillon(cleOuverte, { message })}
+                fichier={brouillon.fichier}
+                onFichierChange={(fichier) => modifierBrouillon(cleOuverte, { fichier })}
+                disabled={envoiOuvert !== undefined}
               />
-              {creerConversationMutation.data?.pieceJointeEchecAnalyse && (
-                <output className="text-sm text-muted-foreground">
-                  L'IA n'a pas pu analyser la pièce jointe « {creerConversationMutation.data.pieceJointeNomFichier} ».
-                </output>
-              )}
               {erreurNouvelleConversation && (
                 <p role="alert" className="text-sm text-destructive">
                   {erreurNouvelleConversation}
@@ -1014,25 +974,26 @@ export function OngletChat({ conversationOuverteId, onConversationCreee }: Reado
                 </div>
               )
             )}
-            {envoiEnCours && (
-              <>
-                <BulleMessageEnvoye texte={envoiEnCours.message} />
-                {envoiEnCours.phase === "attente" ? (
+            {/* Clé par conversation (issue #166) : une bascule entre deux envois
+                ne réutilise pas l'animation de l'autre. */}
+            {envoiOuvert && (
+              <Fragment key={cleOuverte}>
+                <BulleMessageEnvoye texte={envoiOuvert.message} />
+                {envoiOuvert.phase === "attente" ? (
                   <output className="flex max-w-[70%] items-center gap-2 self-start rounded-md bg-muted px-3 py-1.5 text-sm text-muted-foreground">
                     <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
-                    Réflexion…
+                    {envoiOuvert.statut}
                   </output>
                 ) : (
                   <div className="max-w-[70%] self-start rounded-md bg-muted px-3 py-1.5 text-sm">
                     <TexteAnimeReponse
-                      texte={envoiEnCours.reponse}
-                      onTermine={() =>
-                        setEnvoiEnCours((precedent) => (precedent ? { ...precedent, phase: "termine" } : precedent))
-                      }
+                      texte={envoiOuvert.reponse}
+                      animer={envoiOuvert.phase === "frappe"}
+                      onTermine={() => envois.terminerFrappe(cleOuverte)}
                     />
                   </div>
                 )}
-              </>
+              </Fragment>
             )}
           </div>
 
@@ -1040,11 +1001,11 @@ export function OngletChat({ conversationOuverteId, onConversationCreee }: Reado
             <ChampMessageAvecPieceJointe
               id="message"
               label="Message"
-              valeur={champMessage}
-              onChange={setChampMessage}
-              fichier={fichierMessage}
-              onFichierChange={setFichierMessage}
-              disabled={envoiEnCours !== null}
+              valeur={brouillon.message}
+              onChange={(message) => modifierBrouillon(cleOuverte, { message })}
+              fichier={brouillon.fichier}
+              onFichierChange={(fichier) => modifierBrouillon(cleOuverte, { fichier })}
+              disabled={envoiOuvert !== undefined}
             />
             {dernierMessageAvecContexte?.tokens_contexte != null && (
               <JaugeContexte
@@ -1052,9 +1013,9 @@ export function OngletChat({ conversationOuverteId, onConversationCreee }: Reado
                 fenetre={dernierMessageAvecContexte.fenetre_contexte}
               />
             )}
-            {envoyerMessageMutation.data?.pieceJointeEchecAnalyse && (
+            {retourOuvert?.pieceJointeNonAnalysee && (
               <output className="text-sm text-muted-foreground">
-                L'IA n'a pas pu analyser la pièce jointe « {envoyerMessageMutation.data.pieceJointeNomFichier} ».
+                L'IA n'a pas pu analyser la pièce jointe « {retourOuvert.pieceJointeNonAnalysee} ».
               </output>
             )}
             {erreurEnvoiMessage && (

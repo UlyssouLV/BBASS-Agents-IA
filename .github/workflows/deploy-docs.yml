@@ -102,6 +102,7 @@ jobs:
             sleep 1
           done
           npm run capturer-accueil
+          npm run capturer-bugs
 
       - name: Capture suivi « Travail réalisé »
         working-directory: docs-site
@@ -115,7 +116,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/img/apercu-docs-accueil.png docs/img/apercu-travail-realise.png README.md
+          git add docs/img/apercu-docs-accueil.png docs/img/apercu-docs-bugs.png docs/img/apercu-travail-realise.png README.md
           if git diff --staged --quiet; then
             echo "Aperçus inchangés."
             exit 0

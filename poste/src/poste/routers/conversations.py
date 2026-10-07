@@ -1,14 +1,15 @@
+import json
+from collections.abc import Iterator
+
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.responses import StreamingResponse
 
 from poste.schemas import (
     ConversationCreationRequest,
-    ConversationCreeResponse,
     ConversationDetailResponse,
     ConversationRenommeeRequest,
     ConversationResponse,
-    ConversationResume,
     MessageEnvoyeRequest,
-    MessageEnvoyeResponse,
     MessageResponse,
     PieceJointeCreeeResponse,
     PieceJointeResumeResponse,
@@ -22,6 +23,7 @@ from poste.vm_centrale_client import (
     PieceJointeRefuseeError,
     VmCentraleClient,
     get_vm_centrale_client,
+    lever_erreur_du_tour,
 )
 
 router = APIRouter()
@@ -72,31 +74,68 @@ _RESPONSES_PIECE_JOINTE = {
     404: {"description": _PIECE_JOINTE_INTROUVABLE},
     400: {"description": _PIECE_JOINTE_REFUSEE},
 }
+_RESPONSE_FLUX = {200: {"content": {"text/event-stream": {}}}}
+
+
+_FIN_EVENEMENT = b"\n\n"
+
+
+def _evenement_sse(nom: str, donnees: dict) -> bytes:
+    return f"event: {nom}\ndata: {json.dumps(donnees, ensure_ascii=False)}".encode() + _FIN_EVENEMENT
+
+
+def _evenement_relaye(session: SessionStore, evenement: bytes) -> bytes:
+    # Un `erreur` de la VM (HTTPException levée pendant le tour) est traduit
+    # comme un refus d'avant le flux, par _erreur_vm_vers_http ; les autres
+    # événements passent tels quels.
+    lignes = dict(ligne.split(": ", 1) for ligne in evenement.decode().splitlines() if ": " in ligne)
+    if lignes.get("event") != "erreur":
+        return evenement + _FIN_EVENEMENT
+    donnees = json.loads(lignes.get("data", "{}"))
+    try:
+        lever_erreur_du_tour(donnees.get("status", 500), donnees.get("detail"))
+    except Exception as erreur:
+        http = _erreur_vm_vers_http(session, erreur)
+    return _evenement_sse("erreur", {"status": http.status_code, "detail": http.detail})
+
+
+def _relayer_flux(session: SessionStore, flux: Iterator[bytes]) -> StreamingResponse:
+    # Flux de la VM relayé événement par événement (spec 1.4.4, ADR-0016).
+    # Une VM coupée en plein flux (connexion perdue, POSTE_HTTP_TIMEOUT
+    # dépassé entre deux événements) le termine par un événement `erreur` ;
+    # un événement à moitié reçu n'est jamais relayé.
+    def relais() -> Iterator[bytes]:
+        tampon = b""
+        try:
+            for morceau in flux:
+                *evenements, tampon = (tampon + morceau).split(_FIN_EVENEMENT)
+                for evenement in evenements:
+                    yield _evenement_relaye(session, evenement)
+        except Exception:
+            yield _evenement_sse("erreur", {"status": 502, "detail": _VM_CENTRALE_INDISPONIBLE})
+
+    return StreamingResponse(relais(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
 
 
 @router.post(
     "/conversations",
-    responses={**_RESPONSES_BASE, **_RESPONSES_PIECE_JOINTE},
+    response_class=StreamingResponse,
+    responses={**_RESPONSES_BASE, **_RESPONSES_PIECE_JOINTE, **_RESPONSE_FLUX},
 )
 def creer_conversation(
     requete: ConversationCreationRequest,
     client: VmCentraleClient = Depends(get_vm_centrale_client),
     session: SessionStore = Depends(get_session_store),
-) -> ConversationCreeResponse:
+) -> StreamingResponse:
     jeton = _jeton_de_session(session)
     try:
-        cree = client.creer_conversation(
+        flux = client.creer_conversation(
             jeton, requete.message, requete.cle_idempotence, requete.piece_jointe_id
         )
     except Exception as erreur:
         raise _erreur_vm_vers_http(session, erreur) from erreur
 
-    return ConversationCreeResponse(
-        conversation=ConversationResume(id=cree.conversation.id, titre=cree.conversation.titre),
-        reponse=cree.reponse,
-        tokens_contexte=cree.tokens_contexte,
-        fenetre_contexte=cree.fenetre_contexte,
-    )
+    return _relayer_flux(session, flux)
 
 
 @router.get("/conversations", responses=_RESPONSES_BASE)
@@ -201,9 +240,11 @@ def supprimer_conversation(
 
 @router.post(
     "/conversations/{conversation_id}/messages",
+    response_class=StreamingResponse,
     responses={
         **_RESPONSES_BASE,
         **_RESPONSES_PIECE_JOINTE,
+        **_RESPONSE_FLUX,
         404: {"description": f"{_CONVERSATION_INTROUVABLE} / {_PIECE_JOINTE_INTROUVABLE}"},
     },
 )
@@ -212,20 +253,16 @@ def envoyer_message(
     requete: MessageEnvoyeRequest,
     client: VmCentraleClient = Depends(get_vm_centrale_client),
     session: SessionStore = Depends(get_session_store),
-) -> MessageEnvoyeResponse:
+) -> StreamingResponse:
     jeton = _jeton_de_session(session)
     try:
-        envoye = client.envoyer_message(
+        flux = client.envoyer_message(
             jeton, conversation_id, requete.message, requete.cle_idempotence, requete.piece_jointe_id
         )
     except Exception as erreur:
         raise _erreur_vm_vers_http(session, erreur) from erreur
 
-    return MessageEnvoyeResponse(
-        reponse=envoye.reponse,
-        tokens_contexte=envoye.tokens_contexte,
-        fenetre_contexte=envoye.fenetre_contexte,
-    )
+    return _relayer_flux(session, flux)
 
 
 def _piece_jointe_creee_response(cree: PieceJointeCreee) -> PieceJointeCreeeResponse:

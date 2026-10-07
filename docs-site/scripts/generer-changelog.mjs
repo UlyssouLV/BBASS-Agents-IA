@@ -6,6 +6,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
+import {escapeMdx, escapeYaml} from './echappement.mjs';
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../..');
 const OUT_DIR = path.join(REPO_ROOT, 'docs/changelog');
@@ -96,31 +98,75 @@ function findSpecFile(version) {
 }
 
 function extractSection(markdown, heading) {
+  // Pas de flag `m` : avec `m`, `$` matche en fin de chaque ligne et coupe au 1er §
+  const esc = heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const re = new RegExp(
-    `^##\\s+${heading}\\s*\\n([\\s\\S]*?)(?=^##\\s+|$)`,
-    'mi',
+    `(?:^|\\n)##\\s+${esc}\\s*\\n([\\s\\S]*?)(?=\\n##\\s+|$)`,
+    'i',
   );
   const m = markdown.match(re);
   return m ? m[1].trim() : '';
 }
 
+/** Prépare le body release pour extraction : annotations + titres collés. */
+function normalizeReleaseBody(body) {
+  let text = String(body || '').replace(/^\uFEFF/, '');
+  // Titres ## / ### collés après du texte (annotations mashées)
+  text = text.replace(/([^\n])\s+(#{2,3}\s+)/g, '$1\n\n$2');
+  // "## Pourquoi  Le modèle…" (titre + corps sur la même ligne)
+  text = text.replace(/^(#{2,3}\s+[^\n]+?)\s{2,}(?=\S)/gm, '$1\n\n');
+  // Nouveau bloc d'annotation collé
+  text = text.replace(/([^\n])\s+(> \*\*Modifié en)/g, '$1\n\n$2');
+  // Retire les blockquotes d'annotation en tête (Modifié en VX.Y.Z)
+  text = text.replace(
+    /^(?:>\s*\*\*Modifié en[\s\S]*?\n)(?=\n|#{2,3}\s|$)/gim,
+    '',
+  );
+  // Encore des lignes > orphelines en tête
+  while (/^>\s?/m.test(text) && !/^#{2,3}\s/m.test(text.slice(0, 80))) {
+    const next = text.replace(/^(?:>.*(?:\n|$))+/, '').trimStart();
+    if (next === text) break;
+    text = next;
+  }
+  return text.trim();
+}
+
 function extractFunctional(body) {
-  const pourquoi = extractSection(body, 'Pourquoi');
-  const faire = extractSection(body, "Ce qu'on peut faire maintenant");
-  const faireAlt = extractSection(body, 'Ce qu’on peut faire maintenant');
-  const ceQuonPeut = faire || faireAlt;
+  const normalized = normalizeReleaseBody(body);
+  const pourquoi =
+    extractSection(normalized, 'Pourquoi') ||
+    extractSection(normalized, 'Objectif') ||
+    extractSection(normalized, 'À quoi sert cette version');
+  const ceQuonPeut =
+    extractSection(normalized, "Ce qu'on peut faire maintenant") ||
+    extractSection(normalized, 'Ce qu’on peut faire maintenant') ||
+    extractSection(normalized, 'Ce que l’on peut faire') ||
+    extractSection(normalized, "Ce que ça change pour l'utilisateur") ||
+    extractSection(normalized, 'Ce que ça change') ||
+    extractSection(normalized, 'Ce qui est livré');
+  // ### sous-titres (ex. anciennes notes 1.2.1) — pas de flag `m` (sinon `$` coupe au 1er §)
+  const faireH3 = normalized.match(
+    /(?:^|\n)###\s+Ce qu['’]on peut faire maintenant\s*\n([\s\S]*?)(?=\n#{2,3}\s+|$)/i,
+  );
   const parts = [];
   if (pourquoi) {
     parts.push(`## Pourquoi\n\n${pourquoi}`);
   }
-  if (ceQuonPeut) {
-    parts.push(`## Ce qu'on peut faire maintenant\n\n${ceQuonPeut}`);
+  const faire = ceQuonPeut || (faireH3 ? faireH3[1].trim() : '');
+  if (faire) {
+    parts.push(`## Ce qu'on peut faire maintenant\n\n${faire}`);
   }
   if (parts.length === 0) {
-    const stripped = body
-      .replace(/^>(?:.|\n)*?(?=\n## |\n*$)/m, '')
+    // Notes d'avant le format (autres titres) : le corps tel quel, sans les
+    // lignes PR / Tickets déjà portées par <LiensRelease>.
+    const brut = normalized
+      .replace(/^.*(?:PR\s*:\s*https:|Tickets\s*\(`Fixes`\)).*$/gim, '')
+      .replace(/\n{3,}/g, '\n\n')
       .trim();
-    return stripped || '_Aucune note de release._';
+    return (
+      brut ||
+      '_Aucune note produit structurée (Pourquoi / Ce qu’on peut faire) dans la release._'
+    );
   }
   return parts.join('\n\n');
 }
@@ -137,22 +183,13 @@ function extractFixes(body) {
   if (!m) {
     return [];
   }
-  return [...m[1].matchAll(/#(\d+)/g)].map((x) => x[1]);
+  // Le parent (issue de la version) vient en premier (format des notes,
+  // agents/issue-tracker.md) ; un numéro répété n'est gardé qu'une fois.
+  return [...new Set([...m[1].matchAll(/#(\d+)/g)].map((x) => x[1]))];
 }
 
 function stripSpecTitle(specMarkdown) {
   return specMarkdown.replace(/^#\s+[^\n]+\n+/, '').trim();
-}
-
-function escapeYaml(value) {
-  return JSON.stringify(String(value ?? ''));
-}
-
-function escapeMdx(text) {
-  return String(text)
-    .replace(/\{/g, '\\{')
-    .replace(/\}/g, '\\}')
-    .replace(/<([A-Za-z/])/g, '\\<$1');
 }
 
 function writeVersionPage(release, specPath, positionInSerie) {
@@ -178,18 +215,17 @@ function writeVersionPage(release, specPath, positionInSerie) {
     technical = stripSpecTitle(fs.readFileSync(specPath, 'utf8'));
   }
 
-  const liens = [
-    `- [Release GitHub](${releaseUrl})`,
-    prUrl ? `- [Pull request](${prUrl})` : null,
-    specRel
-      ? `- Spec : [\`${specRel}\`](https://github.com/${OWNER}/${REPO}/blob/${tag}/${specRel})`
-      : null,
-    fixes.length
-      ? `- Tickets : ${fixes.map((n) => `[#${n}](https://github.com/${OWNER}/${REPO}/issues/${n})`).join(' ')}`
-      : null,
-  ]
-    .filter(Boolean)
-    .join('\n');
+  const specUrl = specRel
+    ? `https://github.com/${OWNER}/${REPO}/blob/${tag}/${specRel}`
+    : null;
+  const specLabel = specRel ? path.basename(specRel) : null;
+  const ticketsJsx = fixes
+    .map(
+      (n) =>
+        `{number: ${JSON.stringify(n)}, href: ${JSON.stringify(`https://github.com/${OWNER}/${REPO}/issues/${n}`)}}`,
+    )
+    .join(', ');
+  const prNum = prUrl?.match(/\/pull\/(\d+)/)?.[1];
 
   const slug = `v${version}`;
   const serieDir = path.join(OUT_DIR, serie);
@@ -200,13 +236,21 @@ sidebar_label: ${escapeYaml(tag)}
 sidebar_position: ${positionInSerie}
 ---
 
+import LiensRelease from '@site/src/components/LiensRelease';
+
 # ${release.name || tag}
 
 Publiée le **${published}**.
 
-## Liens
-
-${liens}
+<LiensRelease
+  releaseUrl=${JSON.stringify(releaseUrl)}
+  releaseLabel=${JSON.stringify(tag)}
+  prUrl={${prUrl ? JSON.stringify(prUrl) : 'null'}}
+  prLabel={${prNum ? JSON.stringify(`#${prNum}`) : 'null'}}
+  specUrl={${specUrl ? JSON.stringify(specUrl) : 'null'}}
+  specLabel={${specLabel ? JSON.stringify(specLabel) : 'null'}}
+  tickets={[${ticketsJsx}]}
+/>
 
 ## Documentation fonctionnelle
 
@@ -221,7 +265,7 @@ ${escapeMdx(functional)}
 ${escapeMdx(technical)}
 `;
 
-  fs.writeFileSync(path.join(serieDir, `${slug}.md`), content, 'utf8');
+  fs.writeFileSync(path.join(serieDir, `${slug}.mdx`), content, 'utf8');
   return {
     tag,
     name: release.name || tag,
@@ -294,7 +338,12 @@ function resetOutDir() {
     if (name === '.gitkeep' || name === 'README.md') {
       continue;
     }
-    fs.rmSync(path.join(OUT_DIR, name), {recursive: true, force: true});
+    fs.rmSync(path.join(OUT_DIR, name), {
+      recursive: true,
+      force: true,
+      maxRetries: 5,
+      retryDelay: 100,
+    });
   }
   fs.writeFileSync(
     path.join(OUT_DIR, '_category_.json'),

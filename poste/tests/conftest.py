@@ -1,3 +1,6 @@
+import json
+from collections.abc import Iterator
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -10,18 +13,27 @@ from poste.vm_centrale_client import (
     CompteCree,
     Consommation,
     Conversation,
-    ConversationCree,
     ConversationDetail,
     InspecteurCompte,
     InspecteurConversation,
     InspecteurEchangeDetail,
     InspecteurEchangeResume,
-    MessageEnvoye,
     PieceJointeCreee,
     ProfilTravail,
     VerificationReussie,
     get_vm_centrale_client,
 )
+
+
+Evenement = tuple[str, dict]
+
+
+def _octets_du_flux(evenements: tuple[Evenement, ...], coupure: Exception | None) -> Iterator[bytes]:
+    # Flux SSE de la VM (ADR-0016), coupé par `coupure` après ses événements.
+    for nom, donnees in evenements:
+        yield f"event: {nom}\ndata: {json.dumps(donnees, ensure_ascii=False)}\n\n".encode()
+    if coupure is not None:
+        raise coupure
 
 
 class VmCentraleClientFactice:
@@ -72,7 +84,7 @@ class VmCentraleClientFactice:
         self._exception_suppression_compte: Exception | None = None
         self._jetons_suppression_compte: list[str] = []
         self._requetes_suppression_compte: list[dict] = []
-        self._conversation_creee: ConversationCree | None = None
+        self._flux_creation_conversation: tuple[tuple[Evenement, ...], Exception | None] | None = None
         self._exception_creation_conversation: Exception | None = None
         self._jetons_creation_conversation: list[str] = []
         self._messages_creation_conversation: list[str] = []
@@ -93,7 +105,7 @@ class VmCentraleClientFactice:
         self._exception_suppression_conversation: Exception | None = None
         self._jetons_suppression_conversation: list[str] = []
         self._ids_suppression_conversation: list[int] = []
-        self._reponse_message_conversation: MessageEnvoye | None = None
+        self._flux_envoi_message_conversation: tuple[tuple[Evenement, ...], Exception | None] | None = None
         self._exception_envoi_message_conversation: Exception | None = None
         self._jetons_envoi_message_conversation: list[str] = []
         self._requetes_envoi_message_conversation: list[dict] = []
@@ -361,8 +373,8 @@ class VmCentraleClientFactice:
         if self._exception_suppression_compte is not None:
             raise self._exception_suppression_compte
 
-    def creation_conversation_reussit(self, conversation: ConversationCree) -> None:
-        self._conversation_creee = conversation
+    def creation_conversation_reussit(self, *evenements: Evenement, coupure: Exception | None = None) -> None:
+        self._flux_creation_conversation = (evenements, coupure)
         self._exception_creation_conversation = None
 
     def creation_conversation_echoue(self, exception: Exception) -> None:
@@ -374,15 +386,15 @@ class VmCentraleClientFactice:
         message: str,
         cle_idempotence: str | None = None,
         piece_jointe_id: int | None = None,
-    ) -> ConversationCree:
+    ) -> Iterator[bytes]:
         self._jetons_creation_conversation.append(jeton)
         self._messages_creation_conversation.append(message)
         self._cles_idempotence_creation_conversation.append(cle_idempotence)
         self._pieces_jointes_id_creation_conversation.append(piece_jointe_id)
         if self._exception_creation_conversation is not None:
             raise self._exception_creation_conversation
-        assert self._conversation_creee is not None
-        return self._conversation_creee
+        assert self._flux_creation_conversation is not None
+        return _octets_du_flux(*self._flux_creation_conversation)
 
     def liste_conversations_retourne(self, conversations: list[Conversation]) -> None:
         self._conversations = conversations
@@ -447,11 +459,9 @@ class VmCentraleClientFactice:
             raise self._exception_suppression_conversation
 
     def envoi_message_conversation_reussit(
-        self, reponse: str, tokens_contexte: int | None = None, fenetre_contexte: int = 262_144
+        self, *evenements: Evenement, coupure: Exception | None = None
     ) -> None:
-        self._reponse_message_conversation = MessageEnvoye(
-            reponse=reponse, tokens_contexte=tokens_contexte, fenetre_contexte=fenetre_contexte
-        )
+        self._flux_envoi_message_conversation = (evenements, coupure)
         self._exception_envoi_message_conversation = None
 
     def envoi_message_conversation_echoue(self, exception: Exception) -> None:
@@ -464,7 +474,7 @@ class VmCentraleClientFactice:
         message: str,
         cle_idempotence: str | None = None,
         piece_jointe_id: int | None = None,
-    ) -> MessageEnvoye:
+    ) -> Iterator[bytes]:
         self._jetons_envoi_message_conversation.append(jeton)
         self._requetes_envoi_message_conversation.append(
             {"conversation_id": conversation_id, "message": message}
@@ -473,8 +483,8 @@ class VmCentraleClientFactice:
         self._pieces_jointes_id_envoi_message_conversation.append(piece_jointe_id)
         if self._exception_envoi_message_conversation is not None:
             raise self._exception_envoi_message_conversation
-        assert self._reponse_message_conversation is not None
-        return self._reponse_message_conversation
+        assert self._flux_envoi_message_conversation is not None
+        return _octets_du_flux(*self._flux_envoi_message_conversation)
 
     def televersement_piece_jointe_reussit(self, piece_jointe: PieceJointeCreee) -> None:
         self._piece_jointe_creee = piece_jointe

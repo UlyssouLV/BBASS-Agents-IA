@@ -5,6 +5,8 @@ import pytest
 from docx import Document
 from openpyxl import Workbook
 
+from flux_sse import fin
+
 from vm_centrale.models import PieceJointe
 
 _TYPE_MIME_DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -40,7 +42,7 @@ def _creer_conversation(client, mistral_client_factice, jeton: str, message: str
     reponse = client.post(
         "/conversations", json={"message": message}, headers=_autorisation(jeton)
     )
-    return reponse.json()["conversation"]["id"]
+    return fin(reponse)["conversation"]["id"]
 
 
 def _jeton_admin(client, seed_compte, identifiant: str = "a.martin") -> str:

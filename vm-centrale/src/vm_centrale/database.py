@@ -1,4 +1,5 @@
-from collections.abc import Generator
+from collections.abc import Callable, Generator, Iterator
+from contextlib import AbstractContextManager, contextmanager
 
 from sqlalchemy import Engine, create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
@@ -40,3 +41,21 @@ def get_db() -> Generator[Session, None, None]:
         yield db
     finally:
         db.close()
+
+
+FabriqueSession = Callable[[], AbstractContextManager[Session]]
+
+
+@contextmanager
+def _session_du_tour() -> Iterator[Session]:
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+def get_fabrique_session() -> FabriqueSession:
+    # Le tour d'un envoi de message (ADR-0016) survit à la requête : il ouvre
+    # et ferme sa propre session, jamais celle de get_db.
+    return _session_du_tour

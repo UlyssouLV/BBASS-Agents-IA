@@ -1,3 +1,5 @@
+from collections.abc import Iterator
+from typing import NoReturn
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
@@ -119,22 +121,6 @@ class CompteCree(CompteAdmin):
 
 
 @dataclass
-class ConversationResume:
-    id: int
-    titre: str
-
-
-@dataclass
-class ConversationCree:
-    conversation: ConversationResume
-    reponse: str
-    # Jauge de contexte (spec 1.4.2), relayée telle quelle : voir
-    # vm_centrale.schemas.MessageEnvoyeResponse.
-    tokens_contexte: int | None
-    fenetre_contexte: int
-
-
-@dataclass
 class Conversation:
     id: int
     titre: str
@@ -147,16 +133,9 @@ class Message:
     role: str
     contenu: str
     date_creation: datetime
-    # Voir ConversationCree.tokens_contexte ; null pour un message `user` ou
-    # d'avant la 1.4.2.
-    tokens_contexte: int | None
-    fenetre_contexte: int
-
-
-@dataclass
-class MessageEnvoye:
-    reponse: str
-    # Voir ConversationCree.tokens_contexte.
+    # Jauge de contexte (spec 1.4.2), relayée telle quelle : voir
+    # vm_centrale.schemas.MessageEnvoyeResponse ; null pour un message
+    # `user` ou d'avant la 1.4.2.
     tokens_contexte: int | None
     fenetre_contexte: int
 
@@ -484,6 +463,43 @@ def _lever_si_echange_introuvable(reponse: httpx.Response) -> None:
         raise EchangeIntrouvableError()
 
 
+def _ouvrir_flux_du_tour(url: str, corps: dict, jeton: str) -> Iterator[bytes]:
+    # Envoi d'un message (spec 1.4.4, ADR-0016) : la VM répond un flux
+    # `text/event-stream`, relayé octet par octet. Les refus d'avant le tour
+    # (jeton, conversation, pièce jointe) sont de vrais statuts HTTP, levés
+    # ici avant le premier octet. POSTE_HTTP_TIMEOUT borne l'attente entre
+    # deux lectures du flux.
+    requete = _http_client.build_request("POST", url, json=corps, headers={"Authorization": f"Bearer {jeton}"})
+    reponse = _http_client.send(requete, stream=True)
+    try:
+        if not reponse.is_success:
+            reponse.read()
+            _lever_si_jeton_invalide(reponse)
+            _lever_si_erreur_piece_jointe(reponse)
+            reponse.raise_for_status()
+    except Exception:
+        reponse.close()
+        raise
+    return _octets_du_flux(reponse)
+
+
+def lever_erreur_du_tour(status: int, detail: object) -> NoReturn:
+    # Événement `erreur` du flux (une HTTPException levée pendant le tour,
+    # ADR-0016) : la même exception qu'un refus d'avant le flux, pour que le
+    # poste la traduise de la même façon.
+    reponse = httpx.Response(status, json={"detail": detail})
+    _lever_si_jeton_invalide(reponse)
+    _lever_si_erreur_piece_jointe(reponse)
+    raise RuntimeError(f"Erreur {status} de la VM centrale pendant le tour : {detail}")
+
+
+def _octets_du_flux(reponse: httpx.Response) -> Iterator[bytes]:
+    try:
+        yield from reponse.iter_bytes()
+    finally:
+        reponse.close()
+
+
 class VmCentraleClient:
     def authentifier(self, identifiant: str, mot_de_passe: str) -> AuthentificationReussie | None:
         reponse = _http_client.post(
@@ -510,25 +526,11 @@ class VmCentraleClient:
         message: str,
         cle_idempotence: str | None = None,
         piece_jointe_id: int | None = None,
-    ) -> ConversationCree:
-        reponse = _http_client.post(
+    ) -> Iterator[bytes]:
+        return _ouvrir_flux_du_tour(
             f"{VM_CENTRALE_BASE_URL}/conversations",
-            json={
-                "message": message,
-                "cle_idempotence": cle_idempotence,
-                "piece_jointe_id": piece_jointe_id,
-            },
-            headers={"Authorization": f"Bearer {jeton}"},
-        )
-        _lever_si_jeton_invalide(reponse)
-        _lever_si_erreur_piece_jointe(reponse)
-        reponse.raise_for_status()
-        corps = reponse.json()
-        return ConversationCree(
-            conversation=ConversationResume(**corps["conversation"]),
-            reponse=corps["reponse"],
-            tokens_contexte=corps["tokens_contexte"],
-            fenetre_contexte=corps["fenetre_contexte"],
+            {"message": message, "cle_idempotence": cle_idempotence, "piece_jointe_id": piece_jointe_id},
+            jeton,
         )
 
     def lister_conversations(self, jeton: str) -> list[Conversation]:
@@ -602,24 +604,11 @@ class VmCentraleClient:
         message: str,
         cle_idempotence: str | None = None,
         piece_jointe_id: int | None = None,
-    ) -> MessageEnvoye:
-        reponse = _http_client.post(
+    ) -> Iterator[bytes]:
+        return _ouvrir_flux_du_tour(
             f"{VM_CENTRALE_BASE_URL}/conversations/{conversation_id}/messages",
-            json={
-                "message": message,
-                "cle_idempotence": cle_idempotence,
-                "piece_jointe_id": piece_jointe_id,
-            },
-            headers={"Authorization": f"Bearer {jeton}"},
-        )
-        _lever_si_jeton_invalide(reponse)
-        _lever_si_erreur_piece_jointe(reponse)
-        reponse.raise_for_status()
-        corps = reponse.json()
-        return MessageEnvoye(
-            reponse=corps["reponse"],
-            tokens_contexte=corps["tokens_contexte"],
-            fenetre_contexte=corps["fenetre_contexte"],
+            {"message": message, "cle_idempotence": cle_idempotence, "piece_jointe_id": piece_jointe_id},
+            jeton,
         )
 
     def televerser_piece_jointe(

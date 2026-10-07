@@ -1,6 +1,8 @@
 import json
 import re
 
+from flux_sse import fin
+
 from vm_centrale.config import MODELE_CHAT
 from vm_centrale.models import Consommation, EchangeInspecteur, QuestionCouverte, ResultatRechercheWeb
 from vm_centrale.outils.lire_pages_web import CONSIGNE_LECTURE_PAGE, CONSIGNE_REVERIFICATION_PAGE
@@ -39,7 +41,7 @@ def _demander_recherche(mistral_client_factice, requete: str = "loi climat rési
 def _creer_conversation(client, jeton: str, message: str = "Trouve la loi Climat") -> int:
     reponse = client.post("/conversations", json={"message": message}, headers=_autorisation(jeton))
     assert reponse.status_code == 200
-    return reponse.json()["conversation"]["id"]
+    return fin(reponse)["conversation"]["id"]
 
 
 def _envoyer(client, jeton: str, conversation_id: int, message: str):
@@ -143,11 +145,11 @@ def test_une_url_des_resultats_reste_au_tour_meme_et_au_tour_suivant_une_url_inv
     )
 
     assert reponse.status_code == 200
-    texte = reponse.json()["reponse"]
+    texte = fin(reponse)["reponse"]
     assert f"[loi]({_URL_TROUVEE})" in texte
     assert "inventee.example.org" not in texte
 
-    conversation_id = reponse.json()["conversation"]["id"]
+    conversation_id = fin(reponse)["conversation"]["id"]
     mistral_client_factice.repondre(
         f"Le lien était {_URL_TROUVEE} et non {_URL_INVENTEE}",
         resume_et_profil=_reponse_resume_et_profil(),
@@ -155,8 +157,8 @@ def test_une_url_des_resultats_reste_au_tour_meme_et_au_tour_suivant_une_url_inv
     suivante = _envoyer(client, jeton_valide, conversation_id, "Redonne-moi le lien")
 
     assert suivante.status_code == 200
-    assert _URL_TROUVEE in suivante.json()["reponse"]
-    assert "inventee.example.org" not in suivante.json()["reponse"]
+    assert _URL_TROUVEE in fin(suivante)["reponse"]
+    assert "inventee.example.org" not in fin(suivante)["reponse"]
 
 
 def test_moteur_injoignable_reponse_200_et_texte_recherche_indisponible(
@@ -171,7 +173,7 @@ def test_moteur_injoignable_reponse_200_et_texte_recherche_indisponible(
     )
 
     assert reponse.status_code == 200
-    assert reponse.json()["reponse"] == "Je n'ai pas pu chercher."
+    assert fin(reponse)["reponse"] == "Je n'ai pas pu chercher."
     (message_tool,) = _messages_tool(mistral_client_factice.appels_reponse[-2])
     assert "recherche indisponible" in message_tool["content"].lower()
     assert db_session.query(ResultatRechercheWeb).count() == 0
@@ -189,7 +191,7 @@ def test_aucun_resultat_reponse_200_et_texte_aucun_resultat(
     reponse = _envoyer(client, jeton_valide, conversation_id, "Cherche ceci")
 
     assert reponse.status_code == 200
-    assert reponse.json()["reponse"] == "Rien trouvé."
+    assert fin(reponse)["reponse"] == "Rien trouvé."
     (message_tool,) = _messages_tool(mistral_client_factice.appels_reponse[-1])
     assert "aucun résultat" in message_tool["content"].lower()
 
@@ -237,7 +239,7 @@ def test_un_chiffre_dun_extrait_du_moteur_reste_un_chiffre_absent_part_sans_phra
     )
 
     assert reponse.status_code == 200
-    contenu = reponse.json()["reponse"]
+    contenu = fin(reponse)["reponse"]
     assert "305" in contenu
     assert "48" not in contenu
     assert "page ni document" not in contenu
@@ -351,7 +353,7 @@ def test_une_page_en_echec_est_ignoree_et_son_extrait_de_moteur_reste(
     )
 
     assert reponse.status_code == 200
-    conversation_id = reponse.json()["conversation"]["id"]
+    conversation_id = fin(reponse)["conversation"]["id"]
     contenu = _pages_envoyees_a_lextraction(mistral_client_factice)
     assert "Texte de la loi lue." in contenu
     assert "Introuvable" not in contenu and "%PDF" not in contenu
@@ -528,7 +530,7 @@ def test_un_chiffre_present_seulement_dans_le_texte_dune_page_reste_dans_la_repo
     )
 
     assert reponse.status_code == 200
-    contenu = reponse.json()["reponse"]
+    contenu = fin(reponse)["reponse"]
     assert "305" in contenu
     assert "48" not in contenu
 
@@ -603,7 +605,7 @@ def test_un_chiffre_present_seulement_dans_lextrait_est_retire_de_la_reponse(
     )
 
     assert reponse.status_code == 200
-    contenu = reponse.json()["reponse"]
+    contenu = fin(reponse)["reponse"]
     assert "305" in contenu
     assert "48" not in contenu
 
@@ -657,7 +659,7 @@ def test_extraction_en_erreur_reponse_200_et_liste_des_resultats_avec_extraction
     )
 
     assert reponse.status_code == 200
-    assert reponse.json()["reponse"] == "Voici les résultats."
+    assert fin(reponse)["reponse"] == "Voici les résultats."
     (message_tool,) = _messages_tool(mistral_client_factice.appels_reponse[-2])
     contenu = message_tool["content"]
     assert "extraction indisponible" in contenu.lower()
@@ -667,7 +669,7 @@ def test_extraction_en_erreur_reponse_200_et_liste_des_resultats_avec_extraction
 
     monkeypatch.setenv("VM_ADMIN_KEY", "cle-admin-de-test")
     entetes_admin = {**_autorisation(jeton_valide), "X-Admin-Key": "cle-admin-de-test"}
-    conversation_id = reponse.json()["conversation"]["id"]
+    conversation_id = fin(reponse)["conversation"]["id"]
     echanges = client.get(
         f"/inspecteur/conversations/{conversation_id}/echanges", headers=entetes_admin
     ).json()
@@ -717,7 +719,7 @@ def _repondre_apres_recherche_datee(client, mistral_client_factice, moteur_reche
         "/conversations", json={"message": "Trouve le guide MaPrimeRénov'"}, headers=_autorisation(jeton)
     )
     assert resultat.status_code == 200
-    return resultat.json()["reponse"]
+    return fin(resultat)["reponse"]
 
 
 def test_un_lien_markdown_vers_un_resultat_garde_ses_nombres_un_chiffre_hors_source_part(
@@ -782,7 +784,7 @@ def test_une_url_de_resultat_avec_parentheses_reste_entiere_une_url_inventee_ave
     )
 
     assert reponse.status_code == 200
-    assert reponse.json()["reponse"] == f"Voir [Loi]({url}) et {url}. (Source : {url}) Faux : fin"
+    assert fin(reponse)["reponse"] == f"Voir [Loi]({url}) et {url}. (Source : {url}) Faux : fin"
 
 
 # Questions couvertes de l'appel d'extraction (spec 1.4.1, #136) : JSON
@@ -917,7 +919,7 @@ def test_un_json_invalide_rend_lextraction_indisponible_comme_en_1_4_0(
     assert "pas de JSON" not in contenu
     for _, url, extrait in _RESULTATS[:5]:
         assert url in contenu and extrait in contenu
-    assert _questions_couvertes(db_session, reponse.json()["conversation"]["id"]) == []
+    assert _questions_couvertes(db_session, fin(reponse)["conversation"]["id"]) == []
 
 
 def test_supprimer_la_conversation_supprime_ses_questions_couvertes(
@@ -996,7 +998,7 @@ def _reponse_sur_page_de_bornage(
     mistral_client_factice.repondre(reponse, "Titre")
     resultat = client.post("/conversations", json={"message": message}, headers=_autorisation(jeton))
     assert resultat.status_code == 200
-    return resultat.json()["reponse"]
+    return fin(resultat)["reponse"]
 
 
 def test_un_chiffre_garde_venu_dune_page_ajoute_une_ligne_sources_avec_son_lien(
@@ -1135,4 +1137,4 @@ def test_une_page_connue_seulement_par_lextrait_du_moteur_nest_pas_citee(
         "/conversations", json={"message": "Durée d'un bornage ?"}, headers=_autorisation(jeton_valide)
     )
 
-    assert resultat.json()["reponse"] == "Un bornage amiable dure 6 à 12 semaines."
+    assert fin(resultat)["reponse"] == "Un bornage amiable dure 6 à 12 semaines."

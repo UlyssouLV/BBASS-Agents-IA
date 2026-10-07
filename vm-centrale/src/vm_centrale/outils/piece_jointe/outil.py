@@ -8,6 +8,7 @@ from vm_centrale.inspecteur import payload_depuis_erreur, reponse_depuis_erreur
 from vm_centrale.models import PieceJointe, QuestionCouverte
 from vm_centrale.outils.base import AppelMistralOutil, ContexteTour, Outil, ResultatOutil
 from vm_centrale.questions_couvertes import REPONSE_MAX
+from vm_centrale.statut_tour import relecture_de
 
 _NOM = "relire_pieces_jointes"
 _PIECE_JOINTE_INTROUVABLE = "Pièce jointe introuvable."
@@ -244,6 +245,7 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
             blocs.append(f"Pièce jointe id {identifiant} : {_PIECE_JOINTE_INTROUVABLE}")
             continue
         if piece_jointe not in relues:
+            contexte.publier(relecture_de(piece_jointe.nom_fichier))
             relues.append(piece_jointe)
         if not besoin:
             blocs.append(

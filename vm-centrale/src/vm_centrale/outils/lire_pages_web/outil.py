@@ -13,6 +13,7 @@ from vm_centrale.models import Message, QuestionCouverte, ResultatRechercheWeb
 from vm_centrale.outils.base import AppelMistralOutil, ContexteTour, Outil, ResultatOutil
 from vm_centrale.outils.recherche_web.outil import PLAFOND_TOKENS_PAGES, REGLE_PORTEE, lire_pages
 from vm_centrale.questions_couvertes import REPONSE_MAX
+from vm_centrale.statut_tour import lecture_de
 
 _NOM = "lire_pages_web"
 _PAGE_INTROUVABLE = "Page introuvable."
@@ -581,6 +582,11 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
     urls_du_compte = _urls_du_compte(contexte)
     cibles = [_url_de_la_conversation(url, resultats, urls_du_compte) for url in urls]
     connues = [url for url in cibles if url is not None]
+    # Un statut par page de la conversation (#165), une fois par URL, avant
+    # la lecture (base, cache ou téléchargement) ; une URL inconnue n'est
+    # pas lue.
+    for url in {normaliser_url(url): url for url in connues}.values():
+        contexte.publier(lecture_de(url))
     retelecharger = arguments.get("retelecharger") is True
     forcees = _relire_de_force(connues, resultats, besoin, contexte) if retelecharger else _RelecturesForcees()
     relectures = forcees.relectures

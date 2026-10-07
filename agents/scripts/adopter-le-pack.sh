@@ -32,10 +32,10 @@ mkdir -p "$TARGET/agents"
 rsync -a --exclude .DS_Store --exclude __pycache__ "$PACK/agents/" "$TARGET/agents/"
 echo "copié  agents/"
 
-if [ ! -f "$TARGET/docs/dev/feuille-de-route-dev.md" ]; then
-  mkdir -p "$TARGET/docs/dev"
-  printf '%s\n' '# Feuille de route de dev' > "$TARGET/docs/dev/feuille-de-route-dev.md"
-  echo "créé   docs/dev/feuille-de-route-dev.md"
+if [ ! -f "$TARGET/docs/dev/feuille-de-route/feuille-de-route-dev.md" ]; then
+  mkdir -p "$TARGET/docs/dev/feuille-de-route" "$TARGET/docs/dev/recherches"
+  printf '%s\n' '# Feuille de route de dev' > "$TARGET/docs/dev/feuille-de-route/feuille-de-route-dev.md"
+  echo "créé   docs/dev/feuille-de-route/feuille-de-route-dev.md"
 fi
 mkdir -p "$TARGET/docs/specs" "$TARGET/docs/adr"
 if [ ! -f "$TARGET/CONTEXT.md" ]; then

@@ -162,9 +162,9 @@ Fixes #13
 
 **Options :** aucune.
 
-**Corps :** titre + ce que le ticket livre ; `#parent` si besoin ; éventuellement `Blocked by #n`.
+**Corps :** titre + ce que le ticket livre (critères d’acceptation) ; `#parent` si besoin ; éventuellement `Blocked by #n`.
 
-Crée **un** enfant GitHub (`Part of`, sub-issue, parent bloqué par l’enfant). Avant : le ticket tient dans `docs/specs/vX.Y.Z-*.md`. Après : le corps de l’issue parente GitHub = ce fichier ; si une PR ouverte cite déjà le parent, ajoute les `Fixes #n` manquants. Pas de nouvelle PR. Équivalent : « crée un ticket ». Skill `creer-ticket`.
+Crée **un** enfant GitHub (`Part of`, sub-issue, parent bloqué par l’enfant). Corps au format Matt `/to-tickets` : `## What to build` / `## Acceptance criteria` / `## Blocked by` (`agents/issue-tracker.md`). Avant : le ticket tient dans `docs/specs/vX.Y.Z-*.md`. Après : le corps de l’issue parente GitHub = ce fichier ; si une PR ouverte cite déjà le parent, ajoute les `Fixes #n` manquants. Pas de nouvelle PR. Équivalent : « crée un ticket ». Skill `creer-ticket`.
 
 **Exemple :**
 
@@ -173,6 +173,31 @@ Crée **un** enfant GitHub (`Part of`, sub-issue, parent bloqué par l’enfant)
 Titre : garde-fou chiffres manquants après reverse
 Le reverse d’un message avec chiffres doit rejouer le garde-fou avant envoi.
 Blocked by #40
+```
+
+### Créer un bug
+
+**Commande :** `/cub`
+
+**Options :** aucune.
+
+**Corps :** titre court + constat, reproductibilité, impact, cause probable, à corriger ; métadonnées (version trouvée, contexte, date, priorité). Hors périmètre optionnel.
+
+Crée **une** issue GitHub (`Bug — …`, label `bug`, corps à titres fixes) et l’entrée sous **Plus tard** de la feuille de route (`docs/dev/feuille-de-route/`). Standards : `docs/dev/feuille-de-route/README.md` (jeton `Informations manquantes` si une case manque → bug **incomplet**). Pas de commit. Pas de promo en Prochaine/Ensuite (`/afr`). Équivalents : « crée un bug », « ajoute un bug », « documente un bug ». Skill `creer-un-bug`.
+
+**Exemple :**
+
+```
+/cub
+Titre : bascule de conversation pendant qu’une réponse est en cours
+Constat : le fil affiché ne suit pas la sidebar…
+Reproductibilité : envoyer un message, cliquer une autre conversation
+Impact : mauvais fil affiché
+Cause probable : état React non synchronisé avec la sélection
+À corriger : synchroniser le fil même si une requête est en vol
+Trouvé dans : 1.4.3
+Contexte : test humain
+Priorité : avant déploiement postes
 ```
 
 ### Créer une release

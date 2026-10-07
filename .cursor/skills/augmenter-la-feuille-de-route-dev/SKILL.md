@@ -16,35 +16,55 @@ Git commit goes through **`commit`** (`/c`) only if the user asked to commit thi
 
 Paths: **`agents/roles.yml`**. Role **`roadmap`** is the **feuille de route de dev** (not a product marketing plan).
 
-## Format
+**Writing standards (source of truth)** — read and follow **`docs/dev/feuille-de-route/README.md`** before arguing or writing: sections, version body, bugs, recherches. Do not invent a parallel format.
 
-One job per version, product language:
+## Format (summary — details in the README)
 
 ```markdown
 # Feuille de route de dev
 
-## X.Y.Z — <titre, un job>
+## Déjà livré
+- **X.Y.Z** — titre : résumé…
 
-Un court paragraphe, un seul job.
+## Prochaine : X.Y.Z — <titre>
+Objectif. …
+Hors périmètre …
 
-## Plus tard — <titre>
+## Ensuite : X.Y.Z — <titre>
+Objectif. …
+Hors périmètre …
 
-Idée reportée, pas encore de semver.
+## Plus tard (pas encore numéroté)
+
+### Bug — <titre> (#n)
+Constat …
+À corriger …
+Suivi …
 ```
 
-An intro under the H1 is allowed (constraints that apply to several versions). Headings that `ouvrir-la-version` can find are **`## X.Y.Z — …`**. An existing H1 `# Feuille de route` is the same file; leave it or normalize to **`# Feuille de route de dev`** when writing.
+Rules when **creating or rewriting a version** (Prochaine / Ensuite):
+
+- Semver produit `X.Y.Z`. Heading: `## Prochaine : X.Y.Z — <titre>` or `## Ensuite : X.Y.Z — <titre>`.
+- Exactement **une** **Prochaine**. Other numbered upcoming versions = **Ensuite** (ordered).
+- **One job** per version (product language).
+- Body: **`Objectif.`** (what the collaborator gains) + **`Hors périmètre`** (explicitly deferred). Optional auth / technique / recherche / tests — no spec-level implementation detail.
+- Deferred idea **without** a number → under **`## Plus tard (pas encore numéroté)`** as `### …`, **not** a fake semver and **not** `## Plus tard — …`.
+- Bugs: prefer **`/cub`** to create (issue + feuille). Format under **Plus tard**: README (*Bugs*). When the user schedules a bug into a version: **delete** the whole `### Bug — … (#n)` block from **Plus tard** and fold the fix into that version’s **Objectif** (Prochaine / Ensuite). Do **not** leave a duplicate under Plus tard. Do **not** `gh issue close` here — closing is **`finaliser-la-version`** after ship (`Fixes #<n>` on the PR).
+- Research notes live in **`docs/dev/recherches/`**, not in the roadmap file.
+
+An intro under the H1 is allowed.
 
 ## 1. Read
 
 Read role **`roadmap`**.
 
-List every **`X.Y.Z`** (title + job) and every **`Plus tard`**. Title-only / empty file → say the feuille de route de dev has no versions yet.
+List every **`X.Y.Z`** (title + job) under Déjà livré / Prochaine / Ensuite, and every **Plus tard** entry (bugs vs idées). Title-only / empty file → say the feuille de route de dev has no versions yet.
 
 Done when that inventory matches the file.
 
 ## 2. Argue, then wait
 
-In French: order, jobs that cover more than one job, missing versions, format drift. Propose concrete edits (add / rewrite / reorder). **Wait.**
+In French: order, jobs that cover more than one job, missing versions, format drift vs **`docs/dev/feuille-de-route/README.md`**. Propose concrete edits (add / rewrite / reorder). **Wait.**
 
 Write nothing in this step.
 
@@ -52,9 +72,9 @@ Write nothing in this step.
 
 When they confirm or name versions to add / change / move:
 
-- Write **only** those edits, in the **Format** above.
+- Write **only** those edits, in the **Format** above (and the README).
 - Keep versions they did not mention.
-- Semver = `X.Y.Z`. A deferred idea without a number → **`## Plus tard — …`**.
+- Preserve exactly one **Prochaine** after the edit (promote / demote **Ensuite** as needed).
 
 Done when the file matches what they asked, or when they said to leave it as is.
 
@@ -62,5 +82,6 @@ Done when the file matches what they asked, or when they said to leave it as is.
 
 - Open a version (branch, spec, tickets, PR) → `ouvrir-la-version`
 - Ship a version → `finaliser-la-version`
+- Create a bug (issue + Plus tard) → `creer-un-bug` (`/cub`)
 - Commit / push → `commit` (`/c`)
 - Child TDD → `/implement` + `encadrer-implement`

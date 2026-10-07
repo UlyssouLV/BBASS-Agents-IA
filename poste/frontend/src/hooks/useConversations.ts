@@ -1,11 +1,12 @@
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { appelApi, ErreurApi } from "@/lib/api";
+import { appelApi, appelApiEnFlux, ErreurApi } from "@/lib/api";
 import { marquerSessionExpiree } from "@/hooks/useSession";
 
 // Mêmes formes que poste.schemas (conversations.py) : voir
 // ConversationResponse, ConversationDetailResponse, MessageResponse,
-// PieceJointeResumeResponse, ConversationCreeResponse, MessageEnvoyeResponse.
+// PieceJointeResumeResponse ; et vm_centrale.schemas ConversationCreeResponse,
+// MessageEnvoyeResponse pour l'événement `fin` du flux d'un envoi (spec 1.4.4).
 export interface Conversation {
   id: number;
   titre: string;
@@ -154,22 +155,26 @@ interface CreerConversationVariables {
   message: string;
   fichier: File | null;
   cleIdempotence: string;
+  // Statut du tour (spec 1.4.4) : l'étape en cours, publiée par la VM.
+  onStatut: (libelle: string) => void;
 }
 
 async function creerConversation({
   message,
   fichier,
   cleIdempotence,
+  onStatut,
 }: CreerConversationVariables): Promise<ConversationCreee> {
   const piece = fichier ? await _envoyerPieceJointeAvecCache("/pieces-jointes", fichier) : null;
 
-  const cree = await appelApi<ConversationCreeeReponse>(
+  const cree = await appelApiEnFlux<ConversationCreeeReponse>(
     "/conversations",
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message, cle_idempotence: cleIdempotence, piece_jointe_id: piece?.id ?? null }),
     },
+    onStatut,
     _MSG_ERREUR_RESEAU_CONVERSATIONS,
     "La création de la conversation a échoué. Réessayez plus tard."
   );
@@ -186,6 +191,8 @@ interface EnvoyerMessageVariables {
   message: string;
   fichier: File | null;
   cleIdempotence: string;
+  // Voir CreerConversationVariables.onStatut.
+  onStatut: (libelle: string) => void;
 }
 
 async function envoyerMessage({
@@ -193,18 +200,20 @@ async function envoyerMessage({
   message,
   fichier,
   cleIdempotence,
+  onStatut,
 }: EnvoyerMessageVariables): Promise<MessageEnvoye> {
   const piece = fichier
     ? await _envoyerPieceJointeAvecCache(`/conversations/${conversationId}/pieces-jointes`, fichier)
     : null;
 
-  const envoi = await appelApi<MessageEnvoyeReponse>(
+  const envoi = await appelApiEnFlux<MessageEnvoyeReponse>(
     `/conversations/${conversationId}/messages`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ message, cle_idempotence: cleIdempotence, piece_jointe_id: piece?.id ?? null }),
     },
+    onStatut,
     _MSG_ERREUR_RESEAU_CONVERSATIONS,
     "L'envoi du message a échoué. Réessayez plus tard."
   );

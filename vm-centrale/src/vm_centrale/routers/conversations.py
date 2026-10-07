@@ -9,14 +9,22 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from vm_centrale.analyse_pieces_jointes import TYPES_SUPPORTES, analyser, type_appel_mistral
 from vm_centrale.autorisation import get_identifiant_compte_du_jeton
 from vm_centrale.concurrence import cache_idempotence, verrous_comptes
-from vm_centrale.config import FICHES_MODELES, MODELE_CHAT, MODELE_OCR, PIECES_JOINTES_DIR
+from vm_centrale.config import (
+    FICHES_MODELES,
+    INTERVALLE_STATUT_ATTENTE_SECONDES,
+    MODELE_CHAT,
+    MODELE_OCR,
+    PIECES_JOINTES_DIR,
+)
 from vm_centrale.consommation import enregistrer_consommation
-from vm_centrale.database import get_db
+from vm_centrale.database import FabriqueSession, get_db, get_fabrique_session
 from vm_centrale.garde_fous import (
     PageSource,
     ajouter_sources,
@@ -59,6 +67,15 @@ from vm_centrale.questions_couvertes import (
     enregistrer_questions_piece_jointe,
 )
 from vm_centrale.outils import AppelMistralOutil, ContexteTour, executer_appel, outils_du_tour
+from vm_centrale.statut_tour import (
+    ATTENTE,
+    REFLEXION,
+    TITRAGE,
+    VERIFICATION,
+    Publier,
+    flux_de_la_fin,
+    lancer_tour,
+)
 from vm_centrale.schemas import (
     ConversationCreeRequest,
     ConversationCreeResponse,
@@ -528,6 +545,7 @@ def _reponse_visible(
     reponse: str,
     piece_jointe: PieceJointe | None,
     pages_trop_longues: list[str],
+    publier: Publier,
 ) -> str:
     # Ligne garde_fous de l'inspecteur à chaque réponse de chat (spec 1.4.0,
     # décision 15), même sans retrait : sans elle, on ne voit pas pourquoi la
@@ -536,6 +554,7 @@ def _reponse_visible(
     # garde-fous URL et chiffres : ajoutées par le code, elles ne sont jamais
     # contrôlées comme un texte du modèle, et seuls les chiffres gardés sont
     # cités.
+    publier(VERIFICATION)
     visible = _appliquer_garde_fous(db, conversation_id, nouveau_message, reponse, piece_jointe)
     visible = ajouter_sources(
         visible,
@@ -673,7 +692,7 @@ def _recuperer_conversation_du_compte(
 
 
 def _recuperer_piece_jointe_du_compte(
-    db: Session, identifiant_compte: str, piece_jointe_id: int, conversation_id: int
+    db: Session, identifiant_compte: str, piece_jointe_id: int, conversation_id: int | None
 ) -> PieceJointe:
     piece_jointe = db.get(PieceJointe, piece_jointe_id)
     if (
@@ -682,6 +701,8 @@ def _recuperer_piece_jointe_du_compte(
         # None (pas encore rattachée) accepté ; rattachée à une AUTRE
         # conversation refusé — jamais 403, même confidentialité que
         # _recuperer_conversation_du_compte, y compris pour un jeton admin.
+        # conversation_id None : conversation pas encore créée, tout
+        # rattachement est à une autre.
         or (piece_jointe.conversation_id is not None and piece_jointe.conversation_id != conversation_id)
     ):
         raise HTTPException(status_code=404, detail=_PIECE_JOINTE_INTROUVABLE)
@@ -748,10 +769,12 @@ def _vers_resume(conversation: Conversation) -> ConversationResponse:
 
 @router.post(
     "/conversations",
+    response_class=StreamingResponse,
     responses={
+        200: {"content": {"text/event-stream": {}}},
         404: {"description": _PIECE_JOINTE_INTROUVABLE},
         400: {"description": _PIECE_JOINTE_DEJA_LIEE},
-        502: {"description": _ECHEC_RELAIS},
+        502: {"description": f"{_ECHEC_RELAIS} (événement `erreur` du flux)"},
     },
 )
 def creer_conversation(
@@ -760,164 +783,254 @@ def creer_conversation(
     client: MistralClient = Depends(get_mistral_client),
     moteur_recherche: MoteurRecherche = Depends(get_moteur_recherche),
     telechargeur_pages: TelechargeurPages = Depends(get_telechargeur_pages),
-    db: Session = Depends(get_db),
-) -> ConversationCreeResponse:
-    with verrous_comptes.pour(identifiant_compte):
-        if requete.cle_idempotence is not None:
-            reponse_en_cache = cache_idempotence.recuperer(identifiant_compte, requete.cle_idempotence)
-            if reponse_en_cache is not None:
-                assert isinstance(reponse_en_cache, ConversationCreeResponse)
-                return reponse_en_cache
+    fabrique_session: FabriqueSession = Depends(get_fabrique_session),
+) -> StreamingResponse:
+    reponse_en_cache = _reponse_en_cache(identifiant_compte, requete.cle_idempotence)
+    if reponse_en_cache is not None:
+        return flux_de_la_fin(reponse_en_cache)
+    # Vrai statut HTTP avant le flux (ADR-0016) : la conversation n'existe
+    # pas encore, une pièce jointe déjà rattachée l'est donc à une autre.
+    # Dans une session courte, pas celle de get_db : FastAPI ne ferme cette
+    # dernière qu'une fois la réponse en flux terminée, elle garderait sa
+    # connexion du pool pendant tout le tour.
+    if requete.piece_jointe_id is not None:
+        with fabrique_session() as db:
+            _recuperer_piece_jointe_du_compte(db, identifiant_compte, requete.piece_jointe_id, None)
 
-        maintenant = datetime.now(timezone.utc)
-        conversation = Conversation(
-            identifiant_compte=identifiant_compte,
-            titre="",
-            resume_contexte="",
-            date_creation=maintenant,
-            date_derniere_activite=maintenant,
-        )
-        db.add(conversation)
-        # Flush (jamais commit) pour obtenir conversation.id : une pièce
-        # jointe téléversée avant que la conversation n'existe (POST
-        # /pieces-jointes) ne peut être rattachée qu'une fois cet id connu
-        # (spec 1.1.2, référencement dès le premier message). Un rollback
-        # explicite plus bas annule cette écriture si l'appel Mistral échoue
-        # — pas de conversation fantôme persistée (même garantie qu'avant).
-        db.flush()
-
-        piece_jointe: PieceJointe | None = None
-        if requete.piece_jointe_id is not None:
-            piece_jointe = _recuperer_piece_jointe_du_compte(
-                db, identifiant_compte, requete.piece_jointe_id, conversation.id
-            )
-        piece_jointe_id = piece_jointe.id if piece_jointe is not None else None
-
-        # Même builder qu'envoyer_message ci-dessous : ce chemin couvre le
-        # tout premier message d'une conversation (jamais de résumé glissant
-        # ni d'historique à ce stade), l'autre chemin menant au même appel de
-        # chat principal (spec 1.2.2).
-        message_pour_mistral = _construire_messages_pour_mistral(
-            "",
-            [],
-            requete.message,
-            "",
-            piece_jointe,
-            _memoire_de_la_conversation(db, conversation.id, requete.message),
+    def tour(db_tour: Session, publier: Publier) -> ConversationCreeResponse:
+        return _tour_creer_conversation(
+            db_tour, publier, requete, identifiant_compte, client, moteur_recherche, telechargeur_pages
         )
 
-        # Les deux appels Mistral (réponse, puis titrage) sont faits avant
-        # toute autre écriture en base : en cas d'échec de l'un ou l'autre,
-        # rollback (annule aussi la conversation flushée ci-dessus) — aucune
-        # conversation fantôme n'est persistée. Essayés séparément (plutôt
-        # qu'un seul try englobant les deux, comme avant la spec 1.3.0) pour
-        # savoir lequel des deux a échoué et l'enregistrer comme tel dans
-        # l'inspecteur ; conversation_id=None pour ces deux échecs (la
-        # conversation flushée plus haut n'existe plus en base une fois le
-        # rollback fait, aucune ligne ne peut la référencer par FK).
-        # piece_jointe_id=None aussi : la pièce jointe peut être rattachée
-        # plus tard à une autre conversation puis supprimée avec elle
-        # (supprimer_conversation), ce qui laisserait cette ligne sans
-        # conversation pointer vers une pièce jointe disparue.
-        # Outils sur l'appel principal dès le premier message (spec 1.4.0) :
-        # aucune pièce jointe d'un tour précédent ici, seul rechercher_web
-        # est éligible.
-        contexte_outils = ContexteTour(
-            db=db,
-            conversation_id=conversation.id,
-            moteur_recherche=moteur_recherche,
-            telechargeur_pages=telechargeur_pages,
-            client_mistral=client,
-            message_du_tour=requete.message,
-        )
-        tools = outils_du_tour(contexte_outils)
-        attendre_questions = _lancer_questions_piece_jointe(client, piece_jointe, requete.message)
-        reponse_chat = _resoudre_reponse_chat(
-            lambda: _appeler_reponse_chat(client, message_pour_mistral, tools),
-            client,
-            message_pour_mistral,
-            tools,
-            contexte_outils,
-            identifiant_compte,
-            piece_jointe_id,
-            conversation_persistee=False,
-        )
+    return _flux_du_tour(identifiant_compte, None, requete.cle_idempotence, fabrique_session, tour)
 
-        reponse = _reponse_visible(
-            db,
-            identifiant_compte,
-            conversation.id,
-            requete.message,
-            reponse_chat.contenu,
-            piece_jointe,
-            list(contexte_outils.pages_trop_longues.values()),
-        )
 
+def _reponse_en_cache(identifiant_compte: str, cle_idempotence: str | None) -> BaseModel | None:
+    if cle_idempotence is None:
+        return None
+    reponse = cache_idempotence.recuperer(identifiant_compte, cle_idempotence)
+    assert reponse is None or isinstance(reponse, BaseModel)
+    return reponse
+
+
+# Tour qui tient le verrou de chaque compte : (conversation, clé
+# d'idempotence), conversation à None pour une conversation en création.
+_tours_en_cours: dict[str, tuple[int | None, str | None]] = {}
+
+
+def _statut_d_attente(
+    identifiant_compte: str, conversation_id: int | None, cle_idempotence: str | None
+) -> str:
+    # ATTENTE n'annonce que l'autre conversation : un rejeu de la même clé,
+    # ou un second envoi dans la même conversation (deux onglets), attend
+    # la réponse qu'il affiche déjà.
+    en_cours = _tours_en_cours.get(identifiant_compte)
+    if en_cours is not None:
+        conversation_en_cours, cle_en_cours = en_cours
+        if (cle_idempotence is not None and cle_idempotence == cle_en_cours) or (
+            conversation_id is not None and conversation_id == conversation_en_cours
+        ):
+            return REFLEXION
+    return ATTENTE
+
+
+def _flux_du_tour(
+    identifiant_compte: str,
+    conversation_id: int | None,
+    cle_idempotence: str | None,
+    fabrique_session: FabriqueSession,
+    tour: Callable[[Session, Publier], BaseModel],
+) -> StreamingResponse:
+    # Le tour, verrou par compte compris, s'exécute à part avec sa propre
+    # session (ADR-0016) : il termine et commite même si personne ne lit
+    # plus le flux. Clé relue sous le verrou : une requête rejouée pendant
+    # le premier tour l'attend, puis ne renvoie que sa fin. Verrou déjà pris
+    # (un tour du même compte) : le statut l'annonce, republié pendant
+    # l'attente pour que le flux ne reste pas muet.
+    def executer(publier: Publier) -> BaseModel:
+        verrou = verrous_comptes.pour(identifiant_compte)
+        if not verrou.acquire(blocking=False):
+            statut = _statut_d_attente(identifiant_compte, conversation_id, cle_idempotence)
+            publier(statut)
+            while not verrou.acquire(timeout=INTERVALLE_STATUT_ATTENTE_SECONDES):
+                publier(statut)
+        _tours_en_cours[identifiant_compte] = (conversation_id, cle_idempotence)
         try:
-            reponse_titrage = client.chat(_prompt_titrage(requete.message, reponse))
-        except Exception as erreur:
-            db.rollback()
-            enregistrer_echange_echec(
-                db,
-                identifiant_compte=identifiant_compte,
-                conversation_id=None,
-                piece_jointe_id=None,
-                type_appel="titrage",
-                modele=MODELE_CHAT,
-                requete_payload=payload_depuis_erreur(erreur),
-                erreur=str(erreur),
-            )
-            logger.exception(_MSG_ECHEC_RELAIS_LOG)
-            raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
+            reponse_en_cache = _reponse_en_cache(identifiant_compte, cle_idempotence)
+            if reponse_en_cache is not None:
+                return reponse_en_cache
+            with fabrique_session() as db:
+                resultat = tour(db, publier)
+            if cle_idempotence is not None:
+                cache_idempotence.enregistrer(identifiant_compte, cle_idempotence, resultat)
+            return resultat
+        finally:
+            del _tours_en_cours[identifiant_compte]
+            verrou.release()
 
-        titre = nettoyer_titre(reponse_titrage.contenu)
+    return lancer_tour(executer)
 
-        conversation.titre = titre
-        enregistrer_consommation(
-            db, identifiant_compte, conversation.id, "titrage", MODELE_CHAT, usage=reponse_titrage.usage
+
+def _tour_creer_conversation(
+    db: Session,
+    publier: Publier,
+    requete: ConversationCreeRequest,
+    identifiant_compte: str,
+    client: MistralClient,
+    moteur_recherche: MoteurRecherche,
+    telechargeur_pages: TelechargeurPages,
+) -> ConversationCreeResponse:
+    maintenant = datetime.now(timezone.utc)
+    conversation = Conversation(
+        identifiant_compte=identifiant_compte,
+        titre="",
+        resume_contexte="",
+        date_creation=maintenant,
+        date_derniere_activite=maintenant,
+    )
+    db.add(conversation)
+    # Flush (jamais commit) pour obtenir conversation.id : une pièce
+    # jointe téléversée avant que la conversation n'existe (POST
+    # /pieces-jointes) ne peut être rattachée qu'une fois cet id connu
+    # (spec 1.1.2, référencement dès le premier message). Un rollback
+    # explicite plus bas annule cette écriture si l'appel Mistral échoue
+    # — pas de conversation fantôme persistée (même garantie qu'avant).
+    db.flush()
+
+    # Revalidée dans la session du tour : la route ne l'a vérifiée que pour
+    # répondre un vrai statut HTTP avant le flux.
+    piece_jointe: PieceJointe | None = None
+    if requete.piece_jointe_id is not None:
+        piece_jointe = _recuperer_piece_jointe_du_compte(
+            db, identifiant_compte, requete.piece_jointe_id, conversation.id
         )
-        enregistrer_echange_succes(
+    piece_jointe_id = piece_jointe.id if piece_jointe is not None else None
+
+    # Même builder qu'envoyer_message ci-dessous : ce chemin couvre le
+    # tout premier message d'une conversation (jamais de résumé glissant
+    # ni d'historique à ce stade), l'autre chemin menant au même appel de
+    # chat principal (spec 1.2.2).
+    message_pour_mistral = _construire_messages_pour_mistral(
+        "",
+        [],
+        requete.message,
+        "",
+        piece_jointe,
+        _memoire_de_la_conversation(db, conversation.id, requete.message),
+    )
+
+    # Les deux appels Mistral (réponse, puis titrage) sont faits avant
+    # toute autre écriture en base : en cas d'échec de l'un ou l'autre,
+    # rollback (annule aussi la conversation flushée ci-dessus) — aucune
+    # conversation fantôme n'est persistée. Essayés séparément (plutôt
+    # qu'un seul try englobant les deux, comme avant la spec 1.3.0) pour
+    # savoir lequel des deux a échoué et l'enregistrer comme tel dans
+    # l'inspecteur ; conversation_id=None pour ces deux échecs (la
+    # conversation flushée plus haut n'existe plus en base une fois le
+    # rollback fait, aucune ligne ne peut la référencer par FK).
+    # piece_jointe_id=None aussi : la pièce jointe peut être rattachée
+    # plus tard à une autre conversation puis supprimée avec elle
+    # (supprimer_conversation), ce qui laisserait cette ligne sans
+    # conversation pointer vers une pièce jointe disparue.
+    # Outils sur l'appel principal dès le premier message (spec 1.4.0) :
+    # aucune pièce jointe d'un tour précédent ici, seul rechercher_web
+    # est éligible.
+    contexte_outils = ContexteTour(
+        db=db,
+        conversation_id=conversation.id,
+        moteur_recherche=moteur_recherche,
+        telechargeur_pages=telechargeur_pages,
+        client_mistral=client,
+        message_du_tour=requete.message,
+        publier=publier,
+    )
+    tools = outils_du_tour(contexte_outils)
+    attendre_questions = _lancer_questions_piece_jointe(client, piece_jointe, requete.message)
+    reponse_chat = _resoudre_reponse_chat(
+        lambda: _appeler_reponse_chat(client, message_pour_mistral, tools),
+        client,
+        message_pour_mistral,
+        tools,
+        contexte_outils,
+        identifiant_compte,
+        piece_jointe_id,
+        conversation_persistee=False,
+    )
+
+    reponse = _reponse_visible(
+        db,
+        identifiant_compte,
+        conversation.id,
+        requete.message,
+        reponse_chat.contenu,
+        piece_jointe,
+        list(contexte_outils.pages_trop_longues.values()),
+        publier,
+    )
+
+    publier(TITRAGE)
+    try:
+        reponse_titrage = client.chat(_prompt_titrage(requete.message, reponse))
+    except Exception as erreur:
+        db.rollback()
+        enregistrer_echange_echec(
             db,
             identifiant_compte=identifiant_compte,
-            conversation_id=conversation.id,
+            conversation_id=None,
             piece_jointe_id=None,
             type_appel="titrage",
             modele=MODELE_CHAT,
-            requete_payload=reponse_titrage.payload_envoye,
-            reponse_payload=reponse_titrage.reponse_brute,
+            requete_payload=payload_depuis_erreur(erreur),
+            erreur=str(erreur),
         )
-        _enregistrer_questions_du_tour(db, attendre_questions, identifiant_compte, conversation.id, piece_jointe)
+        logger.exception(_MSG_ECHEC_RELAIS_LOG)
+        raise HTTPException(status_code=502, detail=_ECHEC_RELAIS) from erreur
 
-        message_utilisateur = Message(
-            conversation_id=conversation.id,
-            role="user",
-            contenu=requete.message,
-            date_creation=maintenant,
-        )
-        message_assistant = Message(
-            conversation_id=conversation.id,
-            role="assistant",
-            contenu=reponse,
-            tokens_contexte=reponse_chat.usage.tokens_entree,
-            date_creation=maintenant,
-        )
-        db.add_all([message_utilisateur, message_assistant])
-        _rattacher_recherches_au_message(db, message_assistant)
-        if piece_jointe is not None:
-            _lier_piece_jointe_a_la_conversation(piece_jointe, conversation)
-            piece_jointe.message_id = message_utilisateur.id
-        db.commit()
-        db.refresh(conversation)
+    titre = nettoyer_titre(reponse_titrage.contenu)
 
-        resultat = ConversationCreeResponse(
-            conversation=ConversationResume(id=conversation.id, titre=conversation.titre),
-            reponse=reponse,
-            tokens_contexte=message_assistant.tokens_contexte,
-            fenetre_contexte=_FENETRE_CONTEXTE,
-        )
-        if requete.cle_idempotence is not None:
-            cache_idempotence.enregistrer(identifiant_compte, requete.cle_idempotence, resultat)
-        return resultat
+    conversation.titre = titre
+    enregistrer_consommation(
+        db, identifiant_compte, conversation.id, "titrage", MODELE_CHAT, usage=reponse_titrage.usage
+    )
+    enregistrer_echange_succes(
+        db,
+        identifiant_compte=identifiant_compte,
+        conversation_id=conversation.id,
+        piece_jointe_id=None,
+        type_appel="titrage",
+        modele=MODELE_CHAT,
+        requete_payload=reponse_titrage.payload_envoye,
+        reponse_payload=reponse_titrage.reponse_brute,
+    )
+    _enregistrer_questions_du_tour(db, attendre_questions, identifiant_compte, conversation.id, piece_jointe)
+
+    message_utilisateur = Message(
+        conversation_id=conversation.id,
+        role="user",
+        contenu=requete.message,
+        date_creation=maintenant,
+    )
+    message_assistant = Message(
+        conversation_id=conversation.id,
+        role="assistant",
+        contenu=reponse,
+        tokens_contexte=reponse_chat.usage.tokens_entree,
+        date_creation=maintenant,
+    )
+    db.add_all([message_utilisateur, message_assistant])
+    _rattacher_recherches_au_message(db, message_assistant)
+    if piece_jointe is not None:
+        _lier_piece_jointe_a_la_conversation(piece_jointe, conversation)
+        piece_jointe.message_id = message_utilisateur.id
+    db.commit()
+    db.refresh(conversation)
+
+    return ConversationCreeResponse(
+        conversation=ConversationResume(id=conversation.id, titre=conversation.titre),
+        reponse=reponse,
+        tokens_contexte=message_assistant.tokens_contexte,
+        fenetre_contexte=_FENETRE_CONTEXTE,
+    )
 
 
 @router.get("/conversations")
@@ -1375,6 +1488,7 @@ def _resoudre_reponse_chat(
     messages = list(messages_pour_mistral)
     try:
         for tour in range(1, _TOURS_MAX_PAR_MESSAGE + 1):
+            contexte_outils.publier(REFLEXION)
             try:
                 if tour == 1:
                     reponse = obtenir_reponse()
@@ -1539,10 +1653,12 @@ def _generer_reponse_et_resume(
 
 @router.post(
     "/conversations/{conversation_id}/messages",
+    response_class=StreamingResponse,
     responses={
+        200: {"content": {"text/event-stream": {}}},
         404: {"description": _CONVERSATION_INTROUVABLE},
         400: {"description": _PIECE_JOINTE_INTROUVABLE},
-        502: {"description": _ECHEC_RELAIS},
+        502: {"description": f"{_ECHEC_RELAIS} (événement `erreur` du flux)"},
     },
 )
 def envoyer_message(
@@ -1552,130 +1668,158 @@ def envoyer_message(
     client: MistralClient = Depends(get_mistral_client),
     moteur_recherche: MoteurRecherche = Depends(get_moteur_recherche),
     telechargeur_pages: TelechargeurPages = Depends(get_telechargeur_pages),
-    db: Session = Depends(get_db),
-) -> MessageEnvoyeResponse:
-    with verrous_comptes.pour(identifiant_compte):
-        if requete.cle_idempotence is not None:
-            reponse_en_cache = cache_idempotence.recuperer(identifiant_compte, requete.cle_idempotence)
-            if reponse_en_cache is not None:
-                assert isinstance(reponse_en_cache, MessageEnvoyeResponse)
-                return reponse_en_cache
-
-        conversation = _recuperer_conversation_du_compte(db, conversation_id, identifiant_compte)
-
-        piece_jointe: PieceJointe | None = None
+    fabrique_session: FabriqueSession = Depends(get_fabrique_session),
+) -> StreamingResponse:
+    reponse_en_cache = _reponse_en_cache(identifiant_compte, requete.cle_idempotence)
+    if reponse_en_cache is not None:
+        return flux_de_la_fin(reponse_en_cache)
+    # Vrais statuts HTTP avant le flux (ADR-0016).
+    # Session courte : voir creer_conversation.
+    with fabrique_session() as db:
+        _recuperer_conversation_du_compte(db, conversation_id, identifiant_compte)
         if requete.piece_jointe_id is not None:
-            piece_jointe = _recuperer_piece_jointe_du_compte(
-                db, identifiant_compte, requete.piece_jointe_id, conversation.id
-            )
-        piece_jointe_id = piece_jointe.id if piece_jointe is not None else None
+            _recuperer_piece_jointe_du_compte(db, identifiant_compte, requete.piece_jointe_id, conversation_id)
 
-        derniers_messages = (
-            db.query(Message)
-            .filter(Message.conversation_id == conversation.id)
-            .order_by(Message.id.desc())
-            .limit(_TAILLE_FENETRE_HISTORIQUE)
-            .all()
-        )
-        derniers_messages.reverse()
-
-        # Lus une seule fois, avant les appels Mistral : sous le verrou par
-        # compte ci-dessus, aucune autre requête concurrente sur ce compte ne
-        # peut modifier resume_contexte/ProfilTravail entre cette lecture et
-        # l'écriture plus bas (auparavant une "lost update" possible : deux
-        # requêtes concurrentes pouvaient toutes deux lire l'ancienne valeur
-        # puis écraser l'une des deux mises à jour au commit).
-        profil_actuel = _contenu_profil_actuel(db, identifiant_compte)
-        messages_pour_mistral = _construire_messages_pour_mistral(
-            conversation.resume_contexte,
-            derniers_messages,
-            requete.message,
-            profil_actuel,
-            piece_jointe,
-            _memoire_de_la_conversation(db, conversation.id, requete.message),
-        )
-
-        # Un message sort de la fenêtre des 3 derniers dès que ce tour (2 nouveaux
-        # messages) ne laisse plus la place à tous les messages qui y étaient
-        # jusque-là : tous sauf le plus récent (qui reste dans la fenêtre aux
-        # côtés des 2 nouveaux, cf. spec V1.1.1).
-        messages_sortants = derniers_messages[:-1]
-
-        # Outils déclarés uniquement sur l'appel de réponse de chat principal
-        # ci-dessous, jamais sur celui de résumé+profil (spec 1.1.2).
-        contexte_outils = ContexteTour(
-            db=db,
-            conversation_id=conversation.id,
-            moteur_recherche=moteur_recherche,
-            telechargeur_pages=telechargeur_pages,
-            client_mistral=client,
-            message_du_tour=requete.message,
-        )
-        tools = outils_du_tour(contexte_outils)
-
-        compte = db.query(Compte).filter(Compte.identifiant == identifiant_compte).first()
-
-        attendre_questions = _lancer_questions_piece_jointe(client, piece_jointe, requete.message)
-        reponse_chat, resume_maj, profil_travail = _generer_reponse_et_resume(
+    def tour(db_tour: Session, publier: Publier) -> MessageEnvoyeResponse:
+        return _tour_envoyer_message(
+            db_tour,
+            publier,
+            conversation_id,
+            requete,
+            identifiant_compte,
             client,
-            messages_pour_mistral,
-            tools,
-            contexte_outils,
-            conversation,
-            identifiant_compte,
-            messages_sortants,
-            profil_actuel,
-            compte,
-            piece_jointe_id,
+            moteur_recherche,
+            telechargeur_pages,
         )
 
-        reponse = _reponse_visible(
-            db,
-            identifiant_compte,
-            conversation.id,
-            requete.message,
-            reponse_chat.contenu,
-            piece_jointe,
-            list(contexte_outils.pages_trop_longues.values()),
-        )
-        _enregistrer_questions_du_tour(db, attendre_questions, identifiant_compte, conversation.id, piece_jointe)
+    return _flux_du_tour(identifiant_compte, conversation_id, requete.cle_idempotence, fabrique_session, tour)
 
-        maintenant = datetime.now(timezone.utc)
-        if resume_maj is not None:
-            conversation.resume_contexte = plafonner(resume_maj, _TAILLE_MAX_RESUME_CONTEXTE)
-        if profil_travail and profil_travail.strip():
-            # Remplacé, jamais concaténé (spec 1.3.1) : null ou vide le
-            # laisse intact.
-            profil = _recuperer_ou_creer_profil(db, identifiant_compte)
-            profil.contenu = plafonner(profil_travail.strip(), _TAILLE_MAX_PROFIL_TRAVAIL)
-            profil.date_derniere_maj = maintenant
 
-        message_utilisateur = Message(
-            conversation_id=conversation.id,
-            role="user",
-            contenu=requete.message,
-            date_creation=maintenant,
-        )
-        message_assistant = Message(
-            conversation_id=conversation.id,
-            role="assistant",
-            contenu=reponse,
-            tokens_contexte=reponse_chat.usage.tokens_entree,
-            date_creation=maintenant,
-        )
-        db.add_all([message_utilisateur, message_assistant])
-        _rattacher_recherches_au_message(db, message_assistant)
-        if piece_jointe is not None:
-            _lier_piece_jointe_a_la_conversation(piece_jointe, conversation)
-            piece_jointe.message_id = message_utilisateur.id
-        conversation.date_derniere_activite = maintenant
-        db.commit()
+def _tour_envoyer_message(
+    db: Session,
+    publier: Publier,
+    conversation_id: int,
+    requete: MessageEnvoyeRequest,
+    identifiant_compte: str,
+    client: MistralClient,
+    moteur_recherche: MoteurRecherche,
+    telechargeur_pages: TelechargeurPages,
+) -> MessageEnvoyeResponse:
+    conversation = _recuperer_conversation_du_compte(db, conversation_id, identifiant_compte)
 
-        resultat = MessageEnvoyeResponse(
-            reponse=reponse,
-            tokens_contexte=message_assistant.tokens_contexte,
-            fenetre_contexte=_FENETRE_CONTEXTE,
+    # Revalidées dans la session du tour, comme pour creer_conversation.
+    piece_jointe: PieceJointe | None = None
+    if requete.piece_jointe_id is not None:
+        piece_jointe = _recuperer_piece_jointe_du_compte(
+            db, identifiant_compte, requete.piece_jointe_id, conversation.id
         )
-        if requete.cle_idempotence is not None:
-            cache_idempotence.enregistrer(identifiant_compte, requete.cle_idempotence, resultat)
-        return resultat
+    piece_jointe_id = piece_jointe.id if piece_jointe is not None else None
+
+    derniers_messages = (
+        db.query(Message)
+        .filter(Message.conversation_id == conversation.id)
+        .order_by(Message.id.desc())
+        .limit(_TAILLE_FENETRE_HISTORIQUE)
+        .all()
+    )
+    derniers_messages.reverse()
+
+    # Lus une seule fois, avant les appels Mistral : sous le verrou par
+    # compte ci-dessus, aucune autre requête concurrente sur ce compte ne
+    # peut modifier resume_contexte/ProfilTravail entre cette lecture et
+    # l'écriture plus bas (auparavant une "lost update" possible : deux
+    # requêtes concurrentes pouvaient toutes deux lire l'ancienne valeur
+    # puis écraser l'une des deux mises à jour au commit).
+    profil_actuel = _contenu_profil_actuel(db, identifiant_compte)
+    messages_pour_mistral = _construire_messages_pour_mistral(
+        conversation.resume_contexte,
+        derniers_messages,
+        requete.message,
+        profil_actuel,
+        piece_jointe,
+        _memoire_de_la_conversation(db, conversation.id, requete.message),
+    )
+
+    # Un message sort de la fenêtre des 3 derniers dès que ce tour (2 nouveaux
+    # messages) ne laisse plus la place à tous les messages qui y étaient
+    # jusque-là : tous sauf le plus récent (qui reste dans la fenêtre aux
+    # côtés des 2 nouveaux, cf. spec V1.1.1).
+    messages_sortants = derniers_messages[:-1]
+
+    # Outils déclarés uniquement sur l'appel de réponse de chat principal
+    # ci-dessous, jamais sur celui de résumé+profil (spec 1.1.2).
+    contexte_outils = ContexteTour(
+        db=db,
+        conversation_id=conversation.id,
+        moteur_recherche=moteur_recherche,
+        telechargeur_pages=telechargeur_pages,
+        client_mistral=client,
+        message_du_tour=requete.message,
+        publier=publier,
+    )
+    tools = outils_du_tour(contexte_outils)
+
+    compte = db.query(Compte).filter(Compte.identifiant == identifiant_compte).first()
+
+    attendre_questions = _lancer_questions_piece_jointe(client, piece_jointe, requete.message)
+    reponse_chat, resume_maj, profil_travail = _generer_reponse_et_resume(
+        client,
+        messages_pour_mistral,
+        tools,
+        contexte_outils,
+        conversation,
+        identifiant_compte,
+        messages_sortants,
+        profil_actuel,
+        compte,
+        piece_jointe_id,
+    )
+
+    reponse = _reponse_visible(
+        db,
+        identifiant_compte,
+        conversation.id,
+        requete.message,
+        reponse_chat.contenu,
+        piece_jointe,
+        list(contexte_outils.pages_trop_longues.values()),
+        publier,
+    )
+    _enregistrer_questions_du_tour(db, attendre_questions, identifiant_compte, conversation.id, piece_jointe)
+
+    maintenant = datetime.now(timezone.utc)
+    if resume_maj is not None:
+        conversation.resume_contexte = plafonner(resume_maj, _TAILLE_MAX_RESUME_CONTEXTE)
+    if profil_travail and profil_travail.strip():
+        # Remplacé, jamais concaténé (spec 1.3.1) : null ou vide le
+        # laisse intact.
+        profil = _recuperer_ou_creer_profil(db, identifiant_compte)
+        profil.contenu = plafonner(profil_travail.strip(), _TAILLE_MAX_PROFIL_TRAVAIL)
+        profil.date_derniere_maj = maintenant
+
+    message_utilisateur = Message(
+        conversation_id=conversation.id,
+        role="user",
+        contenu=requete.message,
+        date_creation=maintenant,
+    )
+    message_assistant = Message(
+        conversation_id=conversation.id,
+        role="assistant",
+        contenu=reponse,
+        tokens_contexte=reponse_chat.usage.tokens_entree,
+        date_creation=maintenant,
+    )
+    db.add_all([message_utilisateur, message_assistant])
+    _rattacher_recherches_au_message(db, message_assistant)
+    if piece_jointe is not None:
+        _lier_piece_jointe_a_la_conversation(piece_jointe, conversation)
+        piece_jointe.message_id = message_utilisateur.id
+    conversation.date_derniere_activite = maintenant
+    db.commit()
+
+    return MessageEnvoyeResponse(
+        reponse=reponse,
+        tokens_contexte=message_assistant.tokens_contexte,
+        fenetre_contexte=_FENETRE_CONTEXTE,
+    )

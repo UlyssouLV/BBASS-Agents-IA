@@ -1,14 +1,19 @@
 /**
- * Extrait les prochaines versions de docs/dev/feuille-de-route-dev.md
+ * Extrait les prochaines versions de docs/dev/feuille-de-route/feuille-de-route-dev.md
  * → JSON accueil + pages docs/feuille-de-route/vX.Y.Z.md
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
+import {escapeMdx, escapeYaml} from './echappement.mjs';
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../..');
-const SOURCE = path.join(REPO_ROOT, 'docs/dev/feuille-de-route-dev.md');
+const SOURCE = path.join(
+  REPO_ROOT,
+  'docs/dev/feuille-de-route/feuille-de-route-dev.md',
+);
 const OUT_JSON = path.join(__dirname, '../src/data/feuille-de-route.json');
 const OUT_DIR = path.join(REPO_ROOT, 'docs/feuille-de-route');
 
@@ -41,19 +46,8 @@ function tronquer(texte, max = 180) {
   return `${coupe.slice(0, dernier > 80 ? dernier : max).trim()}…`;
 }
 
-function escapeMdx(text) {
-  return String(text)
-    .replace(/\{/g, '\\{')
-    .replace(/\}/g, '\\}')
-    .replace(/<([A-Za-z/])/g, '\\<$1');
-}
-
-function escapeYaml(value) {
-  return JSON.stringify(String(value ?? ''));
-}
-
 function parserEnsuite(markdown) {
-  const re = /^## Ensuite : (\d+\.\d+(?:\.\d+)?)\s*[—–\-]\s*(.+)$/gm;
+  const re = /^## (?:Prochaine|Ensuite) : (\d+\.\d+(?:\.\d+)?)\s*[—–\-]\s*(.+)$/gm;
   const indices = [];
   let match;
   while ((match = re.exec(markdown)) !== null) {
@@ -96,7 +90,9 @@ function parserPlusTard(markdown) {
   const suite = markdown.slice(debut);
   const fin = suite.search(/\n## [^P]/);
   const bloc = fin > 0 ? suite.slice(0, fin) : suite;
-  return [...bloc.matchAll(/^### (.+)$/gm)].map((m) => m[1].trim());
+  return [...bloc.matchAll(/^### (.+)$/gm)]
+    .map((m) => m[1].trim())
+    .filter((titre) => !/^Bug\s*[—–\-]/.test(titre));
 }
 
 function resetOutDir() {

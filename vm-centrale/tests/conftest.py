@@ -1,5 +1,6 @@
 import json
 import threading
+from contextlib import contextmanager
 
 import pytest
 from fastapi.testclient import TestClient
@@ -7,7 +8,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from vm_centrale.database import Base, get_db
+from vm_centrale.database import Base, get_db, get_fabrique_session
 from vm_centrale.main import app
 from vm_centrale.mistral_client import (
     AppelOutil,
@@ -530,17 +531,53 @@ def telechargeur_pages_factice():
     return TelechargeurPagesFactice()
 
 
+class FabriqueSessionPartagee:
+    # Le tour d'un envoi de message (ADR-0016) s'exécute dans son propre
+    # thread avec sa propre session : ici celle du test, comme get_db, pour
+    # qu'un test relise en base ce que le tour a écrit. Compte les tours
+    # terminés, pour attendre celui dont personne ne lit le flux ; les
+    # vérifications d'avant le flux, sur le thread de la requête, ne
+    # comptent pas.
+    def __init__(self, db) -> None:
+        self._db = db
+        self._tours_termines = threading.Semaphore(0)
+
+    @contextmanager
+    def __call__(self):
+        try:
+            yield self._db
+        finally:
+            if threading.current_thread().name == "tour-de-chat":
+                self._tours_termines.release()
+
+    def attendre_tours(self, nombre: int, delai: float = 5.0) -> bool:
+        return all(self._tours_termines.acquire(timeout=delai) for _ in range(nombre))
+
+
+@pytest.fixture
+def fabrique_session(db_session):
+    return FabriqueSessionPartagee(db_session)
+
+
 @pytest.fixture
 def jeton_store(db_session):
     return JetonStore(db_session)
 
 
 @pytest.fixture
-def client(db_session, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_store):
+def client(
+    db_session,
+    fabrique_session,
+    mistral_client_factice,
+    moteur_recherche_factice,
+    telechargeur_pages_factice,
+    jeton_store,
+):
     def override_get_db():
         yield db_session
 
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_fabrique_session] = lambda: fabrique_session
     app.dependency_overrides[get_mistral_client] = lambda: mistral_client_factice
     app.dependency_overrides[get_moteur_recherche] = lambda: moteur_recherche_factice
     app.dependency_overrides[get_telechargeur_pages] = lambda: telechargeur_pages_factice

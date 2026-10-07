@@ -3,6 +3,8 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
+from flux_sse import fin
+
 from vm_centrale.models import PageWebEnCache, ResultatRechercheWeb
 
 # Cache commun des pages web (spec 1.4.3, ADR-0015, #154) : une page lue
@@ -61,7 +63,7 @@ def _rechercher(client, mistral_client_factice, moteur_recherche_factice, jeton:
     mistral_client_factice.repondre(reponse, "Titre")
     resultat = client.post("/conversations", json={"message": "Trouve la loi Climat"}, headers=_autorisation(jeton))
     assert resultat.status_code == 200
-    return resultat.json()["conversation"]["id"]
+    return fin(resultat)["conversation"]["id"]
 
 
 def _lire_url_du_compte(client, mistral_client_factice, jeton: str) -> int:
@@ -72,7 +74,7 @@ def _lire_url_du_compte(client, mistral_client_factice, jeton: str) -> int:
         "/conversations", json={"message": f"Voici le devis : {_URL_COMPTE}"}, headers=_autorisation(jeton)
     )
     assert resultat.status_code == 200
-    return resultat.json()["conversation"]["id"]
+    return fin(resultat)["conversation"]["id"]
 
 
 def _ligne(db_session, conversation_id: int, url: str = _URL) -> ResultatRechercheWeb:
@@ -275,7 +277,7 @@ def test_le_plafond_de_tokens_sapplique_aux_pages_servies_par_le_cache(
     seconde = client.post("/conversations", json={"message": "Loi"}, headers=_autorisation(jeton_autre_compte))
 
     assert telechargeur_pages_factice.urls_recues == []
-    pages = _trace_outil(client, seconde.json()["conversation"]["id"], jeton_autre_compte, "rechercher_web", monkeypatch)[
+    pages = _trace_outil(client, fin(seconde)["conversation"]["id"], jeton_autre_compte, "rechercher_web", monkeypatch)[
         "pages"
     ]
     assert [page["origine"] for page in pages] == ["cache", "cache", "cache"]
