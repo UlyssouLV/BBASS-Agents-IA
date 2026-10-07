@@ -100,15 +100,13 @@ async function commitsDunePr(owner, repo, number) {
   return Number(pr.commits) || 0;
 }
 
-function blocMarkdown({main, prs, owner, repo}) {
+function blocMarkdown({main, prs}) {
   const badgeMain = `https://img.shields.io/badge/commits_main-${main}-c8102e?style=for-the-badge`;
   const badgePrs = `https://img.shields.io/badge/commits_PR_(historique)-${prs}-1e3a5f?style=for-the-badge`;
-  const activity = `https://img.shields.io/github/commit-activity/y/${owner}/${repo}?style=for-the-badge&color=c8102e&label=activit%C3%A9`;
   return `${START}
 <p align="center">
   <img src="${badgeMain}" alt="${main} commits sur main" />
   <img src="${badgePrs}" alt="${prs} commits dans les PR mergées" />
-  <img src="${activity}" alt="Activité de commits sur un an" />
 </p>
 ${END}`;
 }
@@ -148,7 +146,7 @@ async function main() {
   }
 
   console.log(`[stats] main=${mainCount} · PR mergées=${numeros.length} · commits PR=${prCommits}`);
-  majReadme(blocMarkdown({main: mainCount, prs: prCommits, owner, repo}));
+  majReadme(blocMarkdown({main: mainCount, prs: prCommits}));
 }
 
 main().catch((e) => {

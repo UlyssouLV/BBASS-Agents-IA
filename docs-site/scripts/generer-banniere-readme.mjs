@@ -22,7 +22,7 @@ const html = `<!DOCTYPE html>
   @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@500;700;800&display=swap');
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
-    background: transparent;
+    background: #fff;
     width: 1100px;
     height: 280px;
   }
@@ -34,6 +34,7 @@ const html = `<!DOCTYPE html>
     justify-content: center;
     gap: 2.75rem;
     padding: 1.5rem 2rem;
+    background: #fff;
     font-family: Outfit, system-ui, sans-serif;
   }
   .logo {
@@ -95,7 +96,7 @@ async function main() {
   await page.screenshot({
     path: OUT,
     type: 'png',
-    omitBackground: true,
+    omitBackground: false,
   });
   await browser.close();
   fs.unlinkSync(HTML);

@@ -6,7 +6,6 @@
 <p align="center">
   <img src="https://img.shields.io/badge/commits_main-19-c8102e?style=for-the-badge" alt="19 commits sur main" />
   <img src="https://img.shields.io/badge/commits_PR_(historique)-229-1e3a5f?style=for-the-badge" alt="229 commits dans les PR mergées" />
-  <img src="https://img.shields.io/github/commit-activity/y/UlyssouLV/BBASS-Agents-IA?style=for-the-badge&color=c8102e&label=activit%C3%A9" alt="Activité de commits sur un an" />
 </p>
 <!-- /sync:stats-commits -->
 
