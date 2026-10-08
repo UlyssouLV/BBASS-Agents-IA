@@ -127,3 +127,26 @@ def get_vm_admin_key() -> str | None:
     # jamais planter. Une valeur vide (VM_ADMIN_KEY= dans .env) compte comme
     # non configurée, sinon une clé vide fournie par l'appelant la validerait.
     return os.environ.get("VM_ADMIN_KEY") or None
+
+
+@dataclass(frozen=True)
+class ConfigModuleoChiffree:
+    # None quand la variable est absente ou vide.
+    url: str | None
+    api_key_chiffree: str | None
+    security_code_chiffre: str | None
+    fichier_cle_maitre: str | None
+
+
+def get_config_moduleo_chiffree() -> ConfigModuleoChiffree:
+    # Lu à l'appel, comme get_mistral_api_key : la clé d'API et le
+    # SecurityCode sont chiffrés (Fernet, spec 1.5.0, ADR-0017) avec la clé
+    # maître du fichier VM_CLE_MAITRE_FICHIER, hors du dépôt. Le
+    # déchiffrement est dans vm_centrale/moduleo/configuration.py ;
+    # scripts/chiffrer_secret.py produit les valeurs chiffrées.
+    return ConfigModuleoChiffree(
+        url=os.environ.get("MODULEO_URL", MODULEO_URL) or None,
+        api_key_chiffree=os.environ.get("MODULEO_API_KEY_CHIFFREE") or None,
+        security_code_chiffre=os.environ.get("MODULEO_SECURITY_CODE_CHIFFRE") or None,
+        fichier_cle_maitre=os.environ.get("VM_CLE_MAITRE_FICHIER") or None,
+    )

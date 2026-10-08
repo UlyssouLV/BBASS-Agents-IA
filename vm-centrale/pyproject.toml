@@ -16,6 +16,7 @@ dependencies = [
     "trafilatura>=2.0",
     "truststore>=0.10",
     "mistral-common>=1.12",
+    "cryptography>=44",
 ]
 
 [project.optional-dependencies]
