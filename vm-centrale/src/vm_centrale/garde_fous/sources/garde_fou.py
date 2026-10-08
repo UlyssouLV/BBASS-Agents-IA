@@ -70,7 +70,7 @@ def ajouter_sources(
         citees.setdefault(cle, f"[{_texte_du_lien(titres[cle], source.url)}]({source.url})")
     # Une citation que le modèle a déjà écrite n'est pas répétée (test
     # humain 1.5.0, conversation 113, #180).
-    liens = [lien for lien in reversed(citees.values()) if lien not in reponse]
+    liens = [lien for lien in reversed(citees.values()) if not _deja_citee(lien, reponse)]
     if not liens:
         return reponse
     # Citation d'une lecture → logiciel cité (« Moduléo, affaire X » →
@@ -82,6 +82,17 @@ def ajouter_sources(
         _completer_le_bloc(reponse.rstrip(), liens, logiciels)
         or f"{reponse.rstrip()}\n\nSources : {', '.join(liens)}"
     )
+
+
+def _deja_citee(citation: str, reponse: str) -> bool:
+    # Citation entière, suivie d'une fin de ligne ou d'un séparateur :
+    # « Moduléo, affaire 2024-12 » n'est pas dans « …, affaire 2024-123 »,
+    # ni « contact Dupont » dans « contact Dupont SARL ». Un lien Markdown
+    # se ferme sur sa parenthèse : jamais le début d'un autre.
+    if citation.endswith(")"):
+        return citation in reponse
+    motif = rf"{re.escape(citation)}(?=[ \t]*(?:$|[,;)\]]|\.(?:\s|$)))"
+    return re.search(motif, reponse, re.MULTILINE) is not None
 
 
 def _est_une_annee(chiffre: str) -> bool:

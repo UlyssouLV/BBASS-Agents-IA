@@ -28,7 +28,7 @@ Infer **`X.Y.Z`** from the branch `vX.Y.Z-<slug>` or the PR title `VX.Y.Z — �
 
 Related = listed in the PR body (`Fixes` / `Part of`) **and** children of the parent spec that are in scope for this PR. Ignore `wontfix` and issues the PR or parent spec mark as out of this version. See `agents/issue-tracker.md`.
 
-**Published** = each in-scope **child** is **Closed**.
+**Published** = each in-scope **child** is **Closed** — including the **human-test** child (`ready-for-human` / title `Tests humains — VX.Y.Z`). An Open human-test ticket **blocks** Finalise; tell the user to finish with **`/th`** first.
 
 If any in-scope child is still **Open**: **stop**. List what’s missing. Do not tag, merge, or delete.
 
@@ -97,4 +97,5 @@ Do not start the next version’s branch unless the user asks.
 - Commit / push → `commit` (`/c`)
 - Child wrap → `encadrer-implement`
 - Open a version → `ouvrir-la-version`
+- Human-test results / close → `tests-humains` (`/th`)
 - Feuille de route de dev only → `augmenter-la-feuille-de-route-dev` (`/afr`)

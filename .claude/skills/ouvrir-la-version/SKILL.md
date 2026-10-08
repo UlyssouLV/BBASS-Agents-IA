@@ -55,7 +55,7 @@ You are not wrong: next is **`/to-tickets`**. Follow its quiz: numbered tickets,
 
 Show the **implementation order**: tickets with no open blockers first (lowest number among that set).
 
-**Wait for an explicit yes** on that list. Then for **each** child, in order:
+**Wait for an explicit yes** on that list. Then for **each** implementation child, in order:
 
 1. `gh issue create` with label `ready-for-agent` and body in the **canonical Matt shape** from `agents/issue-tracker.md` (*Child ticket body*): first line `Part of #<parent>`, then `## What to build`, `## Acceptance criteria` (checkboxes), `## Blocked by` (`- Aucun` or `- #<n>`). If `/to-tickets` drafted French or free-form headings, **reshape** to those English headings before create. Do not use `Ce qu'il livre` / `Critères d'acceptation` / `Tests attendus` for new tickets.
 2. Attach it as a **GitHub sub-issue** of the parent (POST `issues/<parent>/sub_issues`, JSON integer `sub_issue_id` = the child’s **database id**) — this is what shows **Y/Z** on the parent. See `agents/issue-tracker.md` (*Version parent and children*).
@@ -63,7 +63,13 @@ Show the **implementation order**: tickets with no open blockers first (lowest n
    - **Between children**, as the quiz said.
    - **Parent blocked by every child**, once per child.
 
-Then `gh issue edit <parent> --remove-label "ready-for-agent"`. Confirm the parent’s `sub_issues_summary.total` equals the number of children just created. The parent is never an `/implement` ticket.
+Then create **one human-test child** (format: `agents/issue-tracker.md`, *Human-test child*):
+
+1. Title `Tests humains — VX.Y.Z`. Label **`ready-for-human`** only (never `ready-for-agent`). Body skeleton: Matt headings + empty `## Plan de tests` / `## Résultats` / `## Ce qu’on peut faire maintenant` placeholders. `## Blocked by` = **every** implementation child just created.
+2. Attach as a **GitHub sub-issue** of the parent (same POST as above).
+3. Native blocked-by: this ticket blocked by **each** implementation child; **parent** blocked by this ticket as well.
+
+Then `gh issue edit <parent> --remove-label "ready-for-agent"`. Confirm the parent’s `sub_issues_summary.total` equals the number of implementation children **plus** the human-test child. The parent is never an `/implement` ticket. The human-test child is never `/implement`.
 
 A body `Part of` line alone does **not** create the sub-issue link. The `## Blocked by` section mirrors native deps (fallback if the API is unavailable). Do not create tickets before that yes. Do not `/implement`.
 
@@ -73,13 +79,13 @@ Run skill **`ouvrir-pr`** as if the user had typed **`/opr -draft`** with:
 
 - Title: `VX.Y.Z — <purpose in one line>`
 - `## Summary` (what this version is)
-- `Fixes #<parent>` and `Fixes #<child>` **one keyword per issue**
+- `Fixes #<parent>` and `Fixes #<child>` **one keyword per issue** (include the human-test child)
 - If this version **fixes** known roadmap bugs: also `Fixes #<bug>` for each GitHub issue with label **`bug`** that this version closes (so `finaliser-la-version` can remove them from **Plus tard** and close them)
-- `## Test plan` (checkboxes)
+- `## Test plan` (checkboxes) — may point at the human-test issue; the detailed plan is filled later by `encadrer-implement`
 
 ## 7. Hand off to implement
 
-Propose: **`/clear`**, then **`/implement #<first>`** where `#first` is the first unblocked **child** (not the parent). Wait. Do not start `/implement` in this same window after a long grill.
+Propose: **`/clear`**, then **`/implement #<first>`** where `#first` is the first unblocked **implementation** child (`ready-for-agent`, not the human-test child, not the parent). Wait. Do not start `/implement` in this same window after a long grill.
 
 ## Not this skill
 

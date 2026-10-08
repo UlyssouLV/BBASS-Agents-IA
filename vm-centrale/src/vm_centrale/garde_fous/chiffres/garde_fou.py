@@ -119,9 +119,16 @@ def chiffres_des_sources(textes_source: Iterable[str]) -> set[str]:
     return _cles_autorisees(textes_source)
 
 
-def retirer_chiffres_hors_source(reponse: str, textes_source: Iterable[str]) -> str:
+def retirer_chiffres_hors_source(
+    reponse: str, textes_source: Iterable[str], expressions_permises: Iterable[re.Pattern[str]] = ()
+) -> str:
+    # `expressions_permises` : écrites telles quelles dans la réponse (la
+    # date du jour en lettres), leurs chiffres ne sont pas contrôlés ; hors
+    # d'elles, les mêmes chiffres le restent.
     autorisees = _cles_autorisees(textes_source)
-    plages_des_urls = _plages_des_urls(reponse)
+    plages_des_urls = _plages_des_urls(reponse) + [
+        correspondance.span() for motif in expressions_permises for correspondance in motif.finditer(reponse)
+    ]
     # Une suite qui commence dans une URL (« …/2011101 12 % ») n'est pas un
     # numéro : la retirer entière couperait l'URL.
     sequences = [

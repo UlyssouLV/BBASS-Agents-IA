@@ -41,6 +41,8 @@ _TROUVEES = "{n} affaires trouvées, {m} affichées"
 # Sans aucun critère (#182, conversation 115 : « les dernières affaires »
 # n'appelait jamais Moduléo) : les affaires créées ces derniers jours.
 _JOURS_RECENTS = 90
+# Borne basse d'une fenêtre de création resserrée sans date au plus tôt.
+_DEBUT_MODULEO = date(2000, 1, 1)
 _AUCUNE_RECENTE = "Aucune affaire créée dans Moduléo depuis le {depuis}."
 _RECENTES = "{{n}} affaires créées depuis le {depuis}, {{m}} plus récentes affichées"
 # Ajoutée à toute phrase de l'outil qui n'a rien lu (#182, conversation
@@ -162,23 +164,58 @@ def _declarer(contexte: ContexteTour) -> dict | None:
 
 
 def _chercher(
-    lecteur: LecteurModuleo, numero: str, texte: str, filtres: dict[str, str], noms: dict[str, str]
-) -> list[int]:
-    # Ids des affaires trouvées, les plus récentes d'abord : ids Moduléo
-    # décroissants (#182), avant la coupe à nb_max.
+    lecteur: LecteurModuleo, numero: str, texte: str, filtres: dict[str, str], noms: dict[str, str], n: int
+) -> tuple[list[int], list[int]]:
+    # Ids des affaires trouvées, et ids parmi lesquels sont les `n` plus
+    # récentes : ids Moduléo décroissants (#182), avant la coupe à nb_max.
     if numero:
         try:
             id_affaire = lecteur.lire(_ROUTE_NUMERO, {"numAffaire": numero})
         except ModuleoIntrouvable:
-            return []
-        return [int(id_affaire)] if id_affaire else []
+            return [], []
+        ids = [int(id_affaire)] if id_affaire else []
+        return ids, ids
     parametres = {"texte": texte or None, **filtres, **_resoudre(lecteur, noms), "nbMaxResultats": IDS_MAX}
     # « Suivie par » : responsable ou chargé d'affaire. L'API combine ses
     # filtres en « et » : deux recherches, ids réunis sans doublon.
     suivi = parametres.pop("suivi_par", None)
     variantes = [{}] if suivi is None else [{"idsResponsable": suivi}, {"idsActeurEnCharge": suivi}]
-    ids = {int(i) for variante in variantes for i in lecteur.lire(_ROUTE_RECHERCHE, {**parametres, **variante})}
-    return sorted(ids, reverse=True)
+    trouves: set[int] = set()
+    recents: set[int] = set()
+    for variante in variantes:
+        parametres_variante = {**parametres, **variante}
+        ids = _ids(lecteur, parametres_variante)
+        trouves |= ids
+        recents |= ids if len(ids) < IDS_MAX else _plus_recents(lecteur, parametres_variante, ids, n)
+    return sorted(trouves, reverse=True), sorted(recents, reverse=True)
+
+
+def _ids(lecteur: LecteurModuleo, parametres: dict[str, Any]) -> set[int]:
+    return {int(i) for i in lecteur.lire(_ROUTE_RECHERCHE, parametres)}
+
+
+def _plus_recents(lecteur: LecteurModuleo, parametres: dict[str, Any], plafonnes: set[int], n: int) -> set[int]:
+    # Moduléo coupe la recherche à IDS_MAX ids, sans ordre garanti : les
+    # plus récentes peuvent manquer. La fenêtre de création est resserrée
+    # depuis sa fin, par dichotomie, jusqu'à passer sous le plafond avec au
+    # moins `n` affaires : celles-là sont toutes les plus récentes.
+    fin = date.fromisoformat(parametres.get("dateCreationMax") or _date_du_jour().isoformat())
+    minimum = parametres.get("dateCreationMin")
+    debut = date.fromisoformat(minimum) if minimum else _DEBUT_MODULEO
+    # Jours avant `fin` : `plafonne` donne IDS_MAX ids, `complet` moins.
+    plafonne, complet = (fin - debut).days, -1
+    meilleurs: set[int] = set()
+    while plafonne - complet > 1:
+        jours = (plafonne + complet) // 2
+        ids = _ids(lecteur, {**parametres, "dateCreationMin": (fin - timedelta(days=jours)).isoformat()})
+        if len(ids) >= IDS_MAX:
+            plafonne = jours
+            continue
+        complet, meilleurs = jours, ids
+        if len(ids) >= n:
+            return ids
+    # Plus de IDS_MAX affaires sur un seul jour : au mieux.
+    return meilleurs | plafonnes
 
 
 def _resoudre(lecteur: LecteurModuleo, noms: dict[str, str]) -> dict[str, Any]:
@@ -282,8 +319,9 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
         trouvees = _RECENTES.format(depuis=depuis.strftime("%d/%m/%Y"))
 
     def lire(lecteur: LecteurModuleo) -> tuple[list[int], list[Fiche]]:
-        ids = _chercher(lecteur, numero, texte, filtres, noms)
-        return ids, _fiches(lecteur, ids[: nb_max(arguments.get("nb_max"))]) if ids else []
+        n = nb_max(arguments.get("nb_max"))
+        ids, recents = _chercher(lecteur, numero, texte, filtres, noms, n)
+        return ids, _fiches(lecteur, recents[:n]) if recents else []
 
     return lire_fiches(
         contexte, contexte.client_moduleo, lire, aucune, trouvees, _SANS_LECTURE, entete_toujours=recentes

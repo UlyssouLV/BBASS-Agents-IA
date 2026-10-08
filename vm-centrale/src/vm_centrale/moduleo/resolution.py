@@ -117,11 +117,21 @@ def chercher_dossier_production(lecteur: LecteurModuleo, nom: str) -> int:
         raise NomNonResolu(f"Aucun dossier de production Moduléo ne correspond à « {nom} » : recherche non lancée.")
     if len(ids) > 1:
         noms = sorted(
-            _texte(lecteur.lire("fileo/dossierproduction/{idDossierProduction}", {"idDossierProduction": i}).get("Nom"))
+            nom_dossier
             for i in ids[:_CANDIDATS_MAX]
+            if (nom_dossier := _nom_dossier_production(lecteur, i)) is not None
         )
         raise NomNonResolu(_ambigu("dossiers de production", nom, noms, len(ids)))
     return ids[0]
+
+
+def _nom_dossier_production(lecteur: LecteurModuleo, id_dossier: int) -> str | None:
+    # Un candidat supprimé entre la recherche et sa lecture n'a pas de nom.
+    try:
+        fiche = lecteur.lire("fileo/dossierproduction/{idDossierProduction}", {"idDossierProduction": id_dossier})
+    except ModuleoIntrouvable:
+        return None
+    return _texte(fiche.get("Nom"))
 
 
 def chercher_qualifications(lecteur: LecteurModuleo, noms: list[str]) -> str:

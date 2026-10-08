@@ -87,6 +87,51 @@ Part of #<parent>
 
 When `/to-tickets` or the user drafts free-form content: **reshape** into this template before `gh issue create`.
 
+### Human-test child
+
+Created by **`ouvrir-la-version`** after the `/to-tickets` implementation children (not by `/implement`, not by `/ct` for normal work). One per version.
+
+- **Title:** `Tests humains — VX.Y.Z`
+- **Label on create:** **`ready-for-human`** only (never `ready-for-agent`). Never `/implement` this issue.
+- **Links:** same three links as any child (`Part of`, sub-issue, parent blocked by this child). **`## Blocked by`** lists **every** implementation child of the version (native `blocked_by` the same way).
+- **Body** — Matt headings plus three required extra sections:
+
+```markdown
+Part of #<parent>
+
+## What to build
+
+Plan et trace des tests humains pour VX.Y.Z (pas d’implémentation agent).
+
+## Acceptance criteria
+
+- [ ] Plan de tests proposé après le dernier ticket d’implémentation
+- [ ] Scénarios joués / non joués documentés
+- [ ] Résultats (et images si fournies) publiés sur ce ticket
+- [ ] Brouillon « Ce qu’on peut faire maintenant » prêt pour la release
+
+## Blocked by
+
+- #<impl-1>
+- #<impl-2>
+
+## Plan de tests
+
+_(rempli par `encadrer-implement` après le dernier enfant `ready-for-agent`)_
+
+## Résultats
+
+_(rempli par `/th`)_
+
+## Ce qu’on peut faire maintenant
+
+_(brouillon produit pour la release ; images sous `docs/img/changelog/vX.Y.Z/`)_
+```
+
+- At version open: create with empty Plan / Résultats / product draft (placeholders above).
+- After the last implementation child closes: `encadrer-implement` writes the concrete plan into `## Plan de tests`.
+- After the human reports: skill **`tests-humains`** (`/th`) fills Résultats + product section, commits screenshots if any, removes `ready-for-human`, closes the issue. Partial plans are OK (document non-joués). Closing this child is **`/th`**, not `/cci`.
+
 ## Changes to earlier versions
 
 A version may change behaviour that an earlier version shipped (a renamed tool, a raised limit, a replaced mechanism). The record is one section of the version spec (role `spec`), written by `ouvrir-la-version` and read by `finaliser-la-version`:
@@ -130,7 +175,7 @@ Skip a target that already holds the block for `VX.Y.Z` and that element. `Aucun
 
 ## Ce qu'on peut faire maintenant
 
-<features in product language>
+<features in product language — prefer the Closed human-test child’s section (text + images under `docs/img/changelog/vX.Y.Z/`) when present>
 
 ## Historique des tickets
 

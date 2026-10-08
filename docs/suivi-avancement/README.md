@@ -7,7 +7,8 @@ Outils branchés dessus :
 - skill `/os` (`ouvrir-semaine-de-travail`) — crée le dossier + HTML de la semaine ;
 - skill `/msa` (`mettre-a-jour-suivi-avancement`) — enregistre une version livrée + régénère le PDF ;
 - skill **Finalise la version** — appelle `/msa` (soft-skip s’il n’y a pas de semaine) ;
-- script `generer-pdf.mjs` — Chrome / Edge headless ;
+- script `generer-pdf.mjs` — resync agenda puis Chrome / Edge headless ;
+- script `sync-agenda.mjs` — lit l’Excel de la semaine dans le dossier externe **Suivi** → `agenda-quotidien-tableau.png` + section HTML ;
 - script `docs-site/scripts/capturer-travail-realise.mjs` — aperçu README (lit le HTML de la semaine courante).
 
 Rôle agents : **`suivi-avancement`** → `docs/suivi-avancement/` (`agents/roles.yml`).
@@ -34,22 +35,33 @@ Mois du dossier (ASCII, comme `capturer-travail-realise.mjs`) : `jan` `fev` `mar
 | --- | --- |
 | `README.md` | cette convention |
 | `template-semaine.html` | gabarit canonique (CSS + structure) pour `/os` |
-| `generer-pdf.mjs` | régénération PDF |
+| `generer-pdf.mjs` | sync agenda + régénération PDF |
+| `sync-agenda.mjs` | Excel Suivi → PNG + `#agenda-quotidien` |
+| `xlsx-vers-html-agenda.py` | helper openpyxl (appelé par sync-agenda) |
 
-Pas d’agenda obligatoire : image / placeholder = hors skills (ajout manuel si besoin).
+## Emploi du temps (agenda)
+
+Source **hors repo** : dossier sibling `../Suivi` (ou `BBASS_SUIVI_DIR`).
+
+| Repo (`docs/suivi-avancement/`) | Suivi externe |
+| --- | --- |
+| `semaine-05-09-oct-2026` (lundi = 05/10/2026) | `Semaine du 05-10-26/` + `Semaine *.xlsx` |
+
+`sync-agenda.mjs` (et donc `generer-pdf.mjs`) retrouve le dossier par la **date du lundi**, prend le premier `Semaine*.xlsx` (sinon `*.xlsx`), régénère `agenda-quotidien-tableau.png` et remplace le contenu de `#agenda-quotidien`. Soft-skip si Suivi / Excel absent (placeholder conservé). `--strict` pour échouer.
 
 ## Structure HTML obligatoire
 
 Reprendre **`template-semaine.html`**. Sections attendues :
 
-1. **Couverture** — logo, titre, dates, badge semaine, **TOC**.
+1. **Couverture** — logo, titre, dates, liens **Dépôt** (GitHub) + **Documentation technique** (GitHub Pages : `https://ulyssoulv.github.io/BBASS-Agents-IA/`), badge semaine, **TOC**.
 2. **`#travail-realise`** — un `.jour` par jour lun→ven ; puces en **langage fonctionnel** (cabinet) : pas de noms d’outils/stack, pas de `#ticket` dans les puces jour.
 3. **`#reste-a-implementer`** — suite feuille de route / non livré.
 4. **`#livre-pour`** — récap point (visé / livré), langage fonctionnel.
 5. **`#descriptif-versions`** — blocs `.version` avec `id="version-X-Y-Z"` :
    - prévu : `<span class="prevu">…</span>` ;
    - livré : `<span class="deploye">Déployé le JJ/MM/AAAA à HH:MM</span>` + corps enrichi.
-6. TOC : entrée par version sous « Descriptif des versions ».
+6. **`#agenda-quotidien`** — PNG synchronisé depuis Suivi (voir ci-dessus) ; placeholder tant que sync n’a pas tourné.
+7. TOC : entrée par version sous « Descriptif des versions » + entrée agenda.
 
 Slots `data-slot="…"` dans le template = repères pour les skills ; on peut les retirer une fois le HTML rempli.
 

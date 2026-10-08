@@ -253,13 +253,20 @@ _MOIS = (
 )
 
 
-def _date_du_jour_source() -> str:
-    # La date du jour donnée au modèle, comptée parmi les textes source du
-    # garde-fou chiffres (#182, conversation 115 : « depuis le 1er septembre
-    # 2026 ? » devenait la phrase fixe). Écrite en lettres : le mois en
-    # chiffres (« 10 ») autoriserait un nombre d'affaires inventé.
+def _annee_du_jour_source() -> str:
+    # L'année de la date du jour donnée au modèle, comptée parmi les textes
+    # source du garde-fou chiffres (#182, conversation 115 : « depuis le 1er
+    # septembre 2026 ? » devenait la phrase fixe). Jamais le jour ni le mois
+    # en chiffres : le 15, « 15 affaires » inventé passerait.
+    return str(_date_du_jour().year)
+
+
+def _date_du_jour_ecrite() -> re.Pattern[str]:
+    # La date du jour en lettres dans la réponse (« 15 octobre », « 1er
+    # octobre 2026 ») : ses chiffres ne sont pas contrôlés, le jour seul l'est.
     aujourdhui = _date_du_jour()
-    return f"{aujourdhui.day} {_MOIS[aujourdhui.month - 1]} {aujourdhui.year}"
+    jour = "1(?:er)?" if aujourdhui.day == 1 else str(aujourdhui.day)
+    return re.compile(rf"(?<!\d){jour}\s+{_MOIS[aujourdhui.month - 1]}(?:\s+{aujourdhui.year})?\b", re.IGNORECASE)
 
 
 def _message_systeme_style() -> dict[str, str]:
@@ -532,6 +539,8 @@ _PHRASES_CHIFFRES = (_REPONSE_SANS_DONNEES, _REPONSE_SANS_DONNEES_MODULEO)
 # déjà au modèle quoi faire : pas de note au tour suivant.
 _PHRASES_FIXES = (*_PHRASES_CHIFFRES, PHRASE_CONTACT_NON_LU)
 _OUTILS_MODULEO = {outil_affaires.OUTIL.nom, outil_contacts.OUTIL.nom}
+# Citation d'une fiche de contact lue (moduleo/fiches.py).
+_CITATION_CONTACT = "Moduléo, contact "
 # Au tour qui suit une réponse aux chiffres remplacée (#182) : l'historique
 # ne porte que la phrase fixe, jamais la réponse brute du modèle.
 _NOTE_APRES_REMPLACEMENT = {
@@ -619,7 +628,9 @@ def _textes_de_recherche(db: Session, conversation_id: int) -> list[str]:
     return [texte for ligne in lignes for texte in ligne if texte and texte.strip()]
 
 
-def _sources_de_la_conversation(db: Session, conversation_id: int) -> list[PageSource | LectureSource]:
+def _sources_de_la_conversation(
+    db: Session, conversation_id: int, lectures: list[LectureDeLaConversation]
+) -> list[PageSource | LectureSource]:
     # Texte nettoyé des pages (spec 1.4.0), jamais l'extrait du moteur
     # d'une page qu'on n'a pas lue (#162) ni les faits produits par l'appel
     # d'extraction, qui pourraient inventer ; et les fiches lues par un
@@ -640,8 +651,7 @@ def _sources_de_la_conversation(db: Session, conversation_id: int) -> list[PageS
         for url, titre, texte_nettoye, date_creation in lignes
     ]
     datees += [
-        (lecture.date_creation, LectureSource(lecture.citation, lecture.texte))
-        for lecture in lectures_de_la_conversation(db, conversation_id)
+        (lecture.date_creation, LectureSource(lecture.citation, lecture.texte)) for lecture in lectures
     ]
     # Tri stable : à date égale, chaque table garde son ordre.
     return [source for _, source in sorted(datees, key=lambda datee: datee[0])]
@@ -657,6 +667,7 @@ def _reponse_visible(
     pages_trop_longues: list[str],
     publier: Publier,
     outils_appeles: list[str],
+    moduleo_configure: bool,
 ) -> str:
     # Ligne garde_fous de l'inspecteur à chaque réponse de chat (spec 1.4.0,
     # décision 15), même sans retrait : sans elle, on ne voit pas pourquoi la
@@ -666,16 +677,30 @@ def _reponse_visible(
     # contrôlées comme un texte du modèle, et seuls les chiffres gardés sont
     # cités.
     publier(VERIFICATION)
+    # Lues une fois pour les garde-fous et la ligne « Sources : ».
+    lectures = lectures_de_la_conversation(db, conversation_id)
     moduleo_appele = not _OUTILS_MODULEO.isdisjoint(outils_appeles)
-    contacts_lus = outil_contacts.OUTIL.nom in outils_appeles
+    # Un contact lu à un tour précédent reste dans la Mémoire de la
+    # conversation : le modèle peut en dire l'absence d'une coordonnée.
+    contacts_lus = outil_contacts.OUTIL.nom in outils_appeles or any(
+        lecture.citation.startswith(_CITATION_CONTACT) for lecture in lectures
+    )
     visible = _appliquer_garde_fous(
-        db, conversation_id, nouveau_message, reponse, piece_jointe, moduleo_appele, contacts_lus
+        db,
+        conversation_id,
+        nouveau_message,
+        reponse,
+        piece_jointe,
+        lectures,
+        moduleo_appele,
+        # Sans Moduléo, la phrase fixe promettrait une recherche impossible.
+        contacts_lus or not moduleo_configure,
     )
     visible = ajouter_sources(
         visible,
         _messages_du_compte(db, conversation_id, nouveau_message)
         + _extraits_pieces_jointes(db, conversation_id, piece_jointe),
-        _sources_de_la_conversation(db, conversation_id),
+        _sources_de_la_conversation(db, conversation_id, lectures),
     )
     visible = mentionner_pages_trop_longues(visible, pages_trop_longues)
     enregistrer_echange_local(
@@ -696,6 +721,7 @@ def _appliquer_garde_fous(
     nouveau_message: str,
     reponse: str,
     piece_jointe: PieceJointe | None,
+    lectures: list[LectureDeLaConversation],
     moduleo_appele: bool = False,
     contacts_lus: bool = False,
 ) -> str:
@@ -713,9 +739,9 @@ def _appliquer_garde_fous(
     # Un texte de recherche non vide compte comme un document.
     extraits += _textes_de_recherche(db, conversation_id)
     # Une fiche lue par un outil (Moduléo, spec 1.5.0) aussi.
-    extraits += [lecture.texte for lecture in lectures_de_la_conversation(db, conversation_id)]
-    textes_source = [*_messages_du_compte(db, conversation_id, nouveau_message), _date_du_jour_source(), *extraits]
-    sans_chiffre_invente = retirer_chiffres_hors_source(reponse, textes_source)
+    extraits += [lecture.texte for lecture in lectures]
+    textes_source = [*_messages_du_compte(db, conversation_id, nouveau_message), _annee_du_jour_source(), *extraits]
+    sans_chiffre_invente = retirer_chiffres_hors_source(reponse, textes_source, [_date_du_jour_ecrite()])
     if sans_chiffre_invente == reponse:
         return reponse
     # Un document, ou un chiffre déjà écrit dans le message du tour : on
@@ -1101,6 +1127,7 @@ def _tour_creer_conversation(
         list(contexte_outils.pages_trop_longues.values()),
         publier,
         contexte_outils.outils_appeles,
+        contexte_outils.client_moduleo is not None,
     )
 
     publier(TITRAGE)
@@ -1927,6 +1954,7 @@ def _tour_envoyer_message(
         list(contexte_outils.pages_trop_longues.values()),
         publier,
         contexte_outils.outils_appeles,
+        contexte_outils.client_moduleo is not None,
     )
     _enregistrer_questions_du_tour(db, attendre_questions, identifiant_compte, conversation.id, piece_jointe)
 

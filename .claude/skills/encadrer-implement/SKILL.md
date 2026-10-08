@@ -2,10 +2,10 @@
 name: encadrer-implement
 description: >-
   Green pytest after a child GitHub ticket, or the implement plugin's closing
-  step: `/t`, `/c -p`, `/cci #<n>`, then the next unblocked child or ask the
-  user to test, then `/code-review`, then Finalise la version. Do not wait
-  for the quality gate. Do not run `/code-review` here.
-  Load this as soon as /implement tests pass.
+  step: `/t`, `/c -p`, `/cci #<n>`, then the next unblocked ready-for-agent
+  child, or fill the human-test plan and point to `/th`, or (all Closed)
+  `/code-review` then Finalise. Do not wait for the quality gate. Do not run
+  `/code-review` here. Load this as soon as /implement tests pass.
 ---
 
 # Wrap `/implement`
@@ -36,19 +36,30 @@ Find the parent (`## Parent` / `Part of #n` on the issue you just finished). Lis
 
 - **Done:** Closed.
 - **Still to build:** Open, `ready-for-agent` (and not `wontfix`).
+- **Human tests:** Open, `ready-for-human` (title `Tests humains — …`). Never `/implement`.
 
 A remaining ticket is **unblocked** when GitHub reports no open blockers (`issue_dependencies_summary.blocked_by` is 0), or every issue in a fallback **Blocked by** body line is Closed. See `agents/issue-tracker.md`.
 
-**If at least one unblocked child remains:**
+**If at least one unblocked `ready-for-agent` child remains:**
 
 - Propose the **next** unblocked child (lowest issue number among unblocked `ready-for-agent`).
 - Ask the user to `/clear` then `/implement #<next>`. Wait. Do not start the next implement in this same compacted window.
 
-**If no remaining children** (all PR children are Closed):
+**Else if an open `ready-for-human` human-test child remains** (format: `agents/issue-tracker.md`, *Human-test child*):
+
+1. Build a **concrete** numbered test plan in product language from the parent spec and the Closed implementation children (what a human can click / verify). Partial runs are allowed later.
+2. `gh issue edit` that issue: replace `## Plan de tests` with checkboxes for each scenario (leave `## Résultats` and `## Ce qu’on peut faire maintenant` for `/th`).
+3. Stop after telling the user, in French (adapt `#n` / PR):
+
+   Tous les tickets d’implémentation sont Closed. Plan de tests humains proposé sur #<n>. Jouez ce que vous voulez (plan partiel OK). Quand c’est fait, lancez **`/th`** avec les résultats (et des captures si vous en avez). Ne lancez pas `/code-review` tant que #<n> est Open.
+
+4. Do **not** propose `/code-review` or Finalise here. Do not merge, tag, or start the next version.
+
+**Else if all in-scope children are Closed** (including the human-test child):
 
 - Stop after telling the user, in French, exactly this handoff (adapt only the parent/PR numbers if useful):
 
-  Tous les tickets ont été implémentés. Veuillez faire des tests pour valider que tout est fonctionnel. Si c’est bon, lancez `/code-review`. Si la revue est bonne, lancez le skill **Finalise la version** (`finaliser-la-version`) : le quality gate est lu à ce moment-là, et s’il n’est pas OK c’est `/cqg`, pas la release.
+  Tous les tickets sont Closed (implémentation et tests humains). Lancez `/code-review`. Si la revue est bonne, lancez le skill **Finalise la version** (`finaliser-la-version`) : le quality gate est lu à ce moment-là, et s’il n’est pas OK c’est `/cqg`, pas la release.
 
 - Do not merge, tag, or start the next version.
 
@@ -59,6 +70,7 @@ A remaining ticket is **unblocked** when GitHub reports no open blockers (`issue
 - Read-only gate → `quality-gate` (`/qg`)
 - Fix the gate only → `corriger-quality-gate` (`/cqg`)
 - Close a child only → `fermer-ticket-enfant` (`/cci`)
+- Human-test results / close → `tests-humains` (`/th`)
 - Opening or merging the PR, GitHub Release, deleting the branch → `finaliser-la-version`
 - Re-implementing Closed children
 - `needs-triage` work that is not a child of this PR

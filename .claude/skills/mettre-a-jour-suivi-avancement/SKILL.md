@@ -48,7 +48,7 @@ From repo root:
 node docs/suivi-avancement/generer-pdf.mjs <chemin-du-html-ou-dossier-semaine>
 ```
 
-If the script fails (PDF locked, no Chrome/Edge, …): **stop**. HTML may already be updated — say so in one line and tell the user how to fix (close the PDF, install Chrome/Edge, rerun the command). Do not invent another print method.
+`generer-pdf` resyncs the agenda from `../Suivi` (Excel) first (soft-skip if missing). If the script fails (PDF locked, no Chrome/Edge, …): **stop**. HTML may already be updated — say so in one line and tell the user how to fix (close the PDF, install Chrome/Edge, rerun the command). Do not invent another print method.
 
 Done when: HTML updated and PDF regenerated (or soft-skip in step 1).
 

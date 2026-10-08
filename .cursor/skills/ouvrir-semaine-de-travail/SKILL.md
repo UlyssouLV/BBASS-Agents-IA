@@ -38,7 +38,8 @@ If attendus came from the roadmap (no explicit list in the prompt): show the pro
    `docs/suivi-avancement/semaine-…/suivi-semaine-….html` (same dates).
 2. Fill couverture, TOC, five `.jour` headings (lun→ven), **Reste à implémenter**, **Livré pour** (date du point = jeudi de la semaine unless the user says otherwise), and one `.version` stub per attendu (`id="version-X-Y-Z"`, badge `.prevu`, body = Objectif in functional language).
 3. Do **not** invent day bullets for work not done (keep « À compléter. »).
-4. Do **not** add agenda assets. Do **not** `git commit`. Do **not** run `generer-pdf.mjs` yet (empty week → PDF optional; skip).
+4. Agenda : run `node docs/suivi-avancement/sync-agenda.mjs <dossier-semaine>` (soft-skip if `../Suivi` / Excel missing — README). Do **not** paste a static agenda by hand.
+5. Do **not** `git commit`. Do **not** run `generer-pdf.mjs` yet (empty week → PDF optional; skip).
 
 Done when: folder + HTML exist and match the README structure.
 

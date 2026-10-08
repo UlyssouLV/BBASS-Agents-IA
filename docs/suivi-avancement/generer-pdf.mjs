@@ -100,7 +100,21 @@ function estVerrouille(pdfPath) {
   }
 }
 
-function main() {
+/**
+ * Emploi du temps : resync depuis ../Suivi (Excel) avant d’imprimer. Jamais
+ * bloquant : sans sync-agenda.mjs, Python/openpyxl ou Playwright, ou si la
+ * conversion échoue, le PDF part avec l’agenda déjà dans le HTML.
+ */
+async function synchroniserAgenda(semaineDir) {
+  try {
+    const {syncAgenda} = await import('./sync-agenda.mjs');
+    await syncAgenda(semaineDir, {strict: false});
+  } catch (err) {
+    console.warn(`[sync-agenda] soft-skip : ${err.message || err}`);
+  }
+}
+
+async function main() {
   const arg = process.argv[2];
   if (!arg) {
     console.error(
@@ -109,6 +123,7 @@ function main() {
     process.exit(2);
   }
   const htmlPath = trouverHtml(arg);
+  await synchroniserAgenda(path.dirname(htmlPath));
   const pdfPath = htmlPath.replace(/\.html?$/i, '.pdf');
   if (estVerrouille(pdfPath)) {
     throw new Error(
@@ -139,9 +154,7 @@ function main() {
   console.log(`[suivi-pdf] ${path.relative(path.join(__dirname, '../..'), pdfPath)}`);
 }
 
-try {
-  main();
-} catch (err) {
+main().catch((err) => {
   console.error(`[suivi-pdf] ${err.message || err}`);
   process.exit(1);
-}
+});

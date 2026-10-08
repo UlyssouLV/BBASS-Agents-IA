@@ -265,7 +265,7 @@
     .agenda img {
       display: block;
       margin: 0 auto;
-      max-width: 170mm;
+      max-width: min(170mm, 100%);
       max-height: 250mm;
       width: auto;
       height: auto;
@@ -379,7 +379,8 @@
         <p class="kicker">Alternance Agents IA · 2026–2027</p>
         <h1>Bilan de semaine - Alternance Ulysse LONG</h1>
         <p class="meta">Semaine du <span data-slot="dates-longues">JJ au JJ mois AAAA</span><br />
-        Dépôt : <a href="https://github.com/UlyssouLV/BBASS-Agents-IA">github.com/UlyssouLV/BBASS-Agents-IA</a></p>
+        Dépôt : <a href="https://github.com/UlyssouLV/BBASS-Agents-IA">github.com/UlyssouLV/BBASS-Agents-IA</a><br />
+        Documentation technique : <a href="https://ulyssoulv.github.io/BBASS-Agents-IA/">ulyssoulv.github.io/BBASS-Agents-IA</a></p>
         <div class="semaine" data-slot="badge-semaine">JJ–JJ mois. AAAA</div>
       </div>
       <nav class="toc" aria-label="Table des matières">
@@ -415,6 +416,13 @@
             <ol data-slot="toc-versions">
               <!-- Une <li><a href="#version-X-Y-Z">VX.Y.Z — titre</a></li> par version attendue / livrée -->
             </ol>
+          </li>
+          <li>
+            <div class="toc-row">
+              <a href="#agenda-quotidien">Emploi du temps quotidien</a>
+              <span class="toc-dots" aria-hidden="true"></span>
+              <span class="toc-ref">semaine</span>
+            </div>
           </li>
         </ol>
       </nav>
@@ -491,6 +499,16 @@
         et enrichir le corps (langage fonctionnel).
       -->
       <div data-slot="blocs-versions"></div>
+    </section>
+
+    <section class="bloc agenda" id="agenda-quotidien" data-slot="agenda">
+      <h2>Emploi du temps quotidien</h2>
+      <div class="agenda-placeholder">
+        <strong>Emploi du temps quotidien</strong>
+        Synchronisé depuis le dossier Suivi (Excel) via
+        <code>node docs/suivi-avancement/sync-agenda.mjs</code>
+        (aussi lancé par <code>generer-pdf.mjs</code>).
+      </div>
     </section>
   </div>
 </body>

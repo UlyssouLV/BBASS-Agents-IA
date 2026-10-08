@@ -17,13 +17,19 @@ _COORDONNEE = re.compile(
 _ABSENCE = re.compile(
     r"\b(?:pas|aucune?|absente?s?|indisponibles?|manquante?s?)\b|\bnon\s+renseign", re.IGNORECASE
 )
+# Négations qui ne disent pas une absence : « N'hésitez pas à me demander
+# ses coordonnées dans Moduléo » effaçait toute une réponse sur des affaires.
+_TOURNURES = re.compile(r"\bh[ée]sit\w*\s+pas\b|\bne\s+manquez\s+pas\b", re.IGNORECASE)
 
 
 def remplacer_contact_non_lu(reponse: str, contacts_lus: bool) -> str:
     # Une phrase qui nomme Moduléo, une coordonnée et une absence.
+    # `contacts_lus` : aussi vrai sans Moduléo, où la phrase fixe
+    # promettrait une recherche impossible.
     if contacts_lus:
         return reponse
     for phrase in _PHRASES.findall(reponse):
-        if _MODULEO.search(phrase) and _COORDONNEE.search(phrase) and _ABSENCE.search(phrase):
+        sans_tournure = _TOURNURES.sub("", phrase)
+        if _MODULEO.search(phrase) and _COORDONNEE.search(phrase) and _ABSENCE.search(sans_tournure):
             return PHRASE_CONTACT_NON_LU
     return reponse

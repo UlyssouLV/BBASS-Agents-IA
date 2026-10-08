@@ -31,3 +31,5 @@ docs/feuille-de-route/**
 docs/bugs/**
 !docs/bugs/.gitkeep
 !docs/bugs/README.md
+# Fichiers de verrou Office (Excel, Word ouverts).
+~$*

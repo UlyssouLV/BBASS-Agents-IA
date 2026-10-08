@@ -346,7 +346,7 @@ Retire `ready-for-agent` et ferme l’issue. Refuse s’il n’y a pas `Part of`
 
 **Corps :** seulement si la version n’est pas déjà dans le rôle **`roadmap`** — à quoi elle sert (un job).
 
-Grill + spec, puis **`/ob`**, écriture de la spec, **`/c -a -p`**, tickets (chaque enfant : `Part of`, **sub-issue** GitHub pour le compteur Y/Z du parent, `blocked_by`), **`/opr -draft`**, puis propose le premier `/implement`. Skill `ouvrir-la-version`.
+Grill + spec, puis **`/ob`**, écriture de la spec, **`/c -a -p`**, tickets d’implémentation + **un enfant tests humains** (`ready-for-human` ; chaque enfant : `Part of`, **sub-issue** GitHub pour le compteur Y/Z du parent, `blocked_by`), **`/opr -draft`**, puis propose le premier `/implement` (pas le ticket tests humains). Skill `ouvrir-la-version`.
 
 **Exemple :**
 
@@ -364,12 +364,31 @@ Ouvre la version 1.3.0
 
 **Corps :** inutile en général (le ticket suffit).
 
-TDD du ticket (plugin `/implement`). La **fin** : **`/t`**, **`/c -p`**, **`/cci #<n>`**, puis le suivant. Au dernier ticket : tests humains, puis **`/code-review`**, puis **Finalise la version**. Skill `encadrer-implement`. Ne pas l’appeler à la place de `/implement`.
+TDD du ticket (plugin `/implement`). La **fin** : **`/t`**, **`/c -p`**, **`/cci #<n>`**, puis le suivant `ready-for-agent`. Quand il n’en reste plus : remplit le **plan** sur le ticket tests humains et renvoie vers **`/th`** (pas `/code-review` tant que ce ticket est Open). Quand tout est Closed : **`/code-review`**, puis **Finalise la version**. Skill `encadrer-implement`. Ne pas l’appeler à la place de `/implement`.
 
 **Exemple :**
 
 ```
 /implement #42
+```
+
+
+
+### Tests humains
+
+**Commande :** `/th`
+
+**Options :** aucune (le ticket `Tests humains — VX.Y.Z` de la branche courante).
+
+**Corps :** scénarios joués / non joués, résultats ; images de preuve optionnelles (commit sous `docs/img/changelog/vX.Y.Z/`).
+
+Met à jour le ticket `ready-for-human`, commit les captures si besoin, ferme l’issue, propose `/code-review` puis Finalise. Skill `tests-humains`. Pas `/implement`. Pas `/cci`.
+
+**Exemple :**
+
+```
+/th
+J’ai joué 1, 2 et 4 (OK). 3 non joué (pas de compte admin sous la main).
 ```
 
 
@@ -418,7 +437,7 @@ Met à jour le HTML de la semaine courante pour la version livrée et régénèr
 
 **Corps :** inutile.
 
-Après une **`/code-review`** acceptée : enfants Closed + docs à jour (`readme`, `roadmap`, **`/msa`** pour le suivi de la semaine courante si présent — `/c -a -p` si besoin), puis **`/qg -w`** (puis **`/cqg`** si le gate n’est pas `OK`), puis **`/crel`**, puis **`/mpr`**. Skill `finaliser-la-version`. Ne relance pas `/code-review`.
+Après une **`/code-review`** acceptée : tous les enfants Closed (y compris le ticket **tests humains** — sinon stop et **`/th`**) + docs à jour (`readme`, `roadmap`, **`/msa`** pour le suivi de la semaine courante si présent — `/c -a -p` si besoin), puis **`/qg -w`** (puis **`/cqg`** si le gate n’est pas `OK`), puis **`/crel`** (fusionne « Ce qu’on peut faire maintenant » du ticket tests humains dans les notes), puis **`/mpr`**. Skill `finaliser-la-version`. Ne relance pas `/code-review`.
 
 **Exemple :**
 

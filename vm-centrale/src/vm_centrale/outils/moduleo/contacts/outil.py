@@ -143,9 +143,14 @@ def _numeros_affaires(lecteur: LecteurModuleo, id_contact: int) -> dict[str, lis
 
 
 def _lire(lecteur: LecteurModuleo, id_contact: int, genre: str) -> Any:
-    if genre in _COORDONNEES:
-        return _coordonnees(lecteur, id_contact, genre)
-    return _numeros_affaires(lecteur, id_contact)
+    # Un contact supprimé entre la recherche et ses lectures (404) n'a ni
+    # coordonnées ni affaires : jamais une panne pour toute la recherche.
+    try:
+        if genre in _COORDONNEES:
+            return _coordonnees(lecteur, id_contact, genre)
+        return _numeros_affaires(lecteur, id_contact)
+    except ModuleoIntrouvable:
+        return [] if genre in _COORDONNEES else {role: [] for role in _AFFAIRES}
 
 
 def _fiches(lecteur: LecteurModuleo, ids: list[int]) -> list[Fiche]:

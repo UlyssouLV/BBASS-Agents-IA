@@ -265,7 +265,7 @@
     .agenda img {
       display: block;
       margin: 0 auto;
-      max-width: 170mm;
+      max-width: min(170mm, 100%);
       max-height: 250mm;
       width: auto;
       height: auto;
@@ -379,7 +379,8 @@
         <p class="kicker">Alternance Agents IA · 2026–2027</p>
         <h1>Bilan de semaine - Alternance Ulysse LONG</h1>
         <p class="meta">Semaine du 05 au 09 octobre 2026<br />
-        Dépôt : <a href="https://github.com/UlyssouLV/BBASS-Agents-IA">github.com/UlyssouLV/BBASS-Agents-IA</a></p>
+        Dépôt : <a href="https://github.com/UlyssouLV/BBASS-Agents-IA">github.com/UlyssouLV/BBASS-Agents-IA</a><br />
+        Documentation technique : <a href="https://ulyssoulv.github.io/BBASS-Agents-IA/">ulyssoulv.github.io/BBASS-Agents-IA</a></p>
         <div class="semaine">05–09 oct. 2026</div>
       </div>
       <nav class="toc" aria-label="Table des matières">
@@ -423,9 +424,6 @@
               <li><a href="#version-1-4-3">V1.4.3 — Cache des pages web</a></li>
               <li><a href="#version-1-4-4">V1.4.4 — Statut d’attente en direct</a></li>
               <li><a href="#version-1-5-0">V1.5.0 — Moduléo lecture</a></li>
-              <li><a href="#version-1-6-0">V1.6.0 — Documentation mémoire / souveraineté</a></li>
-              <li><a href="#version-1-7-0">V1.7.0 — Déploiement postes</a></li>
-              <li><a href="#version-1-8-0">V1.8.0 — Workflows n8n</a></li>
             </ol>
           </li>
           <li>
@@ -476,7 +474,7 @@
     <div class="jour">
       <h3>Jeudi 8 octobre</h3>
       <ul>
-        <li>À compléter. <span class="echeance">Horizon semaine : déploiement postes (V1.7.0), éventuellement n8n (V1.8.0).</span></li>
+        <li>À compléter.</li>
       </ul>
     </div>
 
@@ -493,18 +491,13 @@
     <h2>Reste à implémenter</h2>
     <ul>
       <li><strong>V1.5.0</strong> — Moduléo en lecture seule depuis le chat, via le premier Agent métier (pôle Administration).</li>
-      <li><strong>V1.6.0</strong> — documentation : mémoire conversationnelle et souveraineté des données.</li>
-      <li><strong>V1.7.0</strong> — déploiement postes (CI/CD, conteneurisation, installateur) — priorité avant l’absence à l’école.</li>
-      <li><strong>V1.8.0</strong> — workflows n8n (automatisations), branchés sur Moduléo.</li>
-      <li><strong>V1.9.0</strong> — analyse et traitement des pièces jointes, approfondis.</li>
-      <li><strong>Plus tard</strong> — dire « pas trouvé » plutôt qu’inventer après une recherche (#131, ex-1.4.5) ; optimisation de la recherche web ; pages refusées / PDF ; vérification de la fiabilité des sources ; modes Rapide / Approfondi.</li>
     </ul>
     </section>
 
     <section class="bloc" id="livre-pour">
     <h2>Livré pour le 08/10/2026</h2>
     <div class="recap">
-      <p><strong>Point jeudi 8 octobre — visé : V1.5.0 puis V1.7.0 · livré : V1.4.4</strong></p>
+      <p><strong>Point jeudi 8 octobre — visé : V1.5.0 · livré : V1.4.4</strong></p>
       <h3>Chat</h3>
       <ul>
         <li>Ton professionnel et affichage structuré (V1.2.2) : vouvoiement, sans remplissage ni relance systématique ; mise en forme, blocs de code colorés, liens cliquables vers les sources.</li>
@@ -528,7 +521,7 @@
 
     <section class="bloc versions" id="descriptif-versions">
       <h2>Descriptif des versions</h2>
-      <p class="lead">Versions livrées depuis le bilan précédent, puis prévisionnel de la semaine (feuille de route à jour au 07/10).</p>
+      <p class="lead">Versions livrées depuis le bilan précédent.</p>
 
       <div class="version" id="version-1-2-2">
         <div class="version-head">
@@ -637,47 +630,11 @@
         <p>Premier branchement Moduléo (API lecture seule) via l’Agent Administration : demander depuis le chat des éléments issus de Moduléo (ex. affaire, intervenants) selon l’allowlist du pôle.</p>
         </div>
       </div>
-
-      <div class="version" id="version-1-6-0">
-        <div class="version-head">
-          <h3>V1.6.0 — Documentation mémoire et souveraineté</h3>
-          <span class="prevu">Ensuite (après Moduléo lecture)</span>
-        </div>
-        <div class="version-body">
-        <p>Deux documents produit : persistance de la mémoire conversationnelle, et cartographie de la souveraineté des données (ce qui reste chez le cabinet vs Mistral / SearXNG). Pas de nouvelle capacité code hors doc.</p>
-        </div>
-      </div>
-
-      <div class="version" id="version-1-7-0">
-        <div class="version-head">
-          <h3>V1.7.0 — Déploiement postes</h3>
-          <span class="prevu">Priorité fin de semaine</span>
-        </div>
-        <div class="version-body">
-        <p>Chaîne de déploiement pour installer et mettre à jour le logiciel sur les postes : CI/CD, conteneurisation si retenue, installateur / accès UI (backend local obligatoire). Priorité avant l’absence à l’école.</p>
-        </div>
-      </div>
-
-      <div class="version" id="version-1-8-0">
-        <div class="version-head">
-          <h3>V1.8.0 — Workflows n8n</h3>
-          <span class="prevu">Livraison prévue le 08/10/2026</span>
-        </div>
-        <div class="version-body">
-        <p>Socle d’automatisation n8n, branché sur Moduléo 1.5.0 : déclencher / composer des workflows sans god-mode. Visé jeudi si le déploiement le permet.</p>
-        </div>
-      </div>
     </section>
 
     <section class="bloc agenda" id="agenda-quotidien">
       <h2>Emploi du temps quotidien</h2>
-      <!-- Remplacer le placeholder par l’image dès qu’elle est disponible :
-           <img src="agenda-quotidien-tableau.png" alt="Emploi du temps quotidien — semaine du 05 au 09 octobre 2026" />
-      -->
-      <div class="agenda-placeholder">
-        <strong>Emploi du temps quotidien</strong>
-        Document à venir (tableau d’emploi du temps de la semaine).
-      </div>
+      <img src="agenda-quotidien-tableau.png" alt="Emploi du temps quotidien — semaine du 05 au 09 octobre 2026" />
     </section>
   </div>
 </body>
