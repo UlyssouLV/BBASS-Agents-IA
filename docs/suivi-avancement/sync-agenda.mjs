@@ -239,13 +239,14 @@ function xlsxVersHtml(xlsxPath, htmlTmp) {
   const {cmd, prefix} = pythonExe();
   const run = spawnSync(
     cmd,
-    [...prefix, XLSX_TO_HTML, xlsxPath, htmlTmp],
-    {encoding: 'utf8'},
+    [...prefix, XLSX_TO_HTML, xlsxPath],
+    {encoding: 'utf8', maxBuffer: 16 * 1024 * 1024},
   );
   if (run.status !== 0) {
     const detail = [run.stderr, run.stdout].filter(Boolean).join('\n').trim();
     throw new Error(`xlsx→html échoué\n${detail || '(pas de détail)'}`);
   }
+  fs.writeFileSync(htmlTmp, run.stdout, 'utf8');
 }
 
 async function capturerPng(htmlTmp, pngPath) {

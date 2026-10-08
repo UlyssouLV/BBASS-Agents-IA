@@ -474,7 +474,8 @@
     <div class="jour">
       <h3>Jeudi 8 octobre</h3>
       <ul>
-        <li>À compléter.</li>
+        <li><strong>Livraison de la V1.5.0</strong> (13:59) : depuis le chat, l’assistant consulte Moduléo en lecture seule. Il retrouve une affaire (par numéro, nom, responsable, période…) avec son client, ses intervenants et son état, ou un contact avec ses coordonnées et ses affaires. Les numéros, dates et téléphones lus dans Moduléo sont gardés dans la réponse, et la source « Moduléo, affaire … » est citée.</li>
+        <li>Deux séries de tests humains sur le serveur Moduléo du cabinet, puis corrections livrées avec la version : affaires récentes quand aucun critère n’est donné, réponse honnête quand Moduléo ne renvoie rien, titres de conversation sans mot inventé, coordonnées d’un contact cherchées au lieu d’être déclarées absentes.</li>
       </ul>
     </div>
 
@@ -490,14 +491,14 @@
     <section class="bloc" id="reste-a-implementer">
     <h2>Reste à implémenter</h2>
     <ul>
-      <li><strong>V1.5.0</strong> — Moduléo en lecture seule depuis le chat, via le premier Agent métier (pôle Administration).</li>
+      <li>Aucune version restante pour cette semaine.</li>
     </ul>
     </section>
 
     <section class="bloc" id="livre-pour">
     <h2>Livré pour le 08/10/2026</h2>
     <div class="recap">
-      <p><strong>Point jeudi 8 octobre — visé : V1.5.0 · livré : V1.4.4</strong></p>
+      <p><strong>Point jeudi 8 octobre — visé : V1.5.0 · livré : V1.5.0</strong></p>
       <h3>Chat</h3>
       <ul>
         <li>Ton professionnel et affichage structuré (V1.2.2) : vouvoiement, sans remplissage ni relance systématique ; mise en forme, blocs de code colorés, liens cliquables vers les sources.</li>
@@ -511,6 +512,10 @@
         <li>Mémoire de la conversation (V1.4.1) : à chaque tour, rappel des pièces jointes, recherches et URL du collaborateur (même hors des 3 messages) ; questions couvertes ; outils pour relire un document ou une page, ou lire une URL envoyée ; jusqu’à 5 appels d’outils par message.</li>
         <li>Plafond des pages (V1.4.2) : les pages trop longues sont mesurées avec le vrai compteur du modèle ; une jauge sous la saisie montre le remplissage de la conversation.</li>
         <li>Cache des pages (V1.4.3) : une page lue dans la journée est réutilisée 24 h, y compris dans une autre conversation ; relecture possible si elle a changé ; en cas d’échec, l’assistant le dit et s’appuie sur la version datée.</li>
+      </ul>
+      <h3>Moduléo</h3>
+      <ul>
+        <li>Lecture Moduléo (V1.5.0) : depuis le chat, recherche d’affaires (numéro, nom, état, période, responsable…) et de contacts (coordonnées, affaires liées), en lecture seule, pour tous les comptes ; références lues gardées dans la réponse et citées en source ; Moduléo indisponible ou refusé dit clairement ; accès Moduléo protégé (jamais montré à l’IA ni dans l’inspecteur).</li>
       </ul>
       <h3>Mode développeur</h3>
       <ul>
@@ -624,10 +629,11 @@
       <div class="version" id="version-1-5-0">
         <div class="version-head">
           <h3>V1.5.0 — Moduléo en lecture</h3>
-          <span class="prevu">Livraison prévue le 07/10/2026</span>
+          <span class="deploye">Déployé le 08/10/2026 à 13:59</span>
         </div>
         <div class="version-body">
-        <p>Premier branchement Moduléo (API lecture seule) via l’Agent Administration : demander depuis le chat des éléments issus de Moduléo (ex. affaire, intervenants) selon l’allowlist du pôle.</p>
+        <p>Jusqu’ici, pour connaître l’état d’une affaire, ses intervenants ou les coordonnées d’un contact, il fallait quitter le chat et ouvrir Moduléo. Désormais, l’assistant consulte Moduléo lui-même, en lecture seule, pour tous les comptes : il retrouve des affaires par numéro, nom, état, période, responsable ou chargé d’affaire (les plus récentes d’abord, celles des 90 derniers jours si aucun critère n’est donné), et des contacts avec leurs coordonnées et les affaires où ils apparaissent.</p>
+        <p>Ce qui a été lu dans Moduléo reste fiable dans toute la conversation : numéros, dates et téléphones ne sont pas retirés de la réponse, la source « Moduléo, affaire … » est citée, et l’assistant peut y revenir plus loin dans le fil. Si Moduléo est indisponible ou refuse l’accès, l’assistant le dit simplement. L’accès Moduléo est une clé unique dédiée au cabinet, protégée, jamais montrée à l’IA ni dans l’inspecteur. Rien n’est jamais écrit dans Moduléo.</p>
         </div>
       </div>
     </section>

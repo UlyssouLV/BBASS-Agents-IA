@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Lit un planning Excel (feuille Planning) et écrit un HTML table prêt à capturer."""
+"""Lit un planning Excel (feuille Planning) et écrit sur la sortie standard un HTML table prêt à capturer."""
 from __future__ import annotations
 
 import datetime as dt
@@ -102,12 +102,11 @@ def font_css(cell) -> str:
 
 
 def main() -> None:
-    if len(sys.argv) != 3:
+    if len(sys.argv) != 2:
         raise SystemExit(
-            "Usage : python xlsx-vers-html-agenda.py <source.xlsx> <sortie.html>"
+            "Usage : python xlsx-vers-html-agenda.py <source.xlsx> > sortie.html"
         )
     source = Path(sys.argv[1])
-    sortie = Path(sys.argv[2])
     wb = openpyxl.load_workbook(source, data_only=True)
     ws = wb["Planning"] if "Planning" in wb.sheetnames else wb.active
 
@@ -264,8 +263,8 @@ def main() -> None:
 </body>
 </html>
 """
-    sortie.write_text(doc, encoding="utf-8")
-    print(sortie)
+    # Sortie standard plutôt qu'un chemin en argument : l'appelant choisit où écrire.
+    sys.stdout.buffer.write(doc.encode("utf-8"))
 
 
 if __name__ == "__main__":
