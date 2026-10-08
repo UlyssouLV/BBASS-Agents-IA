@@ -1,6 +1,6 @@
 # sources
 
-`ajouter_sources` ajoute à la fin de la réponse de chat une ligne « Sources : » avec un lien Markdown vers chaque page d'où vient un chiffre gardé : `Sources : [titre](url), [titre](url)`. Sans chiffre de ce type, la réponse est inchangée.
+`ajouter_sources` ajoute à la fin de la réponse de chat une ligne « Sources : » avec un lien Markdown vers chaque page d'où vient un chiffre gardé, et, depuis la 1.5.0 (#174), la citation sans lien de chaque fiche lue par un outil (`LectureSource`, table `lectures_outils`) : `Sources : [titre](url), Moduléo, affaire 2024-123`. Sans chiffre de ce type, la réponse est inchangée.
 
 **Règles.**
 
@@ -8,7 +8,7 @@
 - Seuls comptent les chiffres absents des messages du compte (conversation et message du tour) et des extraits des pièces jointes : un chiffre que le compte a lui-même apporté n'appelle pas de source.
 - Une année seule (entier de 1900 à 2100) ne fait citer aucune page : « 2026 » figure dans presque toutes.
 - Un chiffre qui figure dans une page déjà en lien dans la réponse (lien Markdown ou URL nue, comparée par `normaliser_url`) n'ajoute rien, et cette page n'est pas citée de nouveau.
-- Pour chaque autre chiffre, une seule page : la plus récente de la conversation (table `resultats_recherche_web`, ordre des lignes) dont le **texte nettoyé** le contient. Jamais d'après l'extrait du moteur (une page qu'on n'a pas lue n'est pas citée ; l'extrait reste une source du garde-fou chiffres), ni d'après les faits de l'appel d'extraction ou les questions couvertes, écrits par un modèle.
+- Pour chaque autre chiffre, une seule source : la plus récente de la conversation dont le texte le contient, page (table `resultats_recherche_web`, son **texte nettoyé**) ou fiche lue par un outil (table `lectures_outils`, citée « Moduléo, affaire 2024-123 », sans lien), dans l'ordre de leur date d'enregistrement. Jamais d'après l'extrait du moteur (une page qu'on n'a pas lue n'est pas citée ; l'extrait reste une source du garde-fou chiffres), ni d'après les faits de l'appel d'extraction ou les questions couvertes, écrits par un modèle.
 - Le texte du lien est le titre de la page (crochets remplacés par des parenthèses), sinon son URL. Une page présente sur plusieurs lignes (relue, recherchée deux fois) n'est citée qu'une fois, avec le premier titre connu. Les pages suivent l'ordre de la conversation.
 - **Un seul bloc.** Si la réponse se termine déjà par un bloc « Source : » ou « Sources : » (gras compris), les pages manquantes y sont ajoutées au même format : à la suite de la ligne (`, [titre](url)`) ou en puces de même marque. « Source » passe au pluriel. Un bloc qui n'est pas à la fin de la réponse ne compte pas.
 

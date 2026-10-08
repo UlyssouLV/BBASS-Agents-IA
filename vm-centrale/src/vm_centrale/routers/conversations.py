@@ -26,6 +26,7 @@ from vm_centrale.config import (
 from vm_centrale.consommation import enregistrer_consommation
 from vm_centrale.database import FabriqueSession, get_db, get_fabrique_session
 from vm_centrale.garde_fous import (
+    LectureSource,
     PageSource,
     ajouter_sources,
     mentionner_pages_trop_longues,
@@ -60,6 +61,12 @@ from vm_centrale.models import (
     QuestionCouverte,
     ResultatRechercheWeb,
 )
+from vm_centrale.lectures_outils import (
+    lectures_de_la_conversation,
+    rattacher_lectures_au_message,
+    supprimer_lectures,
+)
+from vm_centrale.moduleo.client import LecteurModuleo, get_client_moduleo
 from vm_centrale.moteur_recherche import MoteurRecherche, get_moteur_recherche
 from vm_centrale.questions_couvertes import (
     AppelQuestionsPieceJointe,
@@ -524,17 +531,32 @@ def _textes_de_recherche(db: Session, conversation_id: int) -> list[str]:
     return [texte for ligne in lignes for texte in ligne if texte and texte.strip()]
 
 
-def _pages_de_la_conversation(db: Session, conversation_id: int) -> list[PageSource]:
+def _sources_de_la_conversation(db: Session, conversation_id: int) -> list[PageSource | LectureSource]:
     # Texte nettoyé des pages (spec 1.4.0), jamais l'extrait du moteur
     # d'une page qu'on n'a pas lue (#162) ni les faits produits par l'appel
-    # d'extraction, qui pourraient inventer. La plus récente en dernier.
+    # d'extraction, qui pourraient inventer ; et les fiches lues par un
+    # outil (spec 1.5.0). La plus récente en dernier.
     lignes = (
-        db.query(ResultatRechercheWeb.url, ResultatRechercheWeb.titre, ResultatRechercheWeb.texte_nettoye)
+        db.query(
+            ResultatRechercheWeb.url,
+            ResultatRechercheWeb.titre,
+            ResultatRechercheWeb.texte_nettoye,
+            ResultatRechercheWeb.date_creation,
+        )
         .filter(ResultatRechercheWeb.conversation_id == conversation_id)
         .order_by(ResultatRechercheWeb.id)
         .all()
     )
-    return [PageSource(url, titre, texte_nettoye or "") for url, titre, texte_nettoye in lignes]
+    datees: list[tuple[datetime, PageSource | LectureSource]] = [
+        (date_creation, PageSource(url, titre, texte_nettoye or ""))
+        for url, titre, texte_nettoye, date_creation in lignes
+    ]
+    datees += [
+        (lecture.date_creation, LectureSource(lecture.citation, lecture.texte))
+        for lecture in lectures_de_la_conversation(db, conversation_id)
+    ]
+    # Tri stable : à date égale, chaque table garde son ordre.
+    return [source for _, source in sorted(datees, key=lambda datee: datee[0])]
 
 
 def _reponse_visible(
@@ -560,7 +582,7 @@ def _reponse_visible(
         visible,
         _messages_du_compte(db, conversation_id, nouveau_message)
         + _extraits_pieces_jointes(db, conversation_id, piece_jointe),
-        _pages_de_la_conversation(db, conversation_id),
+        _sources_de_la_conversation(db, conversation_id),
     )
     visible = mentionner_pages_trop_longues(visible, pages_trop_longues)
     enregistrer_echange_local(
@@ -590,6 +612,8 @@ def _appliquer_garde_fous(
     extraits = _extraits_pieces_jointes(db, conversation_id, piece_jointe)
     # Un texte de recherche non vide compte comme un document.
     extraits += _textes_de_recherche(db, conversation_id)
+    # Une fiche lue par un outil (Moduléo, spec 1.5.0) aussi.
+    extraits += [lecture.texte for lecture in lectures_de_la_conversation(db, conversation_id)]
     textes_source = [*_messages_du_compte(db, conversation_id, nouveau_message), *extraits]
     sans_chiffre_invente = retirer_chiffres_hors_source(reponse, textes_source)
     if sans_chiffre_invente == reponse:
@@ -783,6 +807,7 @@ def creer_conversation(
     client: MistralClient = Depends(get_mistral_client),
     moteur_recherche: MoteurRecherche = Depends(get_moteur_recherche),
     telechargeur_pages: TelechargeurPages = Depends(get_telechargeur_pages),
+    client_moduleo: LecteurModuleo | None = Depends(get_client_moduleo),
     fabrique_session: FabriqueSession = Depends(get_fabrique_session),
 ) -> StreamingResponse:
     reponse_en_cache = _reponse_en_cache(identifiant_compte, requete.cle_idempotence)
@@ -799,7 +824,14 @@ def creer_conversation(
 
     def tour(db_tour: Session, publier: Publier) -> ConversationCreeResponse:
         return _tour_creer_conversation(
-            db_tour, publier, requete, identifiant_compte, client, moteur_recherche, telechargeur_pages
+            db_tour,
+            publier,
+            requete,
+            identifiant_compte,
+            client,
+            moteur_recherche,
+            telechargeur_pages,
+            client_moduleo,
         )
 
     return _flux_du_tour(identifiant_compte, None, requete.cle_idempotence, fabrique_session, tour)
@@ -879,6 +911,7 @@ def _tour_creer_conversation(
     client: MistralClient,
     moteur_recherche: MoteurRecherche,
     telechargeur_pages: TelechargeurPages,
+    client_moduleo: LecteurModuleo | None,
 ) -> ConversationCreeResponse:
     maintenant = datetime.now(timezone.utc)
     conversation = Conversation(
@@ -933,8 +966,8 @@ def _tour_creer_conversation(
     # (supprimer_conversation), ce qui laisserait cette ligne sans
     # conversation pointer vers une pièce jointe disparue.
     # Outils sur l'appel principal dès le premier message (spec 1.4.0) :
-    # aucune pièce jointe d'un tour précédent ici, seul rechercher_web
-    # est éligible.
+    # aucune pièce jointe d'un tour précédent ici, seuls rechercher_web et,
+    # si Moduléo est configuré, chercher_affaires_moduleo sont éligibles.
     contexte_outils = ContexteTour(
         db=db,
         conversation_id=conversation.id,
@@ -943,6 +976,7 @@ def _tour_creer_conversation(
         client_mistral=client,
         message_du_tour=requete.message,
         publier=publier,
+        client_moduleo=client_moduleo,
     )
     tools = outils_du_tour(contexte_outils)
     attendre_questions = _lancer_questions_piece_jointe(client, piece_jointe, requete.message)
@@ -1019,6 +1053,7 @@ def _tour_creer_conversation(
     )
     db.add_all([message_utilisateur, message_assistant])
     _rattacher_recherches_au_message(db, message_assistant)
+    rattacher_lectures_au_message(db, message_assistant)
     if piece_jointe is not None:
         _lier_piece_jointe_a_la_conversation(piece_jointe, conversation)
         piece_jointe.message_id = message_utilisateur.id
@@ -1140,6 +1175,7 @@ def supprimer_conversation(
     db.query(ResultatRechercheWeb).filter(
         ResultatRechercheWeb.conversation_id == conversation.id
     ).delete()
+    supprimer_lectures(db, conversation.id)
 
     # Consommation n'a pas de cascade ORM déclarée sur Conversation (spec
     # 1.1.3) : la ligne survit à la conversation qui l'a produite, seul le
@@ -1668,6 +1704,7 @@ def envoyer_message(
     client: MistralClient = Depends(get_mistral_client),
     moteur_recherche: MoteurRecherche = Depends(get_moteur_recherche),
     telechargeur_pages: TelechargeurPages = Depends(get_telechargeur_pages),
+    client_moduleo: LecteurModuleo | None = Depends(get_client_moduleo),
     fabrique_session: FabriqueSession = Depends(get_fabrique_session),
 ) -> StreamingResponse:
     reponse_en_cache = _reponse_en_cache(identifiant_compte, requete.cle_idempotence)
@@ -1690,6 +1727,7 @@ def envoyer_message(
             client,
             moteur_recherche,
             telechargeur_pages,
+            client_moduleo,
         )
 
     return _flux_du_tour(identifiant_compte, conversation_id, requete.cle_idempotence, fabrique_session, tour)
@@ -1704,6 +1742,7 @@ def _tour_envoyer_message(
     client: MistralClient,
     moteur_recherche: MoteurRecherche,
     telechargeur_pages: TelechargeurPages,
+    client_moduleo: LecteurModuleo | None,
 ) -> MessageEnvoyeResponse:
     conversation = _recuperer_conversation_du_compte(db, conversation_id, identifiant_compte)
 
@@ -1756,6 +1795,7 @@ def _tour_envoyer_message(
         client_mistral=client,
         message_du_tour=requete.message,
         publier=publier,
+        client_moduleo=client_moduleo,
     )
     tools = outils_du_tour(contexte_outils)
 
@@ -1812,6 +1852,7 @@ def _tour_envoyer_message(
     )
     db.add_all([message_utilisateur, message_assistant])
     _rattacher_recherches_au_message(db, message_assistant)
+    rattacher_lectures_au_message(db, message_assistant)
     if piece_jointe is not None:
         _lier_piece_jointe_a_la_conversation(piece_jointe, conversation)
         piece_jointe.message_id = message_utilisateur.id

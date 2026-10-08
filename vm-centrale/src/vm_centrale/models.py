@@ -217,6 +217,32 @@ class ResultatRechercheWeb(Base):
     date_creation: Mapped[datetime] = mapped_column(DateTime)
 
 
+class LectureOutil(Base):
+    # Une ligne par fiche qu'un outil d'un logiciel du cabinet a renvoyée au
+    # modèle (spec 1.5.0, #174 : Moduléo) : source des garde-fous chiffres
+    # et sources sur toute la conversation, comme resultats_recherche_web
+    # pour les pages web. Aucun cache entre conversations.
+    __tablename__ = "lectures_outils"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    conversation_id: Mapped[int] = mapped_column(
+        ForeignKey(_FK_CONVERSATIONS_ID, ondelete="CASCADE"), index=True
+    )
+    # Nullable : renseigné à la persistance de la réponse du tour, comme
+    # resultats_recherche_web.message_id.
+    message_id: Mapped[int | None] = mapped_column(
+        ForeignKey("messages.id"), nullable=True, index=True
+    )
+    # Le logiciel lu (`moduleo`).
+    outil: Mapped[str] = mapped_column(String)
+    # Ce que la ligne « Sources : » cite après le nom du logiciel
+    # (« affaire 2024-123 »).
+    reference: Mapped[str] = mapped_column(String)
+    # La fiche telle qu'envoyée au modèle.
+    texte: Mapped[str] = mapped_column(String)
+    date_creation: Mapped[datetime] = mapped_column(DateTime)
+
+
 class PageWebEnCache(Base):
     # Cache commun des pages web (spec 1.4.3, ADR-0015) : une ligne par URL
     # exacte, partagée entre tous les comptes et tous les pôles. Aucune clé

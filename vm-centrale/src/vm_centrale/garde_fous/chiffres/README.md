@@ -2,7 +2,7 @@
 
 `retirer_chiffres_hors_source` retire de la réponse un chiffre (décimale, pourcentage, entier d'au moins deux chiffres, ou entier d'un chiffre suivi d'une unité de durée) absent des textes source.
 
-**Textes source.** Messages `user` de la conversation, message du tour, extraits de pièces jointes, extraits du moteur et texte nettoyé des pages de la conversation (table `resultats_recherche_web`, depuis 1.4.0 ; page écrite par le compte et lue par `lire_pages_web`, provenance `utilisateur`, depuis 1.4.1, #140). Jamais l'extrait (les faits depuis la 1.4.3) de l'appel d'extraction ni les réponses des questions couvertes, écrites par un modèle (depuis 1.4.1, #137).
+**Textes source.** Messages `user` de la conversation, message du tour, extraits de pièces jointes, extraits du moteur et texte nettoyé des pages de la conversation (table `resultats_recherche_web`, depuis 1.4.0 ; page écrite par le compte et lue par `lire_pages_web`, provenance `utilisateur`, depuis 1.4.1, #140), et fiches lues par un outil d'un logiciel du cabinet (table `lectures_outils`, Fiche Moduléo, depuis 1.5.0, #174), sur toute la conversation. Jamais l'extrait (les faits depuis la 1.4.3) de l'appel d'extraction ni les réponses des questions couvertes, écrites par un modèle (depuis 1.4.1, #137).
 
 **Règles.**
 

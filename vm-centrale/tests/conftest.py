@@ -8,6 +8,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from faux_moduleo import FauxModuleo
+
 from vm_centrale.database import Base, get_db, get_fabrique_session
 from vm_centrale.main import app
 from vm_centrale.mistral_client import (
@@ -20,6 +22,7 @@ from vm_centrale.mistral_client import (
     get_mistral_client,
 )
 from vm_centrale.models import Compte, ComptePole
+from vm_centrale.moduleo.client import get_client_moduleo
 from vm_centrale.moteur_recherche import MoteurIndisponible, ResultatRecherche, get_moteur_recherche
 from vm_centrale.outils.lire_pages_web import CONSIGNE_LECTURE_PAGE, CONSIGNE_REVERIFICATION_PAGE
 from vm_centrale.outils.piece_jointe import CONSIGNE_RELECTURE_PIECES_JOINTES
@@ -582,9 +585,21 @@ def client(
     app.dependency_overrides[get_moteur_recherche] = lambda: moteur_recherche_factice
     app.dependency_overrides[get_telechargeur_pages] = lambda: telechargeur_pages_factice
     app.dependency_overrides[get_jeton_store] = lambda: jeton_store
+    # Moduléo non configuré par défaut : aucun test ne lit le .env réel ni
+    # ne sort vers le serveur du cabinet. Fixture `faux_moduleo` pour le
+    # configurer (spec 1.5.0).
+    app.dependency_overrides[get_client_moduleo] = lambda: None
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def faux_moduleo(client):
+    # Moduléo configuré, servi par le faux de tests/faux_moduleo.py.
+    faux = FauxModuleo()
+    app.dependency_overrides[get_client_moduleo] = lambda: faux
+    return faux
 
 
 @pytest.fixture

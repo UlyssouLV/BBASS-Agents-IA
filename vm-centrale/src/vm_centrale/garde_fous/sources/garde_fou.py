@@ -26,11 +26,24 @@ class PageSource:
     texte: str
 
 
-def ajouter_sources(reponse: str, textes_du_compte: Iterable[str], pages: Iterable[PageSource]) -> str:
+@dataclass(frozen=True)
+class LectureSource:
+    # Une fiche lue par un outil d'un logiciel du cabinet (spec 1.5.0,
+    # table `lectures_outils`) : citée sans lien, « Moduléo, affaire
+    # 2024-123 ».
+    citation: str
+    texte: str
+
+
+def ajouter_sources(
+    reponse: str, textes_du_compte: Iterable[str], sources: Iterable[PageSource | LectureSource]
+) -> str:
     # `textes_du_compte` : messages du compte et extraits des pièces jointes.
-    # Un chiffre qui y figure n'a pas besoin de page pour source. `pages` :
-    # dans l'ordre de la conversation, la plus récente en dernier.
-    pages = list(pages)
+    # Un chiffre qui y figure n'a pas besoin de source. `sources` : pages et
+    # lectures d'outil dans l'ordre de la conversation, la plus récente en
+    # dernier.
+    sources = list(sources)
+    pages = [source for source in sources if isinstance(source, PageSource)]
     chiffres = {
         chiffre
         for chiffre in chiffres_controles(reponse) - chiffres_des_sources(textes_du_compte)
@@ -43,17 +56,21 @@ def ajouter_sources(reponse: str, textes_du_compte: Iterable[str], pages: Iterab
     for page in pages:
         cle = normaliser_url(page.url)
         titres[cle] = titres.get(cle) or page.titre
-    citees: dict[str, PageSource] = {}
-    for page in reversed(pages):
-        trouves = chiffres & chiffres_des_sources([page.texte])
+    # Clé → texte cité : URL normalisée d'une page, citation d'une lecture.
+    citees: dict[str, str] = {}
+    for source in reversed(sources):
+        trouves = chiffres & chiffres_des_sources([source.texte])
         if not trouves:
             continue
         chiffres -= trouves
-        cle = normaliser_url(page.url)
-        citees.setdefault(cle, PageSource(page.url, titres[cle], page.texte))
+        if isinstance(source, LectureSource):
+            citees.setdefault(source.citation, source.citation)
+            continue
+        cle = normaliser_url(source.url)
+        citees.setdefault(cle, f"[{_texte_du_lien(titres[cle], source.url)}]({source.url})")
     if not citees:
         return reponse
-    liens = [f"[{_texte_du_lien(page)}]({page.url})" for page in reversed(citees.values())]
+    liens = list(reversed(citees.values()))
     return _completer_le_bloc(reponse.rstrip(), liens) or f"{reponse.rstrip()}\n\nSources : {', '.join(liens)}"
 
 
@@ -83,7 +100,7 @@ def _completer_le_bloc(reponse: str, liens: list[str]) -> str | None:
     return "\n".join(lignes)
 
 
-def _texte_du_lien(page: PageSource) -> str:
+def _texte_du_lien(titre: str, url: str) -> str:
     # Des crochets dans le titre fermeraient le lien Markdown trop tôt.
-    titre = page.titre.strip().replace("[", "(").replace("]", ")")
-    return titre or page.url
+    titre = titre.strip().replace("[", "(").replace("]", ")")
+    return titre or url

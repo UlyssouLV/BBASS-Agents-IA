@@ -9,6 +9,7 @@ from vm_centrale.moduleo import client as client_module
 from vm_centrale.moduleo.client import (
     ClientModuleo,
     ModuleoIndisponible,
+    ModuleoIntrouvable,
     ModuleoRefuse,
     RequeteInterdite,
 )
@@ -99,6 +100,15 @@ def test_cle_ou_droit_refuse_leve_moduleo_refuse(monkeypatch, statut):
 
     with pytest.raises(ModuleoRefuse):
         client.lire("cogeo/affaire/{idAffaire}", {"idAffaire": 12})
+
+
+def test_element_inexistant_leve_moduleo_introuvable_une_panne_pour_qui_ne_lattend_pas(monkeypatch):
+    client = _client(monkeypatch, lambda _: httpx.Response(404, text="Introuvable"))
+
+    with pytest.raises(ModuleoIntrouvable) as erreur:
+        client.lire("cogeo/affaire/numeroAffaire?numAffaire={numAffaire}", {"numAffaire": "1999-001"})
+
+    assert isinstance(erreur.value, ModuleoIndisponible)
 
 
 def _delai_depasse(requete: httpx.Request) -> httpx.Response:
