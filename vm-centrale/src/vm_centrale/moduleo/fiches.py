@@ -1,11 +1,15 @@
 from dataclasses import dataclass
 from datetime import date
 
+from vm_centrale.lectures_outils import Fiche
 from vm_centrale.moduleo.resolution import Noms, Utilisateur
 
 # Fiche Moduléo (spec 1.5.0) : le texte dense d'un élément lu dans Moduléo,
 # en noms, jamais la réponse brute ni un id. C'est ce que reçoit le modèle et
 # ce qu'enregistre `lectures_outils`. Un champ vide n'a pas de ligne.
+#
+# Ses questions couvertes (#177) : écrites ici par gabarit, champ par
+# champ, jamais par un appel Mistral. Un champ vide n'a pas de question.
 
 _DATES_AFFAIRE = (
     ("DateCreation", "Date de création"),
@@ -15,30 +19,49 @@ _DATES_AFFAIRE = (
 )
 
 
-def reference_affaire(affaire: dict) -> str:
-    # Citée par la ligne « Sources : » : « Moduléo, affaire 2024-123 ».
-    return f"affaire {_texte(affaire.get('Numero'))}"
-
-
-def fiche_affaire(affaire: dict, intervenants: list[dict], noms: Noms) -> str:
-    lignes = [f"Affaire {_texte(affaire.get('Numero'))}"]
-    _ajouter(lignes, "Objet", _texte(affaire.get("Objet")))
-    _ajouter(lignes, "État", _texte(affaire.get("Etat")))
-    for champ, libelle in _DATES_AFFAIRE:
-        _ajouter(lignes, libelle, _date(affaire.get(champ)))
-    _ajouter(lignes, "Adresse", _texte(affaire.get("Adresse")))
-    _ajouter(lignes, "Commune", noms.communes.get(_id(affaire.get("IdCommune")), ""))
-    _ajouter(lignes, "Client", _contact(noms, affaire.get("IdClient"), affaire.get("QualiteClient")))
-    _ajouter(
-        lignes, "Représentant", _contact(noms, affaire.get("IdRepresentant"), affaire.get("QualiteRepresentant"))
-    )
-    _ajouter(lignes, "Responsable", _utilisateur(noms.utilisateurs.get(_id(affaire.get("IdResponsable")))))
-    _ajouter(lignes, "Chargé d'affaire", _utilisateur(noms.utilisateurs.get(_id(affaire.get("IdActeurEnCharge")))))
+def fiche_affaire(affaire: dict, intervenants: list[dict], noms: Noms) -> Fiche:
+    # Référence citée par la ligne « Sources : » : « Moduléo, affaire 2024-123 ».
+    numero = _texte(affaire.get("Numero"))
+    objet = _texte(affaire.get("Objet"))
+    etat = _texte(affaire.get("Etat"))
+    dates = [(libelle, _date(affaire.get(champ))) for champ, libelle in _DATES_AFFAIRE]
+    adresse = _texte(affaire.get("Adresse"))
+    commune = noms.communes.get(_id(affaire.get("IdCommune")), "")
+    client = _contact(noms, affaire.get("IdClient"), affaire.get("QualiteClient"))
+    representant = _contact(noms, affaire.get("IdRepresentant"), affaire.get("QualiteRepresentant"))
+    suivi = [
+        ("Responsable", _utilisateur(noms.utilisateurs.get(_id(affaire.get("IdResponsable"))))),
+        ("Chargé d'affaire", _utilisateur(noms.utilisateurs.get(_id(affaire.get("IdActeurEnCharge"))))),
+    ]
     lignes_intervenants = [ligne for intervenant in intervenants if (ligne := _intervenant(noms, intervenant))]
+
+    lignes = [f"Affaire {numero}"]
+    _ajouter(lignes, "Objet", objet)
+    _ajouter(lignes, "État", etat)
+    for libelle, valeur in dates:
+        _ajouter(lignes, libelle, valeur)
+    _ajouter(lignes, "Adresse", adresse)
+    _ajouter(lignes, "Commune", commune)
+    _ajouter(lignes, "Client", client)
+    _ajouter(lignes, "Représentant", representant)
+    for libelle, valeur in suivi:
+        _ajouter(lignes, libelle, valeur)
     if lignes_intervenants:
         lignes.append("Intervenants :")
         lignes.extend(f"- {ligne}" for ligne in lignes_intervenants)
-    return "\n".join(lignes)
+
+    de_laffaire = f"de l'affaire {numero}"
+    client_represente = f"{client}, représenté par {representant}" if client and representant else client
+    questions = _questions(
+        (f"Quel est l'objet {de_laffaire} ?", objet),
+        (f"Quel est l'état {de_laffaire} ?", etat),
+        (f"Quelles sont les dates {de_laffaire} ?", _libelles(dates)),
+        (f"Où se trouve l'affaire {numero} ?", ", ".join(partie for partie in (adresse, commune) if partie)),
+        (f"Qui est le client {de_laffaire} ?", client_represente),
+        (f"Qui suit l'affaire {numero} ?", _libelles(suivi)),
+        (f"Qui sont les intervenants {de_laffaire} ?", " ; ".join(lignes_intervenants)),
+    )
+    return Fiche(f"affaire {numero}", "\n".join(lignes), questions)
 
 
 # TypeContact : entier dans le JSON, nom de l'énumération dans le XML du
@@ -71,28 +94,49 @@ class DetailsContact:
     affaires_intervenant: list[str]
 
 
-def reference_contact(contact: dict) -> str:
-    # « Moduléo, contact Étude Dupont ».
-    return f"contact {_texte(contact.get('Nom'))}"
+def fiche_contact(contact: dict, details: DetailsContact, communes: dict[int, str]) -> Fiche:
+    # Référence : « Moduléo, contact Étude Dupont ».
+    nom = _texte(contact.get("Nom"))
+    telephones = _valeurs(_avec_lieu(_texte(t.get("Numero")), t.get("Lieu")) for t in details.telephones)
+    emails = _valeurs(_avec_lieu(_texte(e.get("Adresse")), e.get("Lieu")) for e in details.emails)
+    adresses = _valeurs(_adresse(a, communes) for a in details.adresses)
+    affaires = [
+        ("Client des affaires", _numeros(details.affaires_client)),
+        ("Intervenant dans les affaires", _numeros(details.affaires_intervenant)),
+    ]
 
-
-def fiche_contact(contact: dict, details: DetailsContact, communes: dict[int, str]) -> str:
-    lignes = [f"Contact {_texte(contact.get('Nom'))}"]
+    lignes = [f"Contact {nom}"]
     type_contact = contact.get("TypeContact")
     if type_contact not in _TYPES_SANS_LIGNE:
         _ajouter(lignes, "Type", _TYPES_CONTACT.get(type_contact, _texte(type_contact)))
-    _ajouter_liste(
-        lignes, "Téléphones", [_avec_lieu(_texte(t.get("Numero")), t.get("Lieu")) for t in details.telephones]
+    _ajouter_liste(lignes, "Téléphones", telephones)
+    _ajouter_liste(lignes, "Emails", emails)
+    _ajouter_liste(lignes, "Adresses", adresses)
+    for libelle, valeur in affaires:
+        _ajouter(lignes, libelle, valeur)
+
+    questions = _questions(
+        (f"Comment joindre {nom} ?", " ; ".join(telephones + emails)),
+        (f"Quelle est l'adresse de {nom} ?", " ; ".join(adresses)),
+        (f"Dans quelles affaires apparaît {nom} ?", _libelles(affaires)),
     )
-    _ajouter_liste(lignes, "Emails", [_avec_lieu(_texte(e.get("Adresse")), e.get("Lieu")) for e in details.emails])
-    _ajouter_liste(lignes, "Adresses", [_adresse(a, communes) for a in details.adresses])
-    _ajouter(lignes, "Client des affaires", _numeros(details.affaires_client))
-    _ajouter(lignes, "Intervenant dans les affaires", _numeros(details.affaires_intervenant))
-    return "\n".join(lignes)
+    return Fiche(f"contact {nom}", "\n".join(lignes), questions)
+
+
+def _questions(*paires: tuple[str, str]) -> tuple[tuple[str, str], ...]:
+    return tuple((question, reponse) for question, reponse in paires if reponse)
+
+
+def _libelles(valeurs: list[tuple[str, str]]) -> str:
+    # « Responsable : Jean Martin ; Chargé d'affaire : Sophie Bernard ».
+    return " ; ".join(f"{libelle} : {valeur}" for libelle, valeur in valeurs if valeur)
+
+
+def _valeurs(valeurs) -> list[str]:
+    return [valeur for valeur in valeurs if valeur]
 
 
 def _ajouter_liste(lignes: list[str], libelle: str, valeurs: list[str]) -> None:
-    valeurs = [valeur for valeur in valeurs if valeur]
     if valeurs:
         lignes.append(f"{libelle} :")
         lignes.extend(f"- {valeur}" for valeur in valeurs)

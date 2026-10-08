@@ -3,7 +3,7 @@ from typing import Any
 
 from vm_centrale.lectures_outils import Fiche
 from vm_centrale.moduleo.client import LecteurModuleo, ModuleoIntrouvable
-from vm_centrale.moduleo.fiches import fiche_affaire, reference_affaire
+from vm_centrale.moduleo.fiches import fiche_affaire
 from vm_centrale.moduleo.resolution import (
     Noms,
     NomNonResolu,
@@ -222,13 +222,10 @@ def _fiches(lecteur: LecteurModuleo, ids: list[int]) -> list[Fiche]:
         communes=resoudre_communes(lecteur, [a.get("IdCommune") for a in affaires.values()]),
     )
     return [
-        Fiche(
-            reference_affaire(affaires[id_affaire]),
-            fiche_affaire(
-                affaires[id_affaire],
-                [intervenant for intervenant in intervenants if intervenant.get("IdAffaire") == id_affaire],
-                noms,
-            ),
+        fiche_affaire(
+            affaires[id_affaire],
+            [intervenant for intervenant in intervenants if intervenant.get("IdAffaire") == id_affaire],
+            noms,
         )
         for id_affaire in ids
         if id_affaire in affaires

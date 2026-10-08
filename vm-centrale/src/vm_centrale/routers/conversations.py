@@ -62,6 +62,7 @@ from vm_centrale.models import (
     ResultatRechercheWeb,
 )
 from vm_centrale.lectures_outils import (
+    LectureDeLaConversation,
     lectures_de_la_conversation,
     rattacher_lectures_au_message,
     supprimer_lectures,
@@ -296,6 +297,13 @@ NOTE_MEMOIRE = (
     "relis-le (relire_pieces_jointes ou lire_pages_web), sauf s'il est déjà "
     "marqué « non présent selon l'extraction » pour ce besoin."
 )
+# Avant NOTE_MEMOIRE, quand la mémoire liste une lecture d'outil (spec
+# 1.5.0, #177) : une fiche est l'état du logiciel à sa date de lecture.
+NOTE_MEMOIRE_LECTURES = (
+    "Une lecture Moduléo est l'état de Moduléo à sa date de lecture : "
+    "rappelle l'outil Moduléo quand la question porte sur l'état actuel "
+    "d'une affaire ou d'un contact, ou quand la lecture est ancienne."
+)
 
 
 def _memoire_de_la_conversation(db: Session, conversation_id: int, nouveau_message: str) -> str | None:
@@ -322,7 +330,9 @@ def _memoire_de_la_conversation(db: Session, conversation_id: int, nouveau_messa
         .order_by(PieceJointe.id)
         .all()
     )
-    questions_par_piece_jointe, questions_par_resultat = _questions_couvertes_par_element(db, conversation_id)
+    questions_par_piece_jointe, questions_par_resultat, questions_par_lecture = _questions_couvertes_par_element(
+        db, conversation_id
+    )
     for piece_jointe_id, message_id, nom_fichier in pieces_jointes:
         ligne = f"- Tour {tour(message_id)} — pièce jointe id {piece_jointe_id} « {nom_fichier} »"
         lignes_questions = questions_par_piece_jointe.get(piece_jointe_id, [])
@@ -378,16 +388,37 @@ def _memoire_de_la_conversation(db: Session, conversation_id: int, nouveau_messa
         ligne = f"- Tour {tour(message_id)} — recherche « {requete} » : {', '.join(urls)}"
         lignes_questions = questions_par_recherche[(message_id, requete)]
         elements.append((message_id, len(elements), "\n".join([ligne, *lignes_questions])))
+    # Lectures d'outil (#177) : citation et date de lecture, jamais la fiche.
+    lectures = [
+        (lecture.message_id, lecture)
+        for lecture in lectures_de_la_conversation(db, conversation_id)
+        if lecture.message_id is not None
+    ]
+    for message_id, lecture in lectures:
+        ligne = f"- Tour {tour(message_id)} — {lecture.citation} (lue le {_date_de_lecture(lecture)})"
+        lignes_questions = questions_par_lecture.get(lecture.id, [])
+        elements.append((message_id, len(elements), "\n".join([ligne, *lignes_questions])))
     if not elements:
         return None
-    return "\n".join(["Mémoire de la conversation :", *(ligne for _, _, ligne in sorted(elements)), NOTE_MEMOIRE])
+    notes = [NOTE_MEMOIRE_LECTURES, NOTE_MEMOIRE] if lectures else [NOTE_MEMOIRE]
+    return "\n".join(["Mémoire de la conversation :", *(ligne for _, _, ligne in sorted(elements)), *notes])
+
+
+def _date_de_lecture(lecture: LectureDeLaConversation) -> str:
+    # En UTC, comme la date du jour : « 08/10/2026 à 07:31 UTC ». SQLite
+    # rend la date sans fuseau.
+    date_creation = lecture.date_creation
+    if date_creation.tzinfo is not None:
+        date_creation = date_creation.astimezone(timezone.utc)
+    return date_creation.strftime("%d/%m/%Y à %H:%M UTC")
 
 
 def _questions_couvertes_par_element(
     db: Session, conversation_id: int
-) -> tuple[dict[int, list[str]], dict[int, list[str]]]:
-    # Lignes « • question → réponse (source) » par pièce jointe et par
-    # résultat de recherche (spec 1.4.1, #137). Affichées au modèle
+) -> tuple[dict[int, list[str]], dict[int, list[str]], dict[int, list[str]]]:
+    # Lignes « • question → réponse (source) » par pièce jointe, par
+    # résultat de recherche (spec 1.4.1, #137) et par lecture d'outil (spec
+    # 1.5.0, #177). Affichées au modèle
     # seulement : jamais lues par les garde-fous, puisqu'un modèle les a
     # écrites.
     questions = (
@@ -398,6 +429,7 @@ def _questions_couvertes_par_element(
     )
     par_piece_jointe: dict[int, list[str]] = {}
     par_resultat: dict[int, list[str]] = {}
+    par_lecture: dict[int, list[str]] = {}
     for question in questions:
         reponse = question.reponse if question.trouvee else "non présent selon l'extraction"
         ligne = f"  • {question.question} → {reponse} ({question.source})"
@@ -405,7 +437,9 @@ def _questions_couvertes_par_element(
             par_piece_jointe.setdefault(question.piece_jointe_id, []).append(ligne)
         elif question.resultat_recherche_web_id is not None:
             par_resultat.setdefault(question.resultat_recherche_web_id, []).append(ligne)
-    return par_piece_jointe, par_resultat
+        elif question.lecture_outil_id is not None:
+            par_lecture.setdefault(question.lecture_outil_id, []).append(ligne)
+    return par_piece_jointe, par_resultat, par_lecture
 
 
 def _rattacher_recherches_au_message(db: Session, message: Message) -> None:

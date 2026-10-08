@@ -4,7 +4,7 @@ from typing import Any
 
 from vm_centrale.lectures_outils import Fiche
 from vm_centrale.moduleo.client import LecteurModuleo, ModuleoIntrouvable
-from vm_centrale.moduleo.fiches import DetailsContact, fiche_contact, reference_contact
+from vm_centrale.moduleo.fiches import DetailsContact, fiche_contact
 from vm_centrale.moduleo.resolution import NomNonResolu, chercher_qualifications, resoudre_communes
 from vm_centrale.moduleo.routes import ROUTES_GET
 from vm_centrale.outils.base import ContexteTour, Outil, ResultatOutil
@@ -168,9 +168,7 @@ def _fiches(lecteur: LecteurModuleo, ids: list[int]) -> list[Fiche]:
     communes = resoudre_communes(
         lecteur, [adresse.get("IdCommune") for d in details.values() for adresse in d.adresses]
     )
-    return [
-        Fiche(reference_contact(contacts[i]), fiche_contact(contacts[i], details[i], communes)) for i in trouves
-    ]
+    return [fiche_contact(contacts[i], details[i], communes) for i in trouves]
 
 
 def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
