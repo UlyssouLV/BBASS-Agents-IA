@@ -21,6 +21,9 @@ class FauxModuleo:
         self._utilisateurs: dict[int, dict] = {}
         self._contacts: dict[int, dict] = {}
         self._communes: dict[int, dict] = {}
+        self._sites: dict[int, str] = {}
+        self._services: dict[int, str] = {}
+        self._dossiers_production: dict[int, str] = {}
         self._exception: Exception | None = None
 
     def echouer(self, exception: Exception) -> None:
@@ -47,6 +50,9 @@ class FauxModuleo:
             "QualiteRepresentant": None,
             "IdResponsable": None,
             "IdActeurEnCharge": None,
+            "IdSite": None,
+            "IdService": None,
+            "IdDossierProduction": None,
             **champs,
         }
 
@@ -95,6 +101,15 @@ class FauxModuleo:
             "Pays": "France",
         }
 
+    def ajouter_site(self, id_site: int, nom: str) -> None:
+        self._sites[id_site] = nom
+
+    def ajouter_service(self, id_service: int, nom: str) -> None:
+        self._services[id_service] = nom
+
+    def ajouter_dossier_production(self, id_dossier: int, nom: str) -> None:
+        self._dossiers_production[id_dossier] = nom
+
     def routes_appelees(self) -> list[str]:
         return [route for route, _ in self.appels]
 
@@ -110,17 +125,34 @@ class FauxModuleo:
                     return affaire["IdAffaire"]
             raise ModuleoIntrouvable(f"404 sur {route}")
         if route == _RECHERCHE_AFFAIRES:
-            texte = parametres["texte"].lower()
-            ids = [
-                affaire["IdAffaire"]
-                for affaire in self._affaires.values()
-                if texte in f"{affaire['Numero']} {affaire['Objet']} {affaire['Adresse'] or ''}".lower()
-            ]
+            ids = [i for i, affaire in self._affaires.items() if _correspond(affaire, parametres)]
             return ids[: parametres.get("nbMaxResultats") or len(ids)]
+        if route == "moduleo/utilisateur?nom={nom}&prenom={prenom}&actifSeulement={actifSeulement}":
+            return [
+                i
+                for i, utilisateur in self._utilisateurs.items()
+                if _contient(utilisateur["Nom"], parametres.get("nom"))
+                and _contient(utilisateur["Prenom"], parametres.get("prenom"))
+            ]
+        if route == "moduleo/site?nom={nom}&actifSeulement={actifSeulement}":
+            return [i for i, nom in self._sites.items() if _contient(nom, parametres.get("nom"))]
+        if route == "moduleo/service?nom={nom}&actifSeulement={actifSeulement}":
+            return [i for i, nom in self._services.items() if _contient(nom, parametres.get("nom"))]
+        if route == "fileo/dossierproduction?texteRecherche={texteRecherche}":
+            return [
+                i for i, nom in self._dossiers_production.items() if _contient(nom, parametres["texteRecherche"])
+            ]
+        if route == "fileo/dossierproduction/{idDossierProduction}":
+            id_dossier = parametres["idDossierProduction"]
+            if id_dossier not in self._dossiers_production:
+                raise ModuleoIntrouvable(f"404 sur {route}")
+            return {"IdDossierProduction": id_dossier, "Nom": self._dossiers_production[id_dossier]}
         if route == "cogeo/affaire/multi?ids={ids}":
             return [self._affaires[i] for i in _ids(parametres) if i in self._affaires]
         if route == "cogeo/affaire/{idAffaire}/intervenants":
-            return [i for i, intervenant in self._intervenants.items() if intervenant["IdAffaire"] == parametres["idAffaire"]]
+            return [
+                i for i, intervenant in self._intervenants.items() if intervenant["IdAffaire"] == parametres["idAffaire"]
+            ]
         if route == "cogeo/intervenant/multi?ids={ids}":
             return [self._intervenants[i] for i in _ids(parametres) if i in self._intervenants]
         if route == "moduleo/utilisateur/{idUtilisateur}":
@@ -137,3 +169,45 @@ class FauxModuleo:
 def _ids(parametres: dict[str, Any]) -> list[int]:
     # Séparateur entre les ids : la virgule (doc Moduléo, routes `multi`).
     return [int(i) for i in str(parametres["ids"]).split(",") if i]
+
+
+def _contient(valeur: str, recherche: str | None) -> bool:
+    # Recherche par nom du faux : sans casse, sur une partie du nom.
+    return not recherche or recherche.lower() in valeur.lower()
+
+
+# Filtres de cogeo/affaire?… (#175) : paramètre → champ de l'affaire.
+_FILTRES_IDS = {
+    "idsSite": "IdSite",
+    "idsService": "IdService",
+    "idsResponsable": "IdResponsable",
+    "idsActeurEnCharge": "IdActeurEnCharge",
+}
+_FILTRES_DATES = {
+    "Creation": "DateCreation",
+    "Ouverture": "DateOuverture",
+    "Livraison": "DateLivraison",
+    "Cloture": "DateCloture",
+}
+
+
+def _correspond(affaire: dict, parametres: dict[str, Any]) -> bool:
+    texte = parametres.get("texte")
+    if texte and not _contient(f"{affaire['Numero']} {affaire['Objet']} {affaire['Adresse'] or ''}", texte):
+        return False
+    if parametres.get("etatAffaire") is not None and str(affaire["Etat"]) != parametres["etatAffaire"]:
+        return False
+    dossier = parametres.get("idDossierProduction")
+    if dossier is not None and affaire["IdDossierProduction"] != dossier:
+        return False
+    for parametre, champ in _FILTRES_IDS.items():
+        if parametres.get(parametre) is not None and affaire[champ] not in _ids({"ids": parametres[parametre]}):
+            return False
+    for suffixe, champ in _FILTRES_DATES.items():
+        jour = (affaire[champ] or "")[:10]
+        minimum, maximum = parametres.get(f"date{suffixe}Min"), parametres.get(f"date{suffixe}Max")
+        if minimum is not None and not (jour and jour >= minimum):
+            return False
+        if maximum is not None and not (jour and jour <= maximum):
+            return False
+    return True

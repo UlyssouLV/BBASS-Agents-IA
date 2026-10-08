@@ -12,4 +12,4 @@ Les outils que le modèle peut appeler pour lire Moduléo, le logiciel de gestio
 
 | Outil | Ce qu'il fait | Depuis |
 | --- | --- | --- |
-| `chercher_affaires_moduleo` ([`affaires/`](affaires/README.md)) | Retrouve des affaires par numéro ou par texte ; une Fiche Moduléo par affaire. | 1.5.0 (#174) |
+| `chercher_affaires_moduleo` ([`affaires/`](affaires/README.md)) | Retrouve des affaires par numéro, par texte ou par filtres en noms (état, dates, site, service, responsable, chargé d'affaire, dossier de production) ; une Fiche Moduléo par affaire. | 1.5.0 (#174, #175) |
