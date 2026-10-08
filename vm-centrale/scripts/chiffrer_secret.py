@@ -10,7 +10,8 @@ dans .env.
 Lancement, depuis vm-centrale/ :
     python scripts/chiffrer_secret.py MODULEO_API_KEY_CHIFFREE
     python scripts/chiffrer_secret.py MODULEO_SECURITY_CODE_CHIFFRE
-Option `--cle-maitre <chemin>` à la place de VM_CLE_MAITRE_FICHIER.
+Le chemin de la clé maître ne vient que de .env : pas d'option en ligne de
+commande, pour qu'un argument ne puisse pas viser un autre fichier.
 """
 
 import argparse
@@ -45,11 +46,10 @@ def chiffrer(secret: str, chemin_cle_maitre: Path) -> str:
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Chiffre un secret Moduléo pour .env.")
     parser.add_argument("variable", help="Nom de la variable .env, ex. MODULEO_API_KEY_CHIFFREE")
-    parser.add_argument("--cle-maitre", help="Fichier de la clé maître (défaut : VM_CLE_MAITRE_FICHIER)")
     arguments = parser.parse_args(argv)
-    chemin = arguments.cle_maitre or os.environ.get("VM_CLE_MAITRE_FICHIER")
+    chemin = os.environ.get("VM_CLE_MAITRE_FICHIER")
     if not chemin:
-        parser.error("VM_CLE_MAITRE_FICHIER absent de .env : passer --cle-maitre <chemin>.")
+        parser.error("VM_CLE_MAITRE_FICHIER absent de .env.")
     chemin_cle_maitre = Path(chemin)
     if creer_cle_maitre_si_absente(chemin_cle_maitre):
         print(f"Clé maître créée : {chemin_cle_maitre} (hors du dépôt, à sauvegarder à part).")

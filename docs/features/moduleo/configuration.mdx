@@ -51,7 +51,7 @@ Aujourd’hui, la clé maître est un fichier sur la VM. En production (1.7.0) :
 4. Effacer toute copie en clair des deux secrets.
 5. Relancer la VM : la config est lue au démarrage.
 
-`--cle-maitre <chemin>` remplace `VM_CLE_MAITRE_FICHIER` pour un lancement ponctuel. Changer de serveur Moduléo ou de clé ne touche que `.env`.
+Le script ne lit le chemin de la clé maître que dans `VM_CLE_MAITRE_FICHIER`. Changer de serveur Moduléo ou de clé ne touche que `.env`.
 
 ## Au démarrage de la VM
 

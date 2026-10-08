@@ -70,8 +70,9 @@ def test_un_secret_chiffre_avec_une_autre_cle_maitre_est_refuse(cle_maitre):
 def test_le_script_affiche_la_valeur_a_coller_dans_env(cle_maitre, monkeypatch, capsys):
     script = _charger_script()
     monkeypatch.setattr(script, "getpass", lambda invite: _SECURITY_CODE)
+    monkeypatch.setenv("VM_CLE_MAITRE_FICHIER", str(cle_maitre))
 
-    script.main(["--cle-maitre", str(cle_maitre), "MODULEO_SECURITY_CODE_CHIFFRE"])
+    script.main(["MODULEO_SECURITY_CODE_CHIFFRE"])
 
     sortie = capsys.readouterr().out
     ligne = next(ligne for ligne in sortie.splitlines() if ligne.startswith("MODULEO_SECURITY_CODE_CHIFFRE="))

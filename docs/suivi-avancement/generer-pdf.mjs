@@ -6,6 +6,7 @@
  *   node docs/suivi-avancement/generer-pdf.mjs <dossier-semaine/>
  *
  * Si un dossier est passé : prend le premier suivi-semaine-*.html dedans.
+ * La cible doit être sous docs/suivi-avancement/ : tout autre chemin est refusé.
  * Sortie : même nom que le HTML, extension .pdf, à côté.
  *
  * Prérequis : Google Chrome ou Microsoft Edge installé (chemins Windows / macOS / Linux usuels).
@@ -20,6 +21,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 function trouverHtml(cible) {
   const abs = path.resolve(cible);
+  if (abs !== __dirname && !abs.startsWith(__dirname + path.sep)) {
+    throw new Error(`Hors de ${__dirname} : ${abs}`);
+  }
   if (!fs.existsSync(abs)) {
     throw new Error(`Introuvable : ${abs}`);
   }
