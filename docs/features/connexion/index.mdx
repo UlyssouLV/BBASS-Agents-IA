@@ -1,0 +1,24 @@
+import SchemaFlux from '@site/src/components/connexion/SchemaFlux';
+
+# Connexion
+
+Un collaborateur ouvre le poste. S’il a déjà une session valide, il arrive dans l’application. Sinon, il saisit son identifiant et son mot de passe.
+
+Le poste ne vérifie pas le mot de passe lui-même, et il ne détient pas les comptes. Il transmet les identifiants à la VM centrale, qui seule lit la base ([ADR-0001](../../adr/0001-backend-local-par-poste.md), [ADR-0008](../../adr/0008-postgresql-vm-centrale.md)). Le mot de passe n’est jamais conservé.
+
+<SchemaFlux variante="connexion" />
+
+Le temps de savoir si une session existe déjà, l’interface n’affiche rien : ni le formulaire, ni le chat. Ensuite, un seul écran :
+
+1. **Saisie**, s’il n’y a pas de session.
+2. **Changement de mot de passe**, si le compte doit encore en choisir un (création ou réinitialisation). Le chat reste fermé tant que ce n’est pas fait.
+3. **L’application**, sinon.
+
+La saisie de la clé du mode développeur est une autre porte : [Saisie de la clé](../inspecteur/connexion.mdx). Ce n’est ni le mot de passe du compte, ni le fait d’être compte administrateur.
+
+## Ensuite
+
+1. [Saisie](./saisie.mdx)
+2. [Session](./session.mdx)
+3. [Changement de mot de passe](./mot-de-passe.mdx)
+4. [Déconnexion](./deconnexion.mdx)

@@ -28,7 +28,7 @@ Infer **`X.Y.Z`** from the branch `vX.Y.Z-<slug>` or the PR title `VX.Y.Z — �
 
 Related = listed in the PR body (`Fixes` / `Part of`) **and** children of the parent spec that are in scope for this PR. Ignore `wontfix` and issues the PR or parent spec mark as out of this version. See `agents/issue-tracker.md`.
 
-**Published** = each in-scope **child** is **Closed**.
+**Published** = each in-scope **child** is **Closed** — including the **human-test** child (`ready-for-human` / title `Tests humains — VX.Y.Z`). An Open human-test ticket **blocks** Finalise; tell the user to finish with **`/th`** first.
 
 If any in-scope child is still **Open**: **stop**. List what’s missing. Do not tag, merge, or delete.
 
@@ -51,7 +51,7 @@ Read each role below (paths from `agents/roles.yml`), against the parent spec / 
   2. Keep only issues that still have label **`bug`** (`gh issue view <n> --json labels`). Also include any `#n` the parent **spec** / version narrative explicitly says this version closes, if it has label `bug` and is missing from the PR — then **edit the PR body** to add `Fixes #<n>` (same rule as step 1 for the parent).
   3. On role **`roadmap`**: delete each matching `### Bug — … (#n)` block under **Plus tard** (from that heading through the line before the next `###` / `##`). Already absent → OK.
   4. For each such `#n` still **Open**: `gh issue close <n> --comment "Corrigé en VX.Y.Z."` (use this version’s semver). Already Closed → one line, continue.
-- **`suivi-avancement`** — HTML bilan for the **current calendar week** under that role (folder `semaine-…` that covers today’s date). None → one line, do **not** stop. Found → update that HTML for **`X.Y.Z`** (what shipped, **functional** language for a cabinet reader — no tool names, stack, or ticket ids in the day bullets), then regenerate the sibling `.pdf` next to the HTML (headless Chrome or Edge: `--print-to-pdf`, no header/footer). Do not create a week folder. Do not edit other weeks.
+- **`suivi-avancement`** — run skill **`mettre-a-jour-suivi-avancement`** as if the user had typed **`/msa`** for this **`X.Y.Z`** (convention: **`docs/suivi-avancement/README.md`**). That skill soft-skips with a **`/os`** reminder when there is no current-week folder (do **not** stop the release). PDF failure after an HTML edit → **stop** the release until fixed. Do not create a week folder here. Do not edit other weeks.
 
 If anything is stale (except soft-skip on missing week HTML): **stop the release**. Update those files on the **feature branch**, then run skill **`commit`** as if the user had typed **`/c -a -p`**. Then re-read this section. Do **not** `/crel` or `/mpr` until this gate is green — the tag must include the docs (HTML + PDF when updated). Bug issue closes (step above) may run in that same docs turn; they do not require a second commit.
 
@@ -97,4 +97,5 @@ Do not start the next version’s branch unless the user asks.
 - Commit / push → `commit` (`/c`)
 - Child wrap → `encadrer-implement`
 - Open a version → `ouvrir-la-version`
+- Human-test results / close → `tests-humains` (`/th`)
 - Feuille de route de dev only → `augmenter-la-feuille-de-route-dev` (`/afr`)

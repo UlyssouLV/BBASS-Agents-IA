@@ -23,6 +23,8 @@ _COLONNES_AJOUTEES = (
     ("resultats_recherche_web", "provenance", "VARCHAR NOT NULL DEFAULT 'recherche'"),
     # Spec 1.4.2 : les messages existants restent à NULL.
     ("messages", "tokens_contexte", "INTEGER"),
+    # Spec 1.5.0 (#177) : les questions existantes restent à NULL.
+    ("questions_couvertes", "lecture_outil_id", "INTEGER REFERENCES lectures_outils(id)"),
 )
 
 

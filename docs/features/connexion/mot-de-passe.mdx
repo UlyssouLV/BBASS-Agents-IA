@@ -1,0 +1,18 @@
+import ApercuMotDePasse from '@site/src/components/connexion/ApercuMotDePasse';
+import SchemaFlux from '@site/src/components/connexion/SchemaFlux';
+
+# Changement de mot de passe
+
+Après une création de compte, ou une réinitialisation par un compte administrateur, le collaborateur doit choisir son mot de passe avant d’entrer. L’écran s’affiche à la connexion, et aussi si l’obligation est encore là au lancement. Le chat n’est pas accessible entre les deux.
+
+<SchemaFlux variante="mot-de-passe" />
+
+<ApercuMotDePasse />
+
+Les deux saisies doivent être identiques. Sinon, rien n’est envoyé : « Les mots de passe saisis ne correspondent pas. »
+
+Quand elles correspondent, le poste transmet le nouveau mot de passe à la VM centrale avec le jeton de la session. Le hash est remplacé, l’obligation est levée en base et dans la session locale. Le chat s’ouvre.
+
+Cet écran n’existe que dans ce flux. Un compte qui n’a pas l’obligation ne peut pas changer son mot de passe par là : la VM centrale refuse.
+
+Une réinitialisation ne coupe pas les jetons déjà ouverts. Les sessions en cours continuent avec l’ancien jeton. Le nouvel écran n’apparaît qu’à la prochaine connexion. Pour couper les sessions tout de suite, c’est la [déconnexion forcée](./deconnexion.mdx).

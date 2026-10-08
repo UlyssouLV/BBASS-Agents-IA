@@ -217,6 +217,32 @@ class ResultatRechercheWeb(Base):
     date_creation: Mapped[datetime] = mapped_column(DateTime)
 
 
+class LectureOutil(Base):
+    # Une ligne par fiche qu'un outil d'un logiciel du cabinet a renvoyée au
+    # modèle (spec 1.5.0, #174 : Moduléo) : source des garde-fous chiffres
+    # et sources sur toute la conversation, comme resultats_recherche_web
+    # pour les pages web. Aucun cache entre conversations.
+    __tablename__ = "lectures_outils"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    conversation_id: Mapped[int] = mapped_column(
+        ForeignKey(_FK_CONVERSATIONS_ID, ondelete="CASCADE"), index=True
+    )
+    # Nullable : renseigné à la persistance de la réponse du tour, comme
+    # resultats_recherche_web.message_id.
+    message_id: Mapped[int | None] = mapped_column(
+        ForeignKey("messages.id"), nullable=True, index=True
+    )
+    # Le logiciel lu (`moduleo`).
+    outil: Mapped[str] = mapped_column(String)
+    # Ce que la ligne « Sources : » cite après le nom du logiciel
+    # (« affaire 2024-123 »).
+    reference: Mapped[str] = mapped_column(String)
+    # La fiche telle qu'envoyée au modèle.
+    texte: Mapped[str] = mapped_column(String)
+    date_creation: Mapped[datetime] = mapped_column(DateTime)
+
+
 class PageWebEnCache(Base):
     # Cache commun des pages web (spec 1.4.3, ADR-0015) : une ligne par URL
     # exacte, partagée entre tous les comptes et tous les pôles. Aucune clé
@@ -236,8 +262,9 @@ class PageWebEnCache(Base):
 
 class QuestionCouverte(Base):
     # Une question à laquelle le contenu d'un élément de la conversation
-    # répond (spec 1.4.1) : une pièce jointe ou un résultat de recherche web,
-    # jamais les deux. Écrite par un modèle : jamais une source des
+    # répond (spec 1.4.1) : une pièce jointe, un résultat de recherche web ou
+    # une lecture d'outil (spec 1.5.0, #177), jamais deux. Écrite par un
+    # modèle, ou par script pour une lecture d'outil : jamais une source des
     # garde-fous.
     __tablename__ = "questions_couvertes"
 
@@ -251,14 +278,18 @@ class QuestionCouverte(Base):
     resultat_recherche_web_id: Mapped[int | None] = mapped_column(
         ForeignKey("resultats_recherche_web.id"), nullable=True, index=True
     )
+    lecture_outil_id: Mapped[int | None] = mapped_column(
+        ForeignKey("lectures_outils.id"), nullable=True, index=True
+    )
     question: Mapped[str] = mapped_column(String)
     reponse: Mapped[str] = mapped_column(String)
-    # Nom de fichier ou URL de l'élément.
+    # Nom de fichier, URL, ou citation de la lecture d'outil
+    # (« Moduléo, affaire 2024-123 »).
     source: Mapped[str] = mapped_column(String)
     # Faux : « non présent selon l'extraction » pour ce besoin.
     trouvee: Mapped[bool] = mapped_column(Boolean, default=True)
     # "initiale" (générée à la lecture de l'élément) / "besoin" (relecture
-    # avec un besoin).
+    # avec un besoin). Une lecture d'outil n'a que des "initiale".
     origine: Mapped[str] = mapped_column(String)
     date_creation: Mapped[datetime] = mapped_column(DateTime)
 

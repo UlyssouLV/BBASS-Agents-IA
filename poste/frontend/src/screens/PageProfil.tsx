@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { UseMutationResult } from "@tanstack/react-query";
 
-import { Button } from "@/components/ui/button";
+import { EnteteProfil } from "@/components/EnteteProfil";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useConsommationQuery } from "@/hooks/useConsommation";
 import { useProfilTravailQuery } from "@/hooks/useProfilTravail";
@@ -31,15 +31,11 @@ export function PageProfil({ deconnexion, onRetour }: Readonly<PageProfilProps>)
 
   return (
     <main className="mx-auto mt-8 w-full max-w-4xl px-4">
-      <header className="mb-4 flex items-center justify-between gap-4">
-        <Button variant="outline" onClick={onRetour}>
-          ← Retour au chat
-        </Button>
-        <h1 className="text-lg font-semibold">Profil</h1>
-        <Button variant="outline" onClick={() => deconnexion.mutate()} disabled={deconnexion.isPending}>
-          Se déconnecter
-        </Button>
-      </header>
+      <EnteteProfil
+        onRetour={onRetour}
+        onDeconnexion={() => deconnexion.mutate()}
+        deconnexionEnCours={deconnexion.isPending}
+      />
 
       <Tabs value={onglet} onValueChange={setOnglet}>
         <TabsList>

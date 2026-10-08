@@ -1,0 +1,43 @@
+# Lecture seule
+
+Moduléo n’a pas de serveur de test : BBASS est branché sur le serveur réel du cabinet. Deux barrières garantissent qu’il n’y modifie rien.
+
+## 1. La clé d’API, réglée en lecture
+
+Dans Moduléo, chaque clé d’API se règle **par catégorie** (Affaire, Contact, Utilisateur…) et, pour chacune, **en lecture ou en lecture et écriture**. La clé dédiée à BBASS ne coche que la **lecture**, et seulement sur les catégories que lisent les deux outils.
+
+C’est Moduléo qui refuse alors une écriture, quel que soit le logiciel qui utilise la clé.
+
+## 2. Le client de la VM, GET seul
+
+La VM centrale ne compte pas seulement sur le réglage de la clé : une clé mal cochée, ou réutilisée pour un autre usage, ne doit pas suffire à écrire. Avant tout envoi, son client refuse :
+
+- toute méthode autre que GET (POST, PUT, DELETE…) ;
+- toute route absente de la table des routes GET connues ;
+- un paramètre que la route ne prévoit pas, ou un paramètre de chemin manquant.
+
+Une requête refusée ne part pas : Moduléo ne la voit jamais.
+
+## Les routes connues
+
+La table des routes (`vm_centrale/moduleo/routes.py`) est **générée** depuis le WADL du serveur du cabinet : toutes les routes GET de l’API, 207 au 7 octobre 2026, et aucune autre. Seules celles des deux outils servent en 1.5.0 ; les autres (parcelles, devis, factures, planning, GED…) sont prêtes pour la suite.
+
+## La doc Moduléo en local
+
+À côté du client, dans `vm_centrale/moduleo/docs/`, copies datées du serveur du cabinet :
+
+- <a href="pathname:///moduleo/documentation.html" target="_blank">documentation.html</a> : la page de documentation de l’API, toutes méthodes et catégories. Ses liens de détail et sa mise en forme viennent du serveur Moduléo ;
+- <a href="pathname:///moduleo/wadl.xml" target="_blank">wadl.xml</a> : la description machine de l’API, d’où la table des routes est générée ;
+- [index-routes.md](https://github.com/UlyssouLV/BBASS-Agents-IA/blob/main/vm-centrale/src/vm_centrale/moduleo/docs/index-routes.md) : une ligne par route GET, par catégorie, avec ses paramètres et sa description. Point d’entrée pour ajouter une capacité sans dépendre du serveur de doc.
+
+Pour une nouvelle version de l’API ou un autre serveur, depuis `vm-centrale/` :
+
+```
+python scripts/telecharger_doc_moduleo.py
+```
+
+Le script retélécharge le WADL et la page (publics, sans clé), régénère la table et l’index, puis les tests vérifient la table contre le WADL. Les fichiers générés ne se modifient jamais à la main. Le site de doc recopie les deux fichiers à chaque génération.
+
+## Plus tard
+
+Toute écriture dans Moduléo passera par une nouvelle décision, une clé d’API qui coche l’écriture sur les seules catégories utiles, et un serveur Moduléo de test.

@@ -2,7 +2,6 @@ import { Ellipsis, Loader2, SquarePen } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import logoBbassAgentsIa from "@/assets/logo-bbass-agents-ia.jpg";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -18,7 +17,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader } from "@/components/ui/sidebar";
+import { PuceCompte } from "@/components/PuceCompte";
+import { Sidebar, SidebarContent, SidebarHeader } from "@/components/ui/sidebar";
 import {
   useConversationsQuery,
   useRenommerConversationMutation,
@@ -37,10 +37,6 @@ interface BarreLateraleProps {
   conversationRecenteId: number | null;
   onAnimationTitreTerminee: () => void;
   conversationsEnAttente: ReadonlySet<number>;
-}
-
-function initiales(compte: Compte): string {
-  return `${compte.prenom.charAt(0)}${compte.nom.charAt(0)}`.toUpperCase();
 }
 
 const _INTERVALLE_ANIMATION_TITRE_MS = 30;
@@ -115,8 +111,6 @@ export function BarreLaterale({
   // contourné pour le renommage inline — voir #81). conversationASupprimerId
   // pilote l'ouverture d'un Dialog shadcn/ui ; null signifie fermé.
   const [conversationASupprimerId, setConversationASupprimerId] = useState<number | null>(null);
-
-  const poleAgence = [compte.poles.join(", "), compte.agence].filter(Boolean).join(" — ");
 
   function commencerRenommage(conversation: { id: number; titre: string }) {
     setRenommageId(conversation.id);
@@ -284,27 +278,11 @@ export function BarreLaterale({
         </ul>
       </SidebarContent>
 
-      <SidebarFooter>
-        <div className="flex items-center gap-2">
-          <Avatar>
-            <AvatarFallback>{initiales(compte)}</AvatarFallback>
-          </Avatar>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-medium">
-              {compte.prenom} {compte.nom}
-            </p>
-            <p className="truncate text-xs text-muted-foreground">{poleAgence}</p>
-          </div>
-        </div>
-        <Button type="button" variant="outline" size="sm" onClick={onOuvrirProfil}>
-          Profil
-        </Button>
-        {compte.est_admin && (
-          <Button type="button" variant="outline" size="sm" onClick={onOuvrirPanelAdministration}>
-            Panel d'administration
-          </Button>
-        )}
-      </SidebarFooter>
+      <PuceCompte
+        compte={compte}
+        onOuvrirProfil={onOuvrirProfil}
+        onOuvrirPanelAdministration={onOuvrirPanelAdministration}
+      />
 
       <Dialog
         open={conversationASupprimerId !== null}

@@ -52,6 +52,7 @@ flowchart LR
   VM --> PG[("PostgreSQL")]
   VM --> M["API Mistral"]
   VM --> S["SearXNG<br/>localhost"]
+  VM -->|"lecture seule"| MO["API Moduléo"]
 ```
 
 <!-- sync:vue-systeme-mermaid -->
@@ -156,7 +157,7 @@ class node_collaborateur,node_mistral,node_searxng toneIndigo
 
 ## Semaine du 05 au 09 octobre 2026
 
-Point visé jeudi 8 octobre : **V1.5.0** (Moduléo lecture), puis **priorité V1.7.0** (déploiement postes / CI/CD), **V1.8.0** (n8n) si le temps le permet. **V1.4.0** livrée le 06/10 (recherche web ; bug connu [#131](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/131) → **1.4.5**), **V1.4.1** livrée le 06/10 (mémoire de la conversation), **V1.4.2** livrée le 07/10 (contexte en vrais tokens), **V1.4.3** livrée le 07/10 (cache des pages web, relecture forcée), **V1.4.4** livrée le 07/10 (statut d’attente en direct pendant une réponse). Vendredi 9 : RTT.
+**V1.5.0** livrée le 08/10 (Moduléo en lecture seule depuis le chat), puis **V1.5.1** (lecture de plus de données Moduléo) et **V1.5.2** (écriture Moduléo, dès que Kipaware aura confirmé un serveur de test). **V1.4.0** livrée le 06/10 (recherche web ; bug connu [#131](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/131) → **1.4.5**), **V1.4.1** livrée le 06/10 (mémoire de la conversation), **V1.4.2** livrée le 07/10 (contexte en vrais tokens), **V1.4.3** livrée le 07/10 (cache des pages web, relecture forcée), **V1.4.4** livrée le 07/10 (statut d’attente en direct pendant une réponse). Vendredi 9 : RTT.
 
 ```mermaid
 flowchart LR
@@ -165,9 +166,9 @@ flowchart LR
   V141 --> V142["V1.4.2<br/>contexte en vrais tokens<br/>livrée le 07/10"]
   V142 --> V143["V1.4.3<br/>cache des pages web<br/>livrée le 07/10"]
   V143 --> V144["V1.4.4<br/>statut d’attente en direct<br/>livrée le 07/10"]
-  V144 --> V150["V1.5.0<br/>Moduléo lecture<br/>visé le 08/10"]
-  V150 --> V170["V1.7.0<br/>déploiement · priorité"]
-  V170 --> V180["V1.8.0<br/>n8n<br/>visé le 08/10"]
+  V144 --> V150["V1.5.0<br/>Moduléo lecture<br/>livrée le 08/10"]
+  V150 --> V151["V1.5.1<br/>plus de lectures Moduléo"]
+  V151 --> V152["V1.5.2<br/>écriture Moduléo<br/>si serveur de test"]
 ```
 
 ### Travail réalisé

@@ -26,12 +26,15 @@ from vm_centrale.config import (
 from vm_centrale.consommation import enregistrer_consommation
 from vm_centrale.database import FabriqueSession, get_db, get_fabrique_session
 from vm_centrale.garde_fous import (
+    PHRASE_CONTACT_NON_LU,
+    LectureSource,
     PageSource,
     ajouter_sources,
     mentionner_pages_trop_longues,
     nettoyer_titre,
     normaliser_url,
     plafonner,
+    remplacer_contact_non_lu,
     retirer_chiffres_hors_source,
     retirer_urls_inventees,
     urls_ecrites,
@@ -60,6 +63,13 @@ from vm_centrale.models import (
     QuestionCouverte,
     ResultatRechercheWeb,
 )
+from vm_centrale.lectures_outils import (
+    LectureDeLaConversation,
+    lectures_de_la_conversation,
+    rattacher_lectures_au_message,
+    supprimer_lectures,
+)
+from vm_centrale.moduleo.client import LecteurModuleo, get_client_moduleo
 from vm_centrale.moteur_recherche import MoteurRecherche, get_moteur_recherche
 from vm_centrale.questions_couvertes import (
     AppelQuestionsPieceJointe,
@@ -67,6 +77,7 @@ from vm_centrale.questions_couvertes import (
     enregistrer_questions_piece_jointe,
 )
 from vm_centrale.outils import AppelMistralOutil, ContexteTour, executer_appel, outils_du_tour
+from vm_centrale.outils.moduleo import affaires as outil_affaires, contacts as outil_contacts
 from vm_centrale.statut_tour import (
     ATTENTE,
     REFLEXION,
@@ -236,17 +247,43 @@ def _consigne_date_du_jour() -> str:
     )
 
 
+_MOIS = (
+    "janvier", "février", "mars", "avril", "mai", "juin",
+    "juillet", "août", "septembre", "octobre", "novembre", "décembre",
+)
+
+
+def _annee_du_jour_source() -> str:
+    # L'année de la date du jour donnée au modèle, comptée parmi les textes
+    # source du garde-fou chiffres (#182, conversation 115 : « depuis le 1er
+    # septembre 2026 ? » devenait la phrase fixe). Jamais le jour ni le mois
+    # en chiffres : le 15, « 15 affaires » inventé passerait.
+    return str(_date_du_jour().year)
+
+
+def _date_du_jour_ecrite() -> re.Pattern[str]:
+    # La date du jour en lettres dans la réponse (« 15 octobre », « 1er
+    # octobre 2026 ») : ses chiffres ne sont pas contrôlés, le jour seul l'est.
+    aujourdhui = _date_du_jour()
+    jour = "1(?:er)?" if aujourdhui.day == 1 else str(aujourdhui.day)
+    return re.compile(rf"(?<!\d){jour}\s+{_MOIS[aujourdhui.month - 1]}(?:\s+{aujourdhui.year})?\b", re.IGNORECASE)
+
+
 def _message_systeme_style() -> dict[str, str]:
     return {"role": "system", "content": f"{_PROMPT_STYLE}\n{_consigne_date_du_jour()}"}
 
 
 def _prompt_titrage(message_utilisateur: str, reponse_assistant: str) -> str:
+    # Une phrase fixe n'est pas un échange à résumer (#182, conversation
+    # 115 : titre construit sur la phrase fixe) : seul le message compte.
+    echange = f"Utilisateur : {message_utilisateur}"
+    if not _est_remplacee(reponse_assistant):
+        echange += f"\nAssistant : {reponse_assistant}"
     return (
         "Propose un titre court (moins de 8 mots), sans guillemets et sans "
         "aucune mise en forme Markdown (pas de **, #, etc.), résumant "
-        "l'échange suivant :\n"
-        f"Utilisateur : {message_utilisateur}\n"
-        f"Assistant : {reponse_assistant}"
+        "l'échange suivant. N'utilise aucun mot absent de l'échange :\n"
+        f"{echange}"
     )
 
 
@@ -289,6 +326,13 @@ NOTE_MEMOIRE = (
     "relis-le (relire_pieces_jointes ou lire_pages_web), sauf s'il est déjà "
     "marqué « non présent selon l'extraction » pour ce besoin."
 )
+# Avant NOTE_MEMOIRE, quand la mémoire liste une lecture d'outil (spec
+# 1.5.0, #177) : une fiche est l'état du logiciel à sa date de lecture.
+NOTE_MEMOIRE_LECTURES = (
+    "Une lecture Moduléo est l'état de Moduléo à sa date de lecture : "
+    "rappelle l'outil Moduléo quand la question porte sur l'état actuel "
+    "d'une affaire ou d'un contact, ou quand la lecture est ancienne."
+)
 
 
 def _memoire_de_la_conversation(db: Session, conversation_id: int, nouveau_message: str) -> str | None:
@@ -315,7 +359,9 @@ def _memoire_de_la_conversation(db: Session, conversation_id: int, nouveau_messa
         .order_by(PieceJointe.id)
         .all()
     )
-    questions_par_piece_jointe, questions_par_resultat = _questions_couvertes_par_element(db, conversation_id)
+    questions_par_piece_jointe, questions_par_resultat, questions_par_lecture = _questions_couvertes_par_element(
+        db, conversation_id
+    )
     for piece_jointe_id, message_id, nom_fichier in pieces_jointes:
         ligne = f"- Tour {tour(message_id)} — pièce jointe id {piece_jointe_id} « {nom_fichier} »"
         lignes_questions = questions_par_piece_jointe.get(piece_jointe_id, [])
@@ -371,16 +417,37 @@ def _memoire_de_la_conversation(db: Session, conversation_id: int, nouveau_messa
         ligne = f"- Tour {tour(message_id)} — recherche « {requete} » : {', '.join(urls)}"
         lignes_questions = questions_par_recherche[(message_id, requete)]
         elements.append((message_id, len(elements), "\n".join([ligne, *lignes_questions])))
+    # Lectures d'outil (#177) : citation et date de lecture, jamais la fiche.
+    lectures = [
+        (lecture.message_id, lecture)
+        for lecture in lectures_de_la_conversation(db, conversation_id)
+        if lecture.message_id is not None
+    ]
+    for message_id, lecture in lectures:
+        ligne = f"- Tour {tour(message_id)} — {lecture.citation} (lue le {_date_de_lecture(lecture)})"
+        lignes_questions = questions_par_lecture.get(lecture.id, [])
+        elements.append((message_id, len(elements), "\n".join([ligne, *lignes_questions])))
     if not elements:
         return None
-    return "\n".join(["Mémoire de la conversation :", *(ligne for _, _, ligne in sorted(elements)), NOTE_MEMOIRE])
+    notes = [NOTE_MEMOIRE_LECTURES, NOTE_MEMOIRE] if lectures else [NOTE_MEMOIRE]
+    return "\n".join(["Mémoire de la conversation :", *(ligne for _, _, ligne in sorted(elements)), *notes])
+
+
+def _date_de_lecture(lecture: LectureDeLaConversation) -> str:
+    # En UTC, comme la date du jour : « 08/10/2026 à 07:31 UTC ». SQLite
+    # rend la date sans fuseau.
+    date_creation = lecture.date_creation
+    if date_creation.tzinfo is not None:
+        date_creation = date_creation.astimezone(timezone.utc)
+    return date_creation.strftime("%d/%m/%Y à %H:%M UTC")
 
 
 def _questions_couvertes_par_element(
     db: Session, conversation_id: int
-) -> tuple[dict[int, list[str]], dict[int, list[str]]]:
-    # Lignes « • question → réponse (source) » par pièce jointe et par
-    # résultat de recherche (spec 1.4.1, #137). Affichées au modèle
+) -> tuple[dict[int, list[str]], dict[int, list[str]], dict[int, list[str]]]:
+    # Lignes « • question → réponse (source) » par pièce jointe, par
+    # résultat de recherche (spec 1.4.1, #137) et par lecture d'outil (spec
+    # 1.5.0, #177). Affichées au modèle
     # seulement : jamais lues par les garde-fous, puisqu'un modèle les a
     # écrites.
     questions = (
@@ -391,6 +458,7 @@ def _questions_couvertes_par_element(
     )
     par_piece_jointe: dict[int, list[str]] = {}
     par_resultat: dict[int, list[str]] = {}
+    par_lecture: dict[int, list[str]] = {}
     for question in questions:
         reponse = question.reponse if question.trouvee else "non présent selon l'extraction"
         ligne = f"  • {question.question} → {reponse} ({question.source})"
@@ -398,7 +466,9 @@ def _questions_couvertes_par_element(
             par_piece_jointe.setdefault(question.piece_jointe_id, []).append(ligne)
         elif question.resultat_recherche_web_id is not None:
             par_resultat.setdefault(question.resultat_recherche_web_id, []).append(ligne)
-    return par_piece_jointe, par_resultat
+        elif question.lecture_outil_id is not None:
+            par_lecture.setdefault(question.lecture_outil_id, []).append(ligne)
+    return par_piece_jointe, par_resultat, par_lecture
 
 
 def _rattacher_recherches_au_message(db: Session, message: Message) -> None:
@@ -443,6 +513,12 @@ def _construire_messages_pour_mistral(
     if piece_jointe is not None:
         messages.append(_message_systeme_piece_jointe(piece_jointe))
     messages.extend({"role": m.role, "content": m.contenu} for m in derniers_messages)
+    if (
+        derniers_messages
+        and derniers_messages[-1].role == "assistant"
+        and derniers_messages[-1].contenu.startswith(_PHRASES_CHIFFRES)
+    ):
+        messages.append(_NOTE_APRES_REMPLACEMENT)
     messages.append({"role": "user", "content": nouveau_message})
     return messages
 
@@ -454,12 +530,40 @@ def _construire_messages_pour_mistral(
 # contiennent — sauf demande explicite d'inventer, d'imaginer ou de faire
 # une hypothèse. Plus de « pas accès à Internet » depuis la 1.4.0.
 _REPONSE_SANS_DONNEES = "Je n'ai trouvé ni page ni document pour appuyer une réponse chiffrée."
+# Après un appel d'outil Moduléo dans le tour (#182, conversation 115).
+_REPONSE_SANS_DONNEES_MODULEO = (
+    "Moduléo n'a rien renvoyé pour cette demande. Précise un numéro d'affaire, un nom ou une période."
+)
+_PHRASES_CHIFFRES = (_REPONSE_SANS_DONNEES, _REPONSE_SANS_DONNEES_MODULEO)
+# Le contact non lu (#183) n'est pas un échange à titrer, mais sa phrase dit
+# déjà au modèle quoi faire : pas de note au tour suivant.
+_PHRASES_FIXES = (*_PHRASES_CHIFFRES, PHRASE_CONTACT_NON_LU)
+_OUTILS_MODULEO = {outil_affaires.OUTIL.nom, outil_contacts.OUTIL.nom}
+# Citation d'une fiche de contact lue (moduleo/fiches.py).
+_CITATION_CONTACT = "Moduléo, contact "
+# Au tour qui suit une réponse aux chiffres remplacée (#182) : l'historique
+# ne porte que la phrase fixe, jamais la réponse brute du modèle.
+_NOTE_APRES_REMPLACEMENT = {
+    "role": "system",
+    "content": (
+        "Ta réponse précédente a été remplacée par la VM par une phrase fixe : elle "
+        "avançait des chiffres sans source. N'en réutilise aucun chiffre. Pour une "
+        "question sur les affaires du cabinet, lis Moduléo avec un critère (numéro, "
+        "nom, période) ou demande-en un au collaborateur."
+    ),
+}
 _MOTIF_INVENTION = re.compile(
     r"\b(inventer|invente|inventes|inventé|inventée|invention|imaginer|imagine|imagines|"
     r"imaginé|imaginée|hypothèse|hypothese|hypothèses|hypotheses)\b",
     re.IGNORECASE,
 )
 _MOTIF_NEGATION = re.compile(r"(?:n['’]|ne\s+)$", re.IGNORECASE)
+
+
+def _est_remplacee(reponse: str) -> bool:
+    # La réponse visible commence par une phrase fixe (une mention de page
+    # trop longue peut la suivre).
+    return reponse.startswith(_PHRASES_FIXES)
 
 
 def _demande_invention(message: str) -> bool:
@@ -524,17 +628,33 @@ def _textes_de_recherche(db: Session, conversation_id: int) -> list[str]:
     return [texte for ligne in lignes for texte in ligne if texte and texte.strip()]
 
 
-def _pages_de_la_conversation(db: Session, conversation_id: int) -> list[PageSource]:
+def _sources_de_la_conversation(
+    db: Session, conversation_id: int, lectures: list[LectureDeLaConversation]
+) -> list[PageSource | LectureSource]:
     # Texte nettoyé des pages (spec 1.4.0), jamais l'extrait du moteur
     # d'une page qu'on n'a pas lue (#162) ni les faits produits par l'appel
-    # d'extraction, qui pourraient inventer. La plus récente en dernier.
+    # d'extraction, qui pourraient inventer ; et les fiches lues par un
+    # outil (spec 1.5.0). La plus récente en dernier.
     lignes = (
-        db.query(ResultatRechercheWeb.url, ResultatRechercheWeb.titre, ResultatRechercheWeb.texte_nettoye)
+        db.query(
+            ResultatRechercheWeb.url,
+            ResultatRechercheWeb.titre,
+            ResultatRechercheWeb.texte_nettoye,
+            ResultatRechercheWeb.date_creation,
+        )
         .filter(ResultatRechercheWeb.conversation_id == conversation_id)
         .order_by(ResultatRechercheWeb.id)
         .all()
     )
-    return [PageSource(url, titre, texte_nettoye or "") for url, titre, texte_nettoye in lignes]
+    datees: list[tuple[datetime, PageSource | LectureSource]] = [
+        (date_creation, PageSource(url, titre, texte_nettoye or ""))
+        for url, titre, texte_nettoye, date_creation in lignes
+    ]
+    datees += [
+        (lecture.date_creation, LectureSource(lecture.citation, lecture.texte)) for lecture in lectures
+    ]
+    # Tri stable : à date égale, chaque table garde son ordre.
+    return [source for _, source in sorted(datees, key=lambda datee: datee[0])]
 
 
 def _reponse_visible(
@@ -546,6 +666,8 @@ def _reponse_visible(
     piece_jointe: PieceJointe | None,
     pages_trop_longues: list[str],
     publier: Publier,
+    outils_appeles: list[str],
+    moduleo_configure: bool,
 ) -> str:
     # Ligne garde_fous de l'inspecteur à chaque réponse de chat (spec 1.4.0,
     # décision 15), même sans retrait : sans elle, on ne voit pas pourquoi la
@@ -555,12 +677,30 @@ def _reponse_visible(
     # contrôlées comme un texte du modèle, et seuls les chiffres gardés sont
     # cités.
     publier(VERIFICATION)
-    visible = _appliquer_garde_fous(db, conversation_id, nouveau_message, reponse, piece_jointe)
+    # Lues une fois pour les garde-fous et la ligne « Sources : ».
+    lectures = lectures_de_la_conversation(db, conversation_id)
+    moduleo_appele = not _OUTILS_MODULEO.isdisjoint(outils_appeles)
+    # Un contact lu à un tour précédent reste dans la Mémoire de la
+    # conversation : le modèle peut en dire l'absence d'une coordonnée.
+    contacts_lus = outil_contacts.OUTIL.nom in outils_appeles or any(
+        lecture.citation.startswith(_CITATION_CONTACT) for lecture in lectures
+    )
+    visible = _appliquer_garde_fous(
+        db,
+        conversation_id,
+        nouveau_message,
+        reponse,
+        piece_jointe,
+        lectures,
+        moduleo_appele,
+        # Sans Moduléo, la phrase fixe promettrait une recherche impossible.
+        contacts_lus or not moduleo_configure,
+    )
     visible = ajouter_sources(
         visible,
         _messages_du_compte(db, conversation_id, nouveau_message)
         + _extraits_pieces_jointes(db, conversation_id, piece_jointe),
-        _pages_de_la_conversation(db, conversation_id),
+        _sources_de_la_conversation(db, conversation_id, lectures),
     )
     visible = mentionner_pages_trop_longues(visible, pages_trop_longues)
     enregistrer_echange_local(
@@ -581,7 +721,15 @@ def _appliquer_garde_fous(
     nouveau_message: str,
     reponse: str,
     piece_jointe: PieceJointe | None,
+    lectures: list[LectureDeLaConversation],
+    moduleo_appele: bool = False,
+    contacts_lus: bool = False,
 ) -> str:
+    # Une absence de coordonnées dans Moduléo sans lecture du contact dans
+    # le tour (#183) : toute la réponse devient la phrase fixe, rien d'autre
+    # à contrôler.
+    if (sans_contact_non_lu := remplacer_contact_non_lu(reponse, contacts_lus)) != reponse:
+        return sans_contact_non_lu
     # URL d'abord : un chiffre qui ne vivait que dans une URL inventée
     # disparaît avec elle, et n'est pas relu comme une donnée.
     reponse = _reponse_sans_url_inventee(db, conversation_id, nouveau_message, reponse)
@@ -590,8 +738,10 @@ def _appliquer_garde_fous(
     extraits = _extraits_pieces_jointes(db, conversation_id, piece_jointe)
     # Un texte de recherche non vide compte comme un document.
     extraits += _textes_de_recherche(db, conversation_id)
-    textes_source = [*_messages_du_compte(db, conversation_id, nouveau_message), *extraits]
-    sans_chiffre_invente = retirer_chiffres_hors_source(reponse, textes_source)
+    # Une fiche lue par un outil (Moduléo, spec 1.5.0) aussi.
+    extraits += [lecture.texte for lecture in lectures]
+    textes_source = [*_messages_du_compte(db, conversation_id, nouveau_message), _annee_du_jour_source(), *extraits]
+    sans_chiffre_invente = retirer_chiffres_hors_source(reponse, textes_source, [_date_du_jour_ecrite()])
     if sans_chiffre_invente == reponse:
         return reponse
     # Un document, ou un chiffre déjà écrit dans le message du tour : on
@@ -603,7 +753,7 @@ def _appliquer_garde_fous(
     )
     if (extraits or message_apporte_une_donnee) and sans_chiffre_invente:
         return sans_chiffre_invente
-    return _REPONSE_SANS_DONNEES
+    return _REPONSE_SANS_DONNEES_MODULEO if moduleo_appele else _REPONSE_SANS_DONNEES
 
 
 def _identite_connue(compte: Compte | None) -> str:
@@ -783,6 +933,7 @@ def creer_conversation(
     client: MistralClient = Depends(get_mistral_client),
     moteur_recherche: MoteurRecherche = Depends(get_moteur_recherche),
     telechargeur_pages: TelechargeurPages = Depends(get_telechargeur_pages),
+    client_moduleo: LecteurModuleo | None = Depends(get_client_moduleo),
     fabrique_session: FabriqueSession = Depends(get_fabrique_session),
 ) -> StreamingResponse:
     reponse_en_cache = _reponse_en_cache(identifiant_compte, requete.cle_idempotence)
@@ -799,7 +950,14 @@ def creer_conversation(
 
     def tour(db_tour: Session, publier: Publier) -> ConversationCreeResponse:
         return _tour_creer_conversation(
-            db_tour, publier, requete, identifiant_compte, client, moteur_recherche, telechargeur_pages
+            db_tour,
+            publier,
+            requete,
+            identifiant_compte,
+            client,
+            moteur_recherche,
+            telechargeur_pages,
+            client_moduleo,
         )
 
     return _flux_du_tour(identifiant_compte, None, requete.cle_idempotence, fabrique_session, tour)
@@ -879,6 +1037,7 @@ def _tour_creer_conversation(
     client: MistralClient,
     moteur_recherche: MoteurRecherche,
     telechargeur_pages: TelechargeurPages,
+    client_moduleo: LecteurModuleo | None,
 ) -> ConversationCreeResponse:
     maintenant = datetime.now(timezone.utc)
     conversation = Conversation(
@@ -933,8 +1092,8 @@ def _tour_creer_conversation(
     # (supprimer_conversation), ce qui laisserait cette ligne sans
     # conversation pointer vers une pièce jointe disparue.
     # Outils sur l'appel principal dès le premier message (spec 1.4.0) :
-    # aucune pièce jointe d'un tour précédent ici, seul rechercher_web
-    # est éligible.
+    # aucune pièce jointe d'un tour précédent ici, seuls rechercher_web et,
+    # si Moduléo est configuré, chercher_affaires_moduleo sont éligibles.
     contexte_outils = ContexteTour(
         db=db,
         conversation_id=conversation.id,
@@ -943,6 +1102,7 @@ def _tour_creer_conversation(
         client_mistral=client,
         message_du_tour=requete.message,
         publier=publier,
+        client_moduleo=client_moduleo,
     )
     tools = outils_du_tour(contexte_outils)
     attendre_questions = _lancer_questions_piece_jointe(client, piece_jointe, requete.message)
@@ -966,6 +1126,8 @@ def _tour_creer_conversation(
         piece_jointe,
         list(contexte_outils.pages_trop_longues.values()),
         publier,
+        contexte_outils.outils_appeles,
+        contexte_outils.client_moduleo is not None,
     )
 
     publier(TITRAGE)
@@ -1019,6 +1181,7 @@ def _tour_creer_conversation(
     )
     db.add_all([message_utilisateur, message_assistant])
     _rattacher_recherches_au_message(db, message_assistant)
+    rattacher_lectures_au_message(db, message_assistant)
     if piece_jointe is not None:
         _lier_piece_jointe_a_la_conversation(piece_jointe, conversation)
         piece_jointe.message_id = message_utilisateur.id
@@ -1140,6 +1303,7 @@ def supprimer_conversation(
     db.query(ResultatRechercheWeb).filter(
         ResultatRechercheWeb.conversation_id == conversation.id
     ).delete()
+    supprimer_lectures(db, conversation.id)
 
     # Consommation n'a pas de cascade ORM déclarée sur Conversation (spec
     # 1.1.3) : la ligne survit à la conversation qui l'a produite, seul le
@@ -1382,6 +1546,7 @@ def _executer_appels_outils(
     messages_outils: list[dict] = []
     piece_jointe_relue: int | None = None
     for appel in demande.appels:
+        contexte_outils.outils_appeles.append(appel.nom)
         resultat = executer_appel(appel, contexte_outils)
         enregistrer_echange_local(
             contexte_outils.db,
@@ -1668,6 +1833,7 @@ def envoyer_message(
     client: MistralClient = Depends(get_mistral_client),
     moteur_recherche: MoteurRecherche = Depends(get_moteur_recherche),
     telechargeur_pages: TelechargeurPages = Depends(get_telechargeur_pages),
+    client_moduleo: LecteurModuleo | None = Depends(get_client_moduleo),
     fabrique_session: FabriqueSession = Depends(get_fabrique_session),
 ) -> StreamingResponse:
     reponse_en_cache = _reponse_en_cache(identifiant_compte, requete.cle_idempotence)
@@ -1690,6 +1856,7 @@ def envoyer_message(
             client,
             moteur_recherche,
             telechargeur_pages,
+            client_moduleo,
         )
 
     return _flux_du_tour(identifiant_compte, conversation_id, requete.cle_idempotence, fabrique_session, tour)
@@ -1704,6 +1871,7 @@ def _tour_envoyer_message(
     client: MistralClient,
     moteur_recherche: MoteurRecherche,
     telechargeur_pages: TelechargeurPages,
+    client_moduleo: LecteurModuleo | None,
 ) -> MessageEnvoyeResponse:
     conversation = _recuperer_conversation_du_compte(db, conversation_id, identifiant_compte)
 
@@ -1756,6 +1924,7 @@ def _tour_envoyer_message(
         client_mistral=client,
         message_du_tour=requete.message,
         publier=publier,
+        client_moduleo=client_moduleo,
     )
     tools = outils_du_tour(contexte_outils)
 
@@ -1784,6 +1953,8 @@ def _tour_envoyer_message(
         piece_jointe,
         list(contexte_outils.pages_trop_longues.values()),
         publier,
+        contexte_outils.outils_appeles,
+        contexte_outils.client_moduleo is not None,
     )
     _enregistrer_questions_du_tour(db, attendre_questions, identifiant_compte, conversation.id, piece_jointe)
 
@@ -1812,6 +1983,7 @@ def _tour_envoyer_message(
     )
     db.add_all([message_utilisateur, message_assistant])
     _rattacher_recherches_au_message(db, message_assistant)
+    rattacher_lectures_au_message(db, message_assistant)
     if piece_jointe is not None:
         _lier_piece_jointe_a_la_conversation(piece_jointe, conversation)
         piece_jointe.message_id = message_utilisateur.id

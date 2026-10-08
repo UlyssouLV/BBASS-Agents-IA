@@ -1,0 +1,34 @@
+# Chercher des contacts
+
+`chercher_contacts_moduleo` répond à des questions comme :
+
+- « Quelles sont les coordonnées de Dupont ? »
+- « Dans quelles affaires apparaît la SCI Les Oliviers ? »
+- « Les notaires avec qui on travaille. »
+
+## Ce que le modèle peut demander
+
+Combinés en « et » :
+
+- **Un texte** : le nom du contact, ou un mot de son nom.
+- **Un type de contact** : personne, société, collectivité ou groupe de contacts.
+- **Un type de donneur d’ordre.**
+- **Des qualifications**, par leur nom (« Notaire »). Le libellé exact l’emporte, sinon le seul libellé qui contient le nom. Aucun, ou plusieurs possibles : le modèle repose la question, **aucune recherche** n’est lancée.
+
+## Ce qui revient
+
+Une **Fiche Moduléo** par contact :
+
+- type et nom ;
+- téléphones, emails et adresses, avec leur lieu (« Bureau », « Siège ») ;
+- numéros des affaires dont il est **client**, puis de celles où il est **intervenant** (20 au plus par rôle, « et N autres »).
+
+**5 fiches** par défaut, **10** si le modèle le demande. Au-delà : « 12 contacts trouvés, 5 affichés, précise la recherche. » Aucun : « Aucun contact Moduléo ne correspond à cette recherche. »
+
+## Pourquoi c’est plus lent qu’une affaire
+
+Moduléo rend chaque coordonnée par une lecture séparée : la liste des téléphones, puis chaque téléphone, de même pour les emails, les adresses et les affaires. La VM fait ces lectures **en parallèle** (16 à la fois au plus), mais un contact demande plus d’allers-retours qu’une affaire. Le temps de réponse est à mesurer à l’essai réel.
+
+## À confirmer à l’essai réel
+
+Format attendu pour le type de contact, valeurs du type de donneur d’ordre, combinaison de plusieurs qualifications (« et » ou « ou »).

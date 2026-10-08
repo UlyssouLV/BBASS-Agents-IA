@@ -265,7 +265,7 @@
     .agenda img {
       display: block;
       margin: 0 auto;
-      max-width: 170mm;
+      max-width: min(170mm, 100%);
       max-height: 250mm;
       width: auto;
       height: auto;
@@ -379,7 +379,8 @@
         <p class="kicker">Alternance Agents IA · 2026–2027</p>
         <h1>Bilan de semaine - Alternance Ulysse LONG</h1>
         <p class="meta">Semaine du 05 au 09 octobre 2026<br />
-        Dépôt : <a href="https://github.com/UlyssouLV/BBASS-Agents-IA">github.com/UlyssouLV/BBASS-Agents-IA</a></p>
+        Dépôt : <a href="https://github.com/UlyssouLV/BBASS-Agents-IA">github.com/UlyssouLV/BBASS-Agents-IA</a><br />
+        Documentation technique : <a href="https://ulyssoulv.github.io/BBASS-Agents-IA/">ulyssoulv.github.io/BBASS-Agents-IA</a></p>
         <div class="semaine">05–09 oct. 2026</div>
       </div>
       <nav class="toc" aria-label="Table des matières">
@@ -419,10 +420,10 @@
               <li><a href="#version-1-3-1">V1.3.1 — Le chat ne fige plus ses inventions</a></li>
               <li><a href="#version-1-4-0">V1.4.0 — Recherche web</a></li>
               <li><a href="#version-1-4-1">V1.4.1 — Mémoire de la conversation</a></li>
+              <li><a href="#version-1-4-2">V1.4.2 — Contexte en vrais tokens</a></li>
+              <li><a href="#version-1-4-3">V1.4.3 — Cache des pages web</a></li>
+              <li><a href="#version-1-4-4">V1.4.4 — Statut d’attente en direct</a></li>
               <li><a href="#version-1-5-0">V1.5.0 — Moduléo lecture</a></li>
-              <li><a href="#version-1-6-0">V1.6.0 — Documentation mémoire / souveraineté</a></li>
-              <li><a href="#version-1-7-0">V1.7.0 — Déploiement postes</a></li>
-              <li><a href="#version-1-8-0">V1.8.0 — Workflows n8n</a></li>
             </ol>
           </li>
           <li>
@@ -473,7 +474,8 @@
     <div class="jour">
       <h3>Jeudi 8 octobre</h3>
       <ul>
-        <li>À compléter. <span class="echeance">Horizon semaine : déploiement postes (V1.7.0), éventuellement n8n (V1.8.0).</span></li>
+        <li><strong>Livraison de la V1.5.0</strong> (13:59) : depuis le chat, l’assistant consulte Moduléo en lecture seule. Il retrouve une affaire (par numéro, nom, responsable, période…) avec son client, ses intervenants et son état, ou un contact avec ses coordonnées et ses affaires. Les numéros, dates et téléphones lus dans Moduléo sont gardés dans la réponse, et la source « Moduléo, affaire … » est citée.</li>
+        <li>Deux séries de tests humains sur le serveur Moduléo du cabinet, puis corrections livrées avec la version : affaires récentes quand aucun critère n’est donné, réponse honnête quand Moduléo ne renvoie rien, titres de conversation sans mot inventé, coordonnées d’un contact cherchées au lieu d’être déclarées absentes.</li>
       </ul>
     </div>
 
@@ -489,19 +491,15 @@
     <section class="bloc" id="reste-a-implementer">
     <h2>Reste à implémenter</h2>
     <ul>
-      <li><strong>V1.5.0</strong> — Moduléo en lecture seule depuis le chat, via le premier Agent métier (pôle Administration).</li>
-      <li><strong>V1.6.0</strong> — documentation : mémoire conversationnelle et souveraineté des données.</li>
-      <li><strong>V1.7.0</strong> — déploiement postes (CI/CD, conteneurisation, installateur) — priorité avant l’absence à l’école.</li>
-      <li><strong>V1.8.0</strong> — workflows n8n (automatisations), branchés sur Moduléo.</li>
-      <li><strong>V1.9.0</strong> — analyse et traitement des pièces jointes, approfondis.</li>
-      <li><strong>Plus tard</strong> — dire « pas trouvé » plutôt qu’inventer après une recherche (#131, ex-1.4.5) ; optimisation de la recherche web ; pages refusées / PDF ; vérification de la fiabilité des sources ; modes Rapide / Approfondi.</li>
+      <li><strong>V1.5.1</strong> — lire plus de données Moduléo depuis le chat (domaines à choisir avec le cabinet).</li>
+      <li><strong>V1.5.2</strong> — écrire dans Moduléo depuis le chat, dès que Kipaware aura confirmé un serveur de test.</li>
     </ul>
     </section>
 
     <section class="bloc" id="livre-pour">
     <h2>Livré pour le 08/10/2026</h2>
     <div class="recap">
-      <p><strong>Point jeudi 8 octobre — visé : V1.5.0 puis V1.7.0 · livré : V1.4.4</strong></p>
+      <p><strong>Point jeudi 8 octobre — visé : V1.5.0 · livré : V1.5.0</strong></p>
       <h3>Chat</h3>
       <ul>
         <li>Ton professionnel et affichage structuré (V1.2.2) : vouvoiement, sans remplissage ni relance systématique ; mise en forme, blocs de code colorés, liens cliquables vers les sources.</li>
@@ -516,6 +514,10 @@
         <li>Plafond des pages (V1.4.2) : les pages trop longues sont mesurées avec le vrai compteur du modèle ; une jauge sous la saisie montre le remplissage de la conversation.</li>
         <li>Cache des pages (V1.4.3) : une page lue dans la journée est réutilisée 24 h, y compris dans une autre conversation ; relecture possible si elle a changé ; en cas d’échec, l’assistant le dit et s’appuie sur la version datée.</li>
       </ul>
+      <h3>Moduléo</h3>
+      <ul>
+        <li>Lecture Moduléo (V1.5.0) : depuis le chat, recherche d’affaires (numéro, nom, état, période, responsable…) et de contacts (coordonnées, affaires liées), en lecture seule, pour tous les comptes ; références lues gardées dans la réponse et citées en source ; Moduléo indisponible ou refusé dit clairement ; accès Moduléo protégé (jamais montré à l’IA ni dans l’inspecteur).</li>
+      </ul>
       <h3>Mode développeur</h3>
       <ul>
         <li>Inspecteur (V1.3.0) : <code>Ctrl+Maj+D</code>, débloqué par la Clé d’administration VM (jamais stockée) ; lecture de toutes les conversations ; chaque appel Mistral réel (chat, titrage, résumé, OCR, vision, outils) avec payload, réponse et succès/échec.</li>
@@ -525,7 +527,7 @@
 
     <section class="bloc versions" id="descriptif-versions">
       <h2>Descriptif des versions</h2>
-      <p class="lead">Versions livrées depuis le bilan précédent, puis prévisionnel de la semaine (feuille de route à jour au 06/10).</p>
+      <p class="lead">Versions livrées depuis le bilan précédent.</p>
 
       <div class="version" id="version-1-2-2">
         <div class="version-head">
@@ -592,10 +594,32 @@
         </div>
       </div>
 
+      <div class="version" id="version-1-4-2">
+        <div class="version-head">
+          <h3>V1.4.2 — Le contexte en vrais tokens</h3>
+          <span class="deploye">Déployé le 07/10/2026 à 09:35</span>
+        </div>
+        <div class="version-body">
+        <p>Les pages web trop longues étaient plafonnées avec une estimation grossière. Cette version mesure la taille des pages avec le vrai compteur du modèle : une page trop lourde n’est plus relue, et l’assistant répond honnêtement plutôt que de tronquer au hasard.</p>
+        <p>Sous le champ de saisie, une jauge indique à quel point le dernier envoi a rempli la fenêtre du modèle — pour anticiper les conversations qui deviennent trop longues.</p>
+        </div>
+      </div>
+
+      <div class="version" id="version-1-4-3">
+        <div class="version-head">
+          <h3>V1.4.3 — Cache des pages web entre conversations</h3>
+          <span class="deploye">Déployé le 07/10/2026 à 12:56</span>
+        </div>
+        <div class="version-body">
+        <p>Une page déjà lue était retéléchargée à chaque conversation, une page en échec ne pouvait plus être retentée, et une page lue restait figée même si le collaborateur disait qu’elle avait changé.</p>
+        <p>Désormais, une page lue avec succès dans la journée est réutilisée pendant 24 heures, y compris dans une autre conversation. Une page qui n’avait pas pu être lue est retentée plus tard. Si le collaborateur demande une relecture, la page est relue et ce que l’on en savait déjà est revérifié ; en cas d’échec, l’assistant le dit et s’appuie sur la version datée.</p>
+        </div>
+      </div>
+
       <div class="version" id="version-1-4-4">
         <div class="version-head">
           <h3>V1.4.4 — Statut d’attente en direct pendant une réponse</h3>
-          <span class="deploye">Déployé le 07/10/2026</span>
+          <span class="deploye">Déployé le 07/10/2026 à 15:50</span>
         </div>
         <div class="version-body">
         <p>Jusqu’ici, le fil affichait « Réflexion… » pendant toute la préparation de la réponse, alors qu’un tour peut comprendre plusieurs recherches, des pages lues et des documents relus. Le collaborateur ne savait pas si l’assistant avançait ou était bloqué. Désormais, le fil affiche l’étape en cours : « Recherche sur le web : “…” », « Lecture de &lt;site&gt; », « Relecture de &lt;document&gt; », « Vérification de la réponse… ». La réponse finale reste vérifiée avant de s’afficher.</p>
@@ -606,53 +630,18 @@
       <div class="version" id="version-1-5-0">
         <div class="version-head">
           <h3>V1.5.0 — Moduléo en lecture</h3>
-          <span class="prevu">Livraison prévue le 07/10/2026</span>
+          <span class="deploye">Déployé le 08/10/2026 à 13:59</span>
         </div>
         <div class="version-body">
-        <p>Premier branchement Moduléo (API lecture seule) via l’Agent Administration : demander depuis le chat des éléments issus de Moduléo (ex. affaire, intervenants) selon l’allowlist du pôle.</p>
-        </div>
-      </div>
-
-      <div class="version" id="version-1-6-0">
-        <div class="version-head">
-          <h3>V1.6.0 — Documentation mémoire et souveraineté</h3>
-          <span class="prevu">Ensuite (après Moduléo lecture)</span>
-        </div>
-        <div class="version-body">
-        <p>Deux documents produit : persistance de la mémoire conversationnelle, et cartographie de la souveraineté des données (ce qui reste chez le cabinet vs Mistral / SearXNG). Pas de nouvelle capacité code hors doc.</p>
-        </div>
-      </div>
-
-      <div class="version" id="version-1-7-0">
-        <div class="version-head">
-          <h3>V1.7.0 — Déploiement postes</h3>
-          <span class="prevu">Priorité fin de semaine</span>
-        </div>
-        <div class="version-body">
-        <p>Chaîne de déploiement pour installer et mettre à jour le logiciel sur les postes : CI/CD, conteneurisation si retenue, installateur / accès UI (backend local obligatoire). Priorité avant l’absence à l’école.</p>
-        </div>
-      </div>
-
-      <div class="version" id="version-1-8-0">
-        <div class="version-head">
-          <h3>V1.8.0 — Workflows n8n</h3>
-          <span class="prevu">Livraison prévue le 08/10/2026</span>
-        </div>
-        <div class="version-body">
-        <p>Socle d’automatisation n8n, branché sur Moduléo 1.5.0 : déclencher / composer des workflows sans god-mode. Visé jeudi si le déploiement le permet.</p>
+        <p>Jusqu’ici, pour connaître l’état d’une affaire, ses intervenants ou les coordonnées d’un contact, il fallait quitter le chat et ouvrir Moduléo. Désormais, l’assistant consulte Moduléo lui-même, en lecture seule, pour tous les comptes : il retrouve des affaires par numéro, nom, état, période, responsable ou chargé d’affaire (les plus récentes d’abord, celles des 90 derniers jours si aucun critère n’est donné), et des contacts avec leurs coordonnées et les affaires où ils apparaissent.</p>
+        <p>Ce qui a été lu dans Moduléo reste fiable dans toute la conversation : numéros, dates et téléphones ne sont pas retirés de la réponse, la source « Moduléo, affaire … » est citée, et l’assistant peut y revenir plus loin dans le fil. Si Moduléo est indisponible ou refuse l’accès, l’assistant le dit simplement. L’accès Moduléo est une clé unique dédiée au cabinet, protégée, jamais montrée à l’IA ni dans l’inspecteur. Rien n’est jamais écrit dans Moduléo.</p>
         </div>
       </div>
     </section>
 
     <section class="bloc agenda" id="agenda-quotidien">
       <h2>Emploi du temps quotidien</h2>
-      <!-- Remplacer le placeholder par l’image dès qu’elle est disponible :
-           <img src="agenda-quotidien-tableau.png" alt="Emploi du temps quotidien — semaine du 05 au 09 octobre 2026" />
-      -->
-      <div class="agenda-placeholder">
-        <strong>Emploi du temps quotidien</strong>
-        Document à venir (tableau d’emploi du temps de la semaine).
-      </div>
+      <img src="agenda-quotidien-tableau.png" alt="Emploi du temps quotidien — semaine du 05 au 09 octobre 2026" />
     </section>
   </div>
 </body>

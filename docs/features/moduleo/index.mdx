@@ -1,0 +1,33 @@
+import SchemaFlux from '@site/src/components/moduleo/SchemaFlux';
+
+# Branchement Moduléo
+
+Depuis la 1.5.0, le chat lit Moduléo, le logiciel métier du cabinet : affaires, intervenants, contacts et leurs coordonnées. Un collaborateur demande « retrouve l’affaire 2024-123 » ou « coordonnées de Dupont » sans quitter le chat.
+
+Ce n’est pas un Agent Moduléo. Comme pour la recherche web, **le modèle décide** d’appeler un outil. Il en a deux, proposés à tous les comptes dès que la config Moduléo est présente :
+
+| Outil | Ce qu’il fait |
+| --- | --- |
+| `chercher_affaires_moduleo` | Retrouve des affaires par numéro, texte, état, dates, site, service, responsable, chargé d’affaire, dossier de production. |
+| `chercher_contacts_moduleo` | Retrouve des contacts par texte, type, type de donneur d’ordre, qualifications, avec leurs coordonnées et leurs affaires. |
+
+<SchemaFlux variante="appel" />
+
+Pendant la lecture, le fil affiche **« Consultation Moduléo »**. Le modèle donne des **noms**, jamais des ids Moduléo : la VM centrale les traduit dans les deux sens.
+
+Trois règles tiennent l’ensemble ([ADR-0017](../../adr/0017-lecture-moduleo-par-outil.md)) :
+
+- **Lecture seule.** La clé d’API BBASS n’a que le droit de lecture dans Moduléo, et la VM n’envoie de toute façon que des GET.
+- **Une seule clé, chiffrée.** Une clé d’API dédiée à BBASS et le code de sécurité d’un utilisateur de test, chiffrés dans `.env`. Ce que voit le chat est ce que voit cet utilisateur dans Moduléo, quel que soit le compte BBASS.
+- **Aucune copie hors de la Conversation.** Moduléo est relu à chaque appel. Une fiche lue reste dans sa Conversation, jamais dans une autre.
+
+Sans config Moduléo complète, la VM démarre normalement et les deux outils ne sont simplement pas proposés.
+
+## Ensuite
+
+1. [Clé d’API, code de sécurité et clé maître](./configuration.mdx)
+2. [Lecture seule](./lecture-seule.mdx)
+3. [Chercher des affaires](./affaires.mdx)
+4. [Chercher des contacts](./contacts.mdx)
+5. [Sources et mémoire](./sources-et-memoire.mdx)
+6. [Panne et refus](./panne-et-refus.mdx)

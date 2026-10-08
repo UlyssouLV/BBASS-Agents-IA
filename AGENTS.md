@@ -2,11 +2,12 @@
 
 ## Cycle
 
-**« Ouvre la version »** → implement each child (close when tests are green) → human tests → **`/code-review`** → **« Finalise la version »** (quality gate, then **`/cqg`** if it is not `OK`). The **parent** spec closes via `Fixes` on the squash. Do **not** leave implemented children Open. Do **not** close the parent from `encadrer-implement`. New repo: **`/init`** / **« Initialise le repo »**.
+**« Ouvre la version »** → implement each `ready-for-agent` child (close when tests are green) → human tests (`/th` on the `ready-for-human` child) → **`/code-review`** → **« Finalise la version »** (quality gate, then **`/cqg`** if it is not `OK`). The **parent** spec closes via `Fixes` on the squash. Do **not** leave implemented children Open. Do **not** close the parent from `encadrer-implement`. New repo: **`/init`** / **« Initialise le repo »**.
 
 - **« Initialise le repo »** (`/init`): skill `initialise-le-repo`
 - **« Ouvre la version »** (must include **`X.Y.Z`**): skill `ouvrir-la-version`
 - Child-ticket TDD: `/implement`, then skill `encadrer-implement`
+- Human tests: `/th` (`tests-humains`) after the plan on the version’s `ready-for-human` child
 - **« Finalise la version »**: skill `finaliser-la-version`
 
 See `agents/README.md`.
@@ -31,7 +32,7 @@ HTTP-boundary tests only (observable responses). Do not praise or require tests 
 
 - **`readme`**: « État actuel », lancement, comptes de test — no leftover previous-version branch names or « not built yet » for features this version delivered.
 - **`roadmap`**: move **`X.Y.Z`** into **Déjà livré**; drop it from « Prochaine » / « Ensuite »; the next listed version becomes **Prochaine** (keep objectif / recherche).
-- **`suivi-avancement`**: HTML of the current calendar week under that role — record **`X.Y.Z`** in functional language, regenerate the sibling PDF; soft-skip if no week file (see skill `finaliser-la-version`).
+- **`suivi-avancement`**: via **`/msa`** (`mettre-a-jour-suivi-avancement`) — HTML+PDF of the current week for **`X.Y.Z`**; soft-skip + remind **`/os`** if no week folder (see `docs/suivi-avancement/README.md`).
 
 ## Git
 

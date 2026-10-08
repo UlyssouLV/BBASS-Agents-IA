@@ -23,6 +23,8 @@ If it is missing: ask and **wait**. Do not invent one.
 
 `gh issue view <n>`. If the body has no **`Part of #<parent>`** and no **`## Parent`**: **stop**. That `n` is not a child (likely the spec). Do not close it.
 
+If the issue has label **`ready-for-human`** or title starts with **`Tests humains —`**: **stop**. That child closes via skill **`tests-humains`** (`/th`), not `/cci`.
+
 If the issue is already Closed: say so and stop.
 
 ## 3. Tests (`-t` only)

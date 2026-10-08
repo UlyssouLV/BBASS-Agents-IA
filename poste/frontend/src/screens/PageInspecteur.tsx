@@ -1,11 +1,16 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { CarteEchangeInspecteur } from "@/components/CarteEchangeInspecteur";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  CadrePageInspecteur,
+  EnTeteNiveau,
+  FilInspecteur,
+  TableauComptesInspecteur,
+  TableauConversationsInspecteur,
+  TitreInspecteur,
+} from "@/components/ChromeInspecteur";
+import { EcranCleInspecteur } from "@/screens/EcranCleInspecteur";
 import {
   CLE_INSPECTEUR,
   useInspecteurComptesQuery,
@@ -61,34 +66,17 @@ export function PageInspecteur() {
   }
 
   return (
-    <main className="mx-auto flex h-svh w-full max-w-5xl flex-col px-6 py-6">
-      <h1 className="mb-1 text-xl font-semibold">Inspecteur des échanges avec le modèle</h1>
-      <nav aria-label="Fil d'Ariane" className="mb-4 flex flex-wrap items-center gap-1 text-sm text-muted-foreground">
-        <button type="button" className="hover:underline" onClick={() => setNavigation(_NAVIGATION_RACINE)}>
-          Comptes
-        </button>
-        {navigation.identifiantCompte && (
-          <>
-            <span aria-hidden="true">/</span>
-            <button
-              type="button"
-              className="hover:underline"
-              onClick={() => setNavigation({ identifiantCompte: navigation.identifiantCompte, conversation: null })}
-            >
-              {navigation.identifiantCompte}
-            </button>
-          </>
-        )}
-        {navigation.conversation && (
-          <>
-            <span aria-hidden="true">/</span>
-            <span className="text-foreground">{navigation.conversation.titre}</span>
-          </>
-        )}
-      </nav>
+    <CadrePageInspecteur>
+      <TitreInspecteur />
+      <FilInspecteur
+        identifiant={navigation.identifiantCompte}
+        titreConversation={navigation.conversation?.titre ?? null}
+        onComptes={() => setNavigation(_NAVIGATION_RACINE)}
+        onCompte={() => setNavigation({ identifiantCompte: navigation.identifiantCompte, conversation: null })}
+      />
 
       {_niveau(cleAdminVm)}
-    </main>
+    </CadrePageInspecteur>
   );
 
   function _niveau(cle: string) {
@@ -123,66 +111,12 @@ export function PageInspecteur() {
   }
 }
 
-interface EcranCleInspecteurProps {
-  erreur: string | null;
-  onValider: (cle: string) => void;
-}
-
-// Même champ, même libellé et même comportement que la saisie de la Clé
-// d'administration VM d'OngletComptes (FormulaireStatutAdmin) : rien n'est
-// chargé avant qu'elle soit saisie.
-function EcranCleInspecteur({ erreur, onValider }: Readonly<EcranCleInspecteurProps>) {
-  const [saisie, setSaisie] = useState("");
-
-  function gererEnvoi(evenement: FormEvent<HTMLFormElement>) {
-    evenement.preventDefault();
-    onValider(saisie);
-  }
-
-  return (
-    <main className="mx-auto mt-24 w-full max-w-sm">
-      <h1 className="mb-2 text-xl font-semibold">Inspecteur des échanges avec le modèle</h1>
-      <p className="mb-6 text-sm text-muted-foreground">La Clé d'administration VM est requise pour ouvrir le mode développeur.</p>
-      <form onSubmit={gererEnvoi} className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="inspecteur-cle">Clé d'administration VM</Label>
-          <Input
-            id="inspecteur-cle"
-            type="password"
-            required
-            autoFocus
-            value={saisie}
-            onChange={(evenement) => setSaisie(evenement.target.value)}
-          />
-        </div>
-        <Button type="submit">Ouvrir l'inspecteur</Button>
-        {erreur && (
-          <p role="alert" className="text-sm text-destructive">
-            {erreur}
-          </p>
-        )}
-      </form>
-    </main>
-  );
-}
-
 function useRetourSurCleRefusee(erreur: unknown, onCleRefusee: (message: string) => void) {
   useEffect(() => {
     if (erreur instanceof ErreurApi && erreur.status === 401) {
       onCleRefusee(erreur.message);
     }
   }, [erreur, onCleRefusee]);
-}
-
-function EnTeteNiveau({ titre, enCours, onRafraichir }: Readonly<{ titre: string; enCours: boolean; onRafraichir: () => void }>) {
-  return (
-    <div className="mb-4 flex items-center justify-between">
-      <h2 className="text-sm font-semibold">{titre}</h2>
-      <Button type="button" size="sm" variant="outline" disabled={enCours} onClick={onRafraichir}>
-        Rafraîchir
-      </Button>
-    </div>
-  );
 }
 
 interface NiveauComptesProps {
@@ -211,24 +145,10 @@ function NiveauComptes({ cleAdminVm, onChoisir, onCleRefusee }: Readonly<NiveauC
         <p className="text-sm text-muted-foreground">Aucun compte n'a encore de conversation.</p>
       )}
       {comptesQuery.data && comptesQuery.data.length > 0 && (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Identifiant</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {comptesQuery.data.map((compte) => (
-              <TableRow key={compte.identifiant_compte}>
-                <TableCell>
-                  <button type="button" className="hover:underline" onClick={() => onChoisir(compte.identifiant_compte)}>
-                    {compte.identifiant_compte}
-                  </button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <TableauComptesInspecteur
+          identifiants={comptesQuery.data.map((compte) => compte.identifiant_compte)}
+          onChoisir={onChoisir}
+        />
       )}
     </div>
   );
@@ -264,28 +184,20 @@ function NiveauConversations({ cleAdminVm, identifiantCompte, onChoisir, onCleRe
         <p className="text-sm text-muted-foreground">Aucune conversation pour ce compte.</p>
       )}
       {conversationsQuery.data && conversationsQuery.data.length > 0 && (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Titre</TableHead>
-              <TableHead>Créée le</TableHead>
-              <TableHead>Dernière activité</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {conversationsQuery.data.map((conversation) => (
-              <TableRow key={conversation.id}>
-                <TableCell>
-                  <button type="button" className="text-left hover:underline" onClick={() => onChoisir(conversation)}>
-                    {conversation.titre}
-                  </button>
-                </TableCell>
-                <TableCell>{new Date(conversation.date_creation).toLocaleString()}</TableCell>
-                <TableCell>{new Date(conversation.date_derniere_activite).toLocaleString()}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <TableauConversationsInspecteur
+          lignes={conversationsQuery.data.map((conversation) => ({
+            id: conversation.id,
+            titre: conversation.titre,
+            dateCreation: conversation.date_creation,
+            dateActivite: conversation.date_derniere_activite,
+          }))}
+          onChoisir={(id) => {
+            const conversation = conversationsQuery.data?.find((ligne) => ligne.id === id);
+            if (conversation) {
+              onChoisir(conversation);
+            }
+          }}
+        />
       )}
     </div>
   );

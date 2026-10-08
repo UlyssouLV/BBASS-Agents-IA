@@ -7,7 +7,7 @@ The skills speak in terms of five canonical triage roles. This file maps those r
 | `needs-triage`              | `needs-triage`        | Maintainer needs to evaluate this issue   |
 | `needs-info`                | `needs-info`          | Waiting on reporter for more information  |
 | `ready-for-agent`           | `ready-for-agent`     | Fully specified, ready for an AFK agent   |
-| `ready-for-human`           | `ready-for-human`     | Requires human implementation             |
+| `ready-for-human`           | `ready-for-human`     | Version human-test child (not `/implement`) |
 | `wontfix`                   | `wontfix`             | Will not be actioned                      |
 
 When a skill mentions a role (e.g. "apply the AFK-ready triage label"), use the corresponding label string from this table.
@@ -16,7 +16,9 @@ When a skill mentions a role (e.g. "apply the AFK-ready triage label"), use the 
 
 GitHub issues are **Open** or **Closed**. There is **no** `awaiting-merge` label.
 
-When `/implement` finishes green: skill `encadrer-implement` commits, pushes, **removes `ready-for-agent`**, then **`gh issue close`** on that **child**. It does **not** wait for the Sonar quality gate, and there is **no** label for that wait. Closing the blocker updates GitHub **Blocking** / **Blocked by** so the next tickets can start. `finaliser-la-version` reads the gate once, on the current PR `HEAD`, after the user accepted a `/code-review`.
+When `/implement` finishes green: skill `encadrer-implement` commits, pushes, **removes `ready-for-agent`**, then **`gh issue close`** on that **child**. It does **not** wait for the Sonar quality gate, and there is **no** label for that wait. Closing the blocker updates GitHub **Blocking** / **Blocked by** so the next tickets can start.
+
+The version **human-test** child uses **`ready-for-human`**. `encadrer-implement` fills its plan when no `ready-for-agent` children remain. The human reports with **`/th`** (`tests-humains`), which removes `ready-for-human` and closes that child. `finaliser-la-version` requires every in-scope child Closed (including the human-test one) and reads the gate once on the PR `HEAD` after an accepted `/code-review`.
 
 The **parent** spec stays Open until squash-merge (`Fixes #<parent>`). Once children exist it is **Blocked by** each of them (no `ready-for-agent` on the parent). Code can still exist only on the feature branch until « Finalise la version ».
 

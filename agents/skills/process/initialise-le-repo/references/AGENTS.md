@@ -2,12 +2,13 @@
 
 ## Cycle
 
-**« Ouvre la version »** → implement each child (close when tests are green) → human tests → **`/code-review`** → **« Finalise la version »** (quality gate, then **`/cqg`** if it is not `OK`). The **parent** spec closes via `Fixes` on the squash. Do **not** leave implemented children Open. Do **not** close the parent from `encadrer-implement`.
+**« Ouvre la version »** → implement each `ready-for-agent` child (close when tests are green) → human tests (`/th` on the `ready-for-human` child) → **`/code-review`** → **« Finalise la version »** (quality gate, then **`/cqg`** if it is not `OK`). The **parent** spec closes via `Fixes` on the squash. Do **not** leave implemented children Open. Do **not** close the parent from `encadrer-implement`.
 
 - **« Initialise le repo »** (`/init`): skill `initialise-le-repo` (already done in this repo)
 - **« Augmente la feuille de route de dev »** (`/afr`): skill `augmenter-la-feuille-de-route-dev`
 - **« Ouvre la version »** (must include **`X.Y.Z`**): skill `ouvrir-la-version`
 - Child-ticket TDD: `/implement`, then skill `encadrer-implement`
+- Human tests: `/th` (`tests-humains`) after the plan on the version’s `ready-for-human` child
 - **« Finalise la version »**: skill `finaliser-la-version`
 
 See `agents/README.md`.

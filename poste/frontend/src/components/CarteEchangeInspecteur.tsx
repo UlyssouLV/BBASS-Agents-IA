@@ -1,7 +1,6 @@
-import { useState, type ReactNode } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { useState } from "react";
 
-import { Badge } from "@/components/ui/badge";
+import { BlocTexte, CoquilleCarteEchange, MessageRole, SectionEchange } from "@/components/CoquilleCarteEchange";
 import { useInspecteurEchangeQuery, type InspecteurEchangeResume } from "@/hooks/useInspecteur";
 import { messageErreur } from "@/lib/api";
 
@@ -48,70 +47,54 @@ export function CarteEchangeInspecteur({ cleAdminVm, echange }: Readonly<CarteEc
   const detailQuery = useInspecteurEchangeQuery(cleAdminVm, echange.id, deplie);
   const enEchec = echange.statut === "echec";
   const local = echange.origine === "local";
-  const Chevron = deplie ? ChevronDown : ChevronRight;
 
   const erreurDetail = messageErreur(detailQuery.error, "Le chargement de l'échange a échoué. Réessayez plus tard.");
 
   return (
-    <article className="rounded-md border bg-card text-sm">
-      <button
-        type="button"
-        aria-expanded={deplie}
-        onClick={() => setDeplie((valeur) => !valeur)}
-        className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-muted/50"
-      >
-        <Chevron className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-        <span className="font-medium">{libelleTypeAppel(echange.type_appel)}</span>
-        <Badge variant="outline">{local ? "Local" : "Mistral"}</Badge>
-        <Badge variant={enEchec ? "destructive" : "secondary"}>{enEchec ? "Échec" : "Succès"}</Badge>
-        <span className="ml-auto text-xs text-muted-foreground">
-          <time dateTime={echange.date_creation}>{new Date(echange.date_creation).toLocaleString()}</time>
-        </span>
-      </button>
-
-      {deplie && (
-        <div className="flex flex-col gap-3 border-t px-3 py-3">
-          {detailQuery.isLoading && <output>Chargement…</output>}
-          {erreurDetail && (
-            <p role="alert" className="text-sm text-destructive">
-              {erreurDetail}
-            </p>
-          )}
-          {detailQuery.data && echange.type_appel === "garde_fous" && (
-            <DetailGardeFous
-              requetePayload={detailQuery.data.requete_payload}
-              reponsePayload={detailQuery.data.reponse_payload}
-            />
-          )}
-          {detailQuery.data && echange.type_appel !== "garde_fous" && (
-            <>
-              {!local && <p className="text-xs text-muted-foreground">Modèle : {detailQuery.data.modele}</p>}
-              {detailQuery.data.erreur && (
-                <Section titre="Erreur">
-                  <BlocTexte className="text-destructive">{detailQuery.data.erreur}</BlocTexte>
-                </Section>
-              )}
-              <Section titre={local ? "Entrée" : "Payload envoyé"}>
-                <ContenuPayload
-                  payload={detailQuery.data.requete_payload}
-                  pieceJointeId={detailQuery.data.piece_jointe_id}
-                />
-              </Section>
-              <Section titre={local ? "Sortie" : "Réponse brute reçue"}>
-                {detailQuery.data.reponse_payload ? (
-                  <ContenuReponse
-                    reponse={detailQuery.data.reponse_payload}
-                    pieceJointeId={local ? detailQuery.data.piece_jointe_id : null}
-                  />
-                ) : (
-                  <p className="text-xs text-muted-foreground">Aucune réponse reçue.</p>
-                )}
-              </Section>
-            </>
-          )}
-        </div>
+    <CoquilleCarteEchange
+      libelle={libelleTypeAppel(echange.type_appel)}
+      local={local}
+      enEchec={enEchec}
+      dateIso={echange.date_creation}
+      ouvert={deplie}
+      onOuvertChange={setDeplie}
+    >
+      {detailQuery.isLoading && <output>Chargement…</output>}
+      {erreurDetail && (
+        <p role="alert" className="text-sm text-destructive">
+          {erreurDetail}
+        </p>
       )}
-    </article>
+      {detailQuery.data && echange.type_appel === "garde_fous" && (
+        <DetailGardeFous
+          requetePayload={detailQuery.data.requete_payload}
+          reponsePayload={detailQuery.data.reponse_payload}
+        />
+      )}
+      {detailQuery.data && echange.type_appel !== "garde_fous" && (
+        <>
+          {!local && <p className="text-xs text-muted-foreground">Modèle : {detailQuery.data.modele}</p>}
+          {detailQuery.data.erreur && (
+            <SectionEchange titre="Erreur">
+              <BlocTexte className="text-destructive">{detailQuery.data.erreur}</BlocTexte>
+            </SectionEchange>
+          )}
+          <SectionEchange titre={local ? "Entrée" : "Payload envoyé"}>
+            <ContenuPayload payload={detailQuery.data.requete_payload} pieceJointeId={detailQuery.data.piece_jointe_id} />
+          </SectionEchange>
+          <SectionEchange titre={local ? "Sortie" : "Réponse brute reçue"}>
+            {detailQuery.data.reponse_payload ? (
+              <ContenuReponse
+                reponse={detailQuery.data.reponse_payload}
+                pieceJointeId={local ? detailQuery.data.piece_jointe_id : null}
+              />
+            ) : (
+              <p className="text-xs text-muted-foreground">Aucune réponse reçue.</p>
+            )}
+          </SectionEchange>
+        </>
+      )}
+    </CoquilleCarteEchange>
   );
 }
 
@@ -128,32 +111,13 @@ function DetailGardeFous({
       <p className="text-xs text-muted-foreground">
         {brute === visible ? "Aucun retrait : réponse affichée telle quelle." : "Les garde-fous ont modifié la réponse."}
       </p>
-      <Section titre="Réponse brute du modèle">
+      <SectionEchange titre="Réponse brute du modèle">
         <BlocTexte>{brute}</BlocTexte>
-      </Section>
-      <Section titre="Réponse visible">
+      </SectionEchange>
+      <SectionEchange titre="Réponse visible">
         <BlocTexte>{visible}</BlocTexte>
-      </Section>
+      </SectionEchange>
     </>
-  );
-}
-
-function Section({ titre, children }: Readonly<{ titre: string; children: ReactNode }>) {
-  return (
-    <section className="flex flex-col gap-1.5">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{titre}</h3>
-      {children}
-    </section>
-  );
-}
-
-function BlocTexte({ children, className }: Readonly<{ children: ReactNode; className?: string }>) {
-  return (
-    <pre
-      className={`max-h-96 overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted px-3 py-2 font-mono text-xs ${className ?? ""}`}
-    >
-      {children}
-    </pre>
   );
 }
 
@@ -217,11 +181,10 @@ function MessagePayload({ message, pieceJointeId }: Readonly<{ message: unknown;
 
   const { role, content, ...autresChamps } = message;
   return (
-    <div className="flex flex-col gap-1 rounded-md border px-3 py-2">
-      <span className="text-xs font-semibold">{String(role)}</span>
+    <MessageRole role={String(role)}>
       <ContenuMessage role={String(role)} content={content} pieceJointeId={pieceJointeId} />
       {Object.keys(autresChamps).length > 0 && <BlocTexte>{JSON.stringify(autresChamps, null, 2)}</BlocTexte>}
-    </div>
+    </MessageRole>
   );
 }
 
