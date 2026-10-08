@@ -24,6 +24,13 @@ _DATES_AFFAIRE = (
     ("DateLivraison", "Date de livraison"),
     ("DateCloture", "Date de clôture"),
 )
+# La fiche nomme les contacts sans leurs coordonnées : sans cette ligne, le
+# modèle a répondu « pas disponibles dans Moduléo » à quatre demandes de
+# coordonnées (#183, conversation 116).
+_COORDONNEES_DES_CONTACTS = (
+    "Coordonnées du client et des intervenants : absentes de cette fiche, à lire avec "
+    "chercher_contacts_moduleo à partir de leur nom, seulement si le collaborateur les demande."
+)
 
 
 def fiche_affaire(affaire: dict, intervenants: list[dict], noms: Noms) -> Fiche:
@@ -56,6 +63,8 @@ def fiche_affaire(affaire: dict, intervenants: list[dict], noms: Noms) -> Fiche:
     if lignes_intervenants:
         lignes.append("Intervenants :")
         lignes.extend(f"- {ligne}" for ligne in lignes_intervenants)
+    if client or representant or lignes_intervenants:
+        lignes.append(_COORDONNEES_DES_CONTACTS)
 
     de_laffaire = f"de l'affaire {numero}"
     client_represente = f"{client}, représenté par {representant}" if client and representant else client

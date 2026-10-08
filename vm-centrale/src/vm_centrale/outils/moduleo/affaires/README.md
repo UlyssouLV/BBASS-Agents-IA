@@ -23,10 +23,10 @@ Retrouve des affaires Moduléo par **numéro**, par **texte** ou par **filtres e
 4. Noms de tout l'appel, dédoublonnés (`moduleo/resolution.py`) : responsable et chargé d'affaire (`moduleo/utilisateur/{id}`), client, représentant, intervenants et leurs représentants (`cogeo/contact/multi`), commune (`moduleo/commune/multi`).
 5. Une Fiche Moduléo par affaire (`moduleo/fiches.py`), enregistrée dans `lectures_outils` (référence « affaire <numéro> »).
 
-**Au modèle.** Les fiches, séparées par une ligne vide. Plus d'affaires que de fiches : « N affaires trouvées, M affichées, précise la recherche. » en tête (« Au moins 200 » au plafond des ids). Aucune : « Aucune affaire Moduléo ne correspond à cette recherche. »
+**Au modèle.** Les fiches, séparées par une ligne vide. Une fiche qui nomme un client, un représentant ou un intervenant se termine par « Coordonnées du client et des intervenants : absentes de cette fiche, à lire avec chercher_contacts_moduleo à partir de leur nom, seulement si le collaborateur les demande. » ; la description de l'outil le dit aussi. La VM n'appelle jamais l'outil contacts d'elle-même : seul le modèle le fait, sur demande du collaborateur (#183, conversation 116 : le modèle répondait « pas disponibles dans Moduléo » sans le lire ; garde-fou [`contact_non_lu/`](../../../garde_fous/contact_non_lu/README.md)). Plus d'affaires que de fiches : « N affaires trouvées, M affichées, précise la recherche. » en tête (« Au moins 200 » au plafond des ids). Aucune : « Aucune affaire Moduléo ne correspond à cette recherche. »
 
 **Inspecteur** (`outil:chercher_affaires_moduleo`) : arguments, `routes`, `trouvees`, `fiches`, `non_resolu` ou `erreur`.
 
-**Depuis.** 1.5.0 (#174), filtres en noms (#175), affaires récentes sans critère et plus récentes d'abord (#182). Valeurs d'`Etat` relevées sur le serveur réel et affichées en libellés (#180). À confirmer à l'essai réel (#178) : format de date attendu par l'API, recherche par nom exacte ou partielle.
+**Depuis.** 1.5.0 (#174), filtres en noms (#175), affaires récentes sans critère et plus récentes d'abord (#182), renvoi vers `chercher_contacts_moduleo` pour les coordonnées (#183). Valeurs d'`Etat` relevées sur le serveur réel et affichées en libellés (#180). À confirmer à l'essai réel (#178) : format de date attendu par l'API, recherche par nom exacte ou partielle.
 
 Code : `outil.py`.

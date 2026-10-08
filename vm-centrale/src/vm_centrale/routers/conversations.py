@@ -26,6 +26,7 @@ from vm_centrale.config import (
 from vm_centrale.consommation import enregistrer_consommation
 from vm_centrale.database import FabriqueSession, get_db, get_fabrique_session
 from vm_centrale.garde_fous import (
+    PHRASE_CONTACT_NON_LU,
     LectureSource,
     PageSource,
     ajouter_sources,
@@ -33,6 +34,7 @@ from vm_centrale.garde_fous import (
     nettoyer_titre,
     normaliser_url,
     plafonner,
+    remplacer_contact_non_lu,
     retirer_chiffres_hors_source,
     retirer_urls_inventees,
     urls_ecrites,
@@ -504,7 +506,11 @@ def _construire_messages_pour_mistral(
     if piece_jointe is not None:
         messages.append(_message_systeme_piece_jointe(piece_jointe))
     messages.extend({"role": m.role, "content": m.contenu} for m in derniers_messages)
-    if derniers_messages and derniers_messages[-1].role == "assistant" and _est_remplacee(derniers_messages[-1].contenu):
+    if (
+        derniers_messages
+        and derniers_messages[-1].role == "assistant"
+        and derniers_messages[-1].contenu.startswith(_PHRASES_CHIFFRES)
+    ):
         messages.append(_NOTE_APRES_REMPLACEMENT)
     messages.append({"role": "user", "content": nouveau_message})
     return messages
@@ -521,10 +527,13 @@ _REPONSE_SANS_DONNEES = "Je n'ai trouvé ni page ni document pour appuyer une r�
 _REPONSE_SANS_DONNEES_MODULEO = (
     "Moduléo n'a rien renvoyé pour cette demande. Précise un numéro d'affaire, un nom ou une période."
 )
-_PHRASES_FIXES = (_REPONSE_SANS_DONNEES, _REPONSE_SANS_DONNEES_MODULEO)
+_PHRASES_CHIFFRES = (_REPONSE_SANS_DONNEES, _REPONSE_SANS_DONNEES_MODULEO)
+# Le contact non lu (#183) n'est pas un échange à titrer, mais sa phrase dit
+# déjà au modèle quoi faire : pas de note au tour suivant.
+_PHRASES_FIXES = (*_PHRASES_CHIFFRES, PHRASE_CONTACT_NON_LU)
 _OUTILS_MODULEO = {outil_affaires.OUTIL.nom, outil_contacts.OUTIL.nom}
-# Au tour qui suit une réponse remplacée (#182) : l'historique ne porte que
-# la phrase fixe, jamais la réponse brute du modèle.
+# Au tour qui suit une réponse aux chiffres remplacée (#182) : l'historique
+# ne porte que la phrase fixe, jamais la réponse brute du modèle.
 _NOTE_APRES_REMPLACEMENT = {
     "role": "system",
     "content": (
@@ -658,7 +667,10 @@ def _reponse_visible(
     # cités.
     publier(VERIFICATION)
     moduleo_appele = not _OUTILS_MODULEO.isdisjoint(outils_appeles)
-    visible = _appliquer_garde_fous(db, conversation_id, nouveau_message, reponse, piece_jointe, moduleo_appele)
+    contacts_lus = outil_contacts.OUTIL.nom in outils_appeles
+    visible = _appliquer_garde_fous(
+        db, conversation_id, nouveau_message, reponse, piece_jointe, moduleo_appele, contacts_lus
+    )
     visible = ajouter_sources(
         visible,
         _messages_du_compte(db, conversation_id, nouveau_message)
@@ -685,7 +697,13 @@ def _appliquer_garde_fous(
     reponse: str,
     piece_jointe: PieceJointe | None,
     moduleo_appele: bool = False,
+    contacts_lus: bool = False,
 ) -> str:
+    # Une absence de coordonnées dans Moduléo sans lecture du contact dans
+    # le tour (#183) : toute la réponse devient la phrase fixe, rien d'autre
+    # à contrôler.
+    if (sans_contact_non_lu := remplacer_contact_non_lu(reponse, contacts_lus)) != reponse:
+        return sans_contact_non_lu
     # URL d'abord : un chiffre qui ne vivait que dans une URL inventée
     # disparaît avec elle, et n'est pas relu comme une donnée.
     reponse = _reponse_sans_url_inventee(db, conversation_id, nouveau_message, reponse)
