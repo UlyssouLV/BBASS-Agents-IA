@@ -4,8 +4,8 @@
 
 <!-- sync:stats-commits -->
 <p align="center">
-  <img src="https://img.shields.io/badge/commits_main-26-c8102e?style=for-the-badge" alt="26 commits sur main" />
-  <img src="https://img.shields.io/badge/commits_PR_(historique)-276-1e3a5f?style=for-the-badge" alt="276 commits dans les PR mergées" />
+  <img src="https://img.shields.io/badge/commits_main-28-c8102e?style=for-the-badge" alt="28 commits sur main" />
+  <img src="https://img.shields.io/badge/commits_PR_(historique)-277-1e3a5f?style=for-the-badge" alt="277 commits dans les PR mergées" />
 </p>
 <!-- /sync:stats-commits -->
 
