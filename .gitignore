@@ -13,6 +13,7 @@ vm-centrale/pieces_jointes/
 node_modules/
 docs-site/node_modules/
 docs-site/build/
+docs-site/build-check-*/
 docs-site/.docusaurus/
 # Feuille Tailwind du poste, injectée seulement dans les aperçus.
 docs-site/src/poste/
