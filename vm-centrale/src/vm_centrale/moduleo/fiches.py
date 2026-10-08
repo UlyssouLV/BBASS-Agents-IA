@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import date
 
 from vm_centrale.moduleo.resolution import Noms, Utilisateur
@@ -38,6 +39,81 @@ def fiche_affaire(affaire: dict, intervenants: list[dict], noms: Noms) -> str:
         lignes.append("Intervenants :")
         lignes.extend(f"- {ligne}" for ligne in lignes_intervenants)
     return "\n".join(lignes)
+
+
+# TypeContact : entier dans le JSON, nom de l'énumération dans le XML du
+# WADL (Personne = 1 ; ordre des autres supposé, à confirmer à l'essai
+# réel, #178). NonDefini ou 0 : pas de ligne.
+_TYPES_CONTACT = {
+    1: "Personne",
+    2: "Société",
+    3: "Collectivité",
+    4: "Groupe de contacts",
+    "Personne": "Personne",
+    "Societe": "Société",
+    "Collectivite": "Collectivité",
+    "GroupeContacts": "Groupe de contacts",
+}
+_TYPES_SANS_LIGNE = (None, 0, "NonDefini", "")
+# Numéros d'affaires listés au plus par rôle ; au-delà, « et N autres ».
+_AFFAIRES_MAX = 20
+
+
+@dataclass(frozen=True)
+class DetailsContact:
+    # Ce que les lectures par contact rapportent : fiches de téléphone,
+    # d'email et d'adresse telles que Moduléo les renvoie, numéros des
+    # affaires dont le contact est client ou intervenant.
+    telephones: list[dict]
+    emails: list[dict]
+    adresses: list[dict]
+    affaires_client: list[str]
+    affaires_intervenant: list[str]
+
+
+def reference_contact(contact: dict) -> str:
+    # « Moduléo, contact Étude Dupont ».
+    return f"contact {_texte(contact.get('Nom'))}"
+
+
+def fiche_contact(contact: dict, details: DetailsContact, communes: dict[int, str]) -> str:
+    lignes = [f"Contact {_texte(contact.get('Nom'))}"]
+    type_contact = contact.get("TypeContact")
+    if type_contact not in _TYPES_SANS_LIGNE:
+        _ajouter(lignes, "Type", _TYPES_CONTACT.get(type_contact, _texte(type_contact)))
+    _ajouter_liste(
+        lignes, "Téléphones", [_avec_lieu(_texte(t.get("Numero")), t.get("Lieu")) for t in details.telephones]
+    )
+    _ajouter_liste(lignes, "Emails", [_avec_lieu(_texte(e.get("Adresse")), e.get("Lieu")) for e in details.emails])
+    _ajouter_liste(lignes, "Adresses", [_adresse(a, communes) for a in details.adresses])
+    _ajouter(lignes, "Client des affaires", _numeros(details.affaires_client))
+    _ajouter(lignes, "Intervenant dans les affaires", _numeros(details.affaires_intervenant))
+    return "\n".join(lignes)
+
+
+def _ajouter_liste(lignes: list[str], libelle: str, valeurs: list[str]) -> None:
+    valeurs = [valeur for valeur in valeurs if valeur]
+    if valeurs:
+        lignes.append(f"{libelle} :")
+        lignes.extend(f"- {valeur}" for valeur in valeurs)
+
+
+def _avec_lieu(valeur: str, lieu: object) -> str:
+    # « 04 67 98 76 54 (Bureau) ».
+    lieu = _texte(lieu)
+    return f"{valeur} ({lieu})" if valeur and lieu else valeur
+
+
+def _adresse(adresse: dict, communes: dict[int, str]) -> str:
+    # « 3 rue de la Mairie, Castries (34160) (Siège) ».
+    parties = [_texte(adresse.get("Rue")), communes.get(_id(adresse.get("IdCommune")), "")]
+    return _avec_lieu(", ".join(partie for partie in parties if partie), adresse.get("Lieu"))
+
+
+def _numeros(numeros: list[str]) -> str:
+    numeros = [numero for numero in dict.fromkeys(_texte(n) for n in numeros) if numero]
+    autres = f" et {len(numeros) - _AFFAIRES_MAX} autres" if len(numeros) > _AFFAIRES_MAX else ""
+    return ", ".join(numeros[:_AFFAIRES_MAX]) + autres
 
 
 def _id(valeur: object) -> int:

@@ -1,15 +1,8 @@
-import logging
 from datetime import datetime
 from typing import Any
 
-from vm_centrale.lectures_outils import Fiche, enregistrer_lectures
-from vm_centrale.moduleo.client import (
-    ErreurModuleo,
-    LecteurModuleo,
-    ModuleoIntrouvable,
-    ModuleoRefuse,
-    RequeteInterdite,
-)
+from vm_centrale.lectures_outils import Fiche
+from vm_centrale.moduleo.client import LecteurModuleo, ModuleoIntrouvable
 from vm_centrale.moduleo.fiches import fiche_affaire, reference_affaire
 from vm_centrale.moduleo.resolution import (
     Noms,
@@ -24,15 +17,17 @@ from vm_centrale.moduleo.resolution import (
 )
 from vm_centrale.moduleo.routes import ROUTES_GET
 from vm_centrale.outils.base import ContexteTour, Outil, ResultatOutil
-from vm_centrale.statut_tour import CONSULTATION_MODULEO
+from vm_centrale.outils.moduleo.commun import (
+    IDS_MAX,
+    NB_DEFAUT,
+    NB_PLAFOND,
+    liste_ids,
+    lire_argument,
+    lire_fiches,
+    nb_max,
+)
 
 _NOM = "chercher_affaires_moduleo"
-# Fiches renvoyées au modèle (spec 1.5.0) : 5 par défaut, 10 au plus.
-_NB_DEFAUT = 5
-_NB_PLAFOND = 10
-# Ids demandés à la recherche par texte, pour dire combien d'affaires
-# correspondent au-delà des fiches affichées ; limite des routes `multi`.
-_IDS_MAX = 200
 
 _ROUTE_NUMERO = "cogeo/affaire/numeroAffaire?numAffaire={numAffaire}"
 _ROUTE_RECHERCHE = next(route for route in ROUTES_GET if route.startswith("cogeo/affaire?texte="))
@@ -40,11 +35,8 @@ _ROUTE_AFFAIRES = "cogeo/affaire/multi?ids={ids}"
 _ROUTE_INTERVENANTS_AFFAIRE = "cogeo/affaire/{idAffaire}/intervenants"
 _ROUTE_INTERVENANTS = "cogeo/intervenant/multi?ids={ids}"
 
-# Phrases fixes au modèle (spec 1.5.0) : le détail technique ne va qu'à
-# l'inspecteur.
-INDISPONIBLE = "Moduléo est indisponible pour le moment."
-REFUS = "Moduléo refuse l'accès à cette donnée."
 _AUCUNE_AFFAIRE = "Aucune affaire Moduléo ne correspond à cette recherche."
+_TROUVEES = "{n} affaires trouvées, {m} affichées"
 _RIEN_A_CHERCHER = "Donne un numéro d'affaire, un texte ou un filtre à chercher dans Moduléo."
 
 # Filtres de dates (#175) : argument du modèle → paramètre de cogeo/affaire?…
@@ -63,8 +55,6 @@ _DATES = {
 _FORMATS_DATE = ("%Y-%m-%d", "%d/%m/%Y")
 # Filtres en noms, résolus en ids par la VM.
 _NOMS = ("site", "service", "suivi_par", "responsable", "charge_affaire", "dossier_production")
-
-logger = logging.getLogger(__name__)
 
 _SCHEMA = {
     "type": "function",
@@ -137,7 +127,7 @@ _SCHEMA = {
                 "nb_max": {
                     "type": "integer",
                     "description": (
-                        f"Nombre de fiches voulues, {_NB_DEFAUT} par défaut, {_NB_PLAFOND} au plus."
+                        f"Nombre de fiches voulues, {NB_DEFAUT} par défaut, {NB_PLAFOND} au plus."
                     ),
                 },
             },
@@ -151,26 +141,6 @@ def _declarer(contexte: ContexteTour) -> dict | None:
     return _SCHEMA if contexte.client_moduleo is not None else None
 
 
-class _LecteurTrace:
-    # Chaque route lue, avec ses paramètres, pour l'inspecteur. Jamais les
-    # en-têtes : la clé et le SecurityCode restent dans ClientModuleo.
-    def __init__(self, lecteur: LecteurModuleo) -> None:
-        self._lecteur = lecteur
-        self.routes: list[dict[str, Any]] = []
-
-    def lire(self, route: str, parametres: dict[str, Any] | None = None) -> Any:
-        self.routes.append({"route": route, "parametres": parametres or {}})
-        return self._lecteur.lire(route, parametres)
-
-
-def _nb_max(valeur: Any) -> int:
-    try:
-        nombre = int(valeur) if valeur is not None else _NB_DEFAUT
-    except (TypeError, ValueError):
-        nombre = _NB_DEFAUT
-    return min(max(nombre, 1), _NB_PLAFOND)
-
-
 def _chercher(
     lecteur: LecteurModuleo, numero: str, texte: str, filtres: dict[str, str], noms: dict[str, str]
 ) -> list[int]:
@@ -181,7 +151,7 @@ def _chercher(
         except ModuleoIntrouvable:
             return []
         return [int(id_affaire)] if id_affaire else []
-    parametres = {"texte": texte or None, **filtres, **_resoudre(lecteur, noms), "nbMaxResultats": _IDS_MAX}
+    parametres = {"texte": texte or None, **filtres, **_resoudre(lecteur, noms), "nbMaxResultats": IDS_MAX}
     # « Suivie par » : responsable ou chargé d'affaire. L'API combine ses
     # filtres en « et » : deux recherches, ids réunis sans doublon.
     suivi = parametres.pop("suivi_par", None)
@@ -213,10 +183,10 @@ def _filtres(arguments: dict) -> dict[str, str]:
     # État et dates, au format de l'API. Une date illisible lève
     # NomNonResolu : jamais une recherche sans le filtre demandé.
     filtres = {}
-    if etat := _argument(arguments, "etat"):
+    if etat := lire_argument(arguments, "etat"):
         filtres["etatAffaire"] = etat
     for argument, parametre in _DATES.items():
-        if valeur := _argument(arguments, argument):
+        if valeur := lire_argument(arguments, argument):
             filtres[parametre] = _date_api(valeur)
     return filtres
 
@@ -230,19 +200,15 @@ def _date_api(valeur: str) -> str:
     raise NomNonResolu(f"Date « {valeur} » illisible : donne-la au format AAAA-MM-JJ. Recherche non lancée.")
 
 
-def _argument(arguments: dict, nom: str) -> str:
-    return str(arguments.get(nom) or "").strip()
-
-
 def _fiches(lecteur: LecteurModuleo, ids: list[int]) -> list[Fiche]:
-    affaires = {affaire["IdAffaire"]: affaire for affaire in lecteur.lire(_ROUTE_AFFAIRES, {"ids": _liste(ids)})}
+    affaires = {affaire["IdAffaire"]: affaire for affaire in lecteur.lire(_ROUTE_AFFAIRES, {"ids": liste_ids(ids)})}
     ids_intervenants = [
         id_intervenant
         for id_affaire in ids
         if id_affaire in affaires
         for id_intervenant in lecteur.lire(_ROUTE_INTERVENANTS_AFFAIRE, {"idAffaire": id_affaire})
     ]
-    intervenants = lecteur.lire(_ROUTE_INTERVENANTS, {"ids": _liste(ids_intervenants)}) if ids_intervenants else []
+    intervenants = lecteur.lire(_ROUTE_INTERVENANTS, {"ids": liste_ids(ids_intervenants)}) if ids_intervenants else []
     # Tous les noms de l'appel d'un coup, dédoublonnés.
     noms = Noms(
         utilisateurs=resoudre_utilisateurs(
@@ -269,49 +235,23 @@ def _fiches(lecteur: LecteurModuleo, ids: list[int]) -> list[Fiche]:
     ]
 
 
-def _liste(ids: list[int]) -> str:
-    # Séparateur des routes `multi` : la virgule.
-    return ",".join(str(i) for i in dict.fromkeys(ids))
-
-
-def _contenu(fiches: list[Fiche], trouvees: int) -> str:
-    entete = ""
-    if trouvees > len(fiches):
-        plus = "Au moins " if trouvees >= _IDS_MAX else ""
-        entete = f"{plus}{trouvees} affaires trouvées, {len(fiches)} affichées, précise la recherche.\n\n"
-    return entete + "\n\n".join(fiche.texte for fiche in fiches)
-
 
 def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
-    numero = _argument(arguments, "numero")
-    texte = _argument(arguments, "texte")
-    noms = {nom: valeur for nom in _NOMS if (valeur := _argument(arguments, nom))}
+    numero = lire_argument(arguments, "numero")
+    texte = lire_argument(arguments, "texte")
+    noms = {nom: valeur for nom in _NOMS if (valeur := lire_argument(arguments, nom))}
     try:
         filtres = _filtres(arguments)
     except NomNonResolu as erreur:
         return ResultatOutil(str(erreur), trace={"routes": [], "non_resolu": str(erreur)})
     if contexte.client_moduleo is None or not (numero or texte or filtres or noms):
         return ResultatOutil(_RIEN_A_CHERCHER)
-    contexte.publier(CONSULTATION_MODULEO)
-    lecteur = _LecteurTrace(contexte.client_moduleo)
-    try:
+
+    def lire(lecteur: LecteurModuleo) -> tuple[list[int], list[Fiche]]:
         ids = _chercher(lecteur, numero, texte, filtres, noms)
-        fiches = _fiches(lecteur, ids[: _nb_max(arguments.get("nb_max"))]) if ids else []
-    except NomNonResolu as erreur:
-        return ResultatOutil(str(erreur), trace={"routes": lecteur.routes, "non_resolu": str(erreur)})
-    except ModuleoRefuse as erreur:
-        logger.warning("Moduléo refuse la lecture : %s", erreur)
-        return ResultatOutil(REFUS, trace={"routes": lecteur.routes, "erreur": str(erreur)})
-    except (ErreurModuleo, RequeteInterdite, KeyError, TypeError, ValueError, AttributeError) as erreur:
-        # Jamais de 500 ni de nouvelle tentative (spec 1.5.0) : panne, ou
-        # réponse qui n'a pas la forme attendue.
-        logger.warning("Moduléo indisponible : %s", erreur)
-        return ResultatOutil(INDISPONIBLE, trace={"routes": lecteur.routes, "erreur": str(erreur)})
-    trace = {"routes": lecteur.routes, "trouvees": len(ids), "fiches": [fiche.texte for fiche in fiches]}
-    if not fiches:
-        return ResultatOutil(_AUCUNE_AFFAIRE, trace=trace)
-    enregistrer_lectures(contexte.db, contexte.conversation_id, "moduleo", fiches)
-    return ResultatOutil(_contenu(fiches, len(ids)), trace=trace)
+        return ids, _fiches(lecteur, ids[: nb_max(arguments.get("nb_max"))]) if ids else []
+
+    return lire_fiches(contexte, contexte.client_moduleo, lire, _AUCUNE_AFFAIRE, _TROUVEES)
 
 
 OUTIL = Outil(nom=_NOM, declarer=_declarer, executer=_executer)

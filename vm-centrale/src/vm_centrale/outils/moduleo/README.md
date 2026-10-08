@@ -1,6 +1,6 @@
 # Outils Moduléo
 
-Les outils que le modèle peut appeler pour lire Moduléo, le logiciel de gestion du cabinet (spec 1.5.0, [ADR-0017](../../../../../docs/adr/0017-lecture-moduleo-par-outil.md)). Un paquet par outil (`__init__.py` exporte `OUTIL`, `outil.py`, `README.md`), inscrit dans `outils/registre.py`. L'accès à Moduléo (client GET seul, routes, résolution des noms, fiches) est commun à tous les outils et vit dans `vm_centrale/moduleo/`.
+Les outils que le modèle peut appeler pour lire Moduléo, le logiciel de gestion du cabinet (spec 1.5.0, [ADR-0017](../../../../../docs/adr/0017-lecture-moduleo-par-outil.md)). Un paquet par outil (`__init__.py` exporte `OUTIL`, `outil.py`, `README.md`), inscrit dans `outils/registre.py`. L'accès à Moduléo (client GET seul, routes, résolution des noms, fiches) est commun à tous les outils et vit dans `vm_centrale/moduleo/` ; le déroulé commun d'un appel (statut, trace des routes, panne / refus, plafond et « N trouvés », lectures) est `commun.py` (`lire_fiches`, #176).
 
 **Règles communes.**
 
@@ -13,3 +13,4 @@ Les outils que le modèle peut appeler pour lire Moduléo, le logiciel de gestio
 | Outil | Ce qu'il fait | Depuis |
 | --- | --- | --- |
 | `chercher_affaires_moduleo` ([`affaires/`](affaires/README.md)) | Retrouve des affaires par numéro, par texte ou par filtres en noms (état, dates, site, service, responsable, chargé d'affaire, dossier de production) ; une Fiche Moduléo par affaire. | 1.5.0 (#174, #175) |
+| `chercher_contacts_moduleo` ([`contacts/`](contacts/README.md)) | Retrouve des contacts par texte, type de contact, type de donneur d'ordre ou qualifications en noms ; une Fiche Moduléo par contact (type, nom, téléphones, emails, adresses, numéros des affaires où il est client ou intervenant). | 1.5.0 (#176) |

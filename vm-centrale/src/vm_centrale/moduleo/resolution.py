@@ -124,6 +124,24 @@ def chercher_dossier_production(lecteur: LecteurModuleo, nom: str) -> int:
     return ids[0]
 
 
+def chercher_qualifications(lecteur: LecteurModuleo, noms: list[str]) -> str:
+    # Contacts (#176) : un id par nom, séparés par une virgule. Le libellé
+    # exact l'emporte (« Notaire » plutôt que « Clerc de notaire ») ; sinon
+    # le seul libellé qui contient le nom.
+    toutes = {q["IdQualification"]: _texte(q.get("Libelle")) for q in lecteur.lire("cogeo/qualification/all")}
+    ids = []
+    for nom in noms:
+        exactes = [i for i, libelle in toutes.items() if libelle.casefold() == nom.casefold()]
+        proches = exactes or [i for i, libelle in toutes.items() if nom.casefold() in libelle.casefold()]
+        if not proches:
+            raise NomNonResolu(f"Aucune qualification Moduléo ne correspond à « {nom} » : recherche non lancée.")
+        if len(proches) > 1:
+            libelles = sorted(toutes[i] for i in proches[:_CANDIDATS_MAX])
+            raise NomNonResolu(_ambigu("qualifications", nom, libelles, len(proches)))
+        ids.append(proches[0])
+    return ",".join(map(str, dict.fromkeys(ids)))
+
+
 def _essais_utilisateur(nom: str) -> list[dict[str, str]]:
     mots = nom.split()
     if len(mots) == 1:
