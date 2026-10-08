@@ -9,7 +9,7 @@ Retrouve des contacts Moduléo et leurs coordonnées quand le modèle le décide
 - `type_donneur_ordre` : transmis tel quel en `typeDonneurOrdreGE`.
 - `qualifications` : des noms (« Notaire »), résolus en ids par `chercher_qualifications` (`moduleo/resolution.py`, `cogeo/qualification/all`) : le libellé exact l'emporte, sinon le seul libellé qui contient le nom. Aucun libellé, ou plusieurs : une phrase au modèle (« Plusieurs qualifications Moduléo correspondent à « Expert » : Expert foncier, Géomètre-expert. Demande lequel… »), **aucune recherche**, trace `non_resolu`.
 
-`nb_max`, 5 par défaut, ramené entre 1 et 10. Aucun paramètre : une phrase demande un texte, un type ou une qualification, sans lecture.
+`nb_max`, 5 par défaut, ramené entre 1 et 10. Aucun paramètre : une phrase demande un texte, un type ou une qualification, sans lecture. Toute phrase de l'outil qui n'a rien lu se termine par « Aucune lecture faite dans Moduléo : n'invente aucun contact, demande au collaborateur un nom, un type ou une qualification. » (#182).
 
 **Déroulé.**
 

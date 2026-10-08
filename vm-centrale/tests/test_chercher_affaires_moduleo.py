@@ -167,7 +167,8 @@ def test_par_texte_plusieurs_fiches_cinq_au_plus_par_defaut_avec_le_nombre_trouv
 
     contenu = _contenu_outil(mistral_client_factice)
     assert contenu.startswith("7 affaires trouvées, 5 affichées, précise la recherche.")
-    assert [f"Affaire 2024-00{n}" in contenu for n in range(1, 8)] == [True] * 5 + [False] * 2
+    # Les plus récentes d'abord : ids décroissants (#182).
+    assert [f"Affaire 2024-00{n}" in contenu for n in range(1, 8)] == [False] * 2 + [True] * 5
     (_, parametres), = [a for a in faux_moduleo.appels if a[0].startswith("cogeo/affaire?texte=")]
     assert parametres["texte"] == "bornage"
 
@@ -204,14 +205,6 @@ def test_par_texte_aucune_affaire_message_clair(client, faux_moduleo, mistral_cl
     assert "cogeo/affaire/multi?ids={ids}" not in faux_moduleo.routes_appelees()
 
 
-def test_sans_numero_ni_texte_rien_nest_lu(client, faux_moduleo, mistral_client_factice, jeton_valide):
-    reponse = _retrouver(client, mistral_client_factice, jeton_valide, {})
-
-    assert reponse.status_code == 200
-    assert "numéro" in _contenu_outil(mistral_client_factice)
-    assert faux_moduleo.appels == []
-
-
 def test_une_ligne_lectures_outils_par_fiche_rattachee_au_tour_puis_supprimee_avec_la_conversation(
     client, faux_moduleo, mistral_client_factice, jeton_valide, db_session
 ):
@@ -223,8 +216,8 @@ def test_une_ligne_lectures_outils_par_fiche_rattachee_au_tour_puis_supprimee_av
 
     lectures = db_session.query(LectureOutil).filter_by(conversation_id=conversation_id).order_by(LectureOutil.id).all()
     assert [(lecture.outil, lecture.reference) for lecture in lectures] == [
-        ("moduleo", "affaire 2024-001"),
         ("moduleo", "affaire 2024-002"),
+        ("moduleo", "affaire 2024-001"),
     ]
     assert lectures[0].texte in _contenu_outil(mistral_client_factice)
     (assistant,) = db_session.query(Message).filter_by(conversation_id=conversation_id, role="assistant").all()

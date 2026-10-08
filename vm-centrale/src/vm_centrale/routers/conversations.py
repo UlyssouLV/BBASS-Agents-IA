@@ -75,6 +75,7 @@ from vm_centrale.questions_couvertes import (
     enregistrer_questions_piece_jointe,
 )
 from vm_centrale.outils import AppelMistralOutil, ContexteTour, executer_appel, outils_du_tour
+from vm_centrale.outils.moduleo import affaires as outil_affaires, contacts as outil_contacts
 from vm_centrale.statut_tour import (
     ATTENTE,
     REFLEXION,
@@ -244,17 +245,36 @@ def _consigne_date_du_jour() -> str:
     )
 
 
+_MOIS = (
+    "janvier", "février", "mars", "avril", "mai", "juin",
+    "juillet", "août", "septembre", "octobre", "novembre", "décembre",
+)
+
+
+def _date_du_jour_source() -> str:
+    # La date du jour donnée au modèle, comptée parmi les textes source du
+    # garde-fou chiffres (#182, conversation 115 : « depuis le 1er septembre
+    # 2026 ? » devenait la phrase fixe). Écrite en lettres : le mois en
+    # chiffres (« 10 ») autoriserait un nombre d'affaires inventé.
+    aujourdhui = _date_du_jour()
+    return f"{aujourdhui.day} {_MOIS[aujourdhui.month - 1]} {aujourdhui.year}"
+
+
 def _message_systeme_style() -> dict[str, str]:
     return {"role": "system", "content": f"{_PROMPT_STYLE}\n{_consigne_date_du_jour()}"}
 
 
 def _prompt_titrage(message_utilisateur: str, reponse_assistant: str) -> str:
+    # Une phrase fixe n'est pas un échange à résumer (#182, conversation
+    # 115 : titre construit sur la phrase fixe) : seul le message compte.
+    echange = f"Utilisateur : {message_utilisateur}"
+    if not _est_remplacee(reponse_assistant):
+        echange += f"\nAssistant : {reponse_assistant}"
     return (
         "Propose un titre court (moins de 8 mots), sans guillemets et sans "
         "aucune mise en forme Markdown (pas de **, #, etc.), résumant "
-        "l'échange suivant :\n"
-        f"Utilisateur : {message_utilisateur}\n"
-        f"Assistant : {reponse_assistant}"
+        "l'échange suivant. N'utilise aucun mot absent de l'échange :\n"
+        f"{echange}"
     )
 
 
@@ -484,6 +504,8 @@ def _construire_messages_pour_mistral(
     if piece_jointe is not None:
         messages.append(_message_systeme_piece_jointe(piece_jointe))
     messages.extend({"role": m.role, "content": m.contenu} for m in derniers_messages)
+    if derniers_messages and derniers_messages[-1].role == "assistant" and _est_remplacee(derniers_messages[-1].contenu):
+        messages.append(_NOTE_APRES_REMPLACEMENT)
     messages.append({"role": "user", "content": nouveau_message})
     return messages
 
@@ -495,12 +517,35 @@ def _construire_messages_pour_mistral(
 # contiennent — sauf demande explicite d'inventer, d'imaginer ou de faire
 # une hypothèse. Plus de « pas accès à Internet » depuis la 1.4.0.
 _REPONSE_SANS_DONNEES = "Je n'ai trouvé ni page ni document pour appuyer une réponse chiffrée."
+# Après un appel d'outil Moduléo dans le tour (#182, conversation 115).
+_REPONSE_SANS_DONNEES_MODULEO = (
+    "Moduléo n'a rien renvoyé pour cette demande. Précise un numéro d'affaire, un nom ou une période."
+)
+_PHRASES_FIXES = (_REPONSE_SANS_DONNEES, _REPONSE_SANS_DONNEES_MODULEO)
+_OUTILS_MODULEO = {outil_affaires.OUTIL.nom, outil_contacts.OUTIL.nom}
+# Au tour qui suit une réponse remplacée (#182) : l'historique ne porte que
+# la phrase fixe, jamais la réponse brute du modèle.
+_NOTE_APRES_REMPLACEMENT = {
+    "role": "system",
+    "content": (
+        "Ta réponse précédente a été remplacée par la VM par une phrase fixe : elle "
+        "avançait des chiffres sans source. N'en réutilise aucun chiffre. Pour une "
+        "question sur les affaires du cabinet, lis Moduléo avec un critère (numéro, "
+        "nom, période) ou demande-en un au collaborateur."
+    ),
+}
 _MOTIF_INVENTION = re.compile(
     r"\b(inventer|invente|inventes|inventé|inventée|invention|imaginer|imagine|imagines|"
     r"imaginé|imaginée|hypothèse|hypothese|hypothèses|hypotheses)\b",
     re.IGNORECASE,
 )
 _MOTIF_NEGATION = re.compile(r"(?:n['’]|ne\s+)$", re.IGNORECASE)
+
+
+def _est_remplacee(reponse: str) -> bool:
+    # La réponse visible commence par une phrase fixe (une mention de page
+    # trop longue peut la suivre).
+    return reponse.startswith(_PHRASES_FIXES)
 
 
 def _demande_invention(message: str) -> bool:
@@ -602,6 +647,7 @@ def _reponse_visible(
     piece_jointe: PieceJointe | None,
     pages_trop_longues: list[str],
     publier: Publier,
+    outils_appeles: list[str],
 ) -> str:
     # Ligne garde_fous de l'inspecteur à chaque réponse de chat (spec 1.4.0,
     # décision 15), même sans retrait : sans elle, on ne voit pas pourquoi la
@@ -611,7 +657,8 @@ def _reponse_visible(
     # contrôlées comme un texte du modèle, et seuls les chiffres gardés sont
     # cités.
     publier(VERIFICATION)
-    visible = _appliquer_garde_fous(db, conversation_id, nouveau_message, reponse, piece_jointe)
+    moduleo_appele = not _OUTILS_MODULEO.isdisjoint(outils_appeles)
+    visible = _appliquer_garde_fous(db, conversation_id, nouveau_message, reponse, piece_jointe, moduleo_appele)
     visible = ajouter_sources(
         visible,
         _messages_du_compte(db, conversation_id, nouveau_message)
@@ -637,6 +684,7 @@ def _appliquer_garde_fous(
     nouveau_message: str,
     reponse: str,
     piece_jointe: PieceJointe | None,
+    moduleo_appele: bool = False,
 ) -> str:
     # URL d'abord : un chiffre qui ne vivait que dans une URL inventée
     # disparaît avec elle, et n'est pas relu comme une donnée.
@@ -648,7 +696,7 @@ def _appliquer_garde_fous(
     extraits += _textes_de_recherche(db, conversation_id)
     # Une fiche lue par un outil (Moduléo, spec 1.5.0) aussi.
     extraits += [lecture.texte for lecture in lectures_de_la_conversation(db, conversation_id)]
-    textes_source = [*_messages_du_compte(db, conversation_id, nouveau_message), *extraits]
+    textes_source = [*_messages_du_compte(db, conversation_id, nouveau_message), _date_du_jour_source(), *extraits]
     sans_chiffre_invente = retirer_chiffres_hors_source(reponse, textes_source)
     if sans_chiffre_invente == reponse:
         return reponse
@@ -661,7 +709,7 @@ def _appliquer_garde_fous(
     )
     if (extraits or message_apporte_une_donnee) and sans_chiffre_invente:
         return sans_chiffre_invente
-    return _REPONSE_SANS_DONNEES
+    return _REPONSE_SANS_DONNEES_MODULEO if moduleo_appele else _REPONSE_SANS_DONNEES
 
 
 def _identite_connue(compte: Compte | None) -> str:
@@ -1034,6 +1082,7 @@ def _tour_creer_conversation(
         piece_jointe,
         list(contexte_outils.pages_trop_longues.values()),
         publier,
+        contexte_outils.outils_appeles,
     )
 
     publier(TITRAGE)
@@ -1452,6 +1501,7 @@ def _executer_appels_outils(
     messages_outils: list[dict] = []
     piece_jointe_relue: int | None = None
     for appel in demande.appels:
+        contexte_outils.outils_appeles.append(appel.nom)
         resultat = executer_appel(appel, contexte_outils)
         enregistrer_echange_local(
             contexte_outils.db,
@@ -1858,6 +1908,7 @@ def _tour_envoyer_message(
         piece_jointe,
         list(contexte_outils.pages_trop_longues.values()),
         publier,
+        contexte_outils.outils_appeles,
     )
     _enregistrer_questions_du_tour(db, attendre_questions, identifiant_compte, conversation.id, piece_jointe)
 

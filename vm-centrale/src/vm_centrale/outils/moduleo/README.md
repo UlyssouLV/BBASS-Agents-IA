@@ -8,6 +8,7 @@ Les outils que le modèle peut appeler pour lire Moduléo, le logiciel de gestio
 - **Statut** : « Consultation Moduléo » (`CONSULTATION_MODULEO`, `statut_tour.py`) avant la première lecture.
 - **Panne / refus** : phrase fixe au modèle, « Moduléo est indisponible pour le moment. » (panne, réponse inexploitable) ou « Moduléo refuse l'accès à cette donnée. » (401 / 403) ; détail dans la trace de l'inspecteur ; jamais de 500, aucune nouvelle tentative, aucune lecture enregistrée.
 - **Lectures** : une ligne `lectures_outils` (outil `moduleo`) par Fiche Moduléo renvoyée, source des garde-fous chiffres et sources sur toute la conversation (`vm_centrale/lectures_outils.py`). Avec elle, ses questions couvertes (`questions_couvertes.lecture_outil_id`, origine `initiale`, écrites par `moduleo/fiches.py` sans appel Mistral, jamais une source des garde-fous) ; la Mémoire de la conversation liste la lecture avec son tour, sa date et ces questions, et dit de rappeler Moduléo pour l'état actuel ou une lecture ancienne (#177).
+- **Sans lecture** : un nom non résolu ne lance aucune recherche ; la phrase au modèle se termine par la phrase « Aucune lecture faite dans Moduléo… » de l'outil (`lire_fiches`, `sans_lecture`), qui interdit d'inventer et dit de demander un critère (#182).
 - **Inspecteur** : échange `local` `outil:<nom>` : arguments, `fiches`, `routes` (route et paramètres de chaque lecture), `erreur` éventuelle. Jamais la clé ni le SecurityCode : ils restent dans les en-têtes de `ClientModuleo`.
 
 | Outil | Ce qu'il fait | Depuis |

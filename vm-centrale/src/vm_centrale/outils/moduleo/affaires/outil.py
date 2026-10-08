@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from vm_centrale.lectures_outils import Fiche
@@ -38,7 +38,18 @@ _ROUTE_INTERVENANTS = "cogeo/intervenant/multi?ids={ids}"
 
 _AUCUNE_AFFAIRE = "Aucune affaire Moduléo ne correspond à cette recherche."
 _TROUVEES = "{n} affaires trouvées, {m} affichées"
-_RIEN_A_CHERCHER = "Donne un numéro d'affaire, un texte ou un filtre à chercher dans Moduléo."
+# Sans aucun critère (#182, conversation 115 : « les dernières affaires »
+# n'appelait jamais Moduléo) : les affaires créées ces derniers jours.
+_JOURS_RECENTS = 90
+_AUCUNE_RECENTE = "Aucune affaire créée dans Moduléo depuis le {depuis}."
+_RECENTES = "{{n}} affaires créées depuis le {depuis}, {{m}} plus récentes affichées"
+# Ajoutée à toute phrase de l'outil qui n'a rien lu (#182, conversation
+# 115 : le modèle a inventé 10 affaires après un refus).
+_SANS_LECTURE = (
+    "Aucune lecture faite dans Moduléo : n'invente aucune affaire, demande au collaborateur "
+    "un numéro, un nom ou une période."
+)
+_RIEN_A_CHERCHER = f"Moduléo n'est pas configuré. {_SANS_LECTURE}"
 
 # Filtres de dates (#175) : argument du modèle → paramètre de cogeo/affaire?…
 _EVENEMENTS = {
@@ -69,7 +80,8 @@ _SCHEMA = {
             "état, dates, adresse, commune, client, représentant, responsable, "
             "chargé d'affaire et intervenants avec leur qualité. À utiliser pour "
             "toute question sur une affaire du cabinet : ces données ne sont pas "
-            "sur Internet."
+            f"sur Internet. Sans aucun critère, renvoie les affaires créées ces {_JOURS_RECENTS} "
+            "derniers jours. Les plus récentes d'abord."
         ),
         "parameters": {
             "type": "object",
@@ -137,6 +149,10 @@ _SCHEMA = {
 }
 
 
+def _date_du_jour() -> date:
+    return datetime.now(timezone.utc).date()
+
+
 def _declarer(contexte: ContexteTour) -> dict | None:
     # Pour tous les comptes, dès que Moduléo est configuré (spec 1.5.0).
     return _SCHEMA if contexte.client_moduleo is not None else None
@@ -145,7 +161,8 @@ def _declarer(contexte: ContexteTour) -> dict | None:
 def _chercher(
     lecteur: LecteurModuleo, numero: str, texte: str, filtres: dict[str, str], noms: dict[str, str]
 ) -> list[int]:
-    # Ids des affaires trouvées, dans l'ordre de Moduléo.
+    # Ids des affaires trouvées, les plus récentes d'abord : ids Moduléo
+    # décroissants (#182), avant la coupe à nb_max.
     if numero:
         try:
             id_affaire = lecteur.lire(_ROUTE_NUMERO, {"numAffaire": numero})
@@ -157,8 +174,8 @@ def _chercher(
     # filtres en « et » : deux recherches, ids réunis sans doublon.
     suivi = parametres.pop("suivi_par", None)
     variantes = [{}] if suivi is None else [{"idsResponsable": suivi}, {"idsActeurEnCharge": suivi}]
-    ids = [int(i) for variante in variantes for i in lecteur.lire(_ROUTE_RECHERCHE, {**parametres, **variante})]
-    return list(dict.fromkeys(ids))
+    ids = {int(i) for variante in variantes for i in lecteur.lire(_ROUTE_RECHERCHE, {**parametres, **variante})}
+    return sorted(ids, reverse=True)
 
 
 def _resoudre(lecteur: LecteurModuleo, noms: dict[str, str]) -> dict[str, Any]:
@@ -244,7 +261,6 @@ def _fiches(lecteur: LecteurModuleo, ids: list[int]) -> list[Fiche]:
     ]
 
 
-
 def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
     numero = lire_argument(arguments, "numero")
     texte = lire_argument(arguments, "texte")
@@ -252,15 +268,23 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
     try:
         filtres = _filtres(arguments)
     except NomNonResolu as erreur:
-        return ResultatOutil(str(erreur), trace={"routes": [], "non_resolu": str(erreur)})
-    if contexte.client_moduleo is None or not (numero or texte or filtres or noms):
+        return ResultatOutil(f"{erreur} {_SANS_LECTURE}", trace={"routes": [], "non_resolu": str(erreur)})
+    if contexte.client_moduleo is None:
         return ResultatOutil(_RIEN_A_CHERCHER)
+    aucune, trouvees, recentes = _AUCUNE_AFFAIRE, _TROUVEES, not (numero or texte or filtres or noms)
+    if recentes:
+        depuis = _date_du_jour() - timedelta(days=_JOURS_RECENTS)
+        filtres = {"dateCreationMin": depuis.isoformat()}
+        aucune = _AUCUNE_RECENTE.format(depuis=depuis.strftime("%d/%m/%Y"))
+        trouvees = _RECENTES.format(depuis=depuis.strftime("%d/%m/%Y"))
 
     def lire(lecteur: LecteurModuleo) -> tuple[list[int], list[Fiche]]:
         ids = _chercher(lecteur, numero, texte, filtres, noms)
         return ids, _fiches(lecteur, ids[: nb_max(arguments.get("nb_max"))]) if ids else []
 
-    return lire_fiches(contexte, contexte.client_moduleo, lire, _AUCUNE_AFFAIRE, _TROUVEES)
+    return lire_fiches(
+        contexte, contexte.client_moduleo, lire, aucune, trouvees, _SANS_LECTURE, entete_toujours=recentes
+    )
 
 
 OUTIL = Outil(nom=_NOM, declarer=_declarer, executer=_executer)

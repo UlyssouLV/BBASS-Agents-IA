@@ -39,6 +39,9 @@ class ContexteTour:
     # None sans config Moduléo (spec 1.5.0, #173) : les outils Moduléo ne
     # sont alors pas proposés.
     client_moduleo: LecteurModuleo | None = None
+    # Noms des outils appelés pendant ce tour, dans l'ordre (#182) : après
+    # un appel Moduléo, la phrase fixe parle de Moduléo.
+    outils_appeles: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

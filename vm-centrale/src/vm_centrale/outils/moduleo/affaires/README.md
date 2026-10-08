@@ -11,15 +11,15 @@ Retrouve des affaires Moduléo par **numéro**, par **texte** ou par **filtres e
 - `suivi_par` : un utilisateur, responsable **ou** chargé d'affaire ; remplace les deux précédents.
 - `dossier_production` : un dossier de production (`idDossierProduction`).
 
-`nb_max`, 5 par défaut, ramené entre 1 et 10. Rien de tout cela : une phrase demande un numéro, un texte ou un filtre, sans lecture.
+`nb_max`, 5 par défaut, ramené entre 1 et 10. Rien de tout cela (`{}`, `{"nb_max": 10}`) : les affaires créées ces 90 derniers jours (`dateCreationMin` = aujourd'hui − 90 jours), « N affaires créées depuis le JJ/MM/AAAA, M plus récentes affichées. » en tête, ou « Aucune affaire créée dans Moduléo depuis le JJ/MM/AAAA. » (test humain 1.5.0, conversation 115, #182 : « les dernières affaires » n'appelait jamais Moduléo).
 
-**Noms non résolus.** État inconnu, date illisible, nom qui ne désigne rien, ou plusieurs utilisateurs / dossiers de production : une phrase au modèle (« Aucun site Moduléo ne correspond à « Lyon » : recherche non lancée. », « Plusieurs utilisateurs Moduléo correspondent à « Martin » : Jean Martin, Paul Martin. Demande lequel… »), **aucune recherche** sans le filtre demandé, aucune lecture enregistrée. Trace : `non_resolu`.
+**Noms non résolus.** État inconnu, date illisible, nom qui ne désigne rien, ou plusieurs utilisateurs / dossiers de production : une phrase au modèle (« Aucun site Moduléo ne correspond à « Lyon » : recherche non lancée. », « Plusieurs utilisateurs Moduléo correspondent à « Martin » : Jean Martin, Paul Martin. Demande lequel… »), **aucune recherche** sans le filtre demandé, aucune lecture enregistrée. Toute phrase de l'outil qui n'a rien lu se termine par « Aucune lecture faite dans Moduléo : n'invente aucune affaire, demande au collaborateur un numéro, un nom ou une période. » (#182, conversation 115 : le modèle avait inventé 10 affaires après un refus). Trace : `non_resolu`.
 
 **Déroulé.**
 
 1. Noms → ids (`moduleo/resolution.py`) : `moduleo/utilisateur?nom=&prenom=`, `moduleo/site?nom=`, `moduleo/service?nom=`, `fileo/dossierproduction?texteRecherche=`.
-2. Recherche : `cogeo/affaire/numeroAffaire?numAffaire=` (un id ; 404 ou 0 : aucune affaire), ou `cogeo/affaire?texte=…&nbMaxResultats=200` avec les filtres (les ids, pour compter les affaires trouvées au-delà de `nb_max`). `suivi_par` : deux recherches (responsable, puis chargé d'affaire), ids réunis sans doublon.
-3. Les `nb_max` premières : `cogeo/affaire/multi?ids=`, puis `cogeo/affaire/{id}/intervenants` par affaire et `cogeo/intervenant/multi?ids=` pour tous.
+2. Recherche : `cogeo/affaire/numeroAffaire?numAffaire=` (un id ; 404 ou 0 : aucune affaire), ou `cogeo/affaire?texte=…&nbMaxResultats=200` avec les filtres (les ids, pour compter les affaires trouvées au-delà de `nb_max`). `suivi_par` : deux recherches (responsable, puis chargé d'affaire), ids réunis sans doublon. Ids triés par ordre décroissant : les plus récentes d'abord (#182, ordre à confirmer à l'essai réel).
+3. Les `nb_max` plus récentes : `cogeo/affaire/multi?ids=`, puis `cogeo/affaire/{id}/intervenants` par affaire et `cogeo/intervenant/multi?ids=` pour tous.
 4. Noms de tout l'appel, dédoublonnés (`moduleo/resolution.py`) : responsable et chargé d'affaire (`moduleo/utilisateur/{id}`), client, représentant, intervenants et leurs représentants (`cogeo/contact/multi`), commune (`moduleo/commune/multi`).
 5. Une Fiche Moduléo par affaire (`moduleo/fiches.py`), enregistrée dans `lectures_outils` (référence « affaire <numéro> »).
 
@@ -27,6 +27,6 @@ Retrouve des affaires Moduléo par **numéro**, par **texte** ou par **filtres e
 
 **Inspecteur** (`outil:chercher_affaires_moduleo`) : arguments, `routes`, `trouvees`, `fiches`, `non_resolu` ou `erreur`.
 
-**Depuis.** 1.5.0 (#174), filtres en noms (#175). Valeurs d'`Etat` relevées sur le serveur réel et affichées en libellés (#180). À confirmer à l'essai réel (#178) : format de date attendu par l'API, recherche par nom exacte ou partielle.
+**Depuis.** 1.5.0 (#174), filtres en noms (#175), affaires récentes sans critère et plus récentes d'abord (#182). Valeurs d'`Etat` relevées sur le serveur réel et affichées en libellés (#180). À confirmer à l'essai réel (#178) : format de date attendu par l'API, recherche par nom exacte ou partielle.
 
 Code : `outil.py`.

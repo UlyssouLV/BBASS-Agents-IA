@@ -65,17 +65,22 @@ def lire_fiches(
     lire: Callable[[LecteurModuleo], tuple[list[int], list[Fiche]]],
     aucun: str,
     trouves: str,
+    sans_lecture: str,
+    entete_toujours: bool = False,
 ) -> ResultatOutil:
     # `client` : celui du contexte, déjà vérifié. `lire` : les ids trouvés
     # et les fiches des premiers. `aucun` : la phrase sans résultat ;
     # `trouves` : « {n} affaires trouvées, {m} affichées », en tête quand il
-    # y a plus d'ids que de fiches.
+    # y a plus d'ids que de fiches, ou toujours avec `entete_toujours`.
+    # `sans_lecture` : ajoutée à la phrase d'un nom non résolu (#182).
     contexte.publier(CONSULTATION_MODULEO)
     lecteur = LecteurTrace(client)
     try:
         ids, fiches = lire(lecteur)
     except NomNonResolu as erreur:
-        return ResultatOutil(str(erreur), trace={"routes": lecteur.routes, "non_resolu": str(erreur)})
+        return ResultatOutil(
+            f"{erreur} {sans_lecture}", trace={"routes": lecteur.routes, "non_resolu": str(erreur)}
+        )
     except ModuleoRefuse as erreur:
         logger.warning("Moduléo refuse la lecture : %s", erreur)
         return ResultatOutil(REFUS, trace={"routes": lecteur.routes, "erreur": str(erreur)})
@@ -89,7 +94,8 @@ def lire_fiches(
         return ResultatOutil(aucun, trace=trace)
     enregistrer_lectures(contexte.db, contexte.conversation_id, "moduleo", fiches)
     entete = ""
-    if len(ids) > len(fiches):
+    if len(ids) > len(fiches) or entete_toujours:
         plus = "Au moins " if len(ids) >= IDS_MAX else ""
-        entete = f"{plus}{trouves.format(n=len(ids), m=len(fiches))}, précise la recherche.\n\n"
+        precise = ", précise la recherche" if len(ids) > len(fiches) else ""
+        entete = f"{plus}{trouves.format(n=len(ids), m=len(fiches))}{precise}.\n\n"
     return ResultatOutil(entete + "\n\n".join(fiche.texte for fiche in fiches), trace=trace)

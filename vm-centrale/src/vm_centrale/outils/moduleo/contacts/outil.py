@@ -40,7 +40,12 @@ _LECTURES_PARALLELES = 16
 
 _AUCUN_CONTACT = "Aucun contact Moduléo ne correspond à cette recherche."
 _TROUVES = "{n} contacts trouvés, {m} affichés"
-_RIEN_A_CHERCHER = "Donne un texte (nom du contact), un type ou une qualification à chercher dans Moduléo."
+# Ajoutée à toute phrase de l'outil qui n'a rien lu (#182).
+_SANS_LECTURE = (
+    "Aucune lecture faite dans Moduléo : n'invente aucun contact, demande au collaborateur "
+    "un nom, un type ou une qualification."
+)
+_RIEN_A_CHERCHER = f"Donne un texte (nom du contact), un type ou une qualification à chercher. {_SANS_LECTURE}"
 
 _SCHEMA = {
     "type": "function",
@@ -169,7 +174,7 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
     try:
         type_contact = _type_contact(valeur) if (valeur := lire_argument(arguments, "type_contact")) else ""
     except NomNonResolu as erreur:
-        return ResultatOutil(str(erreur), trace={"routes": [], "non_resolu": str(erreur)})
+        return ResultatOutil(f"{erreur} {_SANS_LECTURE}", trace={"routes": [], "non_resolu": str(erreur)})
     if contexte.client_moduleo is None or not (texte or type_contact or donneur or qualifications):
         return ResultatOutil(_RIEN_A_CHERCHER)
     parametres = {
@@ -182,7 +187,7 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
         ids = _chercher(lecteur, parametres, qualifications)
         return ids, _fiches(lecteur, ids[: nb_max(arguments.get("nb_max"))]) if ids else []
 
-    return lire_fiches(contexte, contexte.client_moduleo, lire, _AUCUN_CONTACT, _TROUVES)
+    return lire_fiches(contexte, contexte.client_moduleo, lire, _AUCUN_CONTACT, _TROUVES, _SANS_LECTURE)
 
 
 OUTIL = Outil(nom=_NOM, declarer=_declarer, executer=_executer)
