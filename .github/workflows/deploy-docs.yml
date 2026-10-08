@@ -24,7 +24,22 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # L'environnement github-pages n'accepte que main : un run déclenché par le tag
+  # d'une release ne peut pas déployer. On relance donc le même workflow sur main,
+  # pour que le changelog du site affiche la nouvelle release.
+  relancer-sur-main:
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Relancer Deploy docs sur main
+        run: gh workflow run deploy-docs.yml --ref main --repo "$GITHUB_REPOSITORY"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   build:
+    if: github.event_name != 'release'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -73,8 +88,13 @@ jobs:
     permissions:
       contents: write
     steps:
+      # Pointe de main au démarrage du job, pas le commit qui a déclenché le run :
+      # les runs s'enchaînent (concurrency pages), le suivant repart de ce que le
+      # précédent a poussé au lieu de buter sur README.md au rebase.
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: Setup Node
         uses: actions/setup-node@v4
