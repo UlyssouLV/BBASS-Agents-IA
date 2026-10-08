@@ -3,6 +3,7 @@ from typing import Any
 
 from vm_centrale.lectures_outils import Fiche
 from vm_centrale.moduleo.client import LecteurModuleo, ModuleoIntrouvable
+from vm_centrale.moduleo.enumerations import ETATS_AFFAIRE, libelles, nom_api
 from vm_centrale.moduleo.fiches import fiche_affaire
 from vm_centrale.moduleo.resolution import (
     Noms,
@@ -89,7 +90,7 @@ _SCHEMA = {
                 },
                 "etat": {
                     "type": "string",
-                    "description": "État de l'affaire tel que Moduléo le nomme (ex. « Production »).",
+                    "description": f"État de l'affaire tel que Moduléo le nomme : {libelles(ETATS_AFFAIRE)}.",
                 },
                 **{
                     argument: {
@@ -180,15 +181,26 @@ def _resoudre(lecteur: LecteurModuleo, noms: dict[str, str]) -> dict[str, Any]:
 
 
 def _filtres(arguments: dict) -> dict[str, str]:
-    # État et dates, au format de l'API. Une date illisible lève
-    # NomNonResolu : jamais une recherche sans le filtre demandé.
+    # État et dates, au format de l'API. Un état inconnu ou une date
+    # illisible lève NomNonResolu : jamais une recherche sans le filtre
+    # demandé (Moduléo ignore un nom d'état inconnu et renverrait toutes
+    # les affaires, conversation 113, #180).
     filtres = {}
     if etat := lire_argument(arguments, "etat"):
-        filtres["etatAffaire"] = etat
+        filtres["etatAffaire"] = _etat_api(etat)
     for argument, parametre in _DATES.items():
         if valeur := lire_argument(arguments, argument):
             filtres[parametre] = _date_api(valeur)
     return filtres
+
+
+def _etat_api(valeur: str) -> str:
+    if (nom := nom_api(ETATS_AFFAIRE, valeur)) is None:
+        raise NomNonResolu(
+            f"État « {valeur} » inconnu dans Moduléo, qui ne connaît que : {libelles(ETATS_AFFAIRE)}. "
+            "Recherche non lancée."
+        )
+    return nom
 
 
 def _date_api(valeur: str) -> str:

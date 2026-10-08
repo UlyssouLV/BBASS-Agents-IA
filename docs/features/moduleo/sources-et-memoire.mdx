@@ -6,13 +6,15 @@ Chaque Fiche Moduléo renvoyée au modèle est enregistrée dans la Conversation
 
 Les garde-fous retirent d’une réponse un chiffre qu’aucune source ne contient. Une fiche Moduléo **est une source** : un numéro d’affaire, une date ou un téléphone qu’elle contient reste dans la réponse, au tour de la lecture comme aux tours suivants de la même Conversation.
 
-Un chiffre absent de la fiche est toujours retiré : le modèle ne peut pas inventer un téléphone.
+Un téléphone garde sa place quelle que soit sa ponctuation : « 05 61 12 92 00 » dans la réponse, « 05.61.12.92.00 » dans Moduléo, c’est le même numéro. Un chiffre absent de la fiche est toujours retiré : le modèle ne peut pas inventer un téléphone.
 
 ## La ligne « Sources : »
 
 Elle cite la fiche d’où vient un chiffre gardé, sans lien :
 
 « Sources : Moduléo, affaire 2024-123 »
+
+Une fiche que le modèle a déjà citée ne l’est pas une seconde fois, et un « Moduléo » écrit seul devient la citation complète.
 
 ## La Mémoire de la conversation
 

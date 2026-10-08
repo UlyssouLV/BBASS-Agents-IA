@@ -5,7 +5,7 @@ Retrouve des contacts Moduléo et leurs coordonnées quand le modèle le décide
 **Paramètres**, combinés en « et » :
 
 - `texte` : le nom du contact, ou un mot de son nom.
-- `type_contact` : personne, société, collectivité ou groupe de contacts (sans casse ni accent), transmis en `typeContact` par le nom de l'énumération Moduléo (`Personne`, `Societe`, `Collectivite`, `GroupeContacts`). Un autre type : une phrase au modèle, aucune lecture.
+- `type_contact` : personne, société, collectivité ou groupe de contacts (sans casse ni accent), transmis en `typeContact` par le nom de l'énumération Moduléo (`Personne`, `Societe`, `Collectivite`, `GroupeContacts`, `moduleo/enumerations.py`, relevé #180). Un autre type : une phrase au modèle, aucune lecture.
 - `type_donneur_ordre` : transmis tel quel en `typeDonneurOrdreGE`.
 - `qualifications` : des noms (« Notaire »), résolus en ids par `chercher_qualifications` (`moduleo/resolution.py`, `cogeo/qualification/all`) : le libellé exact l'emporte, sinon le seul libellé qui contient le nom. Aucun libellé, ou plusieurs : une phrase au modèle (« Plusieurs qualifications Moduléo correspondent à « Expert » : Expert foncier, Géomètre-expert. Demande lequel… »), **aucune recherche**, trace `non_resolu`.
 
@@ -24,6 +24,6 @@ Retrouve des contacts Moduléo et leurs coordonnées quand le modèle le décide
 
 **Inspecteur** (`outil:chercher_contacts_moduleo`) : arguments, `routes`, `trouvees`, `fiches`, `non_resolu` ou `erreur`.
 
-**Depuis.** 1.5.0 (#176). À confirmer à l'essai réel (#178) : format attendu par `typeContact` (nom ou entier) et valeurs de `typeDonneurOrdreGE`, entiers de `TypeContact` au-delà de Personne = 1 (affichage supposé : 2 Société, 3 Collectivité, 4 Groupe de contacts), combinaison de plusieurs `idsQualifications` (« et » ou « ou »).
+**Depuis.** 1.5.0 (#176). `TypeContact` relevé sur le serveur réel (#180) : 1 Personne, 3 Société, 4 Collectivité, 5 Groupe de contacts (`moduleo/README.md`). À confirmer à l'essai réel (#178) : valeurs de `typeDonneurOrdreGE`, combinaison de plusieurs `idsQualifications` (« et » ou « ou »).
 
 Code : `outil.py`.

@@ -20,7 +20,10 @@ _MOTIF_NOMBRE = re.compile(
 # Chiffres groupés par des espaces simples (« 831 193 453 00022 ») : un
 # numéro (SIRET, TVA, téléphone) que le modèle regroupe autrement que la
 # source (essai 1.4.1, conversation 93 : « 83119345300022 » devenait « 22 »).
-_MOTIF_SEQUENCE = re.compile(r"(?<![\w.,])\d+(?:[  ]\d+)+")
+# Au moins trois groupes séparés par `.` ou `-` aussi : Moduléo stocke
+# « 05.61.12.92.00 », le modèle écrit « 05 61 12 92 00 » (test humain
+# 1.5.0, conversation 113, #180) ; deux groupes à point restent un décimal.
+_MOTIF_SEQUENCE = re.compile(r"(?<![\w.,])\d+(?:(?:[  ]\d+)+|(?:[.-]\d+){2,})")
 _MOTIF_GROUPE = re.compile(r"\d+")
 _MOTIF_UNITE = re.compile(
     r"[ \t]+(ans|an|années|année|semaines|semaine|jours|jour|mois|heures|heure)\b",
@@ -53,20 +56,34 @@ def _est_une_donnee(correspondance: re.Match[str], texte: str) -> bool:
 
 
 def _chiffres_seuls(sequence: str) -> str:
-    return sequence.replace(" ", "").replace(" ", "")
+    return "".join(_MOTIF_GROUPE.findall(sequence))
+
+
+def _sequences_a_points(texte: str) -> list[re.Match[str]]:
+    # « 05.61.12.92.00 », « 2024-03-11 » : au moins trois groupes à `.` ou `-`.
+    return [
+        correspondance
+        for correspondance in _MOTIF_SEQUENCE.finditer(texte)
+        if re.search(r"[.-]", correspondance.group(0))
+    ]
 
 
 def _cles_autorisees(textes_source: Iterable[str]) -> set[str]:
-    textes_source = list(textes_source)
-    return {
-        _cle(correspondance)
-        for texte in textes_source
-        for correspondance in _MOTIF_NOMBRE.finditer(texte)
-    } | {
-        _chiffres_seuls(correspondance.group(0))
-        for texte in textes_source
-        for correspondance in _MOTIF_SEQUENCE.finditer(texte)
-    }
+    # Dans « 05.61.12.92.00 », chaque groupe est un entier, jamais les
+    # décimaux « 05.61 » ou « 12.92 » (#180) ; « 2024-03-11 » autorise
+    # toujours « 2024 » et « 11 ».
+    cles: set[str] = set()
+    for texte in textes_source:
+        a_points = _sequences_a_points(texte)
+        plages = [sequence.span() for sequence in a_points]
+        cles |= {
+            _cle(correspondance)
+            for correspondance in _MOTIF_NOMBRE.finditer(texte)
+            if not (correspondance.group(2) and _dans(correspondance.start(), plages))
+        }
+        cles |= {groupe for sequence in a_points for groupe in _MOTIF_GROUPE.findall(sequence.group(0))}
+        cles |= {_chiffres_seuls(correspondance.group(0)) for correspondance in _MOTIF_SEQUENCE.finditer(texte)}
+    return cles
 
 
 def _plages_des_urls(texte: str) -> list[tuple[int, int]]:

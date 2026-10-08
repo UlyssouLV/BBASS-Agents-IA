@@ -51,7 +51,7 @@ def _affaire_2024_123(faux_moduleo) -> None:
         101,
         "2024-123",
         "Bornage du lot B",
-        Etat=2,
+        Etat=7,
         DateCreation="2024-03-04T09:30:00+01:00",
         DateOuverture="2024-03-11T00:00:00+01:00",
         Adresse="12 chemin des Oliviers",
@@ -121,7 +121,7 @@ def test_par_numero_la_fiche_donne_les_noms_resolus_et_les_intervenants_avec_leu
     fiche = _contenu_outil(mistral_client_factice)
     assert "Affaire 2024-123" in fiche
     assert "Objet : Bornage du lot B" in fiche
-    assert "État : 2" in fiche
+    assert "État : Acceptée" in fiche
     assert "Date de création : 04/03/2024" in fiche
     assert "Date d'ouverture : 11/03/2024" in fiche
     assert "Adresse : 12 chemin des Oliviers" in fiche

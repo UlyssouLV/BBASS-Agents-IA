@@ -47,7 +47,7 @@ def _recherches(faux_moduleo) -> list[dict]:
 def _dupont(faux_moduleo) -> None:
     faux_moduleo.ajouter_qualification(7, "Notaire")
     faux_moduleo.ajouter_commune(5, "Castries", "34160")
-    faux_moduleo.ajouter_contact(40, "Étude Dupont", type_contact=2, qualifications=(7,))
+    faux_moduleo.ajouter_contact(40, "Étude Dupont", type_contact=3, qualifications=(7,))
     faux_moduleo.ajouter_telephone(1, 40, _TEL, "Bureau")
     faux_moduleo.ajouter_telephone(2, 40, "06 11 22 33 44", "Portable")
     faux_moduleo.ajouter_email(3, 40, "contact@etude-dupont.fr", "Travail")

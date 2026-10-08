@@ -44,7 +44,7 @@ def _affaire_2024_123(faux_moduleo) -> None:
         101,
         "2024-123",
         "Bornage du lot B",
-        Etat="Production",
+        Etat=1,
         DateOuverture="2024-03-11T00:00:00+01:00",
         Adresse="12 chemin des Oliviers",
         IdCommune=5,
@@ -58,7 +58,7 @@ def _affaire_2024_123(faux_moduleo) -> None:
 
 def _dupont(faux_moduleo) -> None:
     faux_moduleo.ajouter_commune(5, "Castries", "34160")
-    faux_moduleo.ajouter_contact(40, "Étude Dupont", type_contact=2)
+    faux_moduleo.ajouter_contact(40, "Étude Dupont", type_contact=3)
     faux_moduleo.ajouter_telephone(1, 40, _TEL_DUPONT, "Bureau")
     faux_moduleo.ajouter_email(3, 40, "contact@etude-dupont.fr", "Travail")
     faux_moduleo.ajouter_adresse(4, 40, "3 rue de la Mairie", "Siège", id_commune=5)

@@ -4,7 +4,7 @@ Retrouve des affaires Moduléo par **numéro**, par **texte** ou par **filtres e
 
 **Paramètres.** `numero` (prioritaire : les autres sont alors ignorés), sinon `texte` (un mot de l'objet, de l'adresse ou du client) et / ou des filtres, combinés en « et » :
 
-- `etat` : transmis tel quel en `etatAffaire` (nom de l'état dans Moduléo, ex. « Production »).
+- `etat` : un état de l'interface Moduléo (Créée, En attente, Acceptée, Production, Suspendue, Prod. terminée, Clôturée, Annulée ; casse, accents et accord indifférents), transmis en `etatAffaire` par le nom de l'énumération (`Acceptee`…, `moduleo/enumerations.py`). Un autre état (« en retard ») : une phrase au modèle qui liste les états, aucune recherche, car Moduléo ignore un nom inconnu et renverrait toutes les affaires (test humain 1.5.0, conversation 113, #180).
 - `date_{creation,ouverture,livraison,cloture}_{min,max}` : AAAA-MM-JJ ou JJ/MM/AAAA, transmis en AAAA-MM-JJ (`dateOuvertureMin`…).
 - `site`, `service` : tous les sites / services qui portent ce nom (`idsSite`, `idsService`).
 - `responsable`, `charge_affaire` : un utilisateur (`idsResponsable`, `idsActeurEnCharge`).
@@ -13,7 +13,7 @@ Retrouve des affaires Moduléo par **numéro**, par **texte** ou par **filtres e
 
 `nb_max`, 5 par défaut, ramené entre 1 et 10. Rien de tout cela : une phrase demande un numéro, un texte ou un filtre, sans lecture.
 
-**Noms non résolus.** Date illisible, nom qui ne désigne rien, ou plusieurs utilisateurs / dossiers de production : une phrase au modèle (« Aucun site Moduléo ne correspond à « Lyon » : recherche non lancée. », « Plusieurs utilisateurs Moduléo correspondent à « Martin » : Jean Martin, Paul Martin. Demande lequel… »), **aucune recherche** sans le filtre demandé, aucune lecture enregistrée. Trace : `non_resolu`.
+**Noms non résolus.** État inconnu, date illisible, nom qui ne désigne rien, ou plusieurs utilisateurs / dossiers de production : une phrase au modèle (« Aucun site Moduléo ne correspond à « Lyon » : recherche non lancée. », « Plusieurs utilisateurs Moduléo correspondent à « Martin » : Jean Martin, Paul Martin. Demande lequel… »), **aucune recherche** sans le filtre demandé, aucune lecture enregistrée. Trace : `non_resolu`.
 
 **Déroulé.**
 
@@ -27,6 +27,6 @@ Retrouve des affaires Moduléo par **numéro**, par **texte** ou par **filtres e
 
 **Inspecteur** (`outil:chercher_affaires_moduleo`) : arguments, `routes`, `trouvees`, `fiches`, `non_resolu` ou `erreur`.
 
-**Depuis.** 1.5.0 (#174), filtres en noms (#175). À confirmer à l'essai réel (#178) : valeurs d'`Etat` (affichées et filtrées telles que Moduléo les nomme), format de date attendu par l'API, recherche par nom exacte ou partielle.
+**Depuis.** 1.5.0 (#174), filtres en noms (#175). Valeurs d'`Etat` relevées sur le serveur réel et affichées en libellés (#180). À confirmer à l'essai réel (#178) : format de date attendu par l'API, recherche par nom exacte ou partielle.
 
 Code : `outil.py`.

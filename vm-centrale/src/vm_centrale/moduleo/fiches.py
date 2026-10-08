@@ -1,7 +1,10 @@
+import re
+import unicodedata
 from dataclasses import dataclass
 from datetime import date
 
 from vm_centrale.lectures_outils import Fiche
+from vm_centrale.moduleo import enumerations
 from vm_centrale.moduleo.resolution import Noms, Utilisateur
 
 # Fiche Moduléo (spec 1.5.0) : le texte dense d'un élément lu dans Moduléo,
@@ -10,6 +13,10 @@ from vm_centrale.moduleo.resolution import Noms, Utilisateur
 #
 # Ses questions couvertes (#177) : écrites ici par gabarit, champ par
 # champ, jamais par un appel Mistral. Un champ vide n'a pas de question.
+#
+# Un champ tient sur une ligne : ses retours à la ligne deviennent des
+# espaces, sinon il coupe la ligne « • question → réponse » de la Mémoire
+# (conversation 113, #180).
 
 _DATES_AFFAIRE = (
     ("DateCreation", "Date de création"),
@@ -23,10 +30,10 @@ def fiche_affaire(affaire: dict, intervenants: list[dict], noms: Noms) -> Fiche:
     # Référence citée par la ligne « Sources : » : « Moduléo, affaire 2024-123 ».
     numero = _texte(affaire.get("Numero"))
     objet = _texte(affaire.get("Objet"))
-    etat = _texte(affaire.get("Etat"))
+    etat = _texte(enumerations.libelle(enumerations.ETATS_AFFAIRE, affaire.get("Etat")))
     dates = [(libelle, _date(affaire.get(champ))) for champ, libelle in _DATES_AFFAIRE]
-    adresse = _texte(affaire.get("Adresse"))
     commune = noms.communes.get(_id(affaire.get("IdCommune")), "")
+    adresse = _sans_la_commune(_texte(affaire.get("Adresse")), commune)
     client = _contact(noms, affaire.get("IdClient"), affaire.get("QualiteClient"))
     representant = _contact(noms, affaire.get("IdRepresentant"), affaire.get("QualiteRepresentant"))
     suivi = [
@@ -65,18 +72,7 @@ def fiche_affaire(affaire: dict, intervenants: list[dict], noms: Noms) -> Fiche:
 
 
 # TypeContact : entier dans le JSON, nom de l'énumération dans le XML du
-# WADL (Personne = 1 ; ordre des autres supposé, à confirmer à l'essai
-# réel, #178). NonDefini ou 0 : pas de ligne.
-_TYPES_CONTACT = {
-    1: "Personne",
-    2: "Société",
-    3: "Collectivité",
-    4: "Groupe de contacts",
-    "Personne": "Personne",
-    "Societe": "Société",
-    "Collectivite": "Collectivité",
-    "GroupeContacts": "Groupe de contacts",
-}
+# WADL (moduleo/enumerations.py). NonDefini ou 0 : pas de ligne.
 _TYPES_SANS_LIGNE = (None, 0, "NonDefini", "")
 # Numéros d'affaires listés au plus par rôle ; au-delà, « et N autres ».
 _AFFAIRES_MAX = 20
@@ -108,7 +104,7 @@ def fiche_contact(contact: dict, details: DetailsContact, communes: dict[int, st
     lignes = [f"Contact {nom}"]
     type_contact = contact.get("TypeContact")
     if type_contact not in _TYPES_SANS_LIGNE:
-        _ajouter(lignes, "Type", _TYPES_CONTACT.get(type_contact, _texte(type_contact)))
+        _ajouter(lignes, "Type", _texte(enumerations.libelle(enumerations.TYPES_CONTACT, type_contact)))
     _ajouter_liste(lignes, "Téléphones", telephones)
     _ajouter_liste(lignes, "Emails", emails)
     _ajouter_liste(lignes, "Adresses", adresses)
@@ -124,7 +120,8 @@ def fiche_contact(contact: dict, details: DetailsContact, communes: dict[int, st
 
 
 def _questions(*paires: tuple[str, str]) -> tuple[tuple[str, str], ...]:
-    return tuple((question, reponse) for question, reponse in paires if reponse)
+    # Jamais de retour à la ligne dans une réponse, quel que soit le champ.
+    return tuple((question, " ".join(reponse.split())) for question, reponse in paires if reponse.strip())
 
 
 def _libelles(valeurs: list[tuple[str, str]]) -> str:
@@ -166,7 +163,23 @@ def _id(valeur: object) -> int:
 
 
 def _texte(valeur: object) -> str:
-    return "" if valeur is None else str(valeur).strip()
+    # « …ALCARAZ\r\nZac Le Solan » → « …ALCARAZ Zac Le Solan ».
+    return "" if valeur is None else " ".join(str(valeur).split())
+
+
+def _sans_la_commune(adresse: str, commune: str) -> str:
+    # Une adresse qui ne fait que répéter la commune (« 34270
+    # SAINT-MATHIEU-DE-TRÉVIERS » pour « Saint-Mathieu-de-Tréviers (34270) »)
+    # n'a pas de ligne (conversation 113, #180).
+    mots = _mots(adresse)
+    return "" if commune and mots and mots <= _mots(commune) else adresse
+
+
+def _mots(texte: str) -> set[str]:
+    sans_accents = "".join(
+        c for c in unicodedata.normalize("NFD", texte.casefold()) if not unicodedata.combining(c)
+    )
+    return set(re.findall(r"[a-z0-9]+", sans_accents))
 
 
 def _ajouter(lignes: list[str], libelle: str, valeur: str) -> None:

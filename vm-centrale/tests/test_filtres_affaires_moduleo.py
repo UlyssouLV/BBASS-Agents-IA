@@ -116,9 +116,9 @@ def test_charge_affaire_filtre_le_charge_daffaire(client, faux_moduleo, mistral_
 
 
 def test_dates_et_etat_transmis_au_format_de_lapi(client, faux_moduleo, mistral_client_factice, jeton_valide):
-    faux_moduleo.ajouter_affaire(1, "2024-001", "Bornage", Etat="Production", DateOuverture="2024-01-15T00:00:00+01:00")
-    faux_moduleo.ajouter_affaire(2, "2023-050", "Bornage", Etat="Production", DateOuverture="2023-11-02T00:00:00+01:00")
-    faux_moduleo.ajouter_affaire(3, "2024-002", "Bornage", Etat="Close", DateOuverture="2024-02-01T00:00:00+01:00")
+    faux_moduleo.ajouter_affaire(1, "2024-001", "Bornage", Etat=1, DateOuverture="2024-01-15T00:00:00+01:00")
+    faux_moduleo.ajouter_affaire(2, "2023-050", "Bornage", Etat=1, DateOuverture="2023-11-02T00:00:00+01:00")
+    faux_moduleo.ajouter_affaire(3, "2024-002", "Bornage", Etat=2, DateOuverture="2024-02-01T00:00:00+01:00")
 
     _chercher(
         client,

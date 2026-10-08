@@ -1,9 +1,9 @@
-import unicodedata
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from vm_centrale.lectures_outils import Fiche
 from vm_centrale.moduleo.client import LecteurModuleo, ModuleoIntrouvable
+from vm_centrale.moduleo.enumerations import TYPES_CONTACT, nom_api
 from vm_centrale.moduleo.fiches import DetailsContact, fiche_contact
 from vm_centrale.moduleo.resolution import NomNonResolu, chercher_qualifications, resoudre_communes
 from vm_centrale.moduleo.routes import ROUTES_GET
@@ -37,16 +37,6 @@ _AFFAIRES = {
 }
 # Lectures par contact en parallèle (spec 1.5.0) : au plus 10 contacts × 4.
 _LECTURES_PARALLELES = 16
-
-# Type de contact dit par le modèle, sans accent ni casse → nom de
-# l'énumération Moduléo (WADL). Format attendu par typeContact à confirmer
-# à l'essai réel (#178).
-_TYPES_CONTACT = {
-    "personne": "Personne",
-    "societe": "Societe",
-    "collectivite": "Collectivite",
-    "groupe de contacts": "GroupeContacts",
-}
 
 _AUCUN_CONTACT = "Aucun contact Moduléo ne correspond à cette recherche."
 _TROUVES = "{n} contacts trouvés, {m} affichés"
@@ -101,13 +91,14 @@ def _declarer(contexte: ContexteTour) -> dict | None:
 
 
 def _type_contact(valeur: str) -> str:
-    cle = "".join(c for c in unicodedata.normalize("NFD", valeur.casefold()) if not unicodedata.combining(c))
-    if cle not in _TYPES_CONTACT:
+    # Type dit par le modèle → nom de l'énumération en filtre
+    # (moduleo/enumerations.py, relevé #180).
+    if (nom := nom_api(TYPES_CONTACT, valeur)) is None:
         raise NomNonResolu(
             f"Type de contact « {valeur} » inconnu : personne, société, collectivité ou groupe de contacts. "
             "Recherche non lancée."
         )
-    return _TYPES_CONTACT[cle]
+    return nom
 
 
 def _qualifications(arguments: dict) -> list[str]:

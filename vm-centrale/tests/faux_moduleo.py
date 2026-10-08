@@ -272,7 +272,10 @@ def _correspond(affaire: dict, parametres: dict[str, Any]) -> bool:
     texte = parametres.get("texte")
     if texte and not _contient(f"{affaire['Numero']} {affaire['Objet']} {affaire['Adresse'] or ''}", texte):
         return False
-    if parametres.get("etatAffaire") is not None and str(affaire["Etat"]) != parametres["etatAffaire"]:
+    # Comme le vrai serveur (#180) : un nom d'état inconnu est ignoré, sans
+    # erreur.
+    etat = parametres.get("etatAffaire")
+    if etat in _ETATS.values() and _ETATS.get(affaire["Etat"]) != etat:
         return False
     dossier = parametres.get("idDossierProduction")
     if dossier is not None and affaire["IdDossierProduction"] != dossier:
@@ -296,7 +299,7 @@ def _contact_correspond(contact: dict, parametres: dict[str, Any]) -> bool:
     if not _contient(contact["Nom"], parametres.get("texte")):
         return False
     type_contact = parametres.get("typeContact")
-    if type_contact is not None and _TYPES_CONTACT[contact["TypeContact"]] != type_contact:
+    if type_contact in _TYPES_CONTACT.values() and _TYPES_CONTACT.get(contact["TypeContact"]) != type_contact:
         return False
     donneur = parametres.get("typeDonneurOrdreGE")
     if donneur is not None and str(contact["TypeDonneurOrdre"]) != donneur:
@@ -307,4 +310,16 @@ def _contact_correspond(contact: dict, parametres: dict[str, Any]) -> bool:
     return True
 
 
-_TYPES_CONTACT = {1: "Personne", 2: "Societe", 3: "Collectivite", 4: "GroupeContacts"}
+# Entier du JSON → nom de l'énumération en filtre, relevés sur le serveur
+# du cabinet (scripts/relever_enumerations_moduleo.py, #180).
+_TYPES_CONTACT = {1: "Personne", 3: "Societe", 4: "Collectivite", 5: "GroupeContacts"}
+_ETATS = {
+    1: "Production",
+    2: "Cloturee",
+    4: "Creee",
+    5: "Terminee",
+    6: "Annulee",
+    7: "Acceptee",
+    8: "EnAttente",
+    9: "Suspendue",
+}
