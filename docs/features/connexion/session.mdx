@@ -1,0 +1,32 @@
+import ApercuPuce from '@site/src/components/connexion/ApercuPuce';
+import SchemaFlux from '@site/src/components/connexion/SchemaFlux';
+
+# Session
+
+Une authentification réussie émet un jeton, enregistré dans la table `jetons` de la VM centrale. Il n’expire pas tout seul. Une nouvelle connexion en émet un autre : les précédents restent valides. Un même compte peut donc être ouvert sur plusieurs postes.
+
+Côté poste, une seule session à la fois. Elle contient l’identifiant, le prénom, le nom, le jeton, l’agence, les pôles, le droit de compte administrateur, et l’obligation éventuelle de changer le mot de passe. Jamais le mot de passe.
+
+Ce bloc est écrit dans le gestionnaire d’identifiants Windows : chiffré, et propre à la personne connectée sur cette machine. Il survit à la fermeture de l’application et à un redémarrage du poste.
+
+<ApercuPuce />
+
+En bas de la barre latérale : les initiales, « Prénom Nom », puis les pôles et l’agence. **Profil** mène à la page d’où l’on se déconnecte.
+
+## Au prochain lancement
+
+<SchemaFlux variante="restauration" />
+
+Avant d’afficher le chat, le poste relit le jeton stocké et le fait vérifier par la VM centrale.
+
+- Jeton encore valide : la session reprend. Le droit de compte administrateur est relu en base — un compte rétrogradé le perd sans avoir à se reconnecter. Le prénom, le nom, l’agence, les pôles et l’obligation de changer le mot de passe viennent du stockage local.
+- Jeton révoqué ou inconnu : le stockage local est effacé, et l’écran de saisie revient.
+- VM centrale injoignable : écran de saisie aussi, **sans** effacer le stockage. Le prochain lancement pourra revalider le même jeton.
+
+Pendant l’usage, aucune vérification en tâche de fond. Un refus (jeton invalide) sur un appel réel — chat, comptes, consommation — renvoie à l’écran de saisie.
+
+## Si Windows ne peut pas enregistrer la session
+
+La session tient en mémoire le temps du processus. Au-dessus du chat :
+
+« Impossible d'enregistrer votre session de façon durable : une reconnexion sera nécessaire au prochain lancement du poste. »

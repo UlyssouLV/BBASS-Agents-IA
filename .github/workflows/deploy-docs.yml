@@ -7,6 +7,8 @@ on:
     paths:
       - 'docs/**'
       - 'docs-site/**'
+      - 'poste/frontend/**'
+      - 'vm-centrale/src/vm_centrale/moduleo/docs/**'
       - '.github/workflows/deploy-docs.yml'
       - 'README.md'
     # Pas de paths-ignore : la boucle est coupée par [skip ci] sur le commit d’aperçu
@@ -40,6 +42,10 @@ jobs:
 
       - name: Install dependencies
         working-directory: docs-site
+        run: npm ci --ignore-scripts
+
+      - name: Install poste frontend
+        working-directory: poste/frontend
         run: npm ci --ignore-scripts
 
       - name: Build
@@ -112,18 +118,25 @@ jobs:
         working-directory: docs-site
         run: npm run sync-architecture-readme
 
-      - name: Commit screenshots if changed
+      # Même commit que les aperçus : évite un 2ᵉ commit bot (README stats)
+      # quand la finalisation touche docs/ + code.
+      - name: Générer les badges commits
+        working-directory: docs-site
+        run: node scripts/generer-stats-commits.mjs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+
+      - name: Commit aperçus et stats si changés
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add docs/img/apercu-docs-accueil.png docs/img/apercu-docs-bugs.png docs/img/apercu-travail-realise.png README.md
           if git diff --staged --quiet; then
-            echo "Aperçus inchangés."
+            echo "Aperçus et stats inchangés."
             exit 0
           fi
-          git commit -m "Met à jour les aperçus README (doc + suivi + archi) [skip ci]"
-          # L'autre workflow (README stats / Deploy docs) a pu pousser sur main
-          # depuis le checkout : rebase avant chaque essai de push.
+          git commit -m "Met à jour les aperçus et compteurs du README [skip ci]"
           for essai in 1 2 3; do
             git pull --rebase origin main && git push origin HEAD:main && exit 0
             sleep 5

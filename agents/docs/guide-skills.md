@@ -374,6 +374,42 @@ TDD du ticket (plugin `/implement`). La **fin** : **`/t`**, **`/c -p`**, **`/cci
 
 
 
+### Ouvrir la semaine de travail
+
+**Commande :** `/os`
+
+**Options :** versions attendues en surcharge (`/os 1.5.0 1.6.0`) ; sinon Prochaine + Ensuite de la feuille de route (confirmation avant écriture).
+
+**Corps :** inutile en général.
+
+Crée le dossier `semaine-…` + HTML depuis `docs/suivi-avancement/template-semaine.html` (lun→ven). Convention : `docs/suivi-avancement/README.md`. Skill `ouvrir-semaine-de-travail`. Ne commit pas. Ne finalise pas.
+
+**Exemple :**
+
+```
+/os
+```
+
+
+
+### Mettre à jour le suivi d’avancement
+
+**Commande :** `/msa`
+
+**Options :** semver `X.Y.Z` si pas déductible de la branche.
+
+**Corps :** inutile.
+
+Met à jour le HTML de la semaine courante pour la version livrée et régénère le PDF (`generer-pdf.mjs`). Soft-skip + rappel `/os` s’il n’y a pas de dossier. Appelé aussi par **Finalise la version**. Skill `mettre-a-jour-suivi-avancement`. Ne commit pas. Ne crée pas la semaine.
+
+**Exemple :**
+
+```
+/msa 1.5.0
+```
+
+
+
 ### Finaliser la version
 
 **Commande :** `Finalise la version`
@@ -382,7 +418,7 @@ TDD du ticket (plugin `/implement`). La **fin** : **`/t`**, **`/c -p`**, **`/cci
 
 **Corps :** inutile.
 
-Après une **`/code-review`** acceptée : enfants Closed + docs à jour (`readme`, `roadmap`, **`suivi-avancement`** HTML+PDF de la semaine courante si présent — `/c -a -p` si besoin), puis **`/qg -w`** (puis **`/cqg`** si le gate n’est pas `OK`), puis **`/crel`**, puis **`/mpr`**. Skill `finaliser-la-version`. Ne relance pas `/code-review`.
+Après une **`/code-review`** acceptée : enfants Closed + docs à jour (`readme`, `roadmap`, **`/msa`** pour le suivi de la semaine courante si présent — `/c -a -p` si besoin), puis **`/qg -w`** (puis **`/cqg`** si le gate n’est pas `OK`), puis **`/crel`**, puis **`/mpr`**. Skill `finaliser-la-version`. Ne relance pas `/code-review`.
 
 **Exemple :**
 

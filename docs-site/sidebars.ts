@@ -10,6 +10,32 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
+      label: 'Connexion',
+      collapsed: true,
+      link: {type: 'doc', id: 'features/connexion/index'},
+      items: [
+        'features/connexion/saisie',
+        'features/connexion/session',
+        'features/connexion/mot-de-passe',
+        'features/connexion/deconnexion',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Branchement Moduléo',
+      collapsed: true,
+      link: {type: 'doc', id: 'features/moduleo/index'},
+      items: [
+        'features/moduleo/configuration',
+        'features/moduleo/lecture-seule',
+        'features/moduleo/affaires',
+        'features/moduleo/contacts',
+        'features/moduleo/sources-et-memoire',
+        'features/moduleo/panne-et-refus',
+      ],
+    },
+    {
+      type: 'category',
       label: 'Inspecteur',
       collapsed: true,
       link: {type: 'doc', id: 'features/inspecteur/index'},

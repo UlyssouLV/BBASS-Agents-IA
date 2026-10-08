@@ -237,6 +237,7 @@ sidebar_position: ${positionInSerie}
 ---
 
 import LiensRelease from '@site/src/components/LiensRelease';
+import SectionDoc from '@site/src/components/SectionDoc';
 
 # ${release.name || tag}
 
@@ -252,17 +253,24 @@ Publiée le **${published}**.
   tickets={[${ticketsJsx}]}
 />
 
-## Documentation fonctionnelle
-
-> Extrait de la [release ${tag}](${releaseUrl}) (sections produit).
+<SectionDoc variante="fonctionnelle">
 
 ${escapeMdx(functional)}
 
-## Documentation technique
+</SectionDoc>
 
-> Spec versionnée dans le dépôt${specRel ? ` (\`${specRel}\`)` : ''}.
+<SectionDoc
+  variante="technique"
+  sousTitre={${JSON.stringify(
+    specRel
+      ? `Spec versionnée : ${specRel}`
+      : 'Pas de spec locale pour cette version',
+  )}}
+>
 
 ${escapeMdx(technical)}
+
+</SectionDoc>
 `;
 
   fs.writeFileSync(path.join(serieDir, `${slug}.mdx`), content, 'utf8');

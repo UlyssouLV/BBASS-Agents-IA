@@ -1,5 +1,8 @@
 name: README stats
 
+# Compteurs seuls. Quand le push touche aussi la doc (typique d’un
+# squash « Finalise la version »), Deploy docs régénère aperçus + compteurs
+# en un seul commit — ce workflow s’arrête alors sans pousser.
 on:
   push:
     branches:
@@ -19,13 +22,35 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Skip si Deploy docs s’occupe du README
+        id: gate
+        if: github.event_name == 'push'
+        env:
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git diff --name-only "$BEFORE" "$AFTER" | grep -qE '^(docs/|docs-site/|README\.md|\.github/workflows/deploy-docs\.yml)'; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Deploy docs s’en charge (aperçus + compteurs)."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Setup Node
+        if: github.event_name == 'workflow_dispatch' || steps.gate.outputs.skip != 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
       - name: Générer les badges commits
+        if: github.event_name == 'workflow_dispatch' || steps.gate.outputs.skip != 'true'
         working-directory: docs-site
         run: node scripts/generer-stats-commits.mjs
         env:
@@ -33,6 +58,7 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
 
       - name: Commit si changé
+        if: github.event_name == 'workflow_dispatch' || steps.gate.outputs.skip != 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -42,8 +68,6 @@ jobs:
             exit 0
           fi
           git commit -m "Met à jour les compteurs de commits du README [skip ci]"
-          # L'autre workflow (README stats / Deploy docs) a pu pousser sur main
-          # depuis le checkout : rebase avant chaque essai de push.
           for essai in 1 2 3; do
             git pull --rebase origin main && git push origin HEAD:main && exit 0
             sleep 5

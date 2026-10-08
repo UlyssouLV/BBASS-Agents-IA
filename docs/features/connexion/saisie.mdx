@@ -1,0 +1,23 @@
+import ApercuSaisie from '@site/src/components/connexion/ApercuSaisie';
+
+# Saisie
+
+Écran affiché tant qu’aucune session n’est ouverte. Identifiant et mot de passe sont obligatoires.
+
+<ApercuSaisie />
+
+**Se connecter** envoie `POST /connexion` au backend du poste. Le poste appelle `POST /auth` sur la VM centrale.
+
+La VM compare le mot de passe au hash du compte. Si l’identifiant est inconnu, elle exécute tout de même une vérification, pour ne pas répondre plus vite que pour un mauvais mot de passe. Le message est le même dans les deux cas.
+
+## Échec
+
+<ApercuSaisie message="Identifiant ou mot de passe incorrect" />
+
+- Mauvais identifiant ou mauvais mot de passe : « Identifiant ou mot de passe incorrect ».
+- VM centrale injoignable, ou réponse en erreur : « Le service de connexion de la VM centrale est indisponible ».
+- Backend du poste injoignable : « Impossible de joindre le service de connexion. Réessayez plus tard. »
+
+Aucun de ces cas n’ouvre de session.
+
+Si, au lancement, le poste lui-même ne répond pas à la vérification de session, l’écran de saisie n’apparaît pas. À la place : « Impossible de vérifier la session en cours. Vérifiez la connexion au serveur puis réessayez. », avec un bouton **Réessayer**.

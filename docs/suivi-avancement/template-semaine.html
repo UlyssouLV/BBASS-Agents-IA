@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <title>Brouillon — Suivi d’avancement — semaine du LUN au VEN MOIS ANNÉE</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 12mm 14mm 12mm 14mm;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #fff;
+      color: #1c1917;
+      font-family: "Segoe UI", Calibri, "Liberation Sans", sans-serif;
+      font-size: 9.2pt;
+      line-height: 1.34;
+    }
+    .sheet {
+      max-width: 180mm;
+      margin: 0 auto;
+      position: relative;
+    }
+    .semaine {
+      display: inline-block;
+      margin-top: 10pt;
+      font-size: 8.5pt;
+      font-weight: 650;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #1e3a5f;
+      border: 1pt solid #1e3a5f;
+      padding: 3pt 7pt;
+      background: #fff;
+    }
+    .couverture {
+      page-break-after: always;
+      break-after: page;
+      padding-bottom: 8mm;
+    }
+    .couverture-identite {
+      text-align: center;
+      padding-top: 10mm;
+    }
+    .couverture .toc {
+      margin-top: 16pt;
+    }
+    .couverture .logo {
+      height: 22mm;
+      margin: 0 auto 14pt;
+    }
+    .couverture .kicker {
+      margin-bottom: 8pt;
+    }
+    .couverture h1 {
+      font-size: 22pt;
+      margin: 0 0 10pt;
+    }
+    .couverture .meta {
+      font-size: 10.5pt;
+      line-height: 1.5;
+    }
+    .toc {
+      margin: 0;
+      padding: 14pt 16pt 16pt;
+      background: #f5f3ef;
+      border-left: 4pt solid #1e3a5f;
+    }
+    .toc-label {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 13pt;
+      font-weight: 600;
+      letter-spacing: 0;
+      text-transform: none;
+      color: #1e3a5f;
+      margin: 0 0 12pt;
+    }
+    .toc ol {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      counter-reset: toc;
+    }
+    .toc > ol > li {
+      counter-increment: toc;
+      margin-bottom: 9pt;
+    }
+    .toc-row {
+      display: flex;
+      align-items: baseline;
+      gap: 0;
+      font-size: 10.5pt;
+    }
+    .toc-row::before {
+      content: counter(toc, decimal-leading-zero);
+      flex-shrink: 0;
+      width: 22pt;
+      font-weight: 650;
+      color: #1e3a5f;
+      font-variant-numeric: tabular-nums;
+    }
+    .toc-row a {
+      color: #1c1917;
+      text-decoration: none;
+      flex-shrink: 0;
+    }
+    .toc-row a:hover {
+      color: #1e3a5f;
+      text-decoration: underline;
+    }
+    .toc-dots {
+      flex: 1;
+      border-bottom: 1pt dotted #a8a29e;
+      margin: 0 8pt 3pt;
+      min-width: 12pt;
+    }
+    .toc ol ol {
+      margin: 5pt 0 0 22pt;
+      padding: 0;
+      list-style: none;
+      counter-reset: tocsub;
+    }
+    .toc ol ol li {
+      counter-increment: tocsub;
+      margin-bottom: 4pt;
+      font-size: 9.5pt;
+      color: #44403c;
+    }
+    .toc ol ol li::before {
+      content: counter(toc) "." counter(tocsub) "  ";
+      color: #1e3a5f;
+      font-weight: 650;
+    }
+    .toc ol ol a {
+      color: inherit;
+      text-decoration: none;
+    }
+    .toc ol ol a:hover {
+      color: #1e3a5f;
+      text-decoration: underline;
+    }
+    .toc-ref {
+      flex-shrink: 0;
+      font-size: 9pt;
+      color: #57534e;
+      font-variant-numeric: tabular-nums;
+    }
+    .bloc {
+      margin-top: 14pt;
+      padding-top: 10pt;
+      border-top: 1.5pt solid #1e3a5f;
+    }
+    .bloc:first-of-type {
+      border-top: none;
+      padding-top: 8pt;
+      margin-top: 8pt;
+    }
+    h2 {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 11pt;
+      font-weight: 600;
+      color: #1e3a5f;
+      margin: 0 0 6pt;
+      padding-top: 0;
+    }
+    .logo {
+      display: block;
+      height: 14mm;
+      width: auto;
+      margin: 0 auto 10pt;
+    }
+    .kicker {
+      font-size: 8.5pt;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: #57534e;
+      margin: 0 0 4pt;
+    }
+    h1 {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 16.5pt;
+      font-weight: 400;
+      color: #1e3a5f;
+      margin: 0 0 6pt;
+      line-height: 1.2;
+    }
+    .meta {
+      font-size: 9.5pt;
+      color: #44403c;
+      margin: 0;
+    }
+    .meta a {
+      color: #1e3a5f;
+      text-decoration: underline;
+    }
+    p { margin: 0 0 6pt; }
+    .lead {
+      font-size: 10pt;
+      color: #292524;
+      margin-bottom: 8pt;
+    }
+    ul {
+      margin: 0 0 6pt;
+      padding-left: 1.1em;
+    }
+    li { margin-bottom: 2pt; }
+    .recap {
+      background: #f5f3ef;
+      border-left: 3.5pt solid #1e3a5f;
+      padding: 8pt 12pt 10pt;
+      margin: 0;
+    }
+    .recap > p,
+    .recap p.recap-intro {
+      margin: 0 0 6pt;
+      font-size: 9.5pt;
+    }
+    .recap h3 {
+      font-family: "Segoe UI", Calibri, sans-serif;
+      font-size: 9.5pt;
+      font-weight: 650;
+      color: #1e3a5f;
+      margin: 8pt 0 3pt;
+    }
+    .recap h3:first-of-type { margin-top: 2pt; }
+    .recap ul {
+      margin: 0 0 2pt;
+    }
+    .versions {
+      page-break-before: always;
+      break-before: page;
+      margin-top: 0;
+      padding-top: 0;
+      border-top: none;
+    }
+    #reste-a-implementer {
+      page-break-before: always;
+      break-before: page;
+    }
+    #attendu-fin-de-semaine {
+      page-break-before: avoid;
+      break-before: avoid;
+    }
+    .agenda {
+      page-break-before: always;
+      break-before: page;
+      border-top: none;
+      margin-top: 0;
+      padding-top: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 250mm;
+    }
+    .agenda h2 {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+    }
+    .agenda img {
+      display: block;
+      margin: 0 auto;
+      max-width: 170mm;
+      max-height: 250mm;
+      width: auto;
+      height: auto;
+    }
+    .agenda-placeholder {
+      width: 170mm;
+      min-height: 200mm;
+      border: 1.5pt dashed #a8a29e;
+      background: #fafaf9;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 16pt;
+      color: #57534e;
+      font-size: 10pt;
+    }
+    .agenda-placeholder strong {
+      display: block;
+      color: #1e3a5f;
+      font-size: 11pt;
+      margin-bottom: 6pt;
+    }
+    .versions .version {
+      margin-top: 12pt;
+      background: #f5f3ef;
+      border-left: 4pt solid #1e3a5f;
+      padding: 0;
+    }
+    .versions .version-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12pt;
+      margin: 0;
+      padding: 8pt 12pt;
+      background: #e7e5e0;
+      border-bottom: 0.75pt solid #d6d3d1;
+    }
+    .versions .version h3 {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 11pt;
+      font-weight: 600;
+      color: #1e3a5f;
+      margin: 0;
+    }
+    .versions .deploye {
+      flex-shrink: 0;
+      font-size: 8pt;
+      font-weight: 650;
+      letter-spacing: 0.03em;
+      color: #fff;
+      background: #1e3a5f;
+      border: none;
+      padding: 3pt 8pt;
+      white-space: nowrap;
+    }
+    .versions .prevu {
+      flex-shrink: 0;
+      font-size: 8pt;
+      font-weight: 650;
+      letter-spacing: 0.03em;
+      color: #1e3a5f;
+      background: #fff;
+      border: 1pt solid #1e3a5f;
+      padding: 3pt 8pt;
+      white-space: nowrap;
+    }
+    .versions .version-body {
+      padding: 8pt 12pt 10pt;
+    }
+    .versions .version p {
+      margin: 0 0 6pt;
+      font-size: 9.5pt;
+    }
+    .versions .version p:last-child {
+      margin-bottom: 0;
+    }
+    .jour {
+      margin-bottom: 5pt;
+      page-break-inside: avoid;
+    }
+    .jour h3 {
+      font-size: 10.5pt;
+      font-weight: 650;
+      margin: 0 0 4pt;
+      color: #1c1917;
+    }
+    .echeance {
+      color: #1e3a5f;
+      font-weight: 650;
+    }
+    footer {
+      margin-top: 10pt;
+      padding-top: 6pt;
+      border-top: 0.75pt solid #d6d3d1;
+      font-size: 8pt;
+      color: #78716c;
+    }
+    @media print {
+      body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body>
+  <div class="sheet">
+    <header class="couverture">
+      <div class="couverture-identite">
+        <img class="logo" src="../../../docs-site/static/img/logo-bbass.png" alt="BBASS géomètre-expert" />
+        <p class="kicker">Alternance Agents IA · 2026–2027</p>
+        <h1>Bilan de semaine - Alternance Ulysse LONG</h1>
+        <p class="meta">Semaine du <span data-slot="dates-longues">JJ au JJ mois AAAA</span><br />
+        Dépôt : <a href="https://github.com/UlyssouLV/BBASS-Agents-IA">github.com/UlyssouLV/BBASS-Agents-IA</a></p>
+        <div class="semaine" data-slot="badge-semaine">JJ–JJ mois. AAAA</div>
+      </div>
+      <nav class="toc" aria-label="Table des matières">
+        <p class="toc-label">Table des matières</p>
+        <ol>
+          <li>
+            <div class="toc-row">
+              <a href="#travail-realise">Travail réalisé</a>
+              <span class="toc-dots" aria-hidden="true"></span>
+              <span class="toc-ref" data-slot="toc-ref-semaine">JJ–JJ mois.</span>
+            </div>
+          </li>
+          <li>
+            <div class="toc-row">
+              <a href="#reste-a-implementer">Reste à implémenter</a>
+              <span class="toc-dots" aria-hidden="true"></span>
+              <span class="toc-ref" data-slot="toc-ref-reste">…</span>
+            </div>
+          </li>
+          <li>
+            <div class="toc-row">
+              <a href="#livre-pour" data-slot="lien-livre-pour">Livré pour le JJ/MM/AAAA</a>
+              <span class="toc-dots" aria-hidden="true"></span>
+              <span class="toc-ref" data-slot="toc-ref-livre">…</span>
+            </div>
+          </li>
+          <li>
+            <div class="toc-row">
+              <a href="#descriptif-versions">Descriptif des versions</a>
+              <span class="toc-dots" aria-hidden="true"></span>
+              <span class="toc-ref">livraisons</span>
+            </div>
+            <ol data-slot="toc-versions">
+              <!-- Une <li><a href="#version-X-Y-Z">VX.Y.Z — titre</a></li> par version attendue / livrée -->
+            </ol>
+          </li>
+        </ol>
+      </nav>
+    </header>
+
+    <section class="bloc" id="travail-realise">
+    <h2>Travail réalisé</h2>
+
+    <div class="jour" data-slot="jour-lundi">
+      <h3>Lundi …</h3>
+      <ul>
+        <li>À compléter.</li>
+      </ul>
+    </div>
+    <div class="jour" data-slot="jour-mardi">
+      <h3>Mardi …</h3>
+      <ul>
+        <li>À compléter.</li>
+      </ul>
+    </div>
+    <div class="jour" data-slot="jour-mercredi">
+      <h3>Mercredi …</h3>
+      <ul>
+        <li>À compléter.</li>
+      </ul>
+    </div>
+    <div class="jour" data-slot="jour-jeudi">
+      <h3>Jeudi …</h3>
+      <ul>
+        <li>À compléter.</li>
+      </ul>
+    </div>
+    <div class="jour" data-slot="jour-vendredi">
+      <h3>Vendredi …</h3>
+      <ul>
+        <li>À compléter.</li>
+      </ul>
+    </div>
+    </section>
+
+    <section class="bloc" id="reste-a-implementer">
+    <h2>Reste à implémenter</h2>
+    <ul data-slot="liste-reste">
+      <!-- Puces VX.Y.Z — titre (attendus + suite feuille de route) -->
+    </ul>
+    </section>
+
+    <section class="bloc" id="livre-pour" data-slot="section-livre-pour">
+    <h2 data-slot="titre-livre-pour">Livré pour le JJ/MM/AAAA</h2>
+    <div class="recap">
+      <p data-slot="recap-intro"><strong>Point — visé : … · livré : (rien encore)</strong></p>
+      <!-- Sous-sections h3 + ul au fil des livraisons -->
+    </div>
+    </section>
+
+    <section class="bloc versions" id="descriptif-versions">
+      <h2>Descriptif des versions</h2>
+      <p class="lead" data-slot="lead-versions">Versions attendues cette semaine (feuille de route). Les blocs passent de « prévu » à « déployé » à chaque finalisation.</p>
+
+      <!--
+        Gabarit d’un bloc version (prévu) :
+        <div class="version" id="version-X-Y-Z">
+          <div class="version-head">
+            <h3>VX.Y.Z — Titre</h3>
+            <span class="prevu">Livraison prévue …</span>
+          </div>
+          <div class="version-body">
+            <p>Objectif en langage cabinet (pas de stack, pas de #ticket).</p>
+          </div>
+        </div>
+
+        Une fois livré, remplacer .prevu par :
+        <span class="deploye">Déployé le JJ/MM/AAAA à HH:MM</span>
+        et enrichir le corps (langage fonctionnel).
+      -->
+      <div data-slot="blocs-versions"></div>
+    </section>
+  </div>
+</body>
+</html>

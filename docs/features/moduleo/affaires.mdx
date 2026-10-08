@@ -1,0 +1,40 @@
+# Chercher des affaires
+
+`chercher_affaires_moduleo` répond à des questions comme :
+
+- « Retrouve l’affaire 2024-123. »
+- « Qui sont les intervenants de cette affaire ? »
+- « Quelles affaires suit Sophie Martin ? »
+- « Les affaires ouvertes à Castries depuis janvier. »
+
+## Ce que le modèle peut demander
+
+- **Un numéro** d’affaire : prioritaire, les autres critères sont alors ignorés.
+- **Un texte** : un mot de l’objet, de l’adresse ou du client.
+- **Des filtres**, combinés en « et » : état (tel que Moduléo le nomme, ex. « Production »), dates de création, d’ouverture, de livraison ou de clôture, site, service, responsable, chargé d’affaire, dossier de production, ou **suivie par** (responsable ou chargé d’affaire).
+
+Les personnes, sites, services et dossiers de production sont donnés **par leur nom**. La VM les cherche dans Moduléo :
+
+- un nom qui ne correspond à rien : « Aucun site Moduléo ne correspond à « Lyon » : recherche non lancée. » ;
+- plusieurs personnes possibles : « Plusieurs utilisateurs Moduléo correspondent à « Martin » : Jean Martin, Paul Martin. Demande lequel… »
+
+Dans ces deux cas, **aucune recherche** n’est lancée sans le filtre demandé : le modèle repose la question au collaborateur.
+
+## Ce qui revient
+
+Une **Fiche Moduléo** par affaire, en noms, jamais en ids :
+
+- numéro, objet, état ;
+- dates (création, ouverture, livraison, clôture) ;
+- adresse et commune ;
+- client et représentant ;
+- responsable et chargé d’affaire, avec leurs coordonnées ;
+- intervenants avec leur qualité et leur représentant.
+
+Un champ vide n’a pas de ligne.
+
+**5 fiches** par défaut, **10** si le modèle le demande. Au-delà : « 37 affaires trouvées, 5 affichées, précise la recherche. » Aucune : « Aucune affaire Moduléo ne correspond à cette recherche. »
+
+## À confirmer à l’essai réel
+
+Valeurs exactes de l’état d’une affaire, contenu réel d’un intervenant, recherche par nom exacte ou partielle.

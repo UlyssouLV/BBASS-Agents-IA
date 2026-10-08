@@ -1,0 +1,23 @@
+# Sources et mémoire
+
+Chaque Fiche Moduléo renvoyée au modèle est enregistrée dans la Conversation : une **Lecture d’outil**, avec l’outil, une référence (« affaire 2024-123 », « contact Étude Dupont »), le texte de la fiche, le tour et la date.
+
+## Les chiffres restent
+
+Les garde-fous retirent d’une réponse un chiffre qu’aucune source ne contient. Une fiche Moduléo **est une source** : un numéro d’affaire, une date ou un téléphone qu’elle contient reste dans la réponse, au tour de la lecture comme aux tours suivants de la même Conversation.
+
+Un chiffre absent de la fiche est toujours retiré : le modèle ne peut pas inventer un téléphone.
+
+## La ligne « Sources : »
+
+Elle cite la fiche d’où vient un chiffre gardé, sans lien :
+
+« Sources : Moduléo, affaire 2024-123 »
+
+## La Mémoire de la conversation
+
+Chaque lecture Moduléo y figure avec son tour et sa date, et avec ses **questions couvertes** : « Qui sont les intervenants de l’affaire 2024-123 ? », « Quel est l’état de l’affaire 2024-123 ? », « Comment joindre Étude Dupont ? »…
+
+Ces questions sont écrites **par script**, champ par champ, sans appel au modèle. Un champ vide n’a pas de question.
+
+Une fiche est l’état de Moduléo **à sa date de lecture**. La consigne demande au modèle de rappeler Moduléo quand la question porte sur l’état actuel d’une affaire ou d’un contact, ou quand la lecture est ancienne. Il n’y a aucun cache entre Conversations : une nouvelle Conversation relit toujours Moduléo.

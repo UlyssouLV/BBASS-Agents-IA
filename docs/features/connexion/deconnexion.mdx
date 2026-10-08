@@ -1,0 +1,24 @@
+import ApercuDeconnexion, {ApercuDeconnexionForcee} from '@site/src/components/connexion/ApercuDeconnexion';
+import SchemaFlux from '@site/src/components/connexion/SchemaFlux';
+
+# Déconnexion
+
+Depuis **Profil** (puce du compte, en bas de la barre latérale).
+
+<ApercuDeconnexion />
+
+<SchemaFlux variante="deconnexion" />
+
+Le poste efface d’abord la session locale — mémoire et gestionnaire Windows — puis demande à la VM centrale de retirer **ce** jeton. Si la VM ne répond pas, la déconnexion locale a quand même lieu : ce jeton reste valide côté VM jusqu’à une déconnexion forcée.
+
+L’écran de saisie revient. Le compte affiché est vidé, y compris si l’appel de déconnexion a échoué.
+
+## Déconnexion forcée
+
+Un compte administrateur, dans le panel, sur la ligne du compte. Pas de clé d’administration VM : le droit de compte administrateur suffit. Tous les jetons de ce compte sont retirés, sur tous les postes.
+
+<ApercuDeconnexionForcee />
+
+Le poste visé ne s’en aperçoit pas tant qu’il n’appelle pas la VM. Au prochain appel, ou au prochain lancement, le jeton est refusé et l’écran de saisie revient.
+
+Ce n’est pas « Réinitialiser le mot de passe » : une réinitialisation laisse les jetons en place. Voir [Changement de mot de passe](./mot-de-passe.mdx).

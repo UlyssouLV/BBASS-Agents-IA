@@ -1,0 +1,64 @@
+import SchemaFlux from '@site/src/components/moduleo/SchemaFlux';
+
+# Clé d’API, code de sécurité et clé maître
+
+Pour lire Moduléo, la VM centrale a besoin de **deux secrets** venus de Moduléo, et d’un **troisième** qu’elle fabrique elle-même pour protéger les deux premiers.
+
+| Élément | Qui le crée | À quoi il sert |
+| --- | --- | --- |
+| **Clé d’API** | Le compte administrateur, dans Moduléo | Autorise un logiciel tiers (BBASS) à interroger l’API. Se restreint par utilisateurs, par adresses IP et par catégories (Affaire, Contact, Utilisateur…), chacune en lecture ou en lecture et écriture. BBASS : **lecture seule**. |
+| **Code de sécurité** (SecurityCode) | Moduléo, pour chaque utilisateur autorisé sur la clé | Dit **quel utilisateur** lit. Personnel, ce n’est **pas** son mot de passe. |
+| **Clé maître** | Le script `chiffrer_secret.py`, sur la VM | Chiffre et déchiffre les deux secrets ci-dessus. N’existe que dans BBASS. |
+
+## Le code de sécurité
+
+Chaque utilisateur autorisé sur une clé d’API a son propre code. Il le trouve dans son client Moduléo : **Mon profil**, onglet **Connectivité**, en face de la clé. Kipaware le dit strictement personnel.
+
+En 1.5.0, BBASS n’utilise qu’**un** code : celui d’un utilisateur de test aux droits modestes. Moduléo applique ses droits à toutes les lectures, quel que soit le collaborateur qui pose la question. Une clé ou un code par collaborateur est prévu plus tard.
+
+Si le renouvellement périodique du code est activé sur la clé, le code change : Moduléo refuse alors l’accès jusqu’à ce qu’on rechiffre le nouveau.
+
+## La clé maître
+
+La clé d’API et le code de sécurité ne sont jamais écrits en clair. Ils sont **chiffrés** (Fernet) dans `vm-centrale/.env`. La clé maître est le petit fichier qui sert à les chiffrer, puis à les déchiffrer au démarrage de la VM.
+
+Elle vit **dans un fichier séparé, hors du dépôt**. `.env` ne contient que son chemin, `VM_CLE_MAITRE_FICHIER`. Ainsi, un `.env` qui fuit (capture d’écran, ticket, sauvegarde) ne livre que des valeurs illisibles. Il faut les deux fichiers pour lire Moduléo.
+
+- **Ne jamais la committer**, ni l’envoyer par mail ou chat.
+- **La sauvegarder à part.** Perdue, les secrets chiffrés deviennent inutilisables : il faut une nouvelle clé d’API ou un nouveau code dans Moduléo, puis rechiffrer.
+- **Ne jamais la remplacer** tant que des secrets chiffrés avec elle sont en service. Le script ne l’écrase jamais.
+
+Aujourd’hui, la clé maître est un fichier sur la VM. En production (1.7.0) : un répertoire système lisible par le seul compte de service, exclu des sauvegardes de la VM et sauvegardé à part, puis, si la VM le permet, scellée par la puce TPM (`systemd-creds`). La clé d’API, restreinte à l’IP de la VM, reste la vraie barrière si un secret fuit.
+
+## Configurer
+
+<SchemaFlux variante="chiffrement" />
+
+1. Dans `vm-centrale/.env`, renseigner l’URL du serveur et le chemin de la clé maître, hors du dépôt :
+   ```
+   MODULEO_URL=https://mwa-bbass.kipaware.fr/api
+   VM_CLE_MAITRE_FICHIER=C:\Users\<vous>\bbass\cle_maitre.key
+   ```
+2. Depuis `vm-centrale/`, dans un vrai terminal (le script demande le secret au clavier) :
+   ```
+   .venv\Scripts\python scripts\chiffrer_secret.py MODULEO_API_KEY_CHIFFREE
+   ```
+   Le premier lancement crée la clé maître. Coller la clé d’API (rien ne s’affiche), puis copier la ligne imprimée dans `.env`.
+3. Même chose pour le code de sécurité :
+   ```
+   .venv\Scripts\python scripts\chiffrer_secret.py MODULEO_SECURITY_CODE_CHIFFRE
+   ```
+4. Effacer toute copie en clair des deux secrets.
+5. Relancer la VM : la config est lue au démarrage.
+
+`--cle-maitre <chemin>` remplace `VM_CLE_MAITRE_FICHIER` pour un lancement ponctuel. Changer de serveur Moduléo ou de clé ne touche que `.env`.
+
+## Au démarrage de la VM
+
+<SchemaFlux variante="demarrage" />
+
+Une variable vide, une clé maître absente ou fausse, un secret qui ne se déchiffre pas : la VM démarre quand même, sans les outils Moduléo. Son journal nomme la variable en cause, jamais une valeur :
+
+« Moduléo non configuré : MODULEO_SECURITY_CODE_CHIFFRE ne se déchiffre pas avec la clé maître … »
+
+Une fois déchiffrés, la clé et le code restent en mémoire, dans les en-têtes HTTP `ApiKey` et `SecurityCode`. Ils ne vont **jamais** au modèle ni à l’inspecteur.

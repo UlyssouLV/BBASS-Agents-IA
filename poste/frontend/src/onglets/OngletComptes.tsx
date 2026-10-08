@@ -1,13 +1,13 @@
 import { useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
 import { toast } from "sonner";
 
-import { Badge } from "@/components/ui/badge";
+import { EnteteComptesAdmin, LigneCompteAdmin } from "@/components/LigneCompteAdmin";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody } from "@/components/ui/table";
 import {
   useComptesQuery,
   useCreerCompteMutation,
@@ -103,84 +103,20 @@ export function OngletComptes() {
 
       {comptesQuery.data && (
         <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Identifiant</TableHead>
-              <TableHead>Prénom</TableHead>
-              <TableHead>Nom</TableHead>
-              <TableHead>Agence</TableHead>
-              <TableHead>Pôles</TableHead>
-              <TableHead>Statut</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>
-                <span className="sr-only">Actions</span>
-              </TableHead>
-            </TableRow>
-          </TableHeader>
+          <EnteteComptesAdmin />
           <TableBody>
             {comptesQuery.data.map((compte) => (
-              <TableRow key={compte.identifiant}>
-                <TableCell>{compte.identifiant}</TableCell>
-                <TableCell>{compte.prenom}</TableCell>
-                <TableCell>{compte.nom}</TableCell>
-                <TableCell>{compte.agence}</TableCell>
-                <TableCell>
-                  <div className="flex flex-wrap gap-1">
-                    {compte.poles.map((pole) => (
-                      <Badge key={pole} variant="outline">
-                        {pole}
-                      </Badge>
-                    ))}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Badge variant={compte.est_admin ? "default" : "secondary"}>
-                    {compte.est_admin ? "Administrateur" : "Standard"}
-                  </Badge>
-                </TableCell>
-                <TableCell>{compte.email ?? ""}</TableCell>
-                <TableCell>
-                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
-                    <button
-                      type="button"
-                      className="hover:underline"
-                      onClick={() => setAction({ type: "modification", compte })}
-                    >
-                      Modifier
-                    </button>
-                    <button
-                      type="button"
-                      className="hover:underline disabled:pointer-events-none disabled:opacity-50"
-                      disabled={reinitialiserMotDePasseMutation.isPending}
-                      onClick={() => reinitialiserMotDePasse(compte)}
-                    >
-                      Réinitialiser le mot de passe
-                    </button>
-                    <button
-                      type="button"
-                      className="hover:underline disabled:pointer-events-none disabled:opacity-50"
-                      disabled={deconnexionForceeMutation.isPending}
-                      onClick={() => forcerLaDeconnexion(compte)}
-                    >
-                      Forcer la déconnexion
-                    </button>
-                    <button
-                      type="button"
-                      className="hover:underline"
-                      onClick={() => setAction({ type: "statut-admin", compte })}
-                    >
-                      {compte.est_admin ? "Rétrograder" : "Promouvoir administrateur"}
-                    </button>
-                    <button
-                      type="button"
-                      className="text-destructive hover:underline"
-                      onClick={() => setAction({ type: "suppression", compte })}
-                    >
-                      Supprimer
-                    </button>
-                  </div>
-                </TableCell>
-              </TableRow>
+              <LigneCompteAdmin
+                key={compte.identifiant}
+                compte={compte}
+                reinitialisationEnCours={reinitialiserMotDePasseMutation.isPending}
+                deconnexionEnCours={deconnexionForceeMutation.isPending}
+                onModifier={() => setAction({ type: "modification", compte })}
+                onReinitialiser={() => reinitialiserMotDePasse(compte)}
+                onForcerDeconnexion={() => forcerLaDeconnexion(compte)}
+                onChangerStatut={() => setAction({ type: "statut-admin", compte })}
+                onSupprimer={() => setAction({ type: "suppression", compte })}
+              />
             ))}
           </TableBody>
         </Table>

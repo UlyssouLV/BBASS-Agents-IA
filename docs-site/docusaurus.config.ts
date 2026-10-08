@@ -1,3 +1,5 @@
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {createRequire} from 'node:module';
 import {themes as prismThemes} from 'prism-react-renderer';
 import type {Config} from '@docusaurus/types';
@@ -5,6 +7,8 @@ import type * as Preset from '@docusaurus/preset-classic';
 
 const require = createRequire(import.meta.url);
 const remarkGlossaire = require('./src/remark/glossaire.cjs');
+const siteDir = path.dirname(fileURLToPath(import.meta.url));
+const reactDir = path.resolve(siteDir, 'node_modules/react');
 
 const config: Config = {
   title: 'BBASS Agents IA',
@@ -35,6 +39,15 @@ const config: Config = {
         name: 'watch-polling-network-drive',
         configureWebpack() {
           return {
+            resolve: {
+              alias: {
+                // `@` ne vise que les imports `@/…` du poste (le slash est
+                // ajouté par webpack). `@site` et `@docusaurus` restent intacts.
+                '@': path.resolve(siteDir, '../poste/frontend/src'),
+                react: reactDir,
+                'react-dom': path.resolve(siteDir, 'node_modules/react-dom'),
+              },
+            },
             watchOptions: {
               poll: 1000,
               aggregateTimeout: 300,

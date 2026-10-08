@@ -1,0 +1,11 @@
+.cadre {
+  display: block;
+  max-width: 42rem;
+  margin: 1.25rem 0 1.75rem;
+}
+
+.etroit {
+  display: block;
+  max-width: 24rem;
+  margin: 1.25rem 0 1.75rem;
+}

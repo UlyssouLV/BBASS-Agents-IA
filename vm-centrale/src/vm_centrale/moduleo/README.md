@@ -2,7 +2,7 @@
 
 Intégration Moduléo de la VM centrale, commune à tous les outils (et plus tard à n8n, 1.8.0). Spec 1.5.0, [ADR-0017](../../../../docs/adr/0017-lecture-moduleo-par-outil.md).
 
-**Lecture seule.** Les droits d'une clé d'API Moduléo se règlent par catégorie (Affaire, Contact…), pas en lecture / écriture : seul ce client garantit que la VM ne modifie rien sur le serveur du cabinet. Toute écriture future (POST / PUT / DELETE) passe par une nouvelle décision et un serveur Moduléo de test.
+**Lecture seule.** Les droits d'une clé d'API Moduléo se règlent par catégorie (Affaire, Contact…), chacune en lecture ou en lecture et écriture : la clé BBASS ne coche que la lecture. Ce client est la seconde barrière : il garantit que la VM ne modifie rien sur le serveur du cabinet, même avec une clé mal réglée. Toute écriture future (POST / PUT / DELETE) passe par une nouvelle décision et un serveur Moduléo de test.
 
 | Élément | Rôle | Depuis |
 | --- | --- | --- |

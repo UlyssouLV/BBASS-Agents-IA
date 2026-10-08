@@ -49,9 +49,9 @@ class LecteurModuleo(Protocol):
 
 
 class ClientModuleo:
-    # Client générique en lecture seule (spec 1.5.0, ADR-0017) : les droits
-    # d'une clé Moduléo se règlent par catégorie, pas en lecture / écriture,
-    # donc seule la VM garantit qu'aucune écriture ne part.
+    # Client générique en lecture seule (spec 1.5.0, ADR-0017) : seconde
+    # barrière après la clé Moduléo réglée en lecture, pour qu'aucune
+    # écriture ne parte même avec une clé mal réglée.
     def __init__(self, url_base: str, api_key: str, security_code: str) -> None:
         self._url_base = url_base.rstrip("/")
         self._en_tetes = {"ApiKey": api_key, "SecurityCode": security_code}

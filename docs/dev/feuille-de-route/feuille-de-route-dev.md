@@ -60,8 +60,10 @@ Ce n’est **pas** une spec (ça vient après « Ouvre la version »).
 - **Installateur Windows** (et éventuellement macOS plus tard) : installe / met à jour le poste, configure le lien vers la VM Castries, démarre le backend local.
 - **Accès UI** — archi à trancher à l’ouverture : fenêtre **pywebview** (ou équivalent) qui embarque l’UI, **ou** navigateur sur `localhost` du poste ; dans les deux cas le **backend Python par poste reste obligatoire**. Fermer la fenêtre ne devrait pas forcément tuer le process (accès encore possible en navigateur) — piste déjà notée sous « Lanceur poste ».
 - Doc d’installation collab / admin cabinet (quelques étapes, pas un clone git).
+- **Clé maître Moduléo en production** (ADR-0017 ; remplace la piste « clé USB », peu adaptée à une VM qui tourne en continu et redémarre sans personne pour la brancher). Niveau 1 au premier déploiement : fichier dans un répertoire système hors du dépôt et hors du dossier de `.env` (`/etc/bbass/` sous Linux, `C:\ProgramData\BBASS\secrets\` sous Windows, ou secret Docker monté dans `/run/secrets/` si la VM centrale est conteneurisée), lisible par le seul compte de service ; **exclu des sauvegardes de la VM** et sauvegardé à part (coffre / gestionnaire de mots de passe du cabinet) ; clé d’API Moduléo **restreinte à l’IP de la VM**, la vraie barrière si elle fuit. Niveau 2 si la VM est sous Linux avec un TPM (virtuel) : clé maître scellée par `systemd-creds`, illisible depuis une copie du disque ou un instantané, démarrage toujours automatique. Pas de service de clés séparé (Vault, OpenBao, Infisical) à ce stade : un seul secret, un seul consommateur, et l’accès au coffre demanderait lui-même un secret stocké sur la VM.
 
 **Recherche / décisions à trancher à l’ouverture.**
+- Clé maître : OS de la VM centrale et TPM virtuel disponible (niveau 2 possible ou non) ; politique de sauvegarde de la VM (exclusion du fichier). Décision à consigner dans un ADR qui complète ADR-0017.
 - pywebview vs navigateur seul vs les deux (lanceur + URL de secours).
 - Quoi Dockeriser sur le poste vs sur la VM ; prérequis Docker Desktop côté collab ou non.
 - Canal de mise à jour (GitHub Releases, partage interne Castries, etc.).
@@ -116,7 +118,7 @@ Déjà tranché : un Agent est une configuration dans le flux chat de la VM cent
 
 ### Clés API Moduléo par utilisateur (droits côté Moduléo)
 
-Sorti de la 1.5.0. Sur le serveur Moduléo, tous les utilisateurs n’ont pas accès aux mêmes choses. Une seule clé de test (1.5.0) ne reflète pas ces droits. À trancher : une clé / un SecurityCode par collaborateur ou par profil, où BBASS les stocke, qui les affecte (panel d’administration ; la création reste côté Moduléo), comportement quand un compte n’a pas de clé. S’appuie sur ce que la 1.5.0 aura appris de l’interface de paramétrage Moduléo.
+Sorti de la 1.5.0. Sur le serveur Moduléo, tous les utilisateurs n’ont pas accès aux mêmes choses. Une seule clé de test (1.5.0) ne reflète pas ces droits. À trancher : une clé / un SecurityCode par collaborateur ou par profil, où BBASS les stocke, qui les affecte (panel d’administration ; la création reste côté Moduléo), comportement quand un compte n’a pas de clé. S’appuie sur ce que la 1.5.0 aura appris de l’interface de paramétrage Moduléo. Avec plusieurs secrets et plusieurs services (n8n 1.8.0, `MISTRAL_API_KEY` à chiffrer), réexaminer un coffre de secrets centralisé (rotation, révocation, journal des lectures) à la place du fichier clé maître de la 1.7.0.
 
 ### Dire « pas trouvé » plutôt qu’inventer après une recherche (ex-1.4.5, #131)
 
@@ -237,6 +239,10 @@ Constat (test humain 1.4.0, ouverture 1.4.1) : une page PDF, trouvée par `reche
 ### Le tool calling ne boucle pas
 
 Constat (ouverture 1.4.1) : la boucle d’outils est bornée par une limite fixe (3 appels principaux en 1.4.0, 5 depuis la 1.4.1), qui protège d’une boucle sans en prouver l’absence. Le but n’est pas un plafond arbitraire : plus le modèle trouve seul les bonnes données, mieux c’est. Cette version prouve que le tool calling ne tourne pas en rond (détection d’un même appel ou d’arguments répétés, trace dans l’inspecteur, tests), puis revoit la limite à chaque nouvel outil plutôt que de la figer.
+
+### Questions couvertes à la demande pour Moduléo (`besoin`)
+
+Constat (1.5.0, [#177](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/177)) : une lecture Moduléo n’a que les questions couvertes écrites par script, champ par champ, sans appel IA. Une question imprévue (« l’affaire est-elle en retard ? ») oblige le modèle à rappeler Moduléo, et sa réponse n’est gardée nulle part. Piste : un `besoin` sur les outils Moduléo, sur le modèle de `lire_pages_web` (1.4.1) : un appel d’extraction isolé sur la fiche relue, avec une réponse (ou « non présent selon l’extraction ») enregistrée en question couverte d’origine `besoin`. **Déclencheur** : l’essai réel ([#178](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/178)) ou l’usage montre beaucoup de rappels de Moduléo pour une même question. Sinon, ne rien changer : relire Moduléo garde une donnée fraîche, et une fiche est courte.
 
 ### Vérification de la fiabilité des sources web
 

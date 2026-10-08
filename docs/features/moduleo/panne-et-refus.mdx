@@ -1,0 +1,33 @@
+import CarteApercu, {JsonApercu, SectionApercu} from '@site/src/components/inspecteur/CarteApercu';
+
+# Panne et refus
+
+Quand Moduléo ne répond pas comme prévu, l’outil renvoie au modèle **une phrase fixe**, et le modèle le dit au collaborateur. Le chat ne plante jamais (pas d’erreur 500), et la VM ne retente pas.
+
+| Cas | Phrase au modèle |
+| --- | --- |
+| Délai dépassé, serveur injoignable, réponse inexploitable | « Moduléo est indisponible pour le moment. » |
+| Clé ou code de sécurité refusé, droit manquant (401 / 403) | « Moduléo refuse l’accès à cette donnée. » |
+
+Aucune lecture n’est enregistrée : rien ne devient source des garde-fous.
+
+Un refus après un changement dans Moduléo vient souvent de la clé : catégorie non cochée (Affaire, Contact, Utilisateur…), IP non autorisée, ou code de sécurité renouvelé. Voir [Clé d’API, code de sécurité et clé maître](./configuration.mdx).
+
+## Dans l’inspecteur
+
+Chaque appel est une étiquette [Outil](../inspecteur/outil.mdx), badge **Local** : `Outil : chercher_affaires_moduleo` ou `Outil : chercher_contacts_moduleo`.
+
+<CarteApercu libelle="Outil : chercher_affaires_moduleo" origine="local" ouvertParDefaut>
+  <SectionApercu titre="Entrée">
+    <JsonApercu>{`{ "numero": "2024-123" }`}</JsonApercu>
+  </SectionApercu>
+  <SectionApercu titre="Sortie">
+    <JsonApercu>{`{
+  "contenu": "Moduléo est indisponible pour le moment.",
+  "routes": [{ "route": "cogeo/affaire/numeroAffaire?numAffaire={numAffaire}", "parametres": { "numAffaire": "2024-123" } }],
+  "erreur": "…"
+}`}</JsonApercu>
+  </SectionApercu>
+</CarteApercu>
+
+En **Entrée**, les arguments du modèle. En **Sortie** : `contenu` (ce que lit le modèle), `routes` (chaque route lue, avec ses paramètres), puis selon le cas `trouvees` et `fiches`, `erreur` (le détail technique), ou `non_resolu` (le nom que Moduléo ne connaît pas). **Jamais** la clé d’API ni le code de sécurité.
