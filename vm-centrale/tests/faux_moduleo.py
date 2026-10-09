@@ -11,6 +11,9 @@ from vm_centrale.moduleo.routes import ROUTES_GET
 
 _RECHERCHE_AFFAIRES = next(route for route in ROUTES_GET if route.startswith("cogeo/affaire?texte="))
 _RECHERCHE_CONTACTS = next(route for route in ROUTES_GET if route.startswith("cogeo/contact?texte="))
+_RECHERCHE_DEVIS = next(route for route in ROUTES_GET if route.startswith("cogeo/devis?texte="))
+# Limite des routes `multi` (doc Moduléo).
+_MULTI_MAX = 200
 # Coordonnées d'un contact (#176) : route des ids → (route de la fiche,
 # paramètre de chemin, clé du faux).
 _COORDONNEES = {
@@ -39,6 +42,7 @@ class FauxModuleo:
         self._coordonnees: dict[str, dict[int, dict]] = {cle: {} for _, _, cle in _COORDONNEES.values()}
         self._coordonnees_contact: dict[int, dict[str, list[int]]] = {}
         self._affaires_contact: dict[int, dict[str, list[int]]] = {}
+        self._devis: dict[int, dict] = {}
         self._exception: Exception | None = None
 
     def echouer(self, exception: Exception) -> None:
@@ -68,6 +72,30 @@ class FauxModuleo:
             "IdSite": None,
             "IdService": None,
             "IdDossierProduction": None,
+            **champs,
+        }
+
+    def ajouter_devis(self, id_devis: int, numero: str, objet: str = "", **champs: Any) -> None:
+        # `champs` : les autres clés du devis, au nom du JSON Moduléo
+        # (`DateEmission`, `MontantTotalHT`, `IdAffaire`…). Émis : une date
+        # d'émission (#189, à confirmer à l'essai réel).
+        self._devis[id_devis] = {
+            "IdDevis": id_devis,
+            "Numero": numero,
+            "Objet": objet,
+            "Etat": 0,
+            "DateCreation": None,
+            "DateEmission": None,
+            "DateReponse": None,
+            "DateExpiration": None,
+            "IdAffaire": None,
+            "IdResponsable": None,
+            "IdRedacteur": None,
+            "IdSite": None,
+            "IdService": None,
+            "MontantTotalHT": 0.0,
+            "MontantTotalTVA": 0.0,
+            "MontantTotalTTC": 0.0,
             **champs,
         }
 
@@ -237,6 +265,14 @@ class FauxModuleo:
             return self._affaires_contact.get(parametres["idContact"], {}).get("client", [])
         if route == "cogeo/contact/{idContact}/affaireintervenant":
             return self._affaires_contact.get(parametres["idContact"], {}).get("intervenant", [])
+        if route == _RECHERCHE_DEVIS:
+            return [i for i, devis in self._devis.items() if _devis_correspond(devis, parametres)]
+        if route == "cogeo/devis/multi?ids={ids}":
+            ids = _ids(parametres)
+            assert len(ids) <= _MULTI_MAX, len(ids)
+            return [self._devis[i] for i in ids if i in self._devis]
+        if route == "cogeo/affaire/{idAffaire}/devis":
+            return [i for i, devis in self._devis.items() if devis["IdAffaire"] == parametres["idAffaire"]]
         if route == "cogeo/contact/multi?ids={ids}":
             return [self._contacts[i] for i in _ids(parametres) if i in self._contacts]
         if route == "moduleo/commune/multi?ids={ids}":
@@ -286,6 +322,30 @@ def _correspond(affaire: dict, parametres: dict[str, Any]) -> bool:
             return False
     for suffixe, champ in _FILTRES_DATES.items():
         jour = (affaire[champ] or "")[:10]
+        minimum, maximum = parametres.get(f"date{suffixe}Min"), parametres.get(f"date{suffixe}Max")
+        if minimum is not None and not (jour and jour >= minimum):
+            return False
+        if maximum is not None and not (jour and jour <= maximum):
+            return False
+    return True
+
+
+# Filtres de cogeo/devis?… (#189) : paramètre → champ du devis.
+_FILTRES_IDS_DEVIS = {"idsService": "IdService", "idsResponsable": "IdResponsable", "idsRedacteur": "IdRedacteur"}
+_FILTRES_DATES_DEVIS = {"Emission": "DateEmission", "Reponse": "DateReponse"}
+
+
+def _devis_correspond(devis: dict, parametres: dict[str, Any]) -> bool:
+    if not _contient(f"{devis['Numero']} {devis['Objet']}", parametres.get("texte")):
+        return False
+    emis = parametres.get("emis")
+    if emis is not None and (emis == "true") != bool(devis["DateEmission"]):
+        return False
+    for parametre, champ in _FILTRES_IDS_DEVIS.items():
+        if parametres.get(parametre) is not None and devis[champ] not in _ids({"ids": parametres[parametre]}):
+            return False
+    for suffixe, champ in _FILTRES_DATES_DEVIS.items():
+        jour = (devis[champ] or "")[:10]
         minimum, maximum = parametres.get(f"date{suffixe}Min"), parametres.get(f"date{suffixe}Max")
         if minimum is not None and not (jour and jour >= minimum):
             return False

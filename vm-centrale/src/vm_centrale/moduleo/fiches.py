@@ -138,6 +138,99 @@ def fiche_contact(contact: dict, details: DetailsContact, communes: dict[int, st
     return Fiche(f"contact {nom}", "\n".join(lignes), questions)
 
 
+# Devis (#189). `Etat` 0 : valeur par défaut, pas de ligne.
+_ETATS_DEVIS_SANS_LIGNE = (None, 0, "")
+
+
+def fiche_devis(devis: dict, affaire: dict | None, noms: Noms) -> Fiche:
+    # Référence : « Moduléo, devis D-2026-042 ». `affaire` : celle du devis,
+    # dont le client est celui de la fiche (le destinataire du devis exige
+    # le droit des factures).
+    numero = _texte(devis.get("Numero"))
+    objet = _texte(devis.get("Objet"))
+    affaire = affaire or {}
+    numero_affaire = _texte(affaire.get("Numero"))
+    client = noms.contacts.get(_id(affaire.get("IdClient")), "")
+    emission, reponse = _date(devis.get("DateEmission")), _date(devis.get("DateReponse"))
+    etat = devis.get("Etat")
+    etat = "" if etat in _ETATS_DEVIS_SANS_LIGNE else _texte(enumerations.libelle(enumerations.ETATS_DEVIS, etat))
+    suivi = [
+        ("Responsable", _nom(noms.utilisateurs.get(_id(devis.get("IdResponsable"))))),
+        ("Rédacteur", _nom(noms.utilisateurs.get(_id(devis.get("IdRedacteur"))))),
+    ]
+    montant_ht, montant_ttc = montant(devis.get("MontantTotalHT")), montant(devis.get("MontantTotalTTC"))
+
+    lignes = [f"Devis {numero}"]
+    _ajouter(lignes, "Objet", objet)
+    _ajouter(lignes, "Affaire", numero_affaire)
+    _ajouter(lignes, "Client", client)
+    _ajouter(lignes, "Date de création", _date(devis.get("DateCreation")))
+    _ajouter(lignes, "Date d'émission", emission or "non émis")
+    _ajouter(lignes, "Date de réponse", reponse)
+    _ajouter(lignes, "Date d'expiration", _date(devis.get("DateExpiration")))
+    _ajouter(lignes, "État", etat)
+    for libelle, valeur in suivi:
+        _ajouter(lignes, libelle, valeur)
+    _ajouter(lignes, "Montant HT", montant_ht)
+    _ajouter(lignes, "Montant TTC", montant_ttc)
+
+    du_devis = f"du devis {numero}"
+    ou_en_est = [
+        f"Émis le {emission}" if emission else "Non émis",
+        f"réponse le {reponse}" if reponse else "",
+        f"état {etat}" if etat else "",
+    ]
+    questions = _questions(
+        (f"Quel est l'objet {du_devis} ?", objet),
+        (f"Quel est le montant {du_devis} ?", _montants(montant_ht, montant_ttc)),
+        (f"Où en est le devis {numero} ?", " ; ".join(partie for partie in ou_en_est if partie)),
+        (
+            f"À quelle affaire se rattache le devis {numero} ?",
+            f"{numero_affaire}, client {client}" if numero_affaire and client else numero_affaire,
+        ),
+        (f"Qui suit le devis {numero} ?", _libelles(suivi)),
+    )
+    return Fiche(f"devis {numero}", "\n".join(lignes), questions)
+
+
+def synthese_devis(devis: list[dict], affiches: int, portee: str, reference: str) -> Fiche:
+    # Totaux calculés par la VM sur tous les devis trouvés, pas seulement
+    # les `affiches` (spec 1.5.1) : un total fait par le modèle serait
+    # retiré par le garde-fou chiffres. `portee` : « trouvés (texte
+    # « Bornage ») », « émis depuis le 09/09/2026 (30 derniers jours) » ;
+    # `reference` : « devis émis du 09/09/2026 au 09/10/2026 ».
+    nombre = len(devis)
+    totaux = _montants(
+        montant(sum(d.get("MontantTotalHT") or 0 for d in devis)),
+        montant(sum(d.get("MontantTotalTTC") or 0 for d in devis)),
+    )
+    texte = f"{nombre} devis {portee}, total {totaux}."
+    if nombre > affiches:
+        recents = "Le plus récent affiché" if affiches == 1 else f"Les {affiches} plus récents affichés"
+        texte += f" {recents}, précise la recherche."
+    questions = _questions(
+        (f"Combien de {reference} ?", str(nombre)),
+        (f"Quel est le montant total des {reference} ?", totaux),
+    )
+    return Fiche(reference, texte, questions)
+
+
+def montant(valeur: object) -> str:
+    # 18400.5 → « 18 400,50 € » ; absent : pas de ligne.
+    if isinstance(valeur, bool) or not isinstance(valeur, (int, float)):
+        return ""
+    return f"{valeur:,.2f}".replace(",", " ").replace(".", ",") + " €"
+
+
+def _montants(ht: str, ttc: str) -> str:
+    # « 1 200,00 € HT, 1 440,00 € TTC ».
+    return ", ".join(f"{valeur} {taxe}" for valeur, taxe in ((ht, "HT"), (ttc, "TTC")) if valeur)
+
+
+def _nom(utilisateur: Utilisateur | None) -> str:
+    return utilisateur.nom if utilisateur is not None else ""
+
+
 def _questions(*paires: tuple[str, str]) -> tuple[tuple[str, str], ...]:
     # Jamais de retour à la ligne dans une réponse, quel que soit le champ.
     return tuple((question, " ".join(reponse.split())) for question, reponse in paires if reponse.strip())

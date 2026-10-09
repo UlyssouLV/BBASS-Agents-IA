@@ -3,6 +3,7 @@ from vm_centrale.outils import lire_pages_web, piece_jointe, recherche_web
 from vm_centrale.outils.base import ContexteTour, Outil, ResultatOutil
 from vm_centrale.outils.moduleo import affaires as moduleo_affaires
 from vm_centrale.outils.moduleo import contacts as moduleo_contacts
+from vm_centrale.outils.moduleo import devis as moduleo_devis
 
 _OUTIL_INCONNU = "Outil inconnu."
 
@@ -14,6 +15,7 @@ _OUTILS: dict[str, Outil] = {
         lire_pages_web.OUTIL,
         moduleo_affaires.OUTIL,
         moduleo_contacts.OUTIL,
+        moduleo_devis.OUTIL,
     )
 }
 

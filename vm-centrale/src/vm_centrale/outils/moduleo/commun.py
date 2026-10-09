@@ -1,6 +1,8 @@
 import logging
 import threading
 from collections.abc import Callable
+from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 from vm_centrale.lectures_outils import Fiche, enregistrer_lectures
@@ -27,6 +29,17 @@ INDISPONIBLE = "Moduléo est indisponible pour le moment."
 REFUS = "Moduléo refuse l'accès à cette donnée."
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class Lecture:
+    # Ce que lit un outil : les ids trouvés, les fiches des premiers et,
+    # pour les outils à totaux (#189), la synthèse calculée par la VM sur
+    # l'ensemble trouvé. Elle remplace l'en-tête « N trouvés » et elle est
+    # enregistrée comme une fiche, avant elles.
+    ids: list[int]
+    fiches: list[Fiche]
+    synthese: Fiche | None = None
 
 
 class LecteurTrace:
@@ -82,6 +95,21 @@ def lire_argument(arguments: dict, nom: str) -> str:
     return str(arguments.get(nom) or "").strip()
 
 
+# Formats de date acceptés du modèle ; l'API reçoit AAAA-MM-JJ.
+_FORMATS_DATE = ("%Y-%m-%d", "%d/%m/%Y")
+
+
+def date_api(valeur: str) -> str:
+    # Une date illisible lève NomNonResolu : jamais une recherche sans le
+    # filtre demandé.
+    for format_date in _FORMATS_DATE:
+        try:
+            return datetime.strptime(valeur, format_date).date().isoformat()
+        except ValueError:
+            continue
+    raise NomNonResolu(f"Date « {valeur} » illisible : donne-la au format AAAA-MM-JJ. Recherche non lancée.")
+
+
 def liste_ids(ids: list[int]) -> str:
     # Séparateur des routes `multi` : la virgule.
     return ",".join(str(i) for i in dict.fromkeys(ids))
@@ -91,7 +119,7 @@ def lire_fiches(
     contexte: ContexteTour,
     client: ClientModuleo,
     domaine: str,
-    lire: Callable[[LecteurModuleo], tuple[list[int], list[Fiche]]],
+    lire: Callable[[LecteurModuleo], tuple[list[int], list[Fiche]] | Lecture],
     aucun: str,
     trouves: str,
     sans_lecture: str,
@@ -103,10 +131,11 @@ def lire_fiches(
     # `trouves` : « {n} affaires trouvées, {m} affichées », en tête quand il
     # y a plus d'ids que de fiches, ou toujours avec `entete_toujours`.
     # `sans_lecture` : ajoutée à la phrase d'un nom non résolu (#182).
+    # `lire` peut aussi renvoyer une `Lecture` avec sa synthèse.
     contexte.publier(consultation_moduleo(domaine))
     lecteur = LecteurTrace(client, contexte.droits_moduleo)
     try:
-        ids, fiches = lire(lecteur)
+        lu = lire(lecteur)
     except DroitManquant as refus:
         return _refuse(refus, lecteur.routes)
     except NomNonResolu as erreur:
@@ -121,9 +150,17 @@ def lire_fiches(
         # pas la forme attendue.
         logger.warning("Moduléo indisponible : %s", erreur)
         return ResultatOutil(INDISPONIBLE, trace={"routes": lecteur.routes, "erreur": str(erreur)})
+    lecture = lu if isinstance(lu, Lecture) else Lecture(*lu)
+    ids, fiches = lecture.ids, lecture.fiches
     trace = {"routes": lecteur.routes, "trouvees": len(ids), "fiches": [fiche.texte for fiche in fiches]}
     if not fiches:
         return ResultatOutil(aucun, trace=trace)
+    if lecture.synthese is not None:
+        trace["synthese"] = lecture.synthese.texte
+        enregistrer_lectures(contexte.db, contexte.conversation_id, "moduleo", [lecture.synthese, *fiches])
+        return ResultatOutil(
+            "\n\n".join(fiche.texte for fiche in (lecture.synthese, *fiches)), trace=trace
+        )
     enregistrer_lectures(contexte.db, contexte.conversation_id, "moduleo", fiches)
     entete = ""
     if len(ids) > len(fiches) or entete_toujours:

@@ -22,6 +22,7 @@ from vm_centrale.outils.moduleo.commun import (
     IDS_MAX,
     NB_DEFAUT,
     NB_PLAFOND,
+    date_api,
     liste_ids,
     lire_argument,
     lire_fiches,
@@ -67,8 +68,6 @@ _DATES = {
     for evenement, (api, _) in _EVENEMENTS.items()
     for borne in ("min", "max")
 }
-# Formats de date acceptés du modèle ; l'API reçoit AAAA-MM-JJ.
-_FORMATS_DATE = ("%Y-%m-%d", "%d/%m/%Y")
 # Filtres en noms, résolus en ids par la VM.
 _NOMS = ("site", "service", "suivi_par", "responsable", "charge_affaire", "dossier_production")
 
@@ -250,7 +249,7 @@ def _filtres(arguments: dict) -> dict[str, str]:
         filtres["etatAffaire"] = _etat_api(etat)
     for argument, parametre in _DATES.items():
         if valeur := lire_argument(arguments, argument):
-            filtres[parametre] = _date_api(valeur)
+            filtres[parametre] = date_api(valeur)
     return filtres
 
 
@@ -261,15 +260,6 @@ def _etat_api(valeur: str) -> str:
             "Recherche non lancée."
         )
     return nom
-
-
-def _date_api(valeur: str) -> str:
-    for format_date in _FORMATS_DATE:
-        try:
-            return datetime.strptime(valeur, format_date).date().isoformat()
-        except ValueError:
-            continue
-    raise NomNonResolu(f"Date « {valeur} » illisible : donne-la au format AAAA-MM-JJ. Recherche non lancée.")
 
 
 def _fiches(lecteur: LecteurModuleo, ids: list[int]) -> list[Fiche]:
