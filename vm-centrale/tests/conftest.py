@@ -3,6 +3,7 @@ import threading
 from contextlib import contextmanager
 
 import pytest
+from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -56,6 +57,25 @@ def _sans_init_db_reel(monkeypatch):
     # mémoire (fixture `db_session`) et ne doivent dépendre d'aucun service
     # externe.
     monkeypatch.setattr("vm_centrale.main.init_db", lambda: None)
+
+
+# Clé Mistral de tous les tests (spec 1.5.1, #186) : chiffrée avec une clé
+# maître temporaire, comme en production, faute de quoi la VM refuse de
+# démarrer. Le .env de vm-centrale/ (load_dotenv dans config.py) ne doit pas
+# fuiter ici : MISTRAL_API_KEY en clair est retirée.
+CLE_API_MISTRAL_DE_TEST = "cle-api-mistral-de-test-0123456789"
+
+
+@pytest.fixture(autouse=True)
+def _cle_mistral_chiffree(monkeypatch, tmp_path_factory):
+    cle_maitre = Fernet.generate_key()
+    fichier_cle_maitre = tmp_path_factory.mktemp("cle_maitre") / "cle_maitre.key"
+    fichier_cle_maitre.write_bytes(cle_maitre)
+    monkeypatch.setenv("VM_CLE_MAITRE_FICHIER", str(fichier_cle_maitre))
+    monkeypatch.setenv(
+        "MISTRAL_API_KEY_CHIFFREE", Fernet(cle_maitre).encrypt(CLE_API_MISTRAL_DE_TEST.encode()).decode()
+    )
+    monkeypatch.delenv("MISTRAL_API_KEY", raising=False)
 
 
 # Usage/pages_processed factices (spec 1.1.3) : ce double ne sert encore

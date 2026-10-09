@@ -15,8 +15,9 @@ const ETAPES: Record<Variante, {ou: string; fait: string}[]> = {
     {ou: 'Interface', fait: 'Réponse avec chiffres gardés et « Sources : Moduléo, affaire 2024-123 »'},
   ],
   demarrage: [
-    {ou: 'VM centrale', fait: 'Lit MODULEO_URL, les deux secrets chiffrés et VM_CLE_MAITRE_FICHIER dans .env'},
+    {ou: 'VM centrale', fait: 'Lit MODULEO_URL, les trois secrets chiffrés et VM_CLE_MAITRE_FICHIER dans .env'},
     {ou: 'Fichier', fait: 'Lit la clé maître à ce chemin'},
+    {ou: 'VM centrale', fait: 'Déchiffre la clé Mistral ; sans clé utilisable, refuse de démarrer'},
     {ou: 'VM centrale', fait: 'Déchiffre la clé d’API et le code de sécurité, en mémoire seulement'},
     {ou: 'Modèle', fait: 'Les deux outils Moduléo sont proposés à chaque appel de chat'},
   ],

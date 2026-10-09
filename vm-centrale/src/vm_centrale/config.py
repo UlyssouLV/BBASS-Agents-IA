@@ -5,6 +5,8 @@ from decimal import Decimal
 
 from dotenv import load_dotenv
 
+from vm_centrale.secrets_chiffres import SecretIndechiffrable, dechiffrer, lire_cle_maitre
+
 load_dotenv()
 
 VM_CENTRALE_HOST = os.environ.get("VM_CENTRALE_HOST", "0.0.0.0")
@@ -114,11 +116,35 @@ def calculer_cout(
     )
 
 
+class CleMistralInutilisable(RuntimeError):
+    # Le message nomme la variable en cause, jamais une valeur (spec 1.5.1).
+    pass
+
+
 def get_mistral_api_key() -> str:
-    # Lu à l'appel (pas mis en cache dans une constante de module) : une clé
-    # manquante doit lever au moment de l'appel Mistral, dans le try/except
-    # du endpoint de relais, jamais avant.
-    return os.environ["MISTRAL_API_KEY"]
+    # Chiffrée (Fernet, spec 1.5.1, ADR-0018) avec la même clé maître que
+    # les secrets Moduléo ; MISTRAL_API_KEY en clair n'est plus lue. Le
+    # démarrage de la VM l'appelle une fois (main.py) : sans clé
+    # utilisable, la VM refuse de démarrer. Lu à l'appel ensuite, comme
+    # get_config_moduleo_chiffree.
+    valeur_chiffree = os.environ.get("MISTRAL_API_KEY_CHIFFREE") or None
+    fichier_cle_maitre = os.environ.get("VM_CLE_MAITRE_FICHIER") or None
+    if valeur_chiffree is None:
+        raise CleMistralInutilisable("MISTRAL_API_KEY_CHIFFREE manquant dans .env.")
+    if fichier_cle_maitre is None:
+        raise CleMistralInutilisable("VM_CLE_MAITRE_FICHIER manquant dans .env.")
+    try:
+        cle_maitre = lire_cle_maitre(fichier_cle_maitre)
+    except OSError as erreur:
+        raise CleMistralInutilisable(
+            f"Clé maître de VM_CLE_MAITRE_FICHIER illisible ({type(erreur).__name__})."
+        ) from None
+    try:
+        return dechiffrer(valeur_chiffree, cle_maitre)
+    except SecretIndechiffrable:
+        raise CleMistralInutilisable(
+            "MISTRAL_API_KEY_CHIFFREE ne se déchiffre pas avec la clé maître de VM_CLE_MAITRE_FICHIER."
+        ) from None
 
 
 def get_vm_admin_key() -> str | None:
@@ -139,7 +165,7 @@ class ConfigModuleoChiffree:
 
 
 def get_config_moduleo_chiffree() -> ConfigModuleoChiffree:
-    # Lu à l'appel, comme get_mistral_api_key : la clé d'API et le
+    # Lu à l'appel : la clé d'API et le
     # SecurityCode sont chiffrés (Fernet, spec 1.5.0, ADR-0017) avec la clé
     # maître du fichier VM_CLE_MAITRE_FICHIER, hors du dépôt. Le
     # déchiffrement est dans vm_centrale/moduleo/configuration.py ;
