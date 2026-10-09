@@ -53,11 +53,18 @@ Then run skill **`commit`** as if the user had typed **`/c -a -p`**. That commit
 
 You are not wrong: next is **`/to-tickets`**. Follow its quiz: numbered tickets, **Blocked by**, what each delivers, **vertical** slices if possible.
 
-Show the **implementation order**: tickets with no open blockers first (lowest number among that set).
+For **every** `Blocked by #n`, the quiz must classify the edge **before** you show the list:
+
+- `vraie dépendance` — say **what breaks** if a fresh agent implements the blocked ticket first (missing type, test that cannot be written, route that does not exist…).
+- `ordre de confort` — say **why nothing breaks** if the order is inverted.
+
+Do **not** invent an extra `#` to make the graph look denser. Parallel work (`- Aucun` on both) is valid. An edge with no “what breaks” is not ready.
+
+Show the **implementation order**: tickets with no open blockers first (lowest number among that set). Include the one-line justification next to each edge.
 
 **Wait for an explicit yes** on that list. Then for **each** implementation child, in order:
 
-1. `gh issue create` with label `ready-for-agent` and body in the **canonical Matt shape** from `agents/issue-tracker.md` (*Child ticket body*): first line `Part of #<parent>`, then `## What to build`, `## Acceptance criteria` (checkboxes), `## Blocked by` (`- Aucun` or `- #<n>`). If `/to-tickets` drafted French or free-form headings, **reshape** to those English headings before create. Do not use `Ce qu'il livre` / `Critères d'acceptation` / `Tests attendus` for new tickets.
+1. `gh issue create` with label `ready-for-agent` and body in the **canonical Matt shape** from `agents/issue-tracker.md` (*Child ticket body*): first line `Part of #<parent>`, then `## What to build`, `## Acceptance criteria` (checkboxes), `## Blocked by` (`- Aucun`, or `- #<n> — vraie dépendance : …` / `- #<n> — ordre de confort : …`). **Stop** if any peer edge is a bare `- #<n>` without that clause. If `/to-tickets` drafted French or free-form headings, **reshape** to those English headings before create. Do not use `Ce qu'il livre` / `Critères d'acceptation` / `Tests attendus` for new tickets.
 2. Attach it as a **GitHub sub-issue** of the parent (POST `issues/<parent>/sub_issues`, JSON integer `sub_issue_id` = the child’s **database id**) — this is what shows **Y/Z** on the parent. See `agents/issue-tracker.md` (*Version parent and children*).
 3. Set **GitHub native** blocked-by (POST `issues/<n>/dependencies/blocked_by`, JSON integer `issue_id` = the blocker’s **database id`):
    - **Between children**, as the quiz said.
@@ -65,7 +72,7 @@ Show the **implementation order**: tickets with no open blockers first (lowest n
 
 Then create **one human-test child** (format: `agents/issue-tracker.md`, *Human-test child*):
 
-1. Title `Tests humains — VX.Y.Z`. Label **`ready-for-human`** only (never `ready-for-agent`). Body skeleton: Matt headings + empty `## Plan de tests` / `## Résultats` / `## Ce qu’on peut faire maintenant` placeholders. `## Blocked by` = **every** implementation child just created.
+1. Title `Tests humains — VX.Y.Z`. Label **`ready-for-human`** only (never `ready-for-agent`). Body skeleton: Matt headings + empty `## Plan de tests` / `## Résultats` / `## Ce qu’on peut faire maintenant` placeholders. `## Blocked by` = **every** implementation child just created, each as `ordre de process` (see `agents/issue-tracker.md`). Do not add extra blockers.
 2. Attach as a **GitHub sub-issue** of the parent (same POST as above).
 3. Native blocked-by: this ticket blocked by **each** implementation child; **parent** blocked by this ticket as well.
 
