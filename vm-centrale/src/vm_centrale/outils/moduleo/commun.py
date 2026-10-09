@@ -6,7 +6,14 @@ from datetime import datetime
 from typing import Any
 
 from vm_centrale.lectures_outils import Fiche, enregistrer_lectures
-from vm_centrale.moduleo.client import ClientModuleo, ErreurModuleo, LecteurModuleo, ModuleoRefuse, RequeteInterdite
+from vm_centrale.moduleo.client import (
+    ClientModuleo,
+    ErreurModuleo,
+    LecteurModuleo,
+    ModuleoIntrouvable,
+    ModuleoRefuse,
+    RequeteInterdite,
+)
 from vm_centrale.moduleo.droits import DroitManquant, DroitsModuleo, autorise, verifier
 from vm_centrale.moduleo.resolution import NomNonResolu
 from vm_centrale.outils.base import ContexteTour, ResultatOutil
@@ -110,9 +117,42 @@ def date_api(valeur: str) -> str:
     raise NomNonResolu(f"Date « {valeur} » illisible : donne-la au format AAAA-MM-JJ. Recherche non lancée.")
 
 
+def booleen(valeur: Any) -> bool | None:
+    # Booléen du schéma ; le modèle écrit parfois « true » en texte.
+    if isinstance(valeur, bool):
+        return valeur
+    return {"true": True, "false": False}.get(str(valeur).strip().casefold()) if valeur is not None else None
+
+
 def liste_ids(ids: list[int]) -> str:
     # Séparateur des routes `multi` : la virgule.
     return ",".join(str(i) for i in dict.fromkeys(ids))
+
+
+def lire_par_lots(lecteur: LecteurModuleo, route: str, ids: list[int]) -> list[dict]:
+    # Tous les éléments de `ids` par une route `multi`, par lots de
+    # IDS_MAX (limite de la route) : les totaux portent sur tout l'ensemble
+    # trouvé (#189).
+    uniques = list(dict.fromkeys(ids))
+    return [
+        element
+        for debut in range(0, len(uniques), IDS_MAX)
+        for element in lecteur.lire(route, {"ids": liste_ids(uniques[debut : debut + IDS_MAX])})
+    ]
+
+
+_ROUTE_NUMERO_AFFAIRE = "cogeo/affaire/numeroAffaire?numAffaire={numAffaire}"
+
+
+def id_affaire(lecteur: LecteurModuleo, numero: str) -> int:
+    # Numéro d'affaire → id ; inconnu : NomNonResolu, recherche non lancée.
+    try:
+        id_trouve = lecteur.lire(_ROUTE_NUMERO_AFFAIRE, {"numAffaire": numero})
+    except ModuleoIntrouvable:
+        id_trouve = None
+    if not id_trouve:
+        raise NomNonResolu(f"Aucune affaire Moduléo ne porte le numéro « {numero} » : recherche non lancée.")
+    return int(id_trouve)
 
 
 def lire_fiches(

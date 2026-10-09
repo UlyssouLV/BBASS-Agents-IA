@@ -215,6 +215,142 @@ def synthese_devis(devis: list[dict], affiches: int, portee: str, reference: str
     return Fiche(reference, texte, questions)
 
 
+@dataclass(frozen=True)
+class Paiements:
+    # Règlements d'une facture lus dans Moduléo (#190), chacun avec son
+    # échéance quand elle a été lue. `complets` : tous les `IdsReglements`
+    # lus, et Moduléo ne dit rien qui empêche de déduire le reste à payer
+    # (avoir, pénalités, type de règlement autre que 0).
+    reglements: tuple[dict, ...]
+    echeances: dict[int, dict]
+    complets: bool
+
+
+def facture_emise(facture: dict) -> bool:
+    # Une date d'émission (#190, sens de `emise` à confirmer à l'essai
+    # réel) ; l'an 1 est un champ vide côté Moduléo.
+    return bool(_date(facture.get("DateEmission")))
+
+
+def reste_a_payer(facture: dict, paiements: Paiements | None) -> float | None:
+    # TTC de la facture moins ses règlements, seulement quand Moduléo permet
+    # de le déduire : facture émise, montants lus, règlements complets.
+    # Jamais estimé (spec 1.5.1) : sinon `None`, et pas de ligne.
+    ttc = facture.get("MontantTotalTTC")
+    if paiements is None or not paiements.complets or not facture_emise(facture):
+        return None
+    if not isinstance(ttc, (int, float)) or not all(_nombre(r.get("MontantTTC")) for r in paiements.reglements):
+        return None
+    reste = round(ttc - sum(r["MontantTTC"] for r in paiements.reglements), 2)
+    return reste if reste >= 0 else None
+
+
+def fiche_facture(
+    facture: dict, affaire: dict | None, destinataire: dict | None, paiements: Paiements | None, noms: Noms
+) -> Fiche:
+    # Référence : « Moduléo, facture F-2026-118 ». Client : le contact
+    # destinataire de la facture, sinon le client de son affaire.
+    # `paiements` : `None` quand ils n'ont pas été lus (facture non émise).
+    numero = _texte(facture.get("Numero"))
+    objet = _texte(facture.get("Objet"))
+    affaire = affaire or {}
+    numero_affaire = _texte(affaire.get("Numero"))
+    client = noms.contacts.get(_id((destinataire or {}).get("IdContact")), "") or noms.contacts.get(
+        _id(affaire.get("IdClient")), ""
+    )
+    emission = _date(facture.get("DateEmission"))
+    suivi = [
+        ("Responsable", _nom(noms.utilisateurs.get(_id(facture.get("IdResponsable"))))),
+        ("Rédacteur", _nom(noms.utilisateurs.get(_id(facture.get("IdRedacteur"))))),
+    ]
+    montant_ht, montant_ttc = montant(facture.get("MontantTotalHT")), montant(facture.get("MontantTotalTTC"))
+    reglements = [_reglement(r, paiements.echeances) for r in paiements.reglements] if paiements else []
+    reste = montant(reste_a_payer(facture, paiements))
+
+    lignes = [f"Facture {numero}"]
+    _ajouter(lignes, "Objet", objet)
+    _ajouter(lignes, "Affaire", numero_affaire)
+    _ajouter(lignes, "Client", client)
+    _ajouter(lignes, "Date de création", _date(facture.get("DateCreation")))
+    _ajouter(lignes, "Date d'émission", emission or "non émise")
+    for libelle, valeur in suivi:
+        _ajouter(lignes, libelle, valeur)
+    _ajouter(lignes, "Montant HT", montant_ht)
+    _ajouter(lignes, "Montant TTC", montant_ttc)
+    if reglements:
+        _ajouter_liste(lignes, "Échéances et règlements", reglements)
+    elif paiements is not None and emission:
+        lignes.append("Échéances et règlements : aucun règlement")
+    _ajouter(lignes, "Reste à payer", reste)
+
+    regle = montant(sum(r["MontantTTC"] for r in paiements.reglements)) if paiements and reglements and reste else ""
+    payee = [
+        f"Émise le {emission}" if emission else "Non émise",
+        f"réglé {regle} TTC" if regle else "",
+        f"reste à payer {reste}" if reste else "",
+    ]
+    questions = _questions(
+        (f"Quel est l'objet de la facture {numero} ?", objet),
+        (f"Quel est le montant de la facture {numero} ?", _montants(montant_ht, montant_ttc)),
+        (f"La facture {numero} est-elle payée ?", " ; ".join(partie for partie in payee if partie)),
+        (
+            f"À quelle affaire se rattache la facture {numero} ?",
+            f"{numero_affaire}, client {client}" if numero_affaire and client else numero_affaire,
+        ),
+        (f"Qui suit la facture {numero} ?", _libelles(suivi)),
+    )
+    return Fiche(f"facture {numero}", "\n".join(lignes), questions)
+
+
+def synthese_factures(
+    factures: list[dict], reste: float | None, sans_reste: str, affiches: int, portee: str, reference: str
+) -> Fiche:
+    # Comme `synthese_devis` (#189), avec le reste à payer des factures
+    # émises (#190), calculé par l'outil sur l'ensemble trouvé : `reste`,
+    # ou `None` et la raison `sans_reste` ; `None` et "" : aucune facture
+    # émise, pas de reste à payer. `portee` : « trouvées (texte
+    # « Bornage ») », « émises depuis le 09/09/2026 (30 derniers jours) ».
+    nombre = len(factures)
+    totaux = _montants(
+        montant(sum(f.get("MontantTotalHT") or 0 for f in factures)),
+        montant(sum(f.get("MontantTotalTTC") or 0 for f in factures)),
+    )
+    toutes_emises = all(facture_emise(f) for f in factures)
+    du_reste = montant(reste)
+    if du_reste:
+        texte_reste = f", reste à payer {du_reste}" if toutes_emises else f", reste à payer sur les émises {du_reste}"
+    else:
+        texte_reste = f", reste à payer non calculé {sans_reste}" if sans_reste else ""
+    texte = f"{nombre} {'facture' if nombre == 1 else 'factures'} {portee}, total {totaux}{texte_reste}."
+    if nombre > affiches:
+        recentes = "La plus récente affichée" if affiches == 1 else f"Les {affiches} plus récentes affichées"
+        texte += f" {recentes}, précise la recherche."
+    questions = _questions(
+        (f"Combien de {reference} ?", str(nombre)),
+        (f"Quel est le montant total des {reference} ?", totaux),
+        (f"Quel est le reste à payer des {reference} ?", du_reste),
+    )
+    return Fiche(reference, texte, questions)
+
+
+def _reglement(reglement: dict, echeances: dict[int, dict]) -> str:
+    # « Règlement du 25/09/2026 : 600,00 € TTC (Virement), échéance du
+    # 30/09/2026 de 600,00 € ».
+    ligne = f"Règlement du {_date(reglement.get('Date')) or 'date inconnue'}"
+    if du_montant := montant(reglement.get("MontantTTC")):
+        ligne += f" : {du_montant} TTC"
+    ligne = _avec_lieu(ligne, reglement.get("Mode"))
+    echeance = echeances.get(_id(reglement.get("IdEcheance")))
+    if echeance:
+        jour, du_montant = _date(echeance.get("Date")), montant(echeance.get("Montant"))
+        ligne += f", échéance{f' du {jour}' if jour else ''}{f' de {du_montant}' if du_montant else ''}"
+    return ligne
+
+
+def _nombre(valeur: object) -> bool:
+    return isinstance(valeur, (int, float)) and not isinstance(valeur, bool)
+
+
 def montant(valeur: object) -> str:
     # 18400.5 → « 18 400,50 € » ; absent : pas de ligne.
     if isinstance(valeur, bool) or not isinstance(valeur, (int, float)):

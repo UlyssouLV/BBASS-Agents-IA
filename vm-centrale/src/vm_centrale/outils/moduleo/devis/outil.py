@@ -2,7 +2,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from vm_centrale.lectures_outils import Fiche
-from vm_centrale.moduleo.client import LecteurModuleo, ModuleoIntrouvable
+from vm_centrale.moduleo.client import LecteurModuleo
 from vm_centrale.moduleo.fiches import fiche_devis, synthese_devis
 from vm_centrale.moduleo.resolution import (
     Noms,
@@ -18,9 +18,12 @@ from vm_centrale.outils.moduleo.commun import (
     NB_DEFAUT,
     NB_PLAFOND,
     Lecture,
+    booleen,
     date_api,
+    id_affaire,
     liste_ids,
     lire_argument,
+    lire_par_lots,
     lire_fiches,
     nb_max,
     propose,
@@ -32,11 +35,7 @@ _NOM = "chercher_devis_moduleo"
 _ROUTE_RECHERCHE = next(route for route in ROUTES_GET if route.startswith("cogeo/devis?texte="))
 _ROUTE_DEVIS = "cogeo/devis/multi?ids={ids}"
 _ROUTE_DEVIS_AFFAIRE = "cogeo/affaire/{idAffaire}/devis"
-_ROUTE_NUMERO_AFFAIRE = "cogeo/affaire/numeroAffaire?numAffaire={numAffaire}"
 _ROUTE_AFFAIRES = "cogeo/affaire/multi?ids={ids}"
-# Limite des routes `multi` : tous les devis trouvés sont lus, par lots,
-# pour les totaux.
-_MULTI_MAX = 200
 
 # Sans aucun critère (spec 1.5.1) : les devis émis ces derniers jours,
 # période annoncée dans le résultat.
@@ -122,13 +121,6 @@ def _declarer(contexte: ContexteTour) -> dict | None:
     return _SCHEMA if propose(contexte, _ROUTE_RECHERCHE) else None
 
 
-def _emis(valeur: Any) -> bool | None:
-    # Booléen du schéma ; le modèle écrit parfois « true » en texte.
-    if isinstance(valeur, bool):
-        return valeur
-    return {"true": True, "false": False}.get(str(valeur).strip().casefold()) if valeur is not None else None
-
-
 def _resoudre(lecteur: LecteurModuleo, noms: dict[str, str]) -> dict[str, Any]:
     # Tous les noms avant la recherche : NomNonResolu l'empêche.
     parametres: dict[str, Any] = {}
@@ -139,18 +131,8 @@ def _resoudre(lecteur: LecteurModuleo, noms: dict[str, str]) -> dict[str, Any]:
     if "redacteur" in noms:
         parametres["idsRedacteur"] = str(chercher_utilisateur(lecteur, noms["redacteur"]))
     if "affaire" in noms:
-        parametres["affaire"] = _id_affaire(lecteur, noms["affaire"])
+        parametres["affaire"] = id_affaire(lecteur, noms["affaire"])
     return parametres
-
-
-def _id_affaire(lecteur: LecteurModuleo, numero: str) -> int:
-    try:
-        id_affaire = lecteur.lire(_ROUTE_NUMERO_AFFAIRE, {"numAffaire": numero})
-    except ModuleoIntrouvable:
-        id_affaire = None
-    if not id_affaire:
-        raise NomNonResolu(f"Aucune affaire Moduléo ne porte le numéro « {numero} » : recherche non lancée.")
-    return int(id_affaire)
 
 
 def _chercher(lecteur: LecteurModuleo, filtres: dict[str, Any], noms: dict[str, str]) -> list[int]:
@@ -170,14 +152,8 @@ def _chercher(lecteur: LecteurModuleo, filtres: dict[str, Any], noms: dict[str, 
 def _lire_devis(lecteur: LecteurModuleo, ids: list[int]) -> list[dict]:
     # Tous les devis trouvés, plus récents d'abord : date d'émission (de
     # création pour un devis non émis), puis id.
-    uniques = list(dict.fromkeys(ids))
-    devis = [
-        d
-        for debut in range(0, len(uniques), _MULTI_MAX)
-        for d in lecteur.lire(_ROUTE_DEVIS, {"ids": liste_ids(uniques[debut : debut + _MULTI_MAX])})
-    ]
     return sorted(
-        devis,
+        lire_par_lots(lecteur, _ROUTE_DEVIS, ids),
         key=lambda d: (str(d.get("DateEmission") or d.get("DateCreation") or "")[:10], d.get("IdDevis") or 0),
         reverse=True,
     )
@@ -217,7 +193,7 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
     if (refus := refus_du_garde(contexte, _ROUTE_RECHERCHE)) is not None:
         return refus
     texte = lire_argument(arguments, "texte")
-    emis = _emis(arguments.get("emis"))
+    emis = booleen(arguments.get("emis"))
     noms = {nom: valeur for nom in _NOMS if (valeur := lire_argument(arguments, nom))}
     try:
         dates = {

@@ -21,7 +21,7 @@ Retrouve des devis Moduléo par **texte** ou par **filtres en noms** quand le mo
 
 **Déroulé.**
 
-1. Noms → ids (`moduleo/resolution.py`, `_id_affaire`).
+1. Noms → ids (`moduleo/resolution.py`, `id_affaire` de `../commun.py`).
 2. Recherche `cogeo/devis?texte=…` (ids), ou devis de l'affaire.
 3. **Tous** les devis trouvés : `cogeo/devis/multi?ids=` par lots de 200 (limite de la route), triés du plus récent au plus ancien (date d'émission, de création pour un devis non émis, puis id).
 4. Les `nb_max` premiers : leurs affaires (`cogeo/affaire/multi`, client de l'affaire), responsable et rédacteur (`moduleo/utilisateur/{id}`), client (`cogeo/contact/multi`). Le client est celui de l'affaire : le destinataire du devis (`cogeo/destinataire`) exige le droit des factures.

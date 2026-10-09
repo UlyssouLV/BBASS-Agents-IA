@@ -12,6 +12,7 @@ from vm_centrale.moduleo.routes import ROUTES_GET
 _RECHERCHE_AFFAIRES = next(route for route in ROUTES_GET if route.startswith("cogeo/affaire?texte="))
 _RECHERCHE_CONTACTS = next(route for route in ROUTES_GET if route.startswith("cogeo/contact?texte="))
 _RECHERCHE_DEVIS = next(route for route in ROUTES_GET if route.startswith("cogeo/devis?texte="))
+_RECHERCHE_FACTURES = next(route for route in ROUTES_GET if route.startswith("cogeo/facture?texte="))
 # Limite des routes `multi` (doc Moduléo).
 _MULTI_MAX = 200
 # Coordonnées d'un contact (#176) : route des ids → (route de la fiche,
@@ -43,6 +44,12 @@ class FauxModuleo:
         self._coordonnees_contact: dict[int, dict[str, list[int]]] = {}
         self._affaires_contact: dict[int, dict[str, list[int]]] = {}
         self._devis: dict[int, dict] = {}
+        self._factures: dict[int, dict] = {}
+        self._reglements: dict[int, dict] = {}
+        self._echeances: dict[int, dict] = {}
+        self._destinataires: dict[int, dict] = {}
+        # Ids des avoirs de chaque facture.
+        self._avoirs_facture: dict[int, list[int]] = {}
         self._exception: Exception | None = None
 
     def echouer(self, exception: Exception) -> None:
@@ -98,6 +105,71 @@ class FauxModuleo:
             "MontantTotalTTC": 0.0,
             **champs,
         }
+
+    def ajouter_facture(self, id_facture: int, numero: str, objet: str = "", **champs: Any) -> None:
+        # `champs` : les autres clés de la facture, au nom du JSON Moduléo
+        # (`DateEmission`, `MontantTotalTTC`, `IdsReglements`…). Émise : une
+        # date d'émission (#190, à confirmer à l'essai réel).
+        self._factures[id_facture] = {
+            "IdFacture": id_facture,
+            "Numero": numero,
+            "Objet": objet,
+            "DateCreation": None,
+            "DateEmission": None,
+            "IdsLignesArticle": [],
+            "IdsReglements": [],
+            "IdAffaire": None,
+            "IdDestinataire": None,
+            "IdResponsable": None,
+            "IdRedacteur": None,
+            "IdSite": None,
+            "IdService": None,
+            "MontantTotalHT": 0.0,
+            "MontantTotalTVA": 0.0,
+            "MontantTotalTTC": 0.0,
+            **champs,
+        }
+
+    def ajouter_reglement(self, id_reglement: int, montant_ttc: float, date: str, **champs: Any) -> None:
+        # Un règlement, lu par les `IdsReglements` de sa facture.
+        self._reglements[id_reglement] = {
+            "IdReglement": id_reglement,
+            "MontantTTC": montant_ttc,
+            "Mode": None,
+            "NumeroPiece": None,
+            "Date": date,
+            "IdEcheance": None,
+            "TypeReglement": 0,
+            "MontantReglementPenalitesTTC": 0.0,
+            "MontantTVA": 0.0,
+            "MontantHT": 0.0,
+            "IdModeReglement": None,
+            **champs,
+        }
+
+    def ajouter_echeance(self, id_echeance: int, montant: float, date: str, **champs: Any) -> None:
+        self._echeances[id_echeance] = {
+            "IdEcheance": id_echeance,
+            "Montant": montant,
+            "Date": date,
+            "IdFacture": None,
+            "IdReglement": None,
+            "ModeReglement": None,
+            "Mention": None,
+            "IdModeReglement": None,
+            **champs,
+        }
+
+    def ajouter_destinataire(self, id_destinataire: int, id_contact: int) -> None:
+        self._destinataires[id_destinataire] = {
+            "IdDestinataire": id_destinataire,
+            "IdAdresse": None,
+            "IdContact": id_contact,
+            "IdContactInterne": None,
+        }
+
+    def ajouter_avoir(self, id_avoir: int, id_facture: int) -> None:
+        self._avoirs_facture.setdefault(id_facture, []).append(id_avoir)
 
     def ajouter_intervenant(
         self,
@@ -273,6 +345,26 @@ class FauxModuleo:
             return [self._devis[i] for i in ids if i in self._devis]
         if route == "cogeo/affaire/{idAffaire}/devis":
             return [i for i, devis in self._devis.items() if devis["IdAffaire"] == parametres["idAffaire"]]
+        if route == _RECHERCHE_FACTURES:
+            return [i for i, facture in self._factures.items() if _facture_correspond(facture, parametres)]
+        if route == "cogeo/facture/multi?ids={ids}":
+            ids = _ids(parametres)
+            assert len(ids) <= _MULTI_MAX, len(ids)
+            return [self._factures[i] for i in ids if i in self._factures]
+        if route == "cogeo/affaire/{idAffaire}/factures":
+            return [i for i, facture in self._factures.items() if facture["IdAffaire"] == parametres["idAffaire"]]
+        if route == "cogeo/reglement/{idReglement}":
+            if parametres["idReglement"] not in self._reglements:
+                raise ModuleoIntrouvable(f"404 sur {route}")
+            return self._reglements[parametres["idReglement"]]
+        if route == "cogeo/echeance/{idEcheance}":
+            if parametres["idEcheance"] not in self._echeances:
+                raise ModuleoIntrouvable(f"404 sur {route}")
+            return self._echeances[parametres["idEcheance"]]
+        if route == "cogeo/avoir/facture?idFacture={idFacture}":
+            return self._avoirs_facture.get(parametres["idFacture"], [])
+        if route == "cogeo/destinataire/multi?ids={ids}":
+            return [self._destinataires[i] for i in _ids(parametres) if i in self._destinataires]
         if route == "cogeo/contact/multi?ids={ids}":
             return [self._contacts[i] for i in _ids(parametres) if i in self._contacts]
         if route == "moduleo/commune/multi?ids={ids}":
@@ -352,6 +444,15 @@ def _devis_correspond(devis: dict, parametres: dict[str, Any]) -> bool:
         if maximum is not None and not (jour and jour <= maximum):
             return False
     return True
+
+
+def _facture_correspond(facture: dict, parametres: dict[str, Any]) -> bool:
+    # Mêmes filtres que les devis (#190), `emise` au féminin, sans date de
+    # réponse.
+    return _devis_correspond(
+        {**facture, "Etat": 0, "DateReponse": None},
+        {**parametres, "emis": parametres.get("emise")},
+    )
 
 
 def _contact_correspond(contact: dict, parametres: dict[str, Any]) -> bool:

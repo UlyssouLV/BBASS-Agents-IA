@@ -11,10 +11,11 @@ Ce n’est pas un Agent Moduléo. Comme pour la recherche web, **le modèle déc
 | `chercher_affaires_moduleo` | Retrouve des affaires par numéro, texte, état, dates, site, service, responsable, chargé d’affaire, dossier de production. |
 | `chercher_contacts_moduleo` | Retrouve des contacts par texte, type, type de donneur d’ordre, qualifications, avec leurs coordonnées et leurs affaires. |
 | `chercher_devis_moduleo` | Retrouve des devis par texte, émission, dates, service, responsable, rédacteur, affaire, avec nombre et totaux HT / TTC calculés par la VM (depuis la 1.5.1). |
+| `chercher_factures_moduleo` | Retrouve des factures par texte, émission, dates, service, responsable, rédacteur, affaire, avec échéances, règlements, reste à payer quand Moduléo permet de le déduire, et totaux calculés par la VM (depuis la 1.5.1). |
 
 <SchemaFlux variante="appel" />
 
-Pendant la lecture, le fil affiche **« Consultation Moduléo : affaires »** (ou « : contacts », « : devis »). Le modèle donne des **noms**, jamais des ids Moduléo : la VM centrale les traduit dans les deux sens.
+Pendant la lecture, le fil affiche **« Consultation Moduléo : affaires »** (ou « : contacts », « : devis », « : factures »). Le modèle donne des **noms**, jamais des ids Moduléo : la VM centrale les traduit dans les deux sens.
 
 Trois règles tiennent l’ensemble ([ADR-0017](../../adr/0017-lecture-moduleo-par-outil.md)) :
 
@@ -31,5 +32,6 @@ Sans config Moduléo complète, la VM démarre normalement et les outils Modulé
 3. [Chercher des affaires](./affaires.mdx)
 4. [Chercher des contacts](./contacts.mdx)
 5. [Chercher des devis](./devis.mdx)
-6. [Sources et mémoire](./sources-et-memoire.mdx)
-7. [Panne et refus](./panne-et-refus.mdx)
+6. [Chercher des factures](./factures.mdx)
+7. [Sources et mémoire](./sources-et-memoire.mdx)
+8. [Panne et refus](./panne-et-refus.mdx)
