@@ -1,5 +1,4 @@
 from datetime import date, datetime, timedelta, timezone
-from typing import Any
 
 from vm_centrale.lectures_outils import Fiche
 from vm_centrale.moduleo.client import LecteurModuleo
@@ -7,8 +6,6 @@ from vm_centrale.moduleo.fiches import fiche_devis, synthese_devis
 from vm_centrale.moduleo.resolution import (
     Noms,
     NomNonResolu,
-    chercher_services,
-    chercher_utilisateur,
     resoudre_contacts,
     resoudre_utilisateurs,
 )
@@ -19,8 +16,9 @@ from vm_centrale.outils.moduleo.commun import (
     NB_PLAFOND,
     Lecture,
     booleen,
+    chercher_avec_affaire,
     date_api,
-    id_affaire,
+    dates_api,
     liste_ids,
     lire_argument,
     lire_par_lots,
@@ -121,33 +119,6 @@ def _declarer(contexte: ContexteTour) -> dict | None:
     return _SCHEMA if propose(contexte, _ROUTE_RECHERCHE) else None
 
 
-def _resoudre(lecteur: LecteurModuleo, noms: dict[str, str]) -> dict[str, Any]:
-    # Tous les noms avant la recherche : NomNonResolu l'empêche.
-    parametres: dict[str, Any] = {}
-    if "service" in noms:
-        parametres["idsService"] = chercher_services(lecteur, noms["service"])
-    if "responsable" in noms:
-        parametres["idsResponsable"] = str(chercher_utilisateur(lecteur, noms["responsable"]))
-    if "redacteur" in noms:
-        parametres["idsRedacteur"] = str(chercher_utilisateur(lecteur, noms["redacteur"]))
-    if "affaire" in noms:
-        parametres["affaire"] = id_affaire(lecteur, noms["affaire"])
-    return parametres
-
-
-def _chercher(lecteur: LecteurModuleo, filtres: dict[str, Any], noms: dict[str, str]) -> list[int]:
-    # La recherche de devis n'a pas de filtre d'affaire : les devis de
-    # l'affaire, croisés avec la recherche s'il y a d'autres filtres.
-    parametres = {cle: valeur for cle, valeur in {**filtres, **_resoudre(lecteur, noms)}.items() if valeur is not None}
-    id_affaire = parametres.pop("affaire", None)
-    if id_affaire is None:
-        return [int(i) for i in lecteur.lire(_ROUTE_RECHERCHE, parametres)]
-    ids = [int(i) for i in lecteur.lire(_ROUTE_DEVIS_AFFAIRE, {"idAffaire": id_affaire})]
-    if not parametres or not ids:
-        return ids
-    trouves = {int(i) for i in lecteur.lire(_ROUTE_RECHERCHE, parametres)}
-    return [i for i in ids if i in trouves]
-
 
 def _lire_devis(lecteur: LecteurModuleo, ids: list[int]) -> list[dict]:
     # Tous les devis trouvés, plus récents d'abord : date d'émission (de
@@ -196,11 +167,7 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
     emis = booleen(arguments.get("emis"))
     noms = {nom: valeur for nom in _NOMS if (valeur := lire_argument(arguments, nom))}
     try:
-        dates = {
-            parametre: date_api(valeur)
-            for argument, (parametre, _) in _DATES.items()
-            if (valeur := lire_argument(arguments, argument))
-        }
+        dates = dates_api(arguments, _DATES)
     except NomNonResolu as erreur:
         return ResultatOutil(f"{erreur} {_SANS_LECTURE}", trace={"routes": [], "non_resolu": str(erreur)})
     if contexte.client_moduleo is None:
@@ -226,7 +193,7 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
     filtres = {"texte": texte or None, "emis": None if emis is None else str(emis).lower(), **dates}
 
     def lire(lecteur: LecteurModuleo) -> Lecture:
-        ids = _chercher(lecteur, filtres, noms)
+        ids = chercher_avec_affaire(lecteur, _ROUTE_RECHERCHE, _ROUTE_DEVIS_AFFAIRE, filtres, noms)
         if not ids:
             return Lecture([], [])
         devis = _lire_devis(lecteur, ids)

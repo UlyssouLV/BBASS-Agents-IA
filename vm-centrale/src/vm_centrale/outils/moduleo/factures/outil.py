@@ -1,6 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta, timezone
-from typing import Any
 
 from vm_centrale.lectures_outils import Fiche
 from vm_centrale.moduleo.client import LecteurModuleo, ModuleoIntrouvable
@@ -8,8 +7,6 @@ from vm_centrale.moduleo.fiches import Paiements, facture_emise, fiche_facture, 
 from vm_centrale.moduleo.resolution import (
     Noms,
     NomNonResolu,
-    chercher_services,
-    chercher_utilisateur,
     resoudre_contacts,
     resoudre_utilisateurs,
 )
@@ -20,8 +17,9 @@ from vm_centrale.outils.moduleo.commun import (
     NB_PLAFOND,
     Lecture,
     booleen,
+    chercher_avec_affaire,
     date_api,
-    id_affaire,
+    dates_api,
     liste_ids,
     lire_argument,
     lire_fiches,
@@ -132,33 +130,6 @@ def _declarer(contexte: ContexteTour) -> dict | None:
     # (garde des droits).
     return _SCHEMA if propose(contexte, _ROUTE_RECHERCHE) else None
 
-
-def _resoudre(lecteur: LecteurModuleo, noms: dict[str, str]) -> dict[str, Any]:
-    # Tous les noms avant la recherche : NomNonResolu l'empêche.
-    parametres: dict[str, Any] = {}
-    if "service" in noms:
-        parametres["idsService"] = chercher_services(lecteur, noms["service"])
-    if "responsable" in noms:
-        parametres["idsResponsable"] = str(chercher_utilisateur(lecteur, noms["responsable"]))
-    if "redacteur" in noms:
-        parametres["idsRedacteur"] = str(chercher_utilisateur(lecteur, noms["redacteur"]))
-    if "affaire" in noms:
-        parametres["affaire"] = id_affaire(lecteur, noms["affaire"])
-    return parametres
-
-
-def _chercher(lecteur: LecteurModuleo, filtres: dict[str, Any], noms: dict[str, str]) -> list[int]:
-    # La recherche de factures n'a pas de filtre d'affaire : les factures
-    # de l'affaire, croisées avec la recherche s'il y a d'autres filtres.
-    parametres = {cle: valeur for cle, valeur in {**filtres, **_resoudre(lecteur, noms)}.items() if valeur is not None}
-    affaire = parametres.pop("affaire", None)
-    if affaire is None:
-        return [int(i) for i in lecteur.lire(_ROUTE_RECHERCHE, parametres)]
-    ids = [int(i) for i in lecteur.lire(_ROUTE_FACTURES_AFFAIRE, {"idAffaire": affaire})]
-    if not parametres or not ids:
-        return ids
-    trouves = {int(i) for i in lecteur.lire(_ROUTE_RECHERCHE, parametres)}
-    return [i for i in ids if i in trouves]
 
 
 def _lire_factures(lecteur: LecteurModuleo, ids: list[int]) -> list[dict]:
@@ -284,11 +255,7 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
     emise = booleen(arguments.get("emise"))
     noms = {nom: valeur for nom in _NOMS if (valeur := lire_argument(arguments, nom))}
     try:
-        dates = {
-            parametre: date_api(valeur)
-            for argument, (parametre, _) in _DATES.items()
-            if (valeur := lire_argument(arguments, argument))
-        }
+        dates = dates_api(arguments, _DATES)
     except NomNonResolu as erreur:
         return ResultatOutil(f"{erreur} {_SANS_LECTURE}", trace={"routes": [], "non_resolu": str(erreur)})
     if contexte.client_moduleo is None:
@@ -314,7 +281,7 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
     filtres = {"texte": texte or None, "emise": None if emise is None else str(emise).lower(), **dates}
 
     def lire(lecteur: LecteurModuleo) -> Lecture:
-        ids = _chercher(lecteur, filtres, noms)
+        ids = chercher_avec_affaire(lecteur, _ROUTE_RECHERCHE, _ROUTE_FACTURES_AFFAIRE, filtres, noms)
         if not ids:
             return Lecture([], [])
         factures = _lire_factures(lecteur, ids)

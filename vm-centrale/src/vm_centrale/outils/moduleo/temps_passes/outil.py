@@ -18,6 +18,7 @@ from vm_centrale.outils.moduleo.commun import (
     NB_PLAFOND,
     Lecture,
     date_api,
+    dates_api,
     id_affaire,
     liste_ids,
     lire_argument,
@@ -184,11 +185,7 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
     restreint = not droits.a(_DROIT_AUTRES)
     noms = {nom: valeur for nom in _NOMS if (valeur := lire_argument(arguments, nom))}
     try:
-        dates = {
-            parametre: date_api(valeur)
-            for argument, (parametre, _) in _DATES.items()
-            if (valeur := lire_argument(arguments, argument))
-        }
+        dates = dates_api(arguments, _DATES)
     except NomNonResolu as erreur:
         return ResultatOutil(f"{erreur} {_SANS_LECTURE}", trace={"routes": [], "non_resolu": str(erreur)})
     if contexte.client_moduleo is None:

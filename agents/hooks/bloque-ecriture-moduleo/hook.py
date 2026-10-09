@@ -11,7 +11,6 @@ from __future__ import annotations
 import json
 import re
 import sys
-from pathlib import Path
 
 _MESSAGE_BLOCAGE = (
     "Écriture Moduléo refusée (ADR-0017) : le client et les outils restent "
@@ -74,8 +73,7 @@ def _chemin(entree: dict) -> str:
 def _dans_perimetre(chemin: str) -> bool:
     if not chemin or chemin.lower().endswith(_SUFFIXES_IGNORER):
         return False
-    normalise = chemin if not Path(chemin).is_absolute() else chemin
-    return any(fragment in normalise for fragment in _CHEMINS_PROD)
+    return any(fragment in chemin for fragment in _CHEMINS_PROD)
 
 
 def _textes(entree: dict) -> list[str]:

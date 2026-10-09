@@ -15,7 +15,7 @@ from vm_centrale.moduleo.client import (
     RequeteInterdite,
 )
 from vm_centrale.moduleo.droits import DroitManquant, DroitsModuleo, autorise, verifier
-from vm_centrale.moduleo.resolution import NomNonResolu
+from vm_centrale.moduleo.resolution import NomNonResolu, chercher_services, chercher_utilisateur
 from vm_centrale.outils.base import ContexteTour, ResultatOutil
 from vm_centrale.statut_tour import consultation_moduleo
 
@@ -156,6 +156,48 @@ def id_affaire(lecteur: LecteurModuleo, numero: str) -> int:
     if not id_trouve:
         raise NomNonResolu(f"Aucune affaire Moduléo ne porte le numéro « {numero} » : recherche non lancée.")
     return int(id_trouve)
+
+
+def dates_api(arguments: dict, dates: dict[str, tuple[str, str]]) -> dict[str, str]:
+    # Arguments de date du modèle → {paramètre de la route: AAAA-MM-JJ} ;
+    # `dates` : argument → (paramètre, libellé). Illisible : NomNonResolu.
+    return {
+        parametre: date_api(valeur)
+        for argument, (parametre, _) in dates.items()
+        if (valeur := lire_argument(arguments, argument))
+    }
+
+
+def resoudre_noms(lecteur: LecteurModuleo, noms: dict[str, str]) -> dict[str, Any]:
+    # Service, responsable, rédacteur, affaire en ids (devis, factures).
+    # Tous les noms avant la recherche : NomNonResolu l'empêche.
+    parametres: dict[str, Any] = {}
+    if "service" in noms:
+        parametres["idsService"] = chercher_services(lecteur, noms["service"])
+    if "responsable" in noms:
+        parametres["idsResponsable"] = str(chercher_utilisateur(lecteur, noms["responsable"]))
+    if "redacteur" in noms:
+        parametres["idsRedacteur"] = str(chercher_utilisateur(lecteur, noms["redacteur"]))
+    if "affaire" in noms:
+        parametres["affaire"] = id_affaire(lecteur, noms["affaire"])
+    return parametres
+
+
+def chercher_avec_affaire(
+    lecteur: LecteurModuleo, route_recherche: str, route_affaire: str, filtres: dict[str, Any], noms: dict[str, str]
+) -> list[int]:
+    # La recherche (devis, factures) n'a pas de filtre d'affaire : les
+    # éléments de l'affaire, croisés avec la recherche s'il y a d'autres
+    # filtres.
+    parametres = {cle: valeur for cle, valeur in {**filtres, **resoudre_noms(lecteur, noms)}.items() if valeur is not None}
+    affaire = parametres.pop("affaire", None)
+    if affaire is None:
+        return [int(i) for i in lecteur.lire(route_recherche, parametres)]
+    ids = [int(i) for i in lecteur.lire(route_affaire, {"idAffaire": affaire})]
+    if not parametres or not ids:
+        return ids
+    trouves = {int(i) for i in lecteur.lire(route_recherche, parametres)}
+    return [i for i in ids if i in trouves]
 
 
 def lire_fiches(
