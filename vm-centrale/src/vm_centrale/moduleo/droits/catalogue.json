@@ -1,0 +1,1562 @@
+{
+  "source": "Captures de Moduléo du 2026-10-08, docs/droits/ (groupes Cogeo Admin et Planning Admin)",
+  "catalogue": {
+    "cogeo": [
+      {
+        "categorie": "Affaires, groupes et archivage",
+        "droits": [
+          {
+            "libelle": "Créer une affaire et créer un groupe"
+          },
+          {
+            "libelle": "Indiquer manuellement le numéro d'une affaire ou d'un groupe"
+          },
+          {
+            "libelle": "Changer la date de création d'une affaire"
+          },
+          {
+            "libelle": "Changer la date d'ouverture d'une affaire"
+          },
+          {
+            "libelle": "Changer la date de livraison d'une affaire"
+          },
+          {
+            "libelle": "Changer la date libre d'une affaire"
+          },
+          {
+            "libelle": "Changer la date de clôture d'une affaire"
+          },
+          {
+            "libelle": "Changer l'état d'une affaire"
+          },
+          {
+            "libelle": "Changer l'état d'une affaire, sauf l'état Clôturée"
+          },
+          {
+            "libelle": "Voir l'avancement financier d'une affaire"
+          },
+          {
+            "libelle": "Associer, créer ou renommer un dossier de travail d'une affaire"
+          },
+          {
+            "libelle": "Gérer l'enveloppe prévisionnelle d'une affaire"
+          },
+          {
+            "libelle": "Gérer les objets prédéfinis des affaires"
+          },
+          {
+            "libelle": "Sélectionner les phases d'une affaire Maîtrise d'œuvre"
+          },
+          {
+            "libelle": "Voir l'onglet prix de revient",
+            "sous_droits": [
+              {
+                "libelle": "Voir le sous-onglet \"Temps passés\""
+              },
+              {
+                "libelle": "Voir le prix de vente des temps passés"
+              },
+              {
+                "libelle": "Voir le prix de revient des temps passés"
+              },
+              {
+                "libelle": "Voir le sous-onglet \"Frais\""
+              },
+              {
+                "libelle": "Créer, modifier, supprimer des frais"
+              }
+            ]
+          },
+          {
+            "libelle": "Affecter des affaires aux autres collaborateurs"
+          },
+          {
+            "libelle": "Limiter l'accès à des affaires aux autres collaborateurs"
+          },
+          {
+            "libelle": "Consulter la vue d'ensemble des affaires",
+            "sous_droits": [
+              {
+                "libelle": "Exporter et imprimer les données de la vue d'ensemble des affaires"
+              }
+            ]
+          },
+          {
+            "libelle": "Consulter la vue d'ensemble des marchés",
+            "sous_droits": [
+              {
+                "libelle": "Exporter et imprimer les données de la vue d'ensemble des marchés"
+              }
+            ]
+          },
+          {
+            "libelle": "Créer une archive"
+          },
+          {
+            "libelle": "Indiquer manuellement le numéro d'une archive"
+          },
+          {
+            "libelle": "Changer l'archive d'une affaire"
+          },
+          {
+            "libelle": "Changer le groupe d'une affaire"
+          },
+          {
+            "libelle": "Définir le compte de vente d'une affaire"
+          },
+          {
+            "libelle": "Accéder à l'onglet Devis de l'affaire et consulter le PDF des devis émis"
+          },
+          {
+            "libelle": "Accéder à l'onglet Facturation de l'affaire et consulter le PDF des factures émises"
+          },
+          {
+            "libelle": "Accéder à l'onglet Relances de l'affaire",
+            "sous_droits": [
+              {
+                "libelle": "Gérer les relances"
+              }
+            ]
+          },
+          {
+            "libelle": "Définir le Géomètre-Expert de l'affaire"
+          },
+          {
+            "libelle": "Voir l'onglet Géofoncier"
+          },
+          {
+            "libelle": "Exporter les affaires dans Géofoncier"
+          },
+          {
+            "libelle": "Consulter Géofoncier"
+          },
+          {
+            "libelle": "Commander un état hypothécaire via Intellig'IA"
+          }
+        ]
+      },
+      {
+        "categorie": "Analyse",
+        "droits": [
+          {
+            "libelle": "Consulter le bilan d'une affaire"
+          },
+          {
+            "libelle": "Consulter l'analyse comparative annuelle",
+            "sous_droits": [
+              {
+                "libelle": "Exporter et imprimer l'analyse comparative annuelle"
+              }
+            ]
+          },
+          {
+            "libelle": "Consulter la facturation croisée",
+            "sous_droits": [
+              {
+                "libelle": "Exporter et imprimer la facturation croisée"
+              }
+            ]
+          },
+          {
+            "libelle": "Consulter les règlements croisés",
+            "sous_droits": [
+              {
+                "libelle": "Exporter et imprimer les règlements croisés"
+              }
+            ]
+          },
+          {
+            "libelle": "Consulter les temps passés par code d'activité"
+          },
+          {
+            "libelle": "Consulter la facturation par collaborateur",
+            "sous_droits": [
+              {
+                "libelle": "Exporter et imprimer la facturation par collaborateur"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "categorie": "Catalogue",
+        "droits": [
+          {
+            "libelle": "Consulter le catalogue",
+            "sous_droits": [
+              {
+                "libelle": "Créer et modifier un article",
+                "sous_droits": [
+                  {
+                    "libelle": "Exporter et imprimer les articles"
+                  }
+                ]
+              },
+              {
+                "libelle": "Créer et modifier une liste d'articles"
+              },
+              {
+                "libelle": "Créer et modifier les phases",
+                "sous_droits": [
+                  {
+                    "libelle": "Exporter et imprimer les phases"
+                  }
+                ]
+              },
+              {
+                "libelle": "Créer et modifier une famille d'articles",
+                "sous_droits": [
+                  {
+                    "libelle": "Exporter et imprimer les familles d'articles"
+                  }
+                ]
+              },
+              {
+                "libelle": "Créer et modifier un marché",
+                "sous_droits": [
+                  {
+                    "libelle": "Exporter et imprimer les marchés"
+                  }
+                ]
+              },
+              {
+                "libelle": "Appliquer une indexation sur le prix des articles"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "categorie": "Contacts",
+        "droits": [
+          {
+            "libelle": "Rechercher des contacts"
+          },
+          {
+            "libelle": "Consulter la vue d'ensemble des contacts",
+            "sous_droits": [
+              {
+                "libelle": "Exporter et imprimer les données de la vue d'ensemble des contacts"
+              }
+            ]
+          },
+          {
+            "libelle": "Effectuer un export publipostage"
+          },
+          {
+            "libelle": "Effectuer un export VCF"
+          },
+          {
+            "libelle": "Consulter et modifier le numéro de compte de comptabilité d'un contact"
+          },
+          {
+            "libelle": "Changer le type d'un contact"
+          },
+          {
+            "libelle": "Fusionner des contacts"
+          },
+          {
+            "libelle": "Supprimer des contacts"
+          },
+          {
+            "libelle": "Configurer des alertes sur des contacts"
+          },
+          {
+            "libelle": "Gérer le suivi de validation des contacts"
+          }
+        ]
+      },
+      {
+        "categorie": "Devis, factures et avoirs",
+        "droits": [
+          {
+            "libelle": "Consulter les devis",
+            "sous_droits": [
+              {
+                "libelle": "Créer et modifier un devis"
+              },
+              {
+                "libelle": "Émettre un devis"
+              },
+              {
+                "libelle": "Supprimer un devis"
+              },
+              {
+                "libelle": "Enregistrer un acompte"
+              },
+              {
+                "libelle": "Supprimer un acompte"
+              },
+              {
+                "libelle": "Changer le numéro ou la date d'émission d'un devis"
+              },
+              {
+                "libelle": "Émettre à la date d'émission de la pièce précédente"
+              },
+              {
+                "libelle": "Émettre à la fin du mois précédent"
+              },
+              {
+                "libelle": "Émettre à la fin de l'exercice précédent"
+              },
+              {
+                "libelle": "Enregistrer la réponse à un devis"
+              },
+              {
+                "libelle": "Changer la réponse d'un devis"
+              },
+              {
+                "libelle": "Corriger les textes ou changer le destinataire d'un devis après son émission"
+              },
+              {
+                "libelle": "Corriger un devis complètement (textes, destinataire, article et montants) après son émission"
+              },
+              {
+                "libelle": "Gérer les mentions prédéfinies des devis"
+              },
+              {
+                "libelle": "Changer le site ou le service d'un devis avant son émission"
+              },
+              {
+                "libelle": "Changer le site ou le service d'un devis après son émission"
+              }
+            ]
+          },
+          {
+            "libelle": "Consulter les factures et les avoirs",
+            "sous_droits": [
+              {
+                "libelle": "Créer et modifier une facture ou un avoir"
+              },
+              {
+                "libelle": "Émettre une facture ou un avoir"
+              },
+              {
+                "libelle": "Supprimer une facture ou un avoir"
+              },
+              {
+                "libelle": "Enregistrer un règlement"
+              },
+              {
+                "libelle": "Supprimer un règlement"
+              },
+              {
+                "libelle": "Changer le numéro ou la date d'émission d'une facture ou d'un avoir"
+              },
+              {
+                "libelle": "Émettre à la date d'émission de la pièce précédente"
+              },
+              {
+                "libelle": "Émettre à la fin du mois précédent"
+              },
+              {
+                "libelle": "Émettre à la fin de l'exercice précédent"
+              },
+              {
+                "libelle": "Associer des temps passés et des frais à une facture"
+              },
+              {
+                "libelle": "Corriger les textes ou changer le destinataire d'une facture ou d'un avoir après son émission"
+              },
+              {
+                "libelle": "Corriger une facture ou un avoir partiel complètement (textes, destinataire, articles et montants) après son émission"
+              },
+              {
+                "libelle": "Gérer les mentions prédéfinies des factures ou des avoirs"
+              },
+              {
+                "libelle": "Changer le site ou le service d'une facture ou d'un avoir avant son émission"
+              },
+              {
+                "libelle": "Changer le site ou le service d'une facture ou d'un avoir après son émission"
+              },
+              {
+                "libelle": "Exporter vers Chorus Pro"
+              },
+              {
+                "libelle": "Annuler les exports vers Chorus Pro"
+              }
+            ]
+          },
+          {
+            "libelle": "Consulter la vue d'ensemble des devis",
+            "sous_droits": [
+              {
+                "libelle": "Exporter et imprimer les données de la vue d'ensemble des devis"
+              }
+            ]
+          },
+          {
+            "libelle": "Consulter la vue d'ensemble des factures",
+            "sous_droits": [
+              {
+                "libelle": "Exporter et imprimer les données de la vue d'ensemble des factures"
+              }
+            ]
+          },
+          {
+            "libelle": "Consulter la vue d'ensemble des règlements",
+            "sous_droits": [
+              {
+                "libelle": "Exporter et imprimer les données de la vue d'ensemble des règlements"
+              }
+            ]
+          },
+          {
+            "libelle": "Exporter les factures, avoirs et règlements vers les logiciels de comptabilité"
+          },
+          {
+            "libelle": "Annuler les exports des factures, avoirs et règlements vers les logiciels de comptabilité"
+          }
+        ]
+      },
+      {
+        "categorie": "G.E.D",
+        "droits": [
+          {
+            "libelle": "Consulter l'onglet G.E.D. et les documents électroniques (courriers, emails, documents, plans, dossiers livrables et états hypothécaires)",
+            "sous_droits": [
+              {
+                "libelle": "Créer et modifier un document électronique"
+              },
+              {
+                "libelle": "Envoyer un courrier ou un dossier livrable, valider un document, un plan ou un dossier livrable, supprimer un document électronique"
+              },
+              {
+                "libelle": "Annuler l'envoi d'un courrier ou d'un dossier livrable, annuler la validation d'un document, d'un plan ou d'un dossier livrable"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "categorie": "Notes",
+        "droits": [
+          {
+            "libelle": "Supprimer / Éditer ses propres notes"
+          },
+          {
+            "libelle": "Supprimer / Éditer les notes des autres"
+          }
+        ]
+      },
+      {
+        "categorie": "Paramètres",
+        "droits": [
+          {
+            "libelle": "Consulter les paramètres des collaborateurs",
+            "sous_droits": [
+              {
+                "libelle": "Modifier les informations des collaborateurs"
+              },
+              {
+                "libelle": "Modifier les droits des collaborateurs"
+              }
+            ]
+          },
+          {
+            "libelle": "Gérer les paramètres de facturation"
+          },
+          {
+            "libelle": "Gérer les paramètres d'avertissements et blocages"
+          },
+          {
+            "libelle": "Gérer les paramètres des partenaires externes"
+          },
+          {
+            "libelle": "Gérer les prix de revient"
+          },
+          {
+            "libelle": "Créer, modifier, supprimer un lieu, un code d'activité, un taux de TVA, ou une profession"
+          },
+          {
+            "libelle": "Gérer les catégories de notes"
+          },
+          {
+            "libelle": "Gérer les paramètres des tickets"
+          },
+          {
+            "libelle": "Gérer les banques"
+          },
+          {
+            "libelle": "Gérer les champs spécifiques"
+          },
+          {
+            "libelle": "Gérer les paramètres d'export vers les logiciels de comptabilité"
+          },
+          {
+            "libelle": "Modifier les paramètres des qualifications"
+          },
+          {
+            "libelle": "Gérer les communes additionnelles"
+          },
+          {
+            "libelle": "Modifier les paramètres de numérotation automatique"
+          },
+          {
+            "libelle": "Gérer les groupes d'utilisateurs"
+          },
+          {
+            "libelle": "Gérer les gabarits"
+          },
+          {
+            "libelle": "Gérer les coefficients d'actualisation"
+          },
+          {
+            "libelle": "Gérer les alertes"
+          },
+          {
+            "libelle": "Gérer les procédures"
+          }
+        ]
+      },
+      {
+        "categorie": "Procédures qualité",
+        "droits": [
+          {
+            "libelle": "Consulter les procédures qualité d'une affaire",
+            "sous_droits": [
+              {
+                "libelle": "Instancier les procédures qualité"
+              },
+              {
+                "libelle": "Gérer les procédures qualité (ajouter/masquer les tâches, activer/désactiver les changements d'état)"
+              },
+              {
+                "libelle": "Supprimer les procédures qualité"
+              },
+              {
+                "libelle": "Affecter une tâche à un collaborateur"
+              },
+              {
+                "libelle": "Modifier le collaborateur ayant effectué la tâche"
+              },
+              {
+                "libelle": "Valider une tâche"
+              },
+              {
+                "libelle": "Associer des fichiers à une tâche"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "categorie": "Ressources Humaines",
+        "droits": [
+          {
+            "libelle": "Consulter les informations RH des collaborateurs",
+            "sous_droits": [
+              {
+                "libelle": "Exporter et imprimer les données de l'onglet \"Général\" des Ressources Humaines"
+              },
+              {
+                "libelle": "Consulter l'onglet \"Informations personnelles\" des collaborateurs",
+                "sous_droits": [
+                  {
+                    "libelle": "Exporter et imprimer les données de l'onglet \"Informations personnelles\" des Ressources Humaines"
+                  }
+                ]
+              },
+              {
+                "libelle": "Consulter l'onglet \"Santé\" des collaborateurs",
+                "sous_droits": [
+                  {
+                    "libelle": "Exporter et imprimer les données de l'onglet \"Santé\" des Ressources Humaines"
+                  }
+                ]
+              },
+              {
+                "libelle": "Consulter l'onglet \"Contrat - Emploi\" des collaborateurs",
+                "sous_droits": [
+                  {
+                    "libelle": "Exporter et imprimer les données de l'onglet \"Contrat - Emploi\" des Ressources Humaines"
+                  }
+                ]
+              },
+              {
+                "libelle": "Consulter l'onglet \"Diplômes - Formations\" des collaborateurs",
+                "sous_droits": [
+                  {
+                    "libelle": "Exporter et imprimer les données de l'onglet \"Diplômes - Formations\" des Ressources Humaines"
+                  }
+                ]
+              },
+              {
+                "libelle": "Consulter l'onglet \"Compétences - Habilitations\" des collaborateurs",
+                "sous_droits": [
+                  {
+                    "libelle": "Exporter et imprimer les données de l'onglet \"Compétences - Habilitations\" des Ressources Humaines"
+                  }
+                ]
+              },
+              {
+                "libelle": "Consulter l'onglet \"Actionnariat\" des collaborateurs",
+                "sous_droits": [
+                  {
+                    "libelle": "Exporter et imprimer les données de l'onglet \"Actionnariat\" des Ressources Humaines"
+                  }
+                ]
+              },
+              {
+                "libelle": "Consulter l'onglet \"Commentaire\" des collaborateurs"
+              },
+              {
+                "libelle": "Modifier les informations RH des collaborateurs"
+              }
+            ]
+          },
+          {
+            "libelle": "Gérer les paramètres RH"
+          }
+        ]
+      },
+      {
+        "categorie": "Signature électronique",
+        "droits": [
+          {
+            "libelle": "Envoyer des documents en signature électronique",
+            "sous_droits": [
+              {
+                "libelle": "Faire signer en face à face un contact ou un collaborateur"
+              }
+            ]
+          },
+          {
+            "libelle": "Télécharger les preuves de signature électronique"
+          },
+          {
+            "libelle": "Abandonner une procédure de signature électronique"
+          },
+          {
+            "libelle": "Acheter des crédits de signature électronique"
+          }
+        ]
+      },
+      {
+        "categorie": "Suivi",
+        "droits": [
+          {
+            "libelle": "Consulter le suivi des signatures électroniques",
+            "sous_droits": [
+              {
+                "libelle": "Exporter et imprimer les données du suivi des signatures électroniques"
+              }
+            ]
+          },
+          {
+            "libelle": "Consulter le suivi des devis et commandes par mois",
+            "sous_droits": [
+              {
+                "libelle": "Exporter et imprimer les données du suivi des devis et commandes par mois"
+              }
+            ]
+          },
+          {
+            "libelle": "Consulter le suivi de la facturation par mois",
+            "sous_droits": [
+              {
+                "libelle": "Exporter et imprimer les données du suivi de la facturation par mois"
+              }
+            ]
+          },
+          {
+            "libelle": "Consulter le suivi des règlements par mois, le suivi des règlements en attente et le suivi des règlements clôturés",
+            "sous_droits": [
+              {
+                "libelle": "Exporter et imprimer les données du suivi des règlements par mois, du suivi des règlements en attente et du suivi des règlements clôturés"
+              }
+            ]
+          },
+          {
+            "libelle": "Consulter le suivi du facturé / à facturer",
+            "sous_droits": [
+              {
+                "libelle": "Exporter et imprimer le suivi du facturé / à facturer"
+              }
+            ]
+          },
+          {
+            "libelle": "Consulter le suivi de la production",
+            "sous_droits": [
+              {
+                "libelle": "Exporter et imprimer les données du suivi de la production"
+              }
+            ]
+          },
+          {
+            "libelle": "Consulter le suivi des encours",
+            "sous_droits": [
+              {
+                "libelle": "Exporter et imprimer les données du suivi des encours"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "categorie": "Tâches à faire",
+        "droits": [
+          {
+            "libelle": "Voir les tâches à faire des autres"
+          },
+          {
+            "libelle": "Supprimer / Éditer les tâches à faire dont il n'est pas le créateur"
+          }
+        ]
+      },
+      {
+        "categorie": "Temps passés et frais des temps passés",
+        "droits": [
+          {
+            "libelle": "Consulter la vue globale"
+          },
+          {
+            "libelle": "Consulter les temps passés et les frais des temps passés des autres collaborateurs",
+            "sous_droits": [
+              {
+                "libelle": "Créer, modifier et supprimer les temps passés et les frais des temps passés des autres collaborateurs"
+              }
+            ]
+          },
+          {
+            "libelle": "Autoriser la saisie forcée d'un temps passé ou d'un frais sur une affaire clôturée"
+          },
+          {
+            "libelle": "Importer les temps passés à partir de Planning"
+          },
+          {
+            "libelle": "Valider la semaine/jour de temps passés des collaborateurs"
+          },
+          {
+            "libelle": "Clôturer des temps passés et des frais"
+          },
+          {
+            "libelle": "Changer l'affaire d'un temps passé ou d'un frais signé"
+          }
+        ]
+      }
+    ],
+    "planning": [
+      {
+        "categorie": "Planning",
+        "droits": [
+          {
+            "libelle": "Créer une tâche",
+            "conditions": {
+              "Avec conditions de participation": [
+                "L'utilisateur doit participer à la tâche",
+                "Les participants … aux groupes suivants"
+              ],
+              "Avec conditions sur l'activité": [
+                "L'activité doit toujours être indiquée",
+                "L'activité … des activités suivantes"
+              ]
+            }
+          },
+          {
+            "libelle": "Modifier une tâche",
+            "conditions": {
+              "Avec conditions de participation": [
+                "L'utilisateur doit participer à la tâche",
+                "Les participants … aux groupes suivants"
+              ],
+              "Avec conditions sur l'activité": [
+                "L'activité doit toujours être indiquée",
+                "L'activité … des activités suivantes"
+              ],
+              "Avec conditions sur le créateur": []
+            }
+          },
+          {
+            "libelle": "Supprimer une tâche",
+            "conditions": {
+              "Avec conditions de participation": [
+                "L'utilisateur doit participer à la tâche",
+                "Les participants … aux groupes suivants"
+              ],
+              "Avec conditions sur l'activité": [
+                "L'activité doit toujours être indiquée",
+                "L'activité … des activités suivantes"
+              ],
+              "Avec conditions sur le créateur": []
+            }
+          },
+          {
+            "libelle": "Superposer des tâches",
+            "conditions": {
+              "Avec conditions sur l'activité": [
+                "L'activité doit toujours être indiquée",
+                "L'activité … des activités suivantes"
+              ]
+            },
+            "sous_droits": [
+              {
+                "libelle": "Forcer automatiquement la superposition en cas de conflit"
+              },
+              {
+                "libelle": "Autoriser la superposition de tâches sur les équipements et véhicules"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "groupes": [
+    {
+      "application": "cogeo",
+      "nom": "Admin",
+      "droits": [
+        [
+          "Affaires, groupes et archivage",
+          "Créer une affaire et créer un groupe"
+        ],
+        [
+          "Affaires, groupes et archivage",
+          "Indiquer manuellement le numéro d'une affaire ou d'un groupe"
+        ],
+        [
+          "Affaires, groupes et archivage",
+          "Changer la date de création d'une affaire"
+        ],
+        [
+          "Affaires, groupes et archivage",
+          "Changer la date d'ouverture d'une affaire"
+        ],
+        [
+          "Affaires, groupes et archivage",
+          "Changer la date de livraison d'une affaire"
+        ],
+        [
+          "Affaires, groupes et archivage",
+          "Changer la date de clôture d'une affaire"
+        ],
+        [
+          "Affaires, groupes et archivage",
+          "Changer l'état d'une affaire"
+        ],
+        [
+          "Affaires, groupes et archivage",
+          "Changer l'état d'une affaire, sauf l'état Clôturée"
+        ],
+        [
+          "Affaires, groupes et archivage",
+          "Voir l'avancement financier d'une affaire"
+        ],
+        [
+          "Affaires, groupes et archivage",
+          "Associer, créer ou renommer un dossier de travail d'une affaire"
+        ],
+        [
+          "Affaires, groupes et archivage",
+          "Gérer les objets prédéfinis des affaires"
+        ],
+        [
+          "Affaires, groupes et archivage",
+          "Sélectionner les phases d'une affaire Maîtrise d'œuvre"
+        ],
+        [
+          "Affaires, groupes et archivage",
+          "Voir l'onglet prix de revient"
+        ],
+        [
+          "Affaires, groupes et archivage",
+          "Voir l'onglet prix de revient",
+          "Voir le sous-onglet \"Temps passés\""
+        ],
+        [
+          "Affaires, groupes et archivage",
+          "Voir l'onglet prix de revient",
+          "Voir le prix de vente des temps passés"
+        ],
+        [
+          "Affaires, groupes et archivage",
+          "Voir l'onglet prix de revient",
+          "Voir le prix de revient des temps passés"
+        ],
+        [
+          "Affaires, groupes et archivage",
+          "Voir l'onglet prix de revient",
+          "Voir le sous-onglet \"Frais\""
+        ],
+        [
+          "Affaires, groupes et archivage",
+          "Voir l'onglet prix de revient",
+          "Créer, modifier, supprimer des frais"
+        ],
+        [
+          "Affaires, groupes et archivage",
+          "Affecter des affaires aux autres collaborateurs"
+        ],
+        [
+          "Affaires, groupes et archivage",
+          "Consulter la vue d'ensemble des affaires"
+        ],
+        [
+          "Affaires, groupes et archivage",
+          "Consulter la vue d'ensemble des affaires",
+          "Exporter et imprimer les données de la vue d'ensemble des affaires"
+        ],
+        [
+          "Affaires, groupes et archivage",
+          "Créer une archive"
+        ],
+        [
+          "Affaires, groupes et archivage",
+          "Indiquer manuellement le numéro d'une archive"
+        ],
+        [
+          "Affaires, groupes et archivage",
+          "Changer l'archive d'une affaire"
+        ],
+        [
+          "Affaires, groupes et archivage",
+          "Changer le groupe d'une affaire"
+        ],
+        [
+          "Affaires, groupes et archivage",
+          "Définir le compte de vente d'une affaire"
+        ],
+        [
+          "Affaires, groupes et archivage",
+          "Accéder à l'onglet Devis de l'affaire et consulter le PDF des devis émis"
+        ],
+        [
+          "Affaires, groupes et archivage",
+          "Accéder à l'onglet Facturation de l'affaire et consulter le PDF des factures émises"
+        ],
+        [
+          "Affaires, groupes et archivage",
+          "Accéder à l'onglet Relances de l'affaire"
+        ],
+        [
+          "Affaires, groupes et archivage",
+          "Accéder à l'onglet Relances de l'affaire",
+          "Gérer les relances"
+        ],
+        [
+          "Affaires, groupes et archivage",
+          "Définir le Géomètre-Expert de l'affaire"
+        ],
+        [
+          "Affaires, groupes et archivage",
+          "Voir l'onglet Géofoncier"
+        ],
+        [
+          "Affaires, groupes et archivage",
+          "Exporter les affaires dans Géofoncier"
+        ],
+        [
+          "Affaires, groupes et archivage",
+          "Consulter Géofoncier"
+        ],
+        [
+          "Analyse",
+          "Consulter le bilan d'une affaire"
+        ],
+        [
+          "Analyse",
+          "Consulter l'analyse comparative annuelle"
+        ],
+        [
+          "Analyse",
+          "Consulter l'analyse comparative annuelle",
+          "Exporter et imprimer l'analyse comparative annuelle"
+        ],
+        [
+          "Analyse",
+          "Consulter la facturation croisée"
+        ],
+        [
+          "Analyse",
+          "Consulter la facturation croisée",
+          "Exporter et imprimer la facturation croisée"
+        ],
+        [
+          "Analyse",
+          "Consulter les règlements croisés"
+        ],
+        [
+          "Analyse",
+          "Consulter les règlements croisés",
+          "Exporter et imprimer les règlements croisés"
+        ],
+        [
+          "Analyse",
+          "Consulter les temps passés par code d'activité"
+        ],
+        [
+          "Analyse",
+          "Consulter la facturation par collaborateur"
+        ],
+        [
+          "Analyse",
+          "Consulter la facturation par collaborateur",
+          "Exporter et imprimer la facturation par collaborateur"
+        ],
+        [
+          "Catalogue",
+          "Consulter le catalogue"
+        ],
+        [
+          "Catalogue",
+          "Consulter le catalogue",
+          "Créer et modifier un article"
+        ],
+        [
+          "Catalogue",
+          "Consulter le catalogue",
+          "Créer et modifier un article",
+          "Exporter et imprimer les articles"
+        ],
+        [
+          "Catalogue",
+          "Consulter le catalogue",
+          "Créer et modifier une liste d'articles"
+        ],
+        [
+          "Catalogue",
+          "Consulter le catalogue",
+          "Créer et modifier les phases"
+        ],
+        [
+          "Catalogue",
+          "Consulter le catalogue",
+          "Créer et modifier les phases",
+          "Exporter et imprimer les phases"
+        ],
+        [
+          "Catalogue",
+          "Consulter le catalogue",
+          "Créer et modifier une famille d'articles"
+        ],
+        [
+          "Catalogue",
+          "Consulter le catalogue",
+          "Créer et modifier une famille d'articles",
+          "Exporter et imprimer les familles d'articles"
+        ],
+        [
+          "Catalogue",
+          "Consulter le catalogue",
+          "Créer et modifier un marché"
+        ],
+        [
+          "Catalogue",
+          "Consulter le catalogue",
+          "Créer et modifier un marché",
+          "Exporter et imprimer les marchés"
+        ],
+        [
+          "Catalogue",
+          "Consulter le catalogue",
+          "Appliquer une indexation sur le prix des articles"
+        ],
+        [
+          "Contacts",
+          "Rechercher des contacts"
+        ],
+        [
+          "Contacts",
+          "Consulter la vue d'ensemble des contacts"
+        ],
+        [
+          "Contacts",
+          "Consulter la vue d'ensemble des contacts",
+          "Exporter et imprimer les données de la vue d'ensemble des contacts"
+        ],
+        [
+          "Contacts",
+          "Effectuer un export publipostage"
+        ],
+        [
+          "Contacts",
+          "Effectuer un export VCF"
+        ],
+        [
+          "Contacts",
+          "Consulter et modifier le numéro de compte de comptabilité d'un contact"
+        ],
+        [
+          "Contacts",
+          "Changer le type d'un contact"
+        ],
+        [
+          "Contacts",
+          "Fusionner des contacts"
+        ],
+        [
+          "Contacts",
+          "Supprimer des contacts"
+        ],
+        [
+          "Contacts",
+          "Configurer des alertes sur des contacts"
+        ],
+        [
+          "Devis, factures et avoirs",
+          "Consulter les devis"
+        ],
+        [
+          "Devis, factures et avoirs",
+          "Consulter les devis",
+          "Créer et modifier un devis"
+        ],
+        [
+          "Devis, factures et avoirs",
+          "Consulter les devis",
+          "Émettre un devis"
+        ],
+        [
+          "Devis, factures et avoirs",
+          "Consulter les devis",
+          "Supprimer un devis"
+        ],
+        [
+          "Devis, factures et avoirs",
+          "Consulter les devis",
+          "Enregistrer un acompte"
+        ],
+        [
+          "Devis, factures et avoirs",
+          "Consulter les devis",
+          "Supprimer un acompte"
+        ],
+        [
+          "Devis, factures et avoirs",
+          "Consulter les devis",
+          "Changer le numéro ou la date d'émission d'un devis"
+        ],
+        [
+          "Devis, factures et avoirs",
+          "Consulter les devis",
+          "Émettre à la date d'émission de la pièce précédente"
+        ],
+        [
+          "Devis, factures et avoirs",
+          "Consulter les devis",
+          "Émettre à la fin du mois précédent"
+        ],
+        [
+          "Devis, factures et avoirs",
+          "Consulter les devis",
+          "Émettre à la fin de l'exercice précédent"
+        ],
+        [
+          "Devis, factures et avoirs",
+          "Consulter les devis",
+          "Enregistrer la réponse à un devis"
+        ],
+        [
+          "Devis, factures et avoirs",
+          "Consulter les devis",
+          "Changer la réponse d'un devis"
+        ],
+        [
+          "Devis, factures et avoirs",
+          "Consulter les devis",
+          "Corriger les textes ou changer le destinataire d'un devis après son émission"
+        ],
+        [
+          "Devis, factures et avoirs",
+          "Consulter les devis",
+          "Corriger un devis complètement (textes, destinataire, article et montants) après son émission"
+        ],
+        [
+          "Devis, factures et avoirs",
+          "Consulter les devis",
+          "Gérer les mentions prédéfinies des devis"
+        ],
+        [
+          "Devis, factures et avoirs",
+          "Consulter les devis",
+          "Changer le site ou le service d'un devis avant son émission"
+        ],
+        [
+          "Devis, factures et avoirs",
+          "Consulter les devis",
+          "Changer le site ou le service d'un devis après son émission"
+        ],
+        [
+          "Devis, factures et avoirs",
+          "Consulter les factures et les avoirs"
+        ],
+        [
+          "Devis, factures et avoirs",
+          "Consulter les factures et les avoirs",
+          "Créer et modifier une facture ou un avoir"
+        ],
+        [
+          "Devis, factures et avoirs",
+          "Consulter les factures et les avoirs",
+          "Émettre une facture ou un avoir"
+        ],
+        [
+          "Devis, factures et avoirs",
+          "Consulter les factures et les avoirs",
+          "Supprimer une facture ou un avoir"
+        ],
+        [
+          "Devis, factures et avoirs",
+          "Consulter les factures et les avoirs",
+          "Enregistrer un règlement"
+        ],
+        [
+          "Devis, factures et avoirs",
+          "Consulter les factures et les avoirs",
+          "Supprimer un règlement"
+        ],
+        [
+          "Devis, factures et avoirs",
+          "Consulter les factures et les avoirs",
+          "Changer le numéro ou la date d'émission d'une facture ou d'un avoir"
+        ],
+        [
+          "Devis, factures et avoirs",
+          "Consulter les factures et les avoirs",
+          "Émettre à la date d'émission de la pièce précédente"
+        ],
+        [
+          "Devis, factures et avoirs",
+          "Consulter les factures et les avoirs",
+          "Émettre à la fin du mois précédent"
+        ],
+        [
+          "Devis, factures et avoirs",
+          "Consulter les factures et les avoirs",
+          "Émettre à la fin de l'exercice précédent"
+        ],
+        [
+          "Devis, factures et avoirs",
+          "Consulter les factures et les avoirs",
+          "Associer des temps passés et des frais à une facture"
+        ],
+        [
+          "Devis, factures et avoirs",
+          "Consulter les factures et les avoirs",
+          "Corriger les textes ou changer le destinataire d'une facture ou d'un avoir après son émission"
+        ],
+        [
+          "Devis, factures et avoirs",
+          "Consulter les factures et les avoirs",
+          "Corriger une facture ou un avoir partiel complètement (textes, destinataire, articles et montants) après son émission"
+        ],
+        [
+          "Devis, factures et avoirs",
+          "Consulter les factures et les avoirs",
+          "Gérer les mentions prédéfinies des factures ou des avoirs"
+        ],
+        [
+          "Devis, factures et avoirs",
+          "Consulter les factures et les avoirs",
+          "Changer le site ou le service d'une facture ou d'un avoir avant son émission"
+        ],
+        [
+          "Devis, factures et avoirs",
+          "Consulter les factures et les avoirs",
+          "Changer le site ou le service d'une facture ou d'un avoir après son émission"
+        ],
+        [
+          "Devis, factures et avoirs",
+          "Consulter les factures et les avoirs",
+          "Exporter vers Chorus Pro"
+        ],
+        [
+          "Devis, factures et avoirs",
+          "Consulter les factures et les avoirs",
+          "Annuler les exports vers Chorus Pro"
+        ],
+        [
+          "Devis, factures et avoirs",
+          "Consulter la vue d'ensemble des devis"
+        ],
+        [
+          "Devis, factures et avoirs",
+          "Consulter la vue d'ensemble des devis",
+          "Exporter et imprimer les données de la vue d'ensemble des devis"
+        ],
+        [
+          "Devis, factures et avoirs",
+          "Consulter la vue d'ensemble des factures"
+        ],
+        [
+          "Devis, factures et avoirs",
+          "Consulter la vue d'ensemble des factures",
+          "Exporter et imprimer les données de la vue d'ensemble des factures"
+        ],
+        [
+          "Devis, factures et avoirs",
+          "Consulter la vue d'ensemble des règlements"
+        ],
+        [
+          "Devis, factures et avoirs",
+          "Consulter la vue d'ensemble des règlements",
+          "Exporter et imprimer les données de la vue d'ensemble des règlements"
+        ],
+        [
+          "Devis, factures et avoirs",
+          "Exporter les factures, avoirs et règlements vers les logiciels de comptabilité"
+        ],
+        [
+          "Devis, factures et avoirs",
+          "Annuler les exports des factures, avoirs et règlements vers les logiciels de comptabilité"
+        ],
+        [
+          "G.E.D",
+          "Consulter l'onglet G.E.D. et les documents électroniques (courriers, emails, documents, plans, dossiers livrables et états hypothécaires)"
+        ],
+        [
+          "G.E.D",
+          "Consulter l'onglet G.E.D. et les documents électroniques (courriers, emails, documents, plans, dossiers livrables et états hypothécaires)",
+          "Créer et modifier un document électronique"
+        ],
+        [
+          "G.E.D",
+          "Consulter l'onglet G.E.D. et les documents électroniques (courriers, emails, documents, plans, dossiers livrables et états hypothécaires)",
+          "Envoyer un courrier ou un dossier livrable, valider un document, un plan ou un dossier livrable, supprimer un document électronique"
+        ],
+        [
+          "G.E.D",
+          "Consulter l'onglet G.E.D. et les documents électroniques (courriers, emails, documents, plans, dossiers livrables et états hypothécaires)",
+          "Annuler l'envoi d'un courrier ou d'un dossier livrable, annuler la validation d'un document, d'un plan ou d'un dossier livrable"
+        ],
+        [
+          "Notes",
+          "Supprimer / Éditer ses propres notes"
+        ],
+        [
+          "Notes",
+          "Supprimer / Éditer les notes des autres"
+        ],
+        [
+          "Paramètres",
+          "Gérer les paramètres d'avertissements et blocages"
+        ],
+        [
+          "Paramètres",
+          "Gérer les paramètres des partenaires externes"
+        ],
+        [
+          "Paramètres",
+          "Gérer les communes additionnelles"
+        ],
+        [
+          "Paramètres",
+          "Gérer les gabarits"
+        ],
+        [
+          "Paramètres",
+          "Gérer les alertes"
+        ],
+        [
+          "Paramètres",
+          "Gérer les procédures"
+        ],
+        [
+          "Procédures qualité",
+          "Consulter les procédures qualité d'une affaire"
+        ],
+        [
+          "Procédures qualité",
+          "Consulter les procédures qualité d'une affaire",
+          "Instancier les procédures qualité"
+        ],
+        [
+          "Procédures qualité",
+          "Consulter les procédures qualité d'une affaire",
+          "Gérer les procédures qualité (ajouter/masquer les tâches, activer/désactiver les changements d'état)"
+        ],
+        [
+          "Procédures qualité",
+          "Consulter les procédures qualité d'une affaire",
+          "Supprimer les procédures qualité"
+        ],
+        [
+          "Procédures qualité",
+          "Consulter les procédures qualité d'une affaire",
+          "Affecter une tâche à un collaborateur"
+        ],
+        [
+          "Procédures qualité",
+          "Consulter les procédures qualité d'une affaire",
+          "Modifier le collaborateur ayant effectué la tâche"
+        ],
+        [
+          "Procédures qualité",
+          "Consulter les procédures qualité d'une affaire",
+          "Valider une tâche"
+        ],
+        [
+          "Procédures qualité",
+          "Consulter les procédures qualité d'une affaire",
+          "Associer des fichiers à une tâche"
+        ],
+        [
+          "Signature électronique",
+          "Envoyer des documents en signature électronique"
+        ],
+        [
+          "Signature électronique",
+          "Envoyer des documents en signature électronique",
+          "Faire signer en face à face un contact ou un collaborateur"
+        ],
+        [
+          "Signature électronique",
+          "Télécharger les preuves de signature électronique"
+        ],
+        [
+          "Signature électronique",
+          "Abandonner une procédure de signature électronique"
+        ],
+        [
+          "Suivi",
+          "Consulter le suivi des signatures électroniques"
+        ],
+        [
+          "Suivi",
+          "Consulter le suivi des devis et commandes par mois"
+        ],
+        [
+          "Suivi",
+          "Consulter le suivi des devis et commandes par mois",
+          "Exporter et imprimer les données du suivi des devis et commandes par mois"
+        ],
+        [
+          "Suivi",
+          "Consulter le suivi de la facturation par mois"
+        ],
+        [
+          "Suivi",
+          "Consulter le suivi de la facturation par mois",
+          "Exporter et imprimer les données du suivi de la facturation par mois"
+        ],
+        [
+          "Suivi",
+          "Consulter le suivi des règlements par mois, le suivi des règlements en attente et le suivi des règlements clôturés"
+        ],
+        [
+          "Suivi",
+          "Consulter le suivi des règlements par mois, le suivi des règlements en attente et le suivi des règlements clôturés",
+          "Exporter et imprimer les données du suivi des règlements par mois, du suivi des règlements en attente et du suivi des règlements clôturés"
+        ],
+        [
+          "Suivi",
+          "Consulter le suivi de la production"
+        ],
+        [
+          "Suivi",
+          "Consulter le suivi de la production",
+          "Exporter et imprimer les données du suivi de la production"
+        ],
+        [
+          "Suivi",
+          "Consulter le suivi des encours"
+        ],
+        [
+          "Suivi",
+          "Consulter le suivi des encours",
+          "Exporter et imprimer les données du suivi des encours"
+        ],
+        [
+          "Tâches à faire",
+          "Voir les tâches à faire des autres"
+        ],
+        [
+          "Tâches à faire",
+          "Supprimer / Éditer les tâches à faire dont il n'est pas le créateur"
+        ],
+        [
+          "Temps passés et frais des temps passés",
+          "Consulter la vue globale"
+        ],
+        [
+          "Temps passés et frais des temps passés",
+          "Consulter les temps passés et les frais des temps passés des autres collaborateurs"
+        ],
+        [
+          "Temps passés et frais des temps passés",
+          "Consulter les temps passés et les frais des temps passés des autres collaborateurs",
+          "Créer, modifier et supprimer les temps passés et les frais des temps passés des autres collaborateurs"
+        ],
+        [
+          "Temps passés et frais des temps passés",
+          "Autoriser la saisie forcée d'un temps passé ou d'un frais sur une affaire clôturée"
+        ],
+        [
+          "Temps passés et frais des temps passés",
+          "Importer les temps passés à partir de Planning"
+        ],
+        [
+          "Temps passés et frais des temps passés",
+          "Valider la semaine/jour de temps passés des collaborateurs"
+        ],
+        [
+          "Temps passés et frais des temps passés",
+          "Clôturer des temps passés et des frais"
+        ],
+        [
+          "Temps passés et frais des temps passés",
+          "Changer l'affaire d'un temps passé ou d'un frais signé"
+        ]
+      ]
+    },
+    {
+      "application": "planning",
+      "nom": "Admin",
+      "droits": [
+        {
+          "chemin": [
+            "Planning",
+            "Créer une tâche"
+          ],
+          "conditions": {
+            "Avec conditions sur l'activité": {
+              "L'activité doit toujours être indiquée": true,
+              "L'activité … des activités suivantes": {
+                "operateur": "Ne fait pas partie",
+                "activites": [
+                  "ABSENCE"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "chemin": [
+            "Planning",
+            "Modifier une tâche"
+          ],
+          "conditions": {
+            "Avec conditions sur l'activité": {
+              "L'activité doit toujours être indiquée": true,
+              "L'activité … des activités suivantes": {
+                "operateur": "Ne fait pas partie",
+                "activites": [
+                  "ABSENCE"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "chemin": [
+            "Planning",
+            "Supprimer une tâche"
+          ],
+          "conditions": {
+            "Avec conditions sur l'activité": {
+              "L'activité doit toujours être indiquée": false,
+              "L'activité … des activités suivantes": {
+                "operateur": "Ne fait pas partie",
+                "activites": [
+                  "ABSENCE"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

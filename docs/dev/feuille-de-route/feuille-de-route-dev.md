@@ -26,11 +26,9 @@ Ce n’est **pas** une spec (ça vient après « Ouvre la version »).
 
 ## Prochaine : 1.5.1 — Lire plus de données Moduléo depuis le chat
 
-**Objectif.** Le collaborateur obtient depuis le chat d’autres informations Moduléo que les affaires et les contacts, toujours en **lecture seule**, avec les mêmes garanties qu’en 1.5.0 : fiches denses en noms, lectures source des garde-fous et citées, Mémoire de la conversation, panne ou refus dit clairement. Le client GET de la 1.5.0 couvre déjà toutes les routes : cette version ajoute des outils, pas un nouveau client. Profite de la version pour **chiffrer `MISTRAL_API_KEY`** avec le mécanisme de la clé Moduléo (Fernet, clé maître hors `.env`).
+**Objectif.** Le collaborateur obtient depuis le chat les **devis**, les **factures**, les **temps passés**, le **planning** et, à la demande, les **parcelles** d’une affaire, toujours en **lecture seule**, avec les garanties de la 1.5.0 et des totaux calculés par la VM. Chaque compte ne lit que ce que son **groupe Moduléo** (Cogeo, Planning) autorise : les droits sont recopiés dans BBASS et un garde fermé par défaut passe avant tout appel à l’API ([#185](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/185), [spec](../../specs/v1.5.1-lire-plus-de-donnees-moduleo.md), [ADR-0018](../../adr/0018-droits-moduleo-appliques-par-bbass.md)). Profite de la version pour **chiffrer `MISTRAL_API_KEY`** avec le mécanisme de la clé Moduléo.
 
-**À trancher au grilling.** Quels domaines lire (parcelles, devis, factures, temps passés, GED, planning…), d’après les questions réelles du cabinet. Un outil par domaine, ou un seul outil Moduléo « à capacités » (piste notée dans la spec 1.5.0 vers 5–6 capacités).
-
-**Hors périmètre.** Écriture Moduléo (→ **1.5.2**). Clés par utilisateur et administration des clés (→ **1.5.3**). Agents par pôle (→ **Plus tard**). Questions couvertes à la demande (`besoin`, **Plus tard**).
+**Hors périmètre.** Toute écriture Moduléo (→ **1.5.2**). Écran d’administration des groupes et droits (→ **1.5.3**). Groupes autres qu’Admin. Restriction d’accès par affaire, clé d’API par collaborateur (→ **Plus tard**). GED, dossiers de production. Agents par pôle (→ **Plus tard**). Questions couvertes à la demande (`besoin`, **Plus tard**).
 
 ## Ensuite : 1.5.2 — Écrire dans Moduléo depuis le chat
 
@@ -40,15 +38,15 @@ Ce n’est **pas** une spec (ça vient après « Ouvre la version »).
 
 **À trancher au grilling.** Quelles écritures (laissé ouvert). Sécurité : confirmation, journal des écritures, client qui n’autorise que les routes d’écriture retenues. Écriture ouverte à tous les comptes ou réservée à certains (lien avec les Agents par pôle, **Plus tard**).
 
-**Hors périmètre.** Écriture sur le serveur de production tant que les essais sur le serveur de test ne sont pas validés. Clés par utilisateur (→ **1.5.3**).
+**Hors périmètre.** Écriture sur le serveur de production tant que les essais sur le serveur de test ne sont pas validés. Administration des groupes et droits Moduléo (→ **1.5.3**).
 
-## Ensuite : 1.5.3 — Clés API Moduléo par utilisateur, administrées depuis le Panel d’administration
+## Ensuite : 1.5.3 — Administration des groupes et droits Moduléo depuis le Panel d’administration
 
-**Objectif.** Sur le serveur Moduléo, tous les utilisateurs n’ont pas accès aux mêmes choses ; une seule clé (1.5.0, 1.5.2) ne reflète pas ces droits. Le compte administrateur **associe** une clé d’API / un SecurityCode Moduléo à un compte BBASS (ou à un profil) et les **administre** depuis le Panel d’administration : ajout, remplacement, révocation. Les lectures et écritures Moduléo d’un compte passent par sa clé, donc par ses droits Moduléo. La création des clés reste côté Moduléo.
+**Objectif.** Le compte administrateur gère depuis le Panel d’administration, dans une partie Moduléo, la copie des **groupes Cogeo et Planning** et de leurs **droits** introduite en 1.5.1 ([ADR-0018](../../adr/0018-droits-moduleo-appliques-par-bbass.md)) : créer un groupe, cocher ses droits comme dans Moduléo, le mettre à jour quand Moduléo change, et **rattacher chaque compte** à son groupe Cogeo, à son groupe Planning et à son utilisateur Moduléo. Remplace le fichier versionné et le script de la 1.5.1.
 
-**À trancher au grilling.** Une clé par collaborateur ou par profil ; stockage chiffré dans BBASS ; comportement quand un compte n’a pas de clé (clé commune, ou outils Moduléo non proposés). S’appuie sur ce que la 1.5.0 a appris de l’interface de paramétrage Moduléo. Avec plusieurs secrets (clés par compte, n8n, `MISTRAL_API_KEY`), réexaminer un coffre de secrets centralisé (rotation, révocation, journal des lectures) à la place du fichier clé maître.
+**À trancher au grilling.** Présentation du catalogue (catégories, sous-droits, conditions du Planning). Journal des changements de droits. Aide pour repérer une copie qui a dérivé de Moduléo.
 
-**Hors périmètre.** Agents par pôle (→ **Plus tard**). Création des clés dans Moduléo.
+**Hors périmètre.** Une clé d’API par collaborateur (→ **Plus tard**). Restriction d’accès par affaire (→ **Plus tard**). Agents par pôle (→ **Plus tard**).
 
 ## Ensuite : 1.6.0 — Déploiement postes (CI/CD, conteneurisation, installateur)
 
@@ -253,6 +251,18 @@ Constat (ouverture 1.4.1) : la boucle d’outils est bornée par une limite fixe
 ### Questions couvertes à la demande pour Moduléo (`besoin`)
 
 Constat (1.5.0, [#177](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/177)) : une lecture Moduléo n’a que les questions couvertes écrites par script, champ par champ, sans appel IA. Une question imprévue (« l’affaire est-elle en retard ? ») oblige le modèle à rappeler Moduléo, et sa réponse n’est gardée nulle part. Piste : un `besoin` sur les outils Moduléo, sur le modèle de `lire_pages_web` (1.4.1) : un appel d’extraction isolé sur la fiche relue, avec une réponse (ou « non présent selon l’extraction ») enregistrée en question couverte d’origine `besoin`. **Déclencheur** : l’essai réel ([#178](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/178)) ou l’usage montre beaucoup de rappels de Moduléo pour une même question. Sinon, ne rien changer : relire Moduléo garde une donnée fraîche, et une fiche est courte.
+
+### Une clé d’API Moduléo par collaborateur
+
+Constat (grilling 1.5.1) : les droits de la clé d’API Moduléo font foi sur ceux des groupes utilisateur ; BBASS garde donc une seule clé de lecture et applique lui-même les droits recopiés ([ADR-0018](../../adr/0018-droits-moduleo-appliques-par-bbass.md)). Une clé par collaborateur, réglée dans Moduléo, serait plus sûre (une fuite de la VM ne livrerait pas tout) mais lourde à administrer. **Déclencheur** : Kipaware fait primer les droits des groupes sur ceux de la clé, ou le risque d’une clé unique devient inacceptable (écriture, 1.5.2).
+
+### Restriction d’accès Moduléo par affaire
+
+Constat (grilling 1.5.1) : Moduléo peut limiter l’accès à certaines affaires (« Limiter l’accès à des affaires aux autres collaborateurs », groupes rattachés à une affaire). La copie des droits de la 1.5.1 ne s’applique qu’aux catégories, pas affaire par affaire. Piste : lire les groupes de chaque affaire trouvée et filtrer les fiches dans le garde des droits.
+
+### Doc-site : administration des groupes et droits Moduléo (hors version)
+
+Constat (grilling 1.5.1) : une page `features/moduleo` du site de documentation rappelle comment les droits Moduléo s’appliquent dans BBASS : groupes Cogeo et Planning, catalogue des droits, rattachement des comptes, mise à jour quand Moduléo change. Rédigée hors version par le développeur.
 
 ### Vérification de la fiabilité des sources web
 

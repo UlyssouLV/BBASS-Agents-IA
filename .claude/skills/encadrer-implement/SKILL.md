@@ -43,6 +43,7 @@ A remaining ticket is **unblocked** when GitHub reports no open blockers (`issue
 **If at least one unblocked `ready-for-agent` child remains:**
 
 - Propose the **next** unblocked child (lowest issue number among unblocked `ready-for-agent`).
+- In that proposal, quote the `## Blocked by` clause of that child (the `vraie dépendance` / `ordre de confort` line) in one sentence, so the human can say what would have broken.
 - Ask the user to `/clear` then `/implement #<next>`. Wait. Do not start the next implement in this same compacted window.
 
 **Else if an open `ready-for-human` human-test child remains** (format: `agents/issue-tracker.md`, *Human-test child*):

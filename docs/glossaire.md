@@ -191,3 +191,21 @@ Le texte dense qu'un Outil Moduléo renvoie au modèle pour une affaire ou un co
 Ce qu'un Outil a lu dans un logiciel pour une Conversation (en 1.5.0 : une Fiche Moduléo), enregistré avec l'outil, une référence (« affaire 2024-123 ») et sa date. Source des Garde-fous sur toute la Conversation, citée dans la ligne « Sources : ». Jamais partagée entre Conversations. Les pages web gardent leur propre enregistrement (Recherche web).
 
 À éviter : cache, appel, échange (l'Échange est celui de l'inspecteur).
+
+## Groupe Moduléo {#groupe-moduleo}
+
+Un groupe d'utilisateurs de Moduléo (Cogeo ou Planning : Admin, Production, Stagiaire…) recopié dans BBASS avec ses Droits Moduléo. Un Compte est rattaché à au plus un groupe Cogeo et un groupe Planning, et à son utilisateur Moduléo, toujours explicitement : être Compte administrateur n'en donne aucun. Sans groupe, aucun Outil Moduléo ne lui est proposé ([ADR-0018](./adr/0018-droits-moduleo-appliques-par-bbass.md)). En 1.5.1, seul le groupe Admin est recopié ; « Tous droits (dev) » est un groupe local, pour le dev et les tests, jamais dans Moduléo.
+
+À éviter : rôle, profil, pôle (le Pôle est un domaine métier du cabinet).
+
+## Droit Moduléo {#droit-moduleo}
+
+Une case du catalogue des droits de Moduléo (« Consulter les devis », « Voir le prix de vente des temps passés »…), recopiée dans BBASS avec son application et sa catégorie (Planning : une action, « Créer une tâche », avec ses conditions de participation, d'activité ou de créateur). Un Groupe Moduléo l'accorde ou non ; un droit absent vaut refus.
+
+À éviter : permission, habilitation, droit de compte (le droit administrateur est un autre droit, celui du Compte BBASS).
+
+## Garde des droits {#garde-des-droits}
+
+Le contrôle que la VM centrale fait avant tout appel à l'API Moduléo : la route doit être classée, et le Compte doit avoir le Droit Moduléo qu'elle exige. Fermé par défaut ; un refus est dit au modèle par une phrase fixe qui nomme le droit manquant, distincte du refus de Moduléo.
+
+À éviter : garde-fou (les Garde-fous contrôlent la réponse du modèle, après coup), filtre, middleware.

@@ -41,6 +41,8 @@ def env_moduleo(monkeypatch, cle_maitre):
     monkeypatch.setenv("MODULEO_API_KEY_CHIFFREE", script.chiffrer(_API_KEY, cle_maitre))
     monkeypatch.setenv("MODULEO_SECURITY_CODE_CHIFFRE", script.chiffrer(_SECURITY_CODE, cle_maitre))
     monkeypatch.setenv("VM_CLE_MAITRE_FICHIER", str(cle_maitre))
+    # Même clé maître que Moduléo (spec 1.5.1) : sans elle, la VM ne démarre pas.
+    monkeypatch.setenv("MISTRAL_API_KEY_CHIFFREE", script.chiffrer("cle-api-mistral", cle_maitre))
     return monkeypatch
 
 
@@ -147,8 +149,10 @@ def test_ni_la_cle_ni_le_code_ne_vont_dans_les_logs(env_moduleo, cle_maitre, cap
     assert cle_maitre.read_text() not in caplog.text
 
 
-def test_la_vm_demarre_avec_une_cle_maitre_fausse(env_moduleo, cle_maitre, caplog):
-    cle_maitre.write_bytes(Fernet.generate_key())
+def test_la_vm_demarre_avec_un_secret_moduleo_indechiffrable(env_moduleo, caplog):
+    # Une clé maître fausse empêche désormais le démarrage (clé Mistral, spec
+    # 1.5.1) ; un secret Moduléo seul indéchiffrable ne l'empêche pas.
+    env_moduleo.setenv("MODULEO_SECURITY_CODE_CHIFFRE", "pas-un-jeton-fernet")
     caplog.set_level(logging.INFO)
 
     with TestClient(app) as client:

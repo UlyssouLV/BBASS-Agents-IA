@@ -295,7 +295,7 @@ def test_le_flux_publie_consultation_moduleo(client, faux_moduleo, mistral_clien
 
     reponse = _chercher(client, mistral_client_factice, jeton_valide, {"texte": "Dupont"})
 
-    assert "Consultation Moduléo" in statuts(reponse)
+    assert "Consultation Moduléo : contacts" in statuts(reponse)
 
 
 @pytest.mark.parametrize(

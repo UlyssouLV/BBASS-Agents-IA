@@ -7,6 +7,7 @@ import httpx
 
 from vm_centrale.config import MODULEO_HTTP_TIMEOUT
 from vm_centrale.moduleo.configuration import config_moduleo
+from vm_centrale.moduleo.droits import DroitsModuleo, verifier, verifier_reponse
 from vm_centrale.moduleo.routes import ROUTES_GET
 
 _http_client = httpx.Client(timeout=MODULEO_HTTP_TIMEOUT)
@@ -17,7 +18,7 @@ _PARAMETRE = re.compile(r"\{(\w+)\}")
 class RequeteInterdite(Exception):
     # Levée avant tout envoi (ADR-0017) : méthode autre que GET, route hors
     # de ROUTES_GET, ou route mal remplie. Une erreur du code de la VM, pas
-    # de Moduléo.
+    # de Moduléo. Un droit manquant est un DroitManquant (garde des droits).
     pass
 
 
@@ -43,25 +44,57 @@ class ModuleoIntrouvable(ModuleoIndisponible):
 
 
 class LecteurModuleo(Protocol):
-    # Ce que les outils connaissent de Moduléo : ClientModuleo, ou le faux
-    # Moduléo des tests (tests/faux_moduleo.py).
+    # Une lecture déjà autorisée : le transport HTTP, le faux Moduléo des
+    # tests (tests/faux_moduleo.py), ou ClientModuleo lié aux droits d'un
+    # compte (`pour`), ce que reçoivent la résolution des noms et les fiches.
     def lire(self, route: str, parametres: dict[str, Any] | None = None) -> Any: ...
 
 
 class ClientModuleo:
     # Client générique en lecture seule (spec 1.5.0, ADR-0017) : seconde
     # barrière après la clé Moduléo réglée en lecture, pour qu'aucune
-    # écriture ne parte même avec une clé mal réglée.
+    # écriture ne parte même avec une clé mal réglée. Depuis 1.5.1 (#188,
+    # ADR-0018), il exige les droits du compte : le garde des droits passe
+    # avant tout envoi, quel que soit le transport.
+    def __init__(self, transport: LecteurModuleo) -> None:
+        self._transport = transport
+
+    def lire(self, route: str, parametres: dict[str, Any] | None, droits: DroitsModuleo) -> Any:
+        return self.envoyer("GET", route, parametres, droits)
+
+    def envoyer(self, methode: str, route: str, parametres: dict[str, Any] | None, droits: DroitsModuleo) -> Any:
+        if methode != "GET":
+            raise RequeteInterdite(f"Méthode {methode!r} refusée : Moduléo est en lecture seule.")
+        _remplir(route, parametres or {})
+        verifier(route, droits, parametres)
+        reponse = self._transport.lire(route, parametres)
+        # Une route ouverte aux seuls éléments du compte (#191) : chaque
+        # élément reçu est relu avant d'être rendu.
+        verifier_reponse(route, droits, reponse)
+        return reponse
+
+    def pour(self, droits: DroitsModuleo) -> LecteurModuleo:
+        # Le client lié aux droits d'un compte, pour le temps d'un appel.
+        return _LecteurDuCompte(self, droits)
+
+
+class _LecteurDuCompte:
+    def __init__(self, client: ClientModuleo, droits: DroitsModuleo) -> None:
+        self._client = client
+        self._droits = droits
+
+    def lire(self, route: str, parametres: dict[str, Any] | None = None) -> Any:
+        return self._client.lire(route, parametres, self._droits)
+
+
+class TransportHttp:
+    # GET sur MODULEO_URL avec les en-têtes ApiKey et SecurityCode : la clé
+    # et le code ne sortent jamais d'ici.
     def __init__(self, url_base: str, api_key: str, security_code: str) -> None:
         self._url_base = url_base.rstrip("/")
         self._en_tetes = {"ApiKey": api_key, "SecurityCode": security_code}
 
     def lire(self, route: str, parametres: dict[str, Any] | None = None) -> Any:
-        return self.envoyer("GET", route, parametres)
-
-    def envoyer(self, methode: str, route: str, parametres: dict[str, Any] | None = None) -> Any:
-        if methode != "GET":
-            raise RequeteInterdite(f"Méthode {methode!r} refusée : Moduléo est en lecture seule.")
         url, params = _remplir(route, parametres or {})
         try:
             reponse = _http_client.get(f"{self._url_base}/{url}", params=params, headers=self._en_tetes)
@@ -80,14 +113,14 @@ class ClientModuleo:
 
 
 @cache
-def get_client_moduleo() -> LecteurModuleo | None:
+def get_client_moduleo() -> ClientModuleo | None:
     # Dépendance des envois de message (spec 1.5.0, #174) : None sans config
     # Moduléo complète et déchiffrable, et les outils Moduléo ne sont pas
     # proposés. Lue une fois par processus, comme le reste de la config.
     config = config_moduleo()
     if config is None:
         return None
-    return ClientModuleo(config.url, config.api_key, config.security_code)
+    return ClientModuleo(TransportHttp(config.url, config.api_key, config.security_code))
 
 
 def _remplir(route: str, parametres: dict[str, Any]) -> tuple[str, dict[str, Any]]:

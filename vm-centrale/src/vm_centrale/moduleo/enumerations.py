@@ -39,6 +39,12 @@ TYPES_CONTACT = (
     Valeur(5, "GroupeContacts", "Groupe de contacts"),
 )
 
+# `Etat` d'un devis (#189) : pas encore relevé sur le serveur du cabinet
+# (à l'essai réel, #178) ; 0, valeur par défaut, n'a pas de ligne, toute
+# autre valeur est affichée en chiffre. Pas de filtre `etat` d'ici là :
+# Moduléo ignorerait un nom inconnu.
+ETATS_DEVIS: tuple[Valeur, ...] = ()
+
 
 def libelle(valeurs: tuple[Valeur, ...], brute: object) -> str:
     # Entier du JSON (ou nom de l'énumération, forme du XML) → libellé ;

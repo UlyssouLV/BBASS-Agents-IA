@@ -78,10 +78,28 @@ Part of #<parent>
 - Aucun
 ```
 
+When a child **is** blocked by a peer, each line names the kind of edge and what would fail:
+
+```markdown
+## Blocked by
+
+- #<n> — vraie dépendance : sans #<n>, <ce qui casse (import, API, test impossible à écrire…)>
+```
+
+Or, if the order is only preferred:
+
+```markdown
+## Blocked by
+
+- #<n> — ordre de confort : on pourrait inverser parce que <rien de concret ne casse>
+```
+
+Do **not** add an edge to justify an order. If nothing would break, write `- Aucun` (or mark an existing edge `ordre de confort` rather than inventing a new `#`).
+
 - **`Part of #<parent>`** — first line, always (even if a `## Parent` block also appears from Matt’s quiz).
 - **`## What to build`** — required. Not a dump of the parent spec.
 - **`## Acceptance criteria`** — required. Checkbox list (`- [ ]`). Include the green-pytest criterion when this repo’s HTTP-boundary tests apply.
-- **`## Blocked by`** — required section. `- Aucun` when no peer blockers; otherwise one `- #<n>` per blocking **child**. Native GitHub `blocked_by` edges are still set by the skills; this section is the human-readable mirror (and fallback).
+- **`## Blocked by`** — required section. `- Aucun` when no peer blockers; otherwise one `- #<n>` per blocking **child**, each with `vraie dépendance : …` or `ordre de confort : …` (see above). Native GitHub `blocked_by` edges are still set by the skills; this section is the human-readable mirror (and fallback). A bare `- #<n>` without that clause is incomplete — `ouvrir-la-version` / `creer-ticket` must not create until it is filled.
 - Optional only if Matt’s quiz produced them: `## Implementation decisions` (keep short). No other top-level `##` headings by default.
 - Label on create: **`ready-for-agent`**. Not a `bug` issue (bugs → `/cub`).
 
@@ -112,8 +130,8 @@ Plan et trace des tests humains pour VX.Y.Z (pas d’implémentation agent).
 
 ## Blocked by
 
-- #<impl-1>
-- #<impl-2>
+- #<impl-1> — ordre de process : les tests humains se jouent sur la version complète
+- #<impl-2> — ordre de process : les tests humains se jouent sur la version complète
 
 ## Plan de tests
 

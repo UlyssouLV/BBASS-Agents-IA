@@ -11,6 +11,12 @@ from vm_centrale.moduleo.routes import ROUTES_GET
 
 _RECHERCHE_AFFAIRES = next(route for route in ROUTES_GET if route.startswith("cogeo/affaire?texte="))
 _RECHERCHE_CONTACTS = next(route for route in ROUTES_GET if route.startswith("cogeo/contact?texte="))
+_RECHERCHE_DEVIS = next(route for route in ROUTES_GET if route.startswith("cogeo/devis?texte="))
+_RECHERCHE_FACTURES = next(route for route in ROUTES_GET if route.startswith("cogeo/facture?texte="))
+_RECHERCHE_TEMPS_PASSES = next(route for route in ROUTES_GET if route.startswith("cogeo/tempspasse?dateMin="))
+_RECHERCHE_TACHES = next(route for route in ROUTES_GET if route.startswith("planning/tacheplanning?libelle="))
+# Limite des routes `multi` (doc Moduléo).
+_MULTI_MAX = 200
 # Coordonnées d'un contact (#176) : route des ids → (route de la fiche,
 # paramètre de chemin, clé du faux).
 _COORDONNEES = {
@@ -39,6 +45,25 @@ class FauxModuleo:
         self._coordonnees: dict[str, dict[int, dict]] = {cle: {} for _, _, cle in _COORDONNEES.values()}
         self._coordonnees_contact: dict[int, dict[str, list[int]]] = {}
         self._affaires_contact: dict[int, dict[str, list[int]]] = {}
+        self._devis: dict[int, dict] = {}
+        self._factures: dict[int, dict] = {}
+        self._reglements: dict[int, dict] = {}
+        self._echeances: dict[int, dict] = {}
+        self._destinataires: dict[int, dict] = {}
+        # Ids des avoirs de chaque facture.
+        self._avoirs_facture: dict[int, list[int]] = {}
+        self._temps_passes: dict[int, dict] = {}
+        self._codes_activite: dict[int, dict] = {}
+        # Planning (#192) : tâches, activités, utilisateurs planning
+        # (id → fiche), équipements.
+        self._taches: dict[int, dict] = {}
+        self._activites: dict[int, dict] = {}
+        self._utilisateurs_planning: dict[int, dict] = {}
+        self._equipements: dict[int, dict] = {}
+        # Parcelles d'affaire et leurs propriétaires (#193).
+        self._parcelles: dict[int, dict] = {}
+        self._proprietaires: dict[int, dict] = {}
+        self._filtre_utilisateurs = True
         self._exception: Exception | None = None
 
     def echouer(self, exception: Exception) -> None:
@@ -69,6 +94,222 @@ class FauxModuleo:
             "IdService": None,
             "IdDossierProduction": None,
             **champs,
+        }
+
+    def ajouter_parcelle(
+        self,
+        id_parcelle: int,
+        id_affaire: int,
+        section: str,
+        numero: str,
+        prefixe: str = "",
+        id_commune: int | None = None,
+        contenance: float | None = None,
+        lieu_dit: str = "",
+    ) -> None:
+        self._parcelles[id_parcelle] = {
+            "IdParcelle": id_parcelle,
+            "Numero": numero,
+            "Section": section,
+            "Prefixe": prefixe,
+            "IdCommune": id_commune,
+            "IdAffaire": id_affaire,
+            "IdParcelleParente": None,
+            "HorairesConvocation": [],
+            "LieuDit": lieu_dit,
+            "DMPC": "",
+            "Information": 0,
+            "NatureSol": 0,
+            "ContenanceCadatrale": contenance,
+        }
+
+    def ajouter_proprietaire(self, id_proprietaire: int, id_parcelle: int, id_contact: int) -> None:
+        self._proprietaires[id_proprietaire] = {
+            "IdProprietaire": id_proprietaire,
+            "TypeDroit": 0,
+            "IdContact": id_contact,
+            "IdParcelle": id_parcelle,
+        }
+
+    def ajouter_devis(self, id_devis: int, numero: str, objet: str = "", **champs: Any) -> None:
+        # `champs` : les autres clés du devis, au nom du JSON Moduléo
+        # (`DateEmission`, `MontantTotalHT`, `IdAffaire`…). Émis : une date
+        # d'émission (#189, à confirmer à l'essai réel).
+        self._devis[id_devis] = {
+            "IdDevis": id_devis,
+            "Numero": numero,
+            "Objet": objet,
+            "Etat": 0,
+            "DateCreation": None,
+            "DateEmission": None,
+            "DateReponse": None,
+            "DateExpiration": None,
+            "IdAffaire": None,
+            "IdResponsable": None,
+            "IdRedacteur": None,
+            "IdSite": None,
+            "IdService": None,
+            "MontantTotalHT": 0.0,
+            "MontantTotalTVA": 0.0,
+            "MontantTotalTTC": 0.0,
+            **champs,
+        }
+
+    def ajouter_facture(self, id_facture: int, numero: str, objet: str = "", **champs: Any) -> None:
+        # `champs` : les autres clés de la facture, au nom du JSON Moduléo
+        # (`DateEmission`, `MontantTotalTTC`, `IdsReglements`…). Émise : une
+        # date d'émission (#190, à confirmer à l'essai réel).
+        self._factures[id_facture] = {
+            "IdFacture": id_facture,
+            "Numero": numero,
+            "Objet": objet,
+            "DateCreation": None,
+            "DateEmission": None,
+            "IdsLignesArticle": [],
+            "IdsReglements": [],
+            "IdAffaire": None,
+            "IdDestinataire": None,
+            "IdResponsable": None,
+            "IdRedacteur": None,
+            "IdSite": None,
+            "IdService": None,
+            "MontantTotalHT": 0.0,
+            "MontantTotalTVA": 0.0,
+            "MontantTotalTTC": 0.0,
+            **champs,
+        }
+
+    def ajouter_reglement(self, id_reglement: int, montant_ttc: float, date: str, **champs: Any) -> None:
+        # Un règlement, lu par les `IdsReglements` de sa facture.
+        self._reglements[id_reglement] = {
+            "IdReglement": id_reglement,
+            "MontantTTC": montant_ttc,
+            "Mode": None,
+            "NumeroPiece": None,
+            "Date": date,
+            "IdEcheance": None,
+            "TypeReglement": 0,
+            "MontantReglementPenalitesTTC": 0.0,
+            "MontantTVA": 0.0,
+            "MontantHT": 0.0,
+            "IdModeReglement": None,
+            **champs,
+        }
+
+    def ajouter_echeance(self, id_echeance: int, montant: float, date: str, **champs: Any) -> None:
+        self._echeances[id_echeance] = {
+            "IdEcheance": id_echeance,
+            "Montant": montant,
+            "Date": date,
+            "IdFacture": None,
+            "IdReglement": None,
+            "ModeReglement": None,
+            "Mention": None,
+            "IdModeReglement": None,
+            **champs,
+        }
+
+    def ajouter_destinataire(self, id_destinataire: int, id_contact: int) -> None:
+        self._destinataires[id_destinataire] = {
+            "IdDestinataire": id_destinataire,
+            "IdAdresse": None,
+            "IdContact": id_contact,
+            "IdContactInterne": None,
+        }
+
+    def ajouter_avoir(self, id_avoir: int, id_facture: int) -> None:
+        self._avoirs_facture.setdefault(id_facture, []).append(id_avoir)
+
+    def ajouter_temps_passe(
+        self, id_temps_passe: int, date: str, nombre_heure: float, id_utilisateur: int, **champs: Any
+    ) -> None:
+        # `champs` : les autres clés du temps passé, au nom du JSON Moduléo
+        # (`IdAffaire`, `IdCodeActivite`, `PrixVenteCollaborateur`…), #191.
+        self._temps_passes[id_temps_passe] = {
+            "IdTempsPasse": id_temps_passe,
+            "Date": date,
+            "DateCloture": None,
+            "NombreHeure": nombre_heure,
+            "NombreKilometre": 0,
+            "Lieu": None,
+            "IdUtilisateur": id_utilisateur,
+            "IdCodeActivite": None,
+            "IdVehicule": None,
+            "IdAffaire": None,
+            "NombreBorne": 0,
+            "Commentaire": None,
+            "IdFacture": None,
+            "PrixVenteCollaborateur": 0.0,
+            "PrixRevientCollaborateur": 0.0,
+            **champs,
+        }
+
+    def ignorer_filtre_utilisateurs(self) -> None:
+        # Comme un serveur qui ignorerait `idsUtilisateurs` de la recherche
+        # de temps passés (#191) : le garde doit tout de même refuser.
+        self._filtre_utilisateurs = False
+
+    def ajouter_code_activite(self, id_code: int, nom: str, code: str = "") -> None:
+        self._codes_activite[id_code] = {
+            "IdCodeActivite": id_code,
+            "Nom": nom,
+            "Code": code,
+            "Actif": True,
+            "Type": 1,
+            "Recup": False,
+        }
+
+    def ajouter_tache(self, id_tache: int, libelle: str, debut: str, fin: str, **champs: Any) -> None:
+        # `champs` : les autres clés de la tâche, au nom du JSON Moduléo
+        # (`Participants` en ids d'utilisateurs planning, `Equipements`,
+        # `IdActivite`, `IdAffaire`, `Emplacement`…), #192.
+        self._taches[id_tache] = {
+            "IdTache": id_tache,
+            "DateHeureDebut": debut,
+            "DateHeureFin": fin,
+            "Libelle": libelle,
+            "IdChefEquipe": None,
+            "Couleur": None,
+            "Commentaire": None,
+            "IdActivite": None,
+            "IdAffaire": None,
+            "IdsContact": [],
+            "Privee": False,
+            "Supprimee": False,
+            "Emplacement": None,
+            "Participants": [],
+            "Equipements": [],
+            "IdRecurrence": None,
+            **champs,
+        }
+
+    def ajouter_activite(self, id_activite: int, libelle: str) -> None:
+        self._activites[id_activite] = {
+            "IdActivite": id_activite,
+            "Libelle": libelle,
+            "Couleur": "",
+            "PrioriteCouleur": 0,
+            "IdCodeActivite": None,
+            "Actif": True,
+        }
+
+    def ajouter_utilisateur_planning(self, id_utilisateur_planning: int, id_utilisateur: int) -> None:
+        # L'utilisateur planning d'un utilisateur Moduléo.
+        self._utilisateurs_planning[id_utilisateur_planning] = {
+            "IdUtilisateurPlanning": id_utilisateur_planning,
+            "IdUtilisateurModuleo": id_utilisateur,
+            "Couleur": "",
+            "Actif": True,
+        }
+
+    def ajouter_equipement(self, id_equipement: int, libelle: str) -> None:
+        self._equipements[id_equipement] = {
+            "IdEquipement": id_equipement,
+            "Libelle": libelle,
+            "TypeEquipement": "",
+            "IdService": None,
+            "IdSite": [],
+            "Actif": True,
         }
 
     def ajouter_intervenant(
@@ -111,6 +352,7 @@ class FauxModuleo:
         type_contact: int = 1,
         type_donneur_ordre: int = 0,
         qualifications: tuple[int, ...] = (),
+        code_comptabilite: str = "",
     ) -> None:
         self._contacts[id_contact] = {
             "IdContact": id_contact,
@@ -120,7 +362,7 @@ class FauxModuleo:
             "Qualifications": list(qualifications),
             "MotsCles": "",
             "Commentaire": "",
-            "CodeComptabilite": "",
+            "CodeComptabilite": code_comptabilite,
         }
 
     def ajouter_qualification(self, id_qualification: int, libelle: str) -> None:
@@ -210,6 +452,18 @@ class FauxModuleo:
             return [
                 i for i, intervenant in self._intervenants.items() if intervenant["IdAffaire"] == parametres["idAffaire"]
             ]
+        if route == "cogeo/affaire/{idAffaire}/parcelles":
+            return [i for i, parcelle in self._parcelles.items() if parcelle["IdAffaire"] == parametres["idAffaire"]]
+        if route == "cogeo/parcelle/{idParcelle}":
+            if parametres["idParcelle"] not in self._parcelles:
+                raise ModuleoIntrouvable(f"404 sur {route}")
+            return self._parcelles[parametres["idParcelle"]]
+        if route == "cogeo/parcelle/{idParcelle}/proprietaires":
+            return [i for i, p in self._proprietaires.items() if p["IdParcelle"] == parametres["idParcelle"]]
+        if route == "cogeo/proprietaire/{idProprietaire}":
+            if parametres["idProprietaire"] not in self._proprietaires:
+                raise ModuleoIntrouvable(f"404 sur {route}")
+            return self._proprietaires[parametres["idProprietaire"]]
         if route == "cogeo/intervenant/multi?ids={ids}":
             return [self._intervenants[i] for i in _ids(parametres) if i in self._intervenants]
         if route == "moduleo/utilisateur/{idUtilisateur}":
@@ -236,6 +490,69 @@ class FauxModuleo:
             return self._affaires_contact.get(parametres["idContact"], {}).get("client", [])
         if route == "cogeo/contact/{idContact}/affaireintervenant":
             return self._affaires_contact.get(parametres["idContact"], {}).get("intervenant", [])
+        if route == _RECHERCHE_DEVIS:
+            return [i for i, devis in self._devis.items() if _devis_correspond(devis, parametres)]
+        if route == "cogeo/devis/multi?ids={ids}":
+            ids = _ids(parametres)
+            assert len(ids) <= _MULTI_MAX, len(ids)
+            return [self._devis[i] for i in ids if i in self._devis]
+        if route == "cogeo/affaire/{idAffaire}/devis":
+            return [i for i, devis in self._devis.items() if devis["IdAffaire"] == parametres["idAffaire"]]
+        if route == _RECHERCHE_FACTURES:
+            return [i for i, facture in self._factures.items() if _facture_correspond(facture, parametres)]
+        if route == "cogeo/facture/multi?ids={ids}":
+            ids = _ids(parametres)
+            assert len(ids) <= _MULTI_MAX, len(ids)
+            return [self._factures[i] for i in ids if i in self._factures]
+        if route == "cogeo/affaire/{idAffaire}/factures":
+            return [i for i, facture in self._factures.items() if facture["IdAffaire"] == parametres["idAffaire"]]
+        if route == "cogeo/reglement/{idReglement}":
+            if parametres["idReglement"] not in self._reglements:
+                raise ModuleoIntrouvable(f"404 sur {route}")
+            return self._reglements[parametres["idReglement"]]
+        if route == "cogeo/echeance/{idEcheance}":
+            if parametres["idEcheance"] not in self._echeances:
+                raise ModuleoIntrouvable(f"404 sur {route}")
+            return self._echeances[parametres["idEcheance"]]
+        if route == "cogeo/avoir/facture?idFacture={idFacture}":
+            return self._avoirs_facture.get(parametres["idFacture"], [])
+        if route == _RECHERCHE_TEMPS_PASSES:
+            if not self._filtre_utilisateurs:
+                parametres = {**parametres, "idsUtilisateurs": None}
+            return [i for i, temps in self._temps_passes.items() if _temps_passe_correspond(temps, parametres)]
+        if route == "cogeo/tempspasse/multi?ids={ids}":
+            ids = _ids(parametres)
+            assert len(ids) <= _MULTI_MAX, len(ids)
+            return [self._temps_passes[i] for i in ids if i in self._temps_passes]
+        if route == "cogeo/codeactivite":
+            return list(self._codes_activite)
+        if route == "cogeo/codeactivite/{idCodeActivite}":
+            if parametres["idCodeActivite"] not in self._codes_activite:
+                raise ModuleoIntrouvable(f"404 sur {route}")
+            return self._codes_activite[parametres["idCodeActivite"]]
+        if route == _RECHERCHE_TACHES:
+            return [i for i, tache in self._taches.items() if _tache_correspond(tache, parametres)]
+        if route == "planning/tacheplanning/multi?ids={ids}":
+            ids = _ids(parametres)
+            assert len(ids) <= _MULTI_MAX, len(ids)
+            return [self._taches[i] for i in ids if i in self._taches]
+        if route == "planning/activite":
+            return list(self._activites.values())
+        if route == "planning/utilisateurplanning/utilisateur/{idUtilisateur}":
+            for utilisateur in self._utilisateurs_planning.values():
+                if utilisateur["IdUtilisateurModuleo"] == parametres["idUtilisateur"]:
+                    return utilisateur
+            raise ModuleoIntrouvable(f"404 sur {route}")
+        if route == "planning/utilisateurplanning/{idUtilisateurPlanning}":
+            if parametres["idUtilisateurPlanning"] not in self._utilisateurs_planning:
+                raise ModuleoIntrouvable(f"404 sur {route}")
+            return self._utilisateurs_planning[parametres["idUtilisateurPlanning"]]
+        if route == "moduleo/equipement/{idEquipement}":
+            if parametres["idEquipement"] not in self._equipements:
+                raise ModuleoIntrouvable(f"404 sur {route}")
+            return self._equipements[parametres["idEquipement"]]
+        if route == "cogeo/destinataire/multi?ids={ids}":
+            return [self._destinataires[i] for i in _ids(parametres) if i in self._destinataires]
         if route == "cogeo/contact/multi?ids={ids}":
             return [self._contacts[i] for i in _ids(parametres) if i in self._contacts]
         if route == "moduleo/commune/multi?ids={ids}":
@@ -290,6 +607,75 @@ def _correspond(affaire: dict, parametres: dict[str, Any]) -> bool:
             return False
         if maximum is not None and not (jour and jour <= maximum):
             return False
+    return True
+
+
+# Filtres de cogeo/devis?… (#189) : paramètre → champ du devis.
+_FILTRES_IDS_DEVIS = {"idsService": "IdService", "idsResponsable": "IdResponsable", "idsRedacteur": "IdRedacteur"}
+_FILTRES_DATES_DEVIS = {"Emission": "DateEmission", "Reponse": "DateReponse"}
+
+
+def _devis_correspond(devis: dict, parametres: dict[str, Any]) -> bool:
+    if not _contient(f"{devis['Numero']} {devis['Objet']}", parametres.get("texte")):
+        return False
+    emis = parametres.get("emis")
+    if emis is not None and (emis == "true") != bool(devis["DateEmission"]):
+        return False
+    for parametre, champ in _FILTRES_IDS_DEVIS.items():
+        if parametres.get(parametre) is not None and devis[champ] not in _ids({"ids": parametres[parametre]}):
+            return False
+    for suffixe, champ in _FILTRES_DATES_DEVIS.items():
+        jour = (devis[champ] or "")[:10]
+        minimum, maximum = parametres.get(f"date{suffixe}Min"), parametres.get(f"date{suffixe}Max")
+        if minimum is not None and not (jour and jour >= minimum):
+            return False
+        if maximum is not None and not (jour and jour <= maximum):
+            return False
+    return True
+
+
+def _facture_correspond(facture: dict, parametres: dict[str, Any]) -> bool:
+    # Mêmes filtres que les devis (#190), `emise` au féminin, sans date de
+    # réponse.
+    return _devis_correspond(
+        {**facture, "Etat": 0, "DateReponse": None},
+        {**parametres, "emis": parametres.get("emise")},
+    )
+
+
+def _temps_passe_correspond(temps: dict, parametres: dict[str, Any]) -> bool:
+    # Filtres de cogeo/tempspasse?… (#191) ; dates comparées au jour.
+    jour = (temps["Date"] or "")[:10]
+    if parametres.get("dateMin") is not None and not (jour and jour >= parametres["dateMin"]):
+        return False
+    if parametres.get("dateMax") is not None and not (jour and jour <= parametres["dateMax"]):
+        return False
+    utilisateurs = parametres.get("idsUtilisateurs")
+    if utilisateurs is not None and temps["IdUtilisateur"] not in _ids({"ids": utilisateurs}):
+        return False
+    for parametre, champ in (("idCodeActivite", "IdCodeActivite"), ("idAffaire", "IdAffaire")):
+        if parametres.get(parametre) is not None and temps[champ] != parametres[parametre]:
+            return False
+    return True
+
+
+def _tache_correspond(tache: dict, parametres: dict[str, Any]) -> bool:
+    # Filtres de planning/tacheplanning?… (#192) : une tâche qui chevauche
+    # la période, au jour près ; un participant au moins.
+    if tache["Supprimee"] and parametres.get("recupererTachesSupprimees") != "true":
+        return False
+    if not _contient(tache["Libelle"], parametres.get("libelle")):
+        return False
+    debut, fin = tache["DateHeureDebut"][:10], tache["DateHeureFin"][:10]
+    if parametres.get("dateDebut") is not None and fin < parametres["dateDebut"]:
+        return False
+    if parametres.get("dateFin") is not None and debut > parametres["dateFin"]:
+        return False
+    if parametres.get("idActivite") is not None and tache["IdActivite"] != parametres["idActivite"]:
+        return False
+    participants = parametres.get("idsParticipants")
+    if participants is not None and not set(tache["Participants"]) & set(_ids({"ids": participants})):
+        return False
     return True
 
 
