@@ -1,3 +1,4 @@
+import unicodedata
 from collections.abc import Iterable
 from dataclasses import dataclass
 
@@ -150,6 +151,49 @@ def chercher_qualifications(lecteur: LecteurModuleo, noms: list[str]) -> str:
             raise NomNonResolu(_ambigu("qualifications", nom, libelles, len(proches)))
         ids.append(proches[0])
     return ",".join(map(str, dict.fromkeys(ids)))
+
+
+def resoudre_codes_activite(lecteur: LecteurModuleo, ids: Iterable[int | None]) -> dict[int, str]:
+    # Temps passés (#191) : pas de route `multi`, une lecture par code.
+    codes = {}
+    for id_code in _uniques(ids):
+        try:
+            codes[id_code] = _nom_code_activite(lecteur.lire(_ROUTE_CODE_ACTIVITE, {"idCodeActivite": id_code}))
+        except ModuleoIntrouvable:
+            continue
+    return codes
+
+
+def chercher_code_activite(lecteur: LecteurModuleo, nom: str) -> int:
+    # Codes lus dans Moduléo (#191) : un code créé dans Moduléo est reconnu
+    # sans changer le code. Nom ou code exact (casse indifférente), sinon le
+    # seul qui contient le nom.
+    codes = {
+        id_code: lecteur.lire(_ROUTE_CODE_ACTIVITE, {"idCodeActivite": id_code})
+        for id_code in _uniques(lecteur.lire("cogeo/codeactivite"))
+    }
+    cherche = _cle(nom)
+    exacts = [i for i, c in codes.items() if cherche in (_cle(c.get("Nom")), _cle(c.get("Code")))]
+    proches = exacts or [i for i, c in codes.items() if cherche in f"{_cle(c.get('Nom'))} {_cle(c.get('Code'))}"]
+    if not proches:
+        raise NomNonResolu(f"Aucun code activité Moduléo ne correspond à « {nom} » : recherche non lancée.")
+    if len(proches) > 1:
+        noms = sorted(_nom_code_activite(codes[i]) for i in proches[:_CANDIDATS_MAX])
+        raise NomNonResolu(_ambigu("codes activité", nom, noms, len(proches)))
+    return proches[0]
+
+
+_ROUTE_CODE_ACTIVITE = "cogeo/codeactivite/{idCodeActivite}"
+
+
+def _cle(valeur: object) -> str:
+    # Casse et accents indifférents : « releve » trouve « Relevé ».
+    texte = unicodedata.normalize("NFD", _texte(valeur).casefold())
+    return "".join(c for c in texte if not unicodedata.combining(c))
+
+
+def _nom_code_activite(code: dict) -> str:
+    return _texte(code.get("Nom")) or _texte(code.get("Code"))
 
 
 def _essais_utilisateur(nom: str) -> list[dict[str, str]]:

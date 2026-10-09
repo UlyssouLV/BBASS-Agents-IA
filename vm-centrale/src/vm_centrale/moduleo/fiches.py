@@ -333,6 +333,119 @@ def synthese_factures(
     return Fiche(reference, texte, questions)
 
 
+# Temps passés (#191). Prix seulement avec leur sous-droit, sinon une
+# mention (vérification par champ, #188) ; sens exact (taux horaire ou
+# prix de la ligne) à confirmer à l'essai réel : affichés tels que lus.
+_PRIX_REVIENT = ("Affaires, groupes et archivage", "Voir l'onglet prix de revient")
+_PRIX_TEMPS_PASSES = (
+    ("PrixVenteCollaborateur", "Prix de vente", chemin(*_PRIX_REVIENT, "Voir le prix de vente des temps passés")),
+    ("PrixRevientCollaborateur", "Prix de revient", chemin(*_PRIX_REVIENT, "Voir le prix de revient des temps passés")),
+)
+
+
+@dataclass(frozen=True)
+class NomsTempsPasses:
+    # Ids → noms d'un appel de chercher_temps_passes_moduleo : utilisateurs,
+    # numéros d'affaire, codes activité.
+    utilisateurs: dict[int, Utilisateur]
+    affaires: dict[int, str]
+    codes_activite: dict[int, str]
+
+
+def heures(valeur: object) -> str:
+    # 4.0 → « 4 h », 7.5 → « 7,5 h » ; absent : pas de ligne.
+    return f"{_decimal(valeur)} h" if _nombre(valeur) else ""
+
+
+def fiche_temps_passe(temps: dict, noms: NomsTempsPasses, droits: DroitsModuleo) -> Fiche:
+    # Référence : « Moduléo, temps passé du 07/10/2026, Jean Martin,
+    # affaire 2024-123 ».
+    jour = _date(temps.get("Date")) or "date inconnue"
+    collaborateur = _nom(noms.utilisateurs.get(_id(temps.get("IdUtilisateur"))))
+    affaire = noms.affaires.get(_id(temps.get("IdAffaire")), "")
+    code = noms.codes_activite.get(_id(temps.get("IdCodeActivite")), "")
+    du_temps = heures(temps.get("NombreHeure"))
+    kilometres = temps.get("NombreKilometre")
+
+    lignes = [f"Temps passé du {jour}"]
+    _ajouter(lignes, "Collaborateur", collaborateur)
+    _ajouter(lignes, "Affaire", affaire)
+    _ajouter(lignes, "Code activité", code)
+    _ajouter(lignes, "Heures", du_temps)
+    _ajouter(lignes, "Kilomètres", _decimal(kilometres) if _nombre(kilometres) and kilometres else "")
+    _ajouter(lignes, "Lieu", _texte(temps.get("Lieu")))
+    _ajouter(lignes, "Commentaire", _texte(temps.get("Commentaire")))
+    for champ, titre, droit in _PRIX_TEMPS_PASSES:
+        if (mention := droits.section(droit, titre)) is not None:
+            lignes.append(mention)
+        else:
+            _ajouter(lignes, titre, montant(temps.get(champ)))
+
+    reference = ", ".join(
+        partie for partie in (f"temps passé du {jour}", collaborateur, f"affaire {affaire}" if affaire else "") if partie
+    )
+    questions = _questions(
+        (f"Combien d'heures pour le {reference} ?", du_temps),
+        (f"Quel code activité pour le {reference} ?", code),
+    )
+    return Fiche(reference, "\n".join(lignes), questions)
+
+
+def synthese_temps_passes(
+    temps: list[dict], noms: NomsTempsPasses, affiches: int, portee: str, reference: str
+) -> Fiche:
+    # Totaux calculés par la VM sur tous les temps passés trouvés (spec
+    # 1.5.1) : général, par collaborateur, par code activité. `portee` :
+    # « trouvés (affaire 2024-123) », « saisis du 02/10/2026 au 09/10/2026
+    # (7 derniers jours) ».
+    nombre = len(temps)
+    total = heures(round(sum(_heures_de(t) for t in temps), 2))
+
+    def collaborateur(id_utilisateur: int) -> str:
+        return _nom(noms.utilisateurs.get(id_utilisateur)) or "collaborateur inconnu"
+
+    def code_activite(id_code: int) -> str:
+        return noms.codes_activite.get(id_code, "code activité inconnu") if id_code else "sans code activité"
+
+    par_collaborateur = _repartition(temps, "IdUtilisateur", collaborateur)
+    par_code = _repartition(temps, "IdCodeActivite", code_activite)
+    texte = (
+        f"{nombre} {'temps passé' if nombre == 1 else 'temps passés'} {portee}, total {total}. "
+        f"Par collaborateur : {par_collaborateur}. Par code activité : {par_code}."
+    )
+    if nombre > affiches:
+        recents = "Le plus récent affiché" if affiches == 1 else f"Les {affiches} plus récents affichés"
+        texte += f" {recents}, précise la recherche."
+    questions = _questions(
+        (f"Combien d'heures dans les {reference} ?", total),
+        (f"Combien d'heures par collaborateur dans les {reference} ?", par_collaborateur),
+        (f"Combien d'heures par code activité dans les {reference} ?", par_code),
+    )
+    return Fiche(reference, texte, questions)
+
+
+def _heures_de(temps: dict) -> float:
+    valeur = temps.get("NombreHeure")
+    return valeur if _nombre(valeur) else 0.0
+
+
+def _repartition(temps: list[dict], champ: str, nom) -> str:
+    # « Jean Martin 6 h, Sophie Bernard 1,5 h » : le plus d'heures d'abord.
+    totaux: dict[str, float] = {}
+    for t in temps:
+        libelle = nom(_id(t.get(champ)))
+        totaux[libelle] = totaux.get(libelle, 0.0) + _heures_de(t)
+    return ", ".join(
+        f"{libelle} {heures(round(valeur, 2))}"
+        for libelle, valeur in sorted(totaux.items(), key=lambda element: (-element[1], element[0]))
+    )
+
+
+def _decimal(valeur: object) -> str:
+    # 4.0 → « 4 », 7.5 → « 7,5 », 1.25 → « 1,25 ».
+    return f"{valeur:.2f}".rstrip("0").rstrip(".").replace(".", ",")
+
+
 def _reglement(reglement: dict, echeances: dict[int, dict]) -> str:
     # « Règlement du 25/09/2026 : 600,00 € TTC (Virement), échéance du
     # 30/09/2026 de 600,00 € ».

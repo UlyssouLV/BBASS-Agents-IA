@@ -13,6 +13,7 @@ _RECHERCHE_AFFAIRES = next(route for route in ROUTES_GET if route.startswith("co
 _RECHERCHE_CONTACTS = next(route for route in ROUTES_GET if route.startswith("cogeo/contact?texte="))
 _RECHERCHE_DEVIS = next(route for route in ROUTES_GET if route.startswith("cogeo/devis?texte="))
 _RECHERCHE_FACTURES = next(route for route in ROUTES_GET if route.startswith("cogeo/facture?texte="))
+_RECHERCHE_TEMPS_PASSES = next(route for route in ROUTES_GET if route.startswith("cogeo/tempspasse?dateMin="))
 # Limite des routes `multi` (doc Moduléo).
 _MULTI_MAX = 200
 # Coordonnées d'un contact (#176) : route des ids → (route de la fiche,
@@ -50,6 +51,9 @@ class FauxModuleo:
         self._destinataires: dict[int, dict] = {}
         # Ids des avoirs de chaque facture.
         self._avoirs_facture: dict[int, list[int]] = {}
+        self._temps_passes: dict[int, dict] = {}
+        self._codes_activite: dict[int, dict] = {}
+        self._filtre_utilisateurs = True
         self._exception: Exception | None = None
 
     def echouer(self, exception: Exception) -> None:
@@ -170,6 +174,45 @@ class FauxModuleo:
 
     def ajouter_avoir(self, id_avoir: int, id_facture: int) -> None:
         self._avoirs_facture.setdefault(id_facture, []).append(id_avoir)
+
+    def ajouter_temps_passe(
+        self, id_temps_passe: int, date: str, nombre_heure: float, id_utilisateur: int, **champs: Any
+    ) -> None:
+        # `champs` : les autres clés du temps passé, au nom du JSON Moduléo
+        # (`IdAffaire`, `IdCodeActivite`, `PrixVenteCollaborateur`…), #191.
+        self._temps_passes[id_temps_passe] = {
+            "IdTempsPasse": id_temps_passe,
+            "Date": date,
+            "DateCloture": None,
+            "NombreHeure": nombre_heure,
+            "NombreKilometre": 0,
+            "Lieu": None,
+            "IdUtilisateur": id_utilisateur,
+            "IdCodeActivite": None,
+            "IdVehicule": None,
+            "IdAffaire": None,
+            "NombreBorne": 0,
+            "Commentaire": None,
+            "IdFacture": None,
+            "PrixVenteCollaborateur": 0.0,
+            "PrixRevientCollaborateur": 0.0,
+            **champs,
+        }
+
+    def ignorer_filtre_utilisateurs(self) -> None:
+        # Comme un serveur qui ignorerait `idsUtilisateurs` de la recherche
+        # de temps passés (#191) : le garde doit tout de même refuser.
+        self._filtre_utilisateurs = False
+
+    def ajouter_code_activite(self, id_code: int, nom: str, code: str = "") -> None:
+        self._codes_activite[id_code] = {
+            "IdCodeActivite": id_code,
+            "Nom": nom,
+            "Code": code,
+            "Actif": True,
+            "Type": 1,
+            "Recup": False,
+        }
 
     def ajouter_intervenant(
         self,
@@ -363,6 +406,20 @@ class FauxModuleo:
             return self._echeances[parametres["idEcheance"]]
         if route == "cogeo/avoir/facture?idFacture={idFacture}":
             return self._avoirs_facture.get(parametres["idFacture"], [])
+        if route == _RECHERCHE_TEMPS_PASSES:
+            if not self._filtre_utilisateurs:
+                parametres = {**parametres, "idsUtilisateurs": None}
+            return [i for i, temps in self._temps_passes.items() if _temps_passe_correspond(temps, parametres)]
+        if route == "cogeo/tempspasse/multi?ids={ids}":
+            ids = _ids(parametres)
+            assert len(ids) <= _MULTI_MAX, len(ids)
+            return [self._temps_passes[i] for i in ids if i in self._temps_passes]
+        if route == "cogeo/codeactivite":
+            return list(self._codes_activite)
+        if route == "cogeo/codeactivite/{idCodeActivite}":
+            if parametres["idCodeActivite"] not in self._codes_activite:
+                raise ModuleoIntrouvable(f"404 sur {route}")
+            return self._codes_activite[parametres["idCodeActivite"]]
         if route == "cogeo/destinataire/multi?ids={ids}":
             return [self._destinataires[i] for i in _ids(parametres) if i in self._destinataires]
         if route == "cogeo/contact/multi?ids={ids}":
@@ -453,6 +510,22 @@ def _facture_correspond(facture: dict, parametres: dict[str, Any]) -> bool:
         {**facture, "Etat": 0, "DateReponse": None},
         {**parametres, "emis": parametres.get("emise")},
     )
+
+
+def _temps_passe_correspond(temps: dict, parametres: dict[str, Any]) -> bool:
+    # Filtres de cogeo/tempspasse?… (#191) ; dates comparées au jour.
+    jour = (temps["Date"] or "")[:10]
+    if parametres.get("dateMin") is not None and not (jour and jour >= parametres["dateMin"]):
+        return False
+    if parametres.get("dateMax") is not None and not (jour and jour <= parametres["dateMax"]):
+        return False
+    utilisateurs = parametres.get("idsUtilisateurs")
+    if utilisateurs is not None and temps["IdUtilisateur"] not in _ids({"ids": utilisateurs}):
+        return False
+    for parametre, champ in (("idCodeActivite", "IdCodeActivite"), ("idAffaire", "IdAffaire")):
+        if parametres.get(parametre) is not None and temps[champ] != parametres[parametre]:
+            return False
+    return True
 
 
 def _contact_correspond(contact: dict, parametres: dict[str, Any]) -> bool:

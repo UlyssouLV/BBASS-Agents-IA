@@ -239,5 +239,15 @@
       "moduleo/tacheafaire/user/{idUser}",
       "moduleo/tacheafaire/{idTacheAFaire}"
     ]
+  },
+  "siens": {
+    "Temps passés et frais des temps passés › Consulter les temps passés et les frais des temps passés des autres collaborateurs": {
+      "parametres": {
+        "cogeo/tempspasse?dateMin={dateMin}&dateMax={dateMax}&idsUtilisateurs={idsUtilisateurs}&idCodeActivite={idCodeActivite}&idAffaire={idAffaire}&nbMaxResultat={nbMaxResultat}": "idsUtilisateurs"
+      },
+      "reponses": {
+        "cogeo/tempspasse/multi?ids={ids}": "IdUtilisateur"
+      }
+    }
   }
 }

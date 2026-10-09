@@ -7,7 +7,7 @@ import httpx
 
 from vm_centrale.config import MODULEO_HTTP_TIMEOUT
 from vm_centrale.moduleo.configuration import config_moduleo
-from vm_centrale.moduleo.droits import DroitsModuleo, verifier
+from vm_centrale.moduleo.droits import DroitsModuleo, verifier, verifier_reponse
 from vm_centrale.moduleo.routes import ROUTES_GET
 
 _http_client = httpx.Client(timeout=MODULEO_HTTP_TIMEOUT)
@@ -66,8 +66,12 @@ class ClientModuleo:
         if methode != "GET":
             raise RequeteInterdite(f"Méthode {methode!r} refusée : Moduléo est en lecture seule.")
         _remplir(route, parametres or {})
-        verifier(route, droits)
-        return self._transport.lire(route, parametres)
+        verifier(route, droits, parametres)
+        reponse = self._transport.lire(route, parametres)
+        # Une route ouverte aux seuls éléments du compte (#191) : chaque
+        # élément reçu est relu avant d'être rendu.
+        verifier_reponse(route, droits, reponse)
+        return reponse
 
     def pour(self, droits: DroitsModuleo) -> LecteurModuleo:
         # Le client lié aux droits d'un compte, pour le temps d'un appel.

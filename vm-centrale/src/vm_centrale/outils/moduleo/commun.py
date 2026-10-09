@@ -61,25 +61,28 @@ class LecteurTrace:
         self.routes: list[dict[str, Any]] = []
 
     def lire(self, route: str, parametres: dict[str, Any] | None = None) -> Any:
-        verifier(route, self._droits)
+        verifier(route, self._droits, parametres)
         with self._verrou:
             self.routes.append({"route": route, "parametres": parametres or {}})
         return self._client.lire(route, parametres, self._droits)
 
 
-def propose(contexte: ContexteTour, route: str) -> bool:
+def propose(contexte: ContexteTour, route: str, parametres: dict[str, Any] | None = None) -> bool:
     # Outil proposé au modèle (spec 1.5.1) : Moduléo configuré et `route`,
     # la recherche de l'outil, autorisée par le garde des droits pour ce
-    # compte. Sans groupe, aucun outil Moduléo, même pour un compte
-    # administrateur.
-    return contexte.client_moduleo is not None and autorise(route, contexte.droits_moduleo)
+    # compte (avec `parametres` pour une route ouverte aux seuls éléments
+    # du compte, #191). Sans groupe, aucun outil Moduléo, même pour un
+    # compte administrateur.
+    return contexte.client_moduleo is not None and autorise(route, contexte.droits_moduleo, parametres)
 
 
-def refus_du_garde(contexte: ContexteTour, route: str) -> ResultatOutil | None:
+def refus_du_garde(
+    contexte: ContexteTour, route: str, parametres: dict[str, Any] | None = None
+) -> ResultatOutil | None:
     # Revérifié à l'exécution, avant toute lecture (même libre) : un outil
     # non proposé peut être appelé.
     try:
-        verifier(route, contexte.droits_moduleo)
+        verifier(route, contexte.droits_moduleo, parametres)
     except DroitManquant as refus:
         return _refuse(refus, [])
     return None

@@ -1,6 +1,7 @@
 import json
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from vm_centrale.moduleo.droits.catalogue import COGEO, FICHIER_CATALOGUE, PLANNING, chemin
 from vm_centrale.moduleo.droits.compte import DroitsModuleo
@@ -18,12 +19,24 @@ _NOMS_APPLICATIONS = {COGEO: "Cogeo", PLANNING: "Planning"}
 
 
 @dataclass(frozen=True)
+class Siens:
+    # Sans le droit, une route reste lisible pour les seuls éléments de
+    # l'utilisateur Moduléo lié au compte (#191) : `parametre`, celui de la
+    # requête qui doit valoir son id ; ou `champ`, celui de chaque élément
+    # reçu qui doit valoir son id.
+    parametre: str | None = None
+    champ: str | None = None
+
+
+@dataclass(frozen=True)
 class Exigence:
     # Une seule des formes : libre (rien), groupe d'une application, droit
-    # (son chemin), ou fermée (aucun compte).
+    # (son chemin), ou fermée (aucun compte). Un droit peut s'ouvrir aux
+    # seuls éléments du compte (`siens`).
     groupe: str | None = None
     droit: str | None = None
     fermee: bool = False
+    siens: Siens | None = None
 
 
 LIBRE = Exigence()
@@ -68,6 +81,13 @@ def _charger_classement() -> dict[str, Exigence]:
         if droit not in _APPLICATIONS:
             raise ValueError(f"routes.json : droit absent du catalogue : {droit}")
         classement |= {route: Exigence(droit=droit) for route in routes}
+    for droit, regles in donnees.get("siens", {}).items():
+        sienne = [(route, Siens(parametre=p)) for route, p in regles.get("parametres", {}).items()]
+        sienne += [(route, Siens(champ=c)) for route, c in regles.get("reponses", {}).items()]
+        for route, siens in sienne:
+            if classement.get(route) != Exigence(droit=droit):
+                raise ValueError(f"routes.json : « siens » hors des routes du droit {droit} : {route}")
+            classement[route] = Exigence(droit=droit, siens=siens)
     return classement
 
 
@@ -94,9 +114,32 @@ def _groupe(droits: DroitsModuleo, application: str) -> str | None:
     return droits.groupe_cogeo if application == COGEO else droits.groupe_planning
 
 
-def verifier(route: str, droits: DroitsModuleo) -> None:
-    # Lève DroitManquant si le compte ne peut pas lire `route`. Recherche en
-    # mémoire seulement, sans base ni réseau.
+def _droit_manquant(droit: str, route: str) -> DroitManquant:
+    libelle = droit.rsplit(" › ", 1)[-1]
+    return DroitManquant(
+        f"Votre compte n'a pas le droit Moduléo « {libelle} ». {_SANS_LECTURE} {_DEMANDER}",
+        f"refusé, droit manquant « {droit} » ({_route_courte(route)})",
+    )
+
+
+def _ids(valeur: Any) -> set[str]:
+    return {i.strip() for i in str(valeur).split(",") if i.strip()} if valeur is not None else set()
+
+
+def _les_siens(siens: Siens | None, droits: DroitsModuleo, parametres: dict[str, Any] | None) -> bool:
+    # Sans le droit : seulement un compte lié à son utilisateur Moduléo,
+    # et un paramètre qui ne désigne que lui. Une route à `champ` passe
+    # ici ; chaque élément reçu est relu par verifier_reponse.
+    if siens is None or droits.id_utilisateur_moduleo is None:
+        return False
+    if siens.champ is not None:
+        return True
+    return _ids((parametres or {}).get(siens.parametre)) == {str(droits.id_utilisateur_moduleo)}
+
+
+def verifier(route: str, droits: DroitsModuleo, parametres: dict[str, Any] | None = None) -> None:
+    # Lève DroitManquant si le compte ne peut pas lire `route` avec
+    # `parametres`. Recherche en mémoire seulement, sans base ni réseau.
     exigence = CLASSEMENT.get(route)
     if exigence is None or exigence.fermee:
         raise DroitManquant(
@@ -109,16 +152,26 @@ def verifier(route: str, droits: DroitsModuleo) -> None:
         application = _APPLICATIONS[exigence.droit]
         if _groupe(droits, application) is None:
             raise _sans_groupe(application)
-        libelle = exigence.droit.rsplit(" › ", 1)[-1]
-        raise DroitManquant(
-            f"Votre compte n'a pas le droit Moduléo « {libelle} ». {_SANS_LECTURE} {_DEMANDER}",
-            f"refusé, droit manquant « {exigence.droit} » ({_route_courte(route)})",
-        )
+        if not _les_siens(exigence.siens, droits, parametres):
+            raise _droit_manquant(exigence.droit, route)
 
 
-def autorise(route: str, droits: DroitsModuleo) -> bool:
+def verifier_reponse(route: str, droits: DroitsModuleo, reponse: Any) -> None:
+    # Après la lecture d'une route ouverte aux seuls éléments du compte
+    # (`Siens.champ`), sans le droit : chaque élément reçu doit être à son
+    # utilisateur Moduléo, sinon DroitManquant et rien n'est rendu.
+    exigence = CLASSEMENT.get(route)
+    if exigence is None or exigence.siens is None or exigence.siens.champ is None or droits.a(exigence.droit):
+        return
+    champ = exigence.siens.champ
+    elements = reponse if isinstance(reponse, list) else [reponse]
+    if any(not isinstance(e, dict) or e.get(champ) != droits.id_utilisateur_moduleo for e in elements):
+        raise _droit_manquant(exigence.droit, route)
+
+
+def autorise(route: str, droits: DroitsModuleo, parametres: dict[str, Any] | None = None) -> bool:
     try:
-        verifier(route, droits)
+        verifier(route, droits, parametres)
     except DroitManquant:
         return False
     return True

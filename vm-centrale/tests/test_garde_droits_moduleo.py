@@ -83,6 +83,8 @@ def test_toutes_les_routes_get_sont_classees_et_seulement_elles():
     routes = [
         route
         for genre, valeur in classement.items()
+        # « siens » (#191) ouvre des routes déjà classées sous leur droit.
+        if genre != "siens"
         for route in (valeur if isinstance(valeur, list) else [r for routes in valeur.values() for r in routes])
     ]
 
@@ -101,6 +103,7 @@ def test_chaque_droit_exige_est_dans_le_catalogue():
 
     connus = {c for application in (COGEO, PLANNING) for cat in catalogue[application] for c in chemins(cat["categorie"], cat["droits"], [])}
     assert set(classement["droits"]) <= connus
+    assert set(classement["siens"]) <= set(classement["droits"])
 
 
 # Refus avant tout envoi.
