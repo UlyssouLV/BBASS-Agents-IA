@@ -60,6 +60,9 @@ class FauxModuleo:
         self._activites: dict[int, dict] = {}
         self._utilisateurs_planning: dict[int, dict] = {}
         self._equipements: dict[int, dict] = {}
+        # Parcelles d'affaire et leurs propriétaires (#193).
+        self._parcelles: dict[int, dict] = {}
+        self._proprietaires: dict[int, dict] = {}
         self._filtre_utilisateurs = True
         self._exception: Exception | None = None
 
@@ -91,6 +94,41 @@ class FauxModuleo:
             "IdService": None,
             "IdDossierProduction": None,
             **champs,
+        }
+
+    def ajouter_parcelle(
+        self,
+        id_parcelle: int,
+        id_affaire: int,
+        section: str,
+        numero: str,
+        prefixe: str = "",
+        id_commune: int | None = None,
+        contenance: float | None = None,
+        lieu_dit: str = "",
+    ) -> None:
+        self._parcelles[id_parcelle] = {
+            "IdParcelle": id_parcelle,
+            "Numero": numero,
+            "Section": section,
+            "Prefixe": prefixe,
+            "IdCommune": id_commune,
+            "IdAffaire": id_affaire,
+            "IdParcelleParente": None,
+            "HorairesConvocation": [],
+            "LieuDit": lieu_dit,
+            "DMPC": "",
+            "Information": 0,
+            "NatureSol": 0,
+            "ContenanceCadatrale": contenance,
+        }
+
+    def ajouter_proprietaire(self, id_proprietaire: int, id_parcelle: int, id_contact: int) -> None:
+        self._proprietaires[id_proprietaire] = {
+            "IdProprietaire": id_proprietaire,
+            "TypeDroit": 0,
+            "IdContact": id_contact,
+            "IdParcelle": id_parcelle,
         }
 
     def ajouter_devis(self, id_devis: int, numero: str, objet: str = "", **champs: Any) -> None:
@@ -414,6 +452,18 @@ class FauxModuleo:
             return [
                 i for i, intervenant in self._intervenants.items() if intervenant["IdAffaire"] == parametres["idAffaire"]
             ]
+        if route == "cogeo/affaire/{idAffaire}/parcelles":
+            return [i for i, parcelle in self._parcelles.items() if parcelle["IdAffaire"] == parametres["idAffaire"]]
+        if route == "cogeo/parcelle/{idParcelle}":
+            if parametres["idParcelle"] not in self._parcelles:
+                raise ModuleoIntrouvable(f"404 sur {route}")
+            return self._parcelles[parametres["idParcelle"]]
+        if route == "cogeo/parcelle/{idParcelle}/proprietaires":
+            return [i for i, p in self._proprietaires.items() if p["IdParcelle"] == parametres["idParcelle"]]
+        if route == "cogeo/proprietaire/{idProprietaire}":
+            if parametres["idProprietaire"] not in self._proprietaires:
+                raise ModuleoIntrouvable(f"404 sur {route}")
+            return self._proprietaires[parametres["idProprietaire"]]
         if route == "cogeo/intervenant/multi?ids={ids}":
             return [self._intervenants[i] for i in _ids(parametres) if i in self._intervenants]
         if route == "moduleo/utilisateur/{idUtilisateur}":

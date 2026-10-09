@@ -86,9 +86,7 @@
     "cogeo/parcelle/{idParcelle}/operationscibles",
     "cogeo/parcelle/{idParcelle}/operationsliees",
     "cogeo/parcelle/{idParcelle}/parcellesfille",
-    "cogeo/parcelle/{idParcelle}/proprietaires",
     "cogeo/parcelle/{idParcelle}/titres",
-    "cogeo/proprietaire/{idProprietaire}",
     "cogeo/titre/multi?ids={ids}",
     "cogeo/titre/{idTitre}"
   ],
@@ -220,6 +218,8 @@
       "cogeo/contact/{idContact}/telephones",
       "cogeo/contact?texte={texte}&typeContact={typeContact}&typeDonneurOrdreGE={typeDonneurOrdreGE}&idsQualifications={idsQualifications}&nbMaxResultat={nbMaxResultat}",
       "cogeo/email/{idEmail}",
+      "cogeo/parcelle/{idParcelle}/proprietaires",
+      "cogeo/proprietaire/{idProprietaire}",
       "moduleo/adresse/{idAdresse}",
       "moduleo/telephone/{idTelephone}"
     ],

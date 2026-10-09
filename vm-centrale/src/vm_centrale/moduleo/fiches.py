@@ -34,8 +34,26 @@ _COORDONNEES_DES_CONTACTS = (
 )
 
 
-def fiche_affaire(affaire: dict, intervenants: list[dict], noms: Noms) -> Fiche:
+@dataclass(frozen=True)
+class ParcellesAffaire:
+    # Ce que `avec_parcelles` lit pour une affaire (#193) : ses parcelles
+    # telles que Moduléo les renvoie et, par id de parcelle, les ids
+    # contact de ses propriétaires ; None : propriétaires non autorisés
+    # pour le compte (« Rechercher des contacts », données personnelles).
+    parcelles: list[dict]
+    proprietaires: dict[int, list[int]] | None
+
+
+_PROPRIETAIRES_NON_AUTORISES = "Propriétaires : non autorisés pour votre compte"
+# Préfixe cadastral par défaut : pas affiché (« AB 123 »).
+_PREFIXES_SANS_AFFICHAGE = ("", "000")
+
+
+def fiche_affaire(
+    affaire: dict, intervenants: list[dict], noms: Noms, parcelles: ParcellesAffaire | None = None
+) -> Fiche:
     # Référence citée par la ligne « Sources : » : « Moduléo, affaire 2024-123 ».
+    # `parcelles` : seulement quand le collaborateur les demande (#193).
     numero = _texte(affaire.get("Numero"))
     objet = _texte(affaire.get("Objet"))
     etat = _texte(enumerations.libelle(enumerations.ETATS_AFFAIRE, affaire.get("Etat")))
@@ -66,6 +84,15 @@ def fiche_affaire(affaire: dict, intervenants: list[dict], noms: Noms) -> Fiche:
         lignes.extend(f"- {ligne}" for ligne in lignes_intervenants)
     if client or representant or lignes_intervenants:
         lignes.append(_COORDONNEES_DES_CONTACTS)
+    lignes_parcelles = [_parcelle(noms, parcelle, parcelles) for parcelle in parcelles.parcelles] if parcelles else []
+    if parcelles is not None:
+        if lignes_parcelles:
+            lignes.append("Parcelles :")
+            lignes.extend(f"- {ligne}" for ligne in lignes_parcelles)
+        else:
+            lignes.append("Parcelles : aucune dans Moduléo")
+        if parcelles.proprietaires is None and lignes_parcelles:
+            lignes.append(_PROPRIETAIRES_NON_AUTORISES)
 
     de_laffaire = f"de l'affaire {numero}"
     client_represente = f"{client}, représenté par {representant}" if client and representant else client
@@ -77,6 +104,7 @@ def fiche_affaire(affaire: dict, intervenants: list[dict], noms: Noms) -> Fiche:
         (f"Qui est le client {de_laffaire} ?", client_represente),
         (f"Qui suit l'affaire {numero} ?", _libelles(suivi)),
         (f"Qui sont les intervenants {de_laffaire} ?", " ; ".join(lignes_intervenants)),
+        (f"Quelles sont les parcelles {de_laffaire} ?", " ; ".join(lignes_parcelles)),
     )
     return Fiche(f"affaire {numero}", "\n".join(lignes), questions)
 
@@ -671,6 +699,38 @@ def _utilisateur(utilisateur: Utilisateur | None) -> str:
         if coordonnee
     ]
     return f"{utilisateur.nom} ({', '.join(coordonnees)})" if coordonnees else utilisateur.nom
+
+
+def _parcelle(noms: Noms, parcelle: dict, parcelles: ParcellesAffaire) -> str:
+    # « AB 123, Castries (34160), lieu-dit Les Plans, contenance 1 234 m²,
+    # propriétaires : SCI Les Oliviers, Paul Durand ».
+    prefixe = _texte(parcelle.get("Prefixe"))
+    reference = " ".join(
+        _valeurs((
+            "" if prefixe in _PREFIXES_SANS_AFFICHAGE else prefixe,
+            _texte(parcelle.get("Section")),
+            _texte(parcelle.get("Numero")),
+        ))
+    )
+    contenance = parcelle.get("ContenanceCadatrale")
+    proprietaires = (parcelles.proprietaires or {}).get(_id(parcelle.get("IdParcelle")), [])
+    noms_proprietaires = ", ".join(_valeurs(dict.fromkeys(noms.contacts.get(i, "") for i in proprietaires)))
+    return ", ".join(
+        _valeurs((
+            reference or "référence inconnue",
+            noms.communes.get(_id(parcelle.get("IdCommune")), ""),
+            f"lieu-dit {lieu_dit}" if (lieu_dit := _texte(parcelle.get("LieuDit"))) else "",
+            f"contenance {_surface(contenance)}" if _nombre(contenance) and contenance else "",
+            f"propriétaires : {noms_proprietaires}" if noms_proprietaires else "",
+        ))
+    )
+
+
+def _surface(valeur: float) -> str:
+    # Contenance cadastrale, en m² (unité à confirmer à l'essai réel,
+    # #178) : 1234.0 → « 1 234 m² », 560.5 → « 560,5 m² ».
+    entier = f"{valeur:,.2f}".rstrip("0").rstrip(".")
+    return entier.replace(",", " ").replace(".", ",") + " m²"
 
 
 def _intervenant(noms: Noms, intervenant: dict) -> str:
