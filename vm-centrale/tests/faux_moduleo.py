@@ -14,6 +14,7 @@ _RECHERCHE_CONTACTS = next(route for route in ROUTES_GET if route.startswith("co
 _RECHERCHE_DEVIS = next(route for route in ROUTES_GET if route.startswith("cogeo/devis?texte="))
 _RECHERCHE_FACTURES = next(route for route in ROUTES_GET if route.startswith("cogeo/facture?texte="))
 _RECHERCHE_TEMPS_PASSES = next(route for route in ROUTES_GET if route.startswith("cogeo/tempspasse?dateMin="))
+_RECHERCHE_TACHES = next(route for route in ROUTES_GET if route.startswith("planning/tacheplanning?libelle="))
 # Limite des routes `multi` (doc Moduléo).
 _MULTI_MAX = 200
 # Coordonnées d'un contact (#176) : route des ids → (route de la fiche,
@@ -53,6 +54,12 @@ class FauxModuleo:
         self._avoirs_facture: dict[int, list[int]] = {}
         self._temps_passes: dict[int, dict] = {}
         self._codes_activite: dict[int, dict] = {}
+        # Planning (#192) : tâches, activités, utilisateurs planning
+        # (id → fiche), équipements.
+        self._taches: dict[int, dict] = {}
+        self._activites: dict[int, dict] = {}
+        self._utilisateurs_planning: dict[int, dict] = {}
+        self._equipements: dict[int, dict] = {}
         self._filtre_utilisateurs = True
         self._exception: Exception | None = None
 
@@ -212,6 +219,59 @@ class FauxModuleo:
             "Actif": True,
             "Type": 1,
             "Recup": False,
+        }
+
+    def ajouter_tache(self, id_tache: int, libelle: str, debut: str, fin: str, **champs: Any) -> None:
+        # `champs` : les autres clés de la tâche, au nom du JSON Moduléo
+        # (`Participants` en ids d'utilisateurs planning, `Equipements`,
+        # `IdActivite`, `IdAffaire`, `Emplacement`…), #192.
+        self._taches[id_tache] = {
+            "IdTache": id_tache,
+            "DateHeureDebut": debut,
+            "DateHeureFin": fin,
+            "Libelle": libelle,
+            "IdChefEquipe": None,
+            "Couleur": None,
+            "Commentaire": None,
+            "IdActivite": None,
+            "IdAffaire": None,
+            "IdsContact": [],
+            "Privee": False,
+            "Supprimee": False,
+            "Emplacement": None,
+            "Participants": [],
+            "Equipements": [],
+            "IdRecurrence": None,
+            **champs,
+        }
+
+    def ajouter_activite(self, id_activite: int, libelle: str) -> None:
+        self._activites[id_activite] = {
+            "IdActivite": id_activite,
+            "Libelle": libelle,
+            "Couleur": "",
+            "PrioriteCouleur": 0,
+            "IdCodeActivite": None,
+            "Actif": True,
+        }
+
+    def ajouter_utilisateur_planning(self, id_utilisateur_planning: int, id_utilisateur: int) -> None:
+        # L'utilisateur planning d'un utilisateur Moduléo.
+        self._utilisateurs_planning[id_utilisateur_planning] = {
+            "IdUtilisateurPlanning": id_utilisateur_planning,
+            "IdUtilisateurModuleo": id_utilisateur,
+            "Couleur": "",
+            "Actif": True,
+        }
+
+    def ajouter_equipement(self, id_equipement: int, libelle: str) -> None:
+        self._equipements[id_equipement] = {
+            "IdEquipement": id_equipement,
+            "Libelle": libelle,
+            "TypeEquipement": "",
+            "IdService": None,
+            "IdSite": [],
+            "Actif": True,
         }
 
     def ajouter_intervenant(
@@ -420,6 +480,27 @@ class FauxModuleo:
             if parametres["idCodeActivite"] not in self._codes_activite:
                 raise ModuleoIntrouvable(f"404 sur {route}")
             return self._codes_activite[parametres["idCodeActivite"]]
+        if route == _RECHERCHE_TACHES:
+            return [i for i, tache in self._taches.items() if _tache_correspond(tache, parametres)]
+        if route == "planning/tacheplanning/multi?ids={ids}":
+            ids = _ids(parametres)
+            assert len(ids) <= _MULTI_MAX, len(ids)
+            return [self._taches[i] for i in ids if i in self._taches]
+        if route == "planning/activite":
+            return list(self._activites.values())
+        if route == "planning/utilisateurplanning/utilisateur/{idUtilisateur}":
+            for utilisateur in self._utilisateurs_planning.values():
+                if utilisateur["IdUtilisateurModuleo"] == parametres["idUtilisateur"]:
+                    return utilisateur
+            raise ModuleoIntrouvable(f"404 sur {route}")
+        if route == "planning/utilisateurplanning/{idUtilisateurPlanning}":
+            if parametres["idUtilisateurPlanning"] not in self._utilisateurs_planning:
+                raise ModuleoIntrouvable(f"404 sur {route}")
+            return self._utilisateurs_planning[parametres["idUtilisateurPlanning"]]
+        if route == "moduleo/equipement/{idEquipement}":
+            if parametres["idEquipement"] not in self._equipements:
+                raise ModuleoIntrouvable(f"404 sur {route}")
+            return self._equipements[parametres["idEquipement"]]
         if route == "cogeo/destinataire/multi?ids={ids}":
             return [self._destinataires[i] for i in _ids(parametres) if i in self._destinataires]
         if route == "cogeo/contact/multi?ids={ids}":
@@ -525,6 +606,26 @@ def _temps_passe_correspond(temps: dict, parametres: dict[str, Any]) -> bool:
     for parametre, champ in (("idCodeActivite", "IdCodeActivite"), ("idAffaire", "IdAffaire")):
         if parametres.get(parametre) is not None and temps[champ] != parametres[parametre]:
             return False
+    return True
+
+
+def _tache_correspond(tache: dict, parametres: dict[str, Any]) -> bool:
+    # Filtres de planning/tacheplanning?… (#192) : une tâche qui chevauche
+    # la période, au jour près ; un participant au moins.
+    if tache["Supprimee"] and parametres.get("recupererTachesSupprimees") != "true":
+        return False
+    if not _contient(tache["Libelle"], parametres.get("libelle")):
+        return False
+    debut, fin = tache["DateHeureDebut"][:10], tache["DateHeureFin"][:10]
+    if parametres.get("dateDebut") is not None and fin < parametres["dateDebut"]:
+        return False
+    if parametres.get("dateFin") is not None and debut > parametres["dateFin"]:
+        return False
+    if parametres.get("idActivite") is not None and tache["IdActivite"] != parametres["idActivite"]:
+        return False
+    participants = parametres.get("idsParticipants")
+    if participants is not None and not set(tache["Participants"]) & set(_ids({"ids": participants})):
+        return False
     return True
 
 

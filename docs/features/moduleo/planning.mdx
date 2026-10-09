@@ -1,0 +1,36 @@
+# Chercher dans le planning
+
+Depuis la 1.5.1, `chercher_planning_moduleo` répond à des questions comme :
+
+- « Qui est sur le terrain jeudi ? »
+- « Qu’est-ce que Martin a au planning cette semaine ? »
+- « Les tâches de relevé topo de la semaine prochaine. »
+
+## Qui voit quoi
+
+Moduléo n’a pas de droit de consultation pour le planning : **tout compte rattaché à un groupe Planning** le lit. Sans groupe Planning, l’outil n’est pas proposé.
+
+Le numéro de l’affaire liée à une tâche n’apparaît qu’avec un groupe Cogeo ; sinon la fiche dit « Affaire : non autorisée pour votre compte ».
+
+## Ce que le modèle peut demander
+
+Combinés en « et » :
+
+- **Un collaborateur**, par son nom : les tâches dont il est participant.
+- **Une période** : date au plus tôt, au plus tard (les deux au même jour pour une journée).
+- **Une activité**, par son nom tel qu’il est dans Moduléo : les activités sont lues dans Moduléo, une activité créée demain fonctionne sans changer BBASS.
+- **Un mot-clé** du libellé de la tâche.
+
+Sans aucun critère : les tâches d’**aujourd’hui et des 7 jours suivants**, et le résultat le dit (« 12 tâches au planning du 09/10/2026 au 16/10/2026 (aujourd’hui et les 7 jours suivants). … »).
+
+## Ce qui revient
+
+En tête, le **nombre** de tâches et les **participants** avec leur nombre de tâches, calculés par la VM sur **toutes** les tâches trouvées : « 2 tâches trouvées au planning (mot-clé lot B). Participants : Sophie Bernard (2 tâches), Jean Martin (1 tâche). »
+
+Puis les tâches dans l’ordre chronologique : libellé, date et heures, participants, activité, matériel, affaire liée, lieu. **5 tâches** par défaut, **10** au plus.
+
+Comme pour les autres outils, ces lectures sont citées par « Sources : Moduléo, tâche « … » du … » ; une heure ou une date absente des fiches est retirée de la réponse ([Sources et mémoire](./sources-et-memoire.mdx)).
+
+## À confirmer à l’essai réel
+
+Participants d’une tâche exprimés en utilisateurs planning (et non en utilisateurs Moduléo), sens de la période de recherche (tâches qui la chevauchent ou qui y commencent), tâches sans heure, tâches privées.

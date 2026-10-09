@@ -13,10 +13,11 @@ Ce n’est pas un Agent Moduléo. Comme pour la recherche web, **le modèle déc
 | `chercher_devis_moduleo` | Retrouve des devis par texte, émission, dates, service, responsable, rédacteur, affaire, avec nombre et totaux HT / TTC calculés par la VM (depuis la 1.5.1). |
 | `chercher_factures_moduleo` | Retrouve des factures par texte, émission, dates, service, responsable, rédacteur, affaire, avec échéances, règlements, reste à payer quand Moduléo permet de le déduire, et totaux calculés par la VM (depuis la 1.5.1). |
 | `chercher_temps_passes_moduleo` | Retrouve des temps passés par période, collaborateur, code activité, affaire, avec totaux d’heures général, par collaborateur et par code activité calculés par la VM ; sans le droit « autres collaborateurs », seulement ses propres temps (depuis la 1.5.1). |
+| `chercher_planning_moduleo` | Retrouve des tâches du planning par collaborateur, période, activité, mot-clé du libellé, avec participants, matériel et affaire liée ; tout compte rattaché à un groupe Planning (depuis la 1.5.1). |
 
 <SchemaFlux variante="appel" />
 
-Pendant la lecture, le fil affiche **« Consultation Moduléo : affaires »** (ou « : contacts », « : devis », « : factures », « : temps passés »). Le modèle donne des **noms**, jamais des ids Moduléo : la VM centrale les traduit dans les deux sens.
+Pendant la lecture, le fil affiche **« Consultation Moduléo : affaires »** (ou « : contacts », « : devis », « : factures », « : temps passés », « : planning »). Le modèle donne des **noms**, jamais des ids Moduléo : la VM centrale les traduit dans les deux sens.
 
 Trois règles tiennent l’ensemble ([ADR-0017](../../adr/0017-lecture-moduleo-par-outil.md)) :
 
@@ -35,5 +36,6 @@ Sans config Moduléo complète, la VM démarre normalement et les outils Modulé
 5. [Chercher des devis](./devis.mdx)
 6. [Chercher des factures](./factures.mdx)
 7. [Chercher des temps passés](./temps-passes.mdx)
-8. [Sources et mémoire](./sources-et-memoire.mdx)
-9. [Panne et refus](./panne-et-refus.mdx)
+8. [Chercher dans le planning](./planning.mdx)
+9. [Sources et mémoire](./sources-et-memoire.mdx)
+10. [Panne et refus](./panne-et-refus.mdx)

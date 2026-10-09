@@ -33,6 +33,7 @@ const sidebars: SidebarsConfig = {
         'features/moduleo/devis',
         'features/moduleo/factures',
         'features/moduleo/temps-passes',
+        'features/moduleo/planning',
         'features/moduleo/sources-et-memoire',
         'features/moduleo/panne-et-refus',
       ],

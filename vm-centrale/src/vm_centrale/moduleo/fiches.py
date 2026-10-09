@@ -424,6 +424,99 @@ def synthese_temps_passes(
     return Fiche(reference, texte, questions)
 
 
+# Planning (#192). Une tâche : libellé, date et heures, participants,
+# activité, matériel, affaire liée. Sans groupe Cogeo, le numéro de
+# l'affaire n'est pas lu (`affaires` à None) : une mention le remplace.
+_AFFAIRE_NON_AUTORISEE = "Affaire : non autorisée pour votre compte"
+
+
+@dataclass(frozen=True)
+class NomsPlanning:
+    # Ids → noms d'un appel de chercher_planning_moduleo : utilisateurs
+    # planning, activités, équipements, numéros d'affaire (None : non
+    # autorisés).
+    participants: dict[int, str]
+    activites: dict[int, str]
+    equipements: dict[int, str]
+    affaires: dict[int, str] | None
+
+
+def _horaire(debut: object, fin: object) -> str:
+    # « 12/10/2026, 08:00 – 12:00 » ; sur plusieurs jours, « du 14/10/2026
+    # 08:00 au 15/10/2026 17:00 » ; sans heure (00:00 – 00:00), le jour.
+    debut, fin = _texte(debut), _texte(fin)
+    jour_debut, jour_fin = _date(debut), _date(fin)
+    heure_debut, heure_fin = debut[11:16], fin[11:16]
+    if not jour_debut:
+        return ""
+    if jour_fin and jour_fin != jour_debut:
+        return f"du {' '.join(_valeurs((jour_debut, heure_debut)))} au {' '.join(_valeurs((jour_fin, heure_fin)))}"
+    if heure_debut in ("", "00:00") and heure_fin in ("", "00:00"):
+        return jour_debut
+    return f"{jour_debut}, {heure_debut} – {heure_fin}" if heure_fin else f"{jour_debut}, {heure_debut}"
+
+
+def fiche_tache(tache: dict, noms: NomsPlanning) -> Fiche:
+    # Référence : « Moduléo, tâche « Bornage lot B » du 12/10/2026 ».
+    libelle = _texte(tache.get("Libelle")) or "sans libellé"
+    jour = _date(tache.get("DateHeureDebut")) or "date inconnue"
+    horaire = _horaire(tache.get("DateHeureDebut"), tache.get("DateHeureFin"))
+    participants = ", ".join(_valeurs(noms.participants.get(i, "") for i in tache.get("Participants") or []))
+    activite = noms.activites.get(_id(tache.get("IdActivite")), "")
+    materiel = ", ".join(_valeurs(noms.equipements.get(i, "") for i in tache.get("Equipements") or []))
+    id_affaire = _id(tache.get("IdAffaire"))
+    affaire = noms.affaires.get(id_affaire, "") if noms.affaires is not None else ""
+
+    lignes = [f"Tâche « {libelle} »"]
+    _ajouter(lignes, "Date", horaire)
+    _ajouter(lignes, "Participants", participants)
+    _ajouter(lignes, "Activité", activite)
+    _ajouter(lignes, "Matériel", materiel)
+    if id_affaire and noms.affaires is None:
+        lignes.append(_AFFAIRE_NON_AUTORISEE)
+    else:
+        _ajouter(lignes, "Affaire", affaire)
+    _ajouter(lignes, "Lieu", _texte(tache.get("Emplacement")))
+
+    reference = f"tâche « {libelle} » du {jour}"
+    questions = _questions(
+        (f"Quand a lieu la {reference} ?", horaire),
+        (f"Qui participe à la {reference} ?", participants),
+        (f"Quelle activité pour la {reference} ?", activite),
+        (f"Quel matériel pour la {reference} ?", materiel),
+        (f"Quelle affaire pour la {reference} ?", affaire),
+    )
+    return Fiche(reference, "\n".join(lignes), questions)
+
+
+def synthese_planning(
+    taches: list[dict], participants: dict[int, str], affiches: int, entete: str, reference: str
+) -> Fiche:
+    # Calculée par la VM sur toutes les tâches trouvées (spec 1.5.1) :
+    # nombre, et participants avec leur nombre de tâches. `entete` : « 2
+    # tâches au planning du 09/10/2026 au 16/10/2026 (…) ».
+    nombre = len(taches)
+    comptes: dict[str, int] = {}
+    for tache in taches:
+        for nom in dict.fromkeys(_valeurs(participants.get(i, "") for i in tache.get("Participants") or [])):
+            comptes[nom] = comptes.get(nom, 0) + 1
+    qui = ", ".join(
+        f"{nom} ({n} {'tâche' if n == 1 else 'tâches'})"
+        for nom, n in sorted(comptes.items(), key=lambda element: (-element[1], element[0]))
+    )
+    texte = f"{entete}."
+    if qui:
+        texte += f" Participants : {qui}."
+    if nombre > affiches:
+        premieres = "La première affichée" if affiches == 1 else f"Les {affiches} premières affichées"
+        texte += f" {premieres}, précise la recherche."
+    questions = _questions(
+        (f"Combien de tâches au {reference} ?", str(nombre)),
+        (f"Qui est au {reference} ?", qui),
+    )
+    return Fiche(reference, texte, questions)
+
+
 def _heures_de(temps: dict) -> float:
     valeur = temps.get("NombreHeure")
     return valeur if _nombre(valeur) else 0.0
