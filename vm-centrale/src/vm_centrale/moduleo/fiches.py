@@ -5,6 +5,7 @@ from datetime import date
 
 from vm_centrale.lectures_outils import Fiche
 from vm_centrale.moduleo import enumerations
+from vm_centrale.moduleo.droits import DroitsModuleo, chemin
 from vm_centrale.moduleo.resolution import Noms, Utilisateur
 
 # Fiche Moduléo (spec 1.5.0) : le texte dense d'un élément lu dans Moduléo,
@@ -99,7 +100,12 @@ class DetailsContact:
     affaires_intervenant: list[str]
 
 
-def fiche_contact(contact: dict, details: DetailsContact, communes: dict[int, str]) -> Fiche:
+# Vérification par champ (#188) : sans ce sous-droit, la fiche dit que le
+# code de comptabilité n'est pas autorisé, jamais qu'il est absent.
+_DROIT_COMPTABILITE = chemin("Contacts", "Consulter et modifier le numéro de compte de comptabilité d'un contact")
+
+
+def fiche_contact(contact: dict, details: DetailsContact, communes: dict[int, str], droits: DroitsModuleo) -> Fiche:
     # Référence : « Moduléo, contact Étude Dupont ».
     nom = _texte(contact.get("Nom"))
     telephones = _valeurs(_avec_lieu(_texte(t.get("Numero")), t.get("Lieu")) for t in details.telephones)
@@ -114,6 +120,10 @@ def fiche_contact(contact: dict, details: DetailsContact, communes: dict[int, st
     type_contact = contact.get("TypeContact")
     if type_contact not in _TYPES_SANS_LIGNE:
         _ajouter(lignes, "Type", _texte(enumerations.libelle(enumerations.TYPES_CONTACT, type_contact)))
+    if (mention := droits.section(_DROIT_COMPTABILITE, "Codes de comptabilité")) is not None:
+        lignes.append(mention)
+    else:
+        _ajouter(lignes, "Code de comptabilité", _texte(contact.get("CodeComptabilite")))
     _ajouter_liste(lignes, "Téléphones", telephones)
     _ajouter_liste(lignes, "Emails", emails)
     _ajouter_liste(lignes, "Adresses", adresses)

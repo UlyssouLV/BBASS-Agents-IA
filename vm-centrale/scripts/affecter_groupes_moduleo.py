@@ -27,7 +27,7 @@ from sqlalchemy.orm import Session
 from vm_centrale.database import SessionLocal, init_db
 from vm_centrale.models import Compte
 from vm_centrale.moduleo.client import ErreurModuleo, LecteurModuleo, get_client_moduleo
-from vm_centrale.moduleo.droits import GroupeInconnu, creer_groupes_dev, droits_du_compte, rattacher
+from vm_centrale.moduleo.droits import AUCUN_DROIT, GroupeInconnu, creer_groupes_dev, droits_du_compte, rattacher
 from vm_centrale.moduleo.resolution import NomNonResolu, chercher_utilisateur
 
 AUCUN = "aucun"
@@ -107,7 +107,9 @@ def main(argv: list[str] | None = None) -> int:
         if not (arguments.cogeo or arguments.planning or arguments.utilisateur or arguments.groupe_dev):
             print(decrire(db, arguments.identifiant))
             return 0
-        lecteur = get_client_moduleo() if arguments.utilisateur not in (None, AUCUN) else None
+        # moduleo/utilisateur est une route libre du garde des droits (#188).
+        client = get_client_moduleo() if arguments.utilisateur not in (None, AUCUN) else None
+        lecteur = client.pour(AUCUN_DROIT) if client is not None else None
         print(
             affecter(
                 db,

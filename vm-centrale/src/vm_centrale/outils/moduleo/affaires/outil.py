@@ -22,12 +22,12 @@ from vm_centrale.outils.moduleo.commun import (
     IDS_MAX,
     NB_DEFAUT,
     NB_PLAFOND,
-    SANS_GROUPE_COGEO,
     liste_ids,
     lire_argument,
     lire_fiches,
     nb_max,
-    propose_cogeo,
+    propose,
+    refus_du_garde,
 )
 
 _NOM = "chercher_affaires_moduleo"
@@ -161,8 +161,9 @@ def _date_du_jour() -> date:
 
 
 def _declarer(contexte: ContexteTour) -> dict | None:
-    # Moduléo configuré, compte rattaché à un groupe Cogeo (spec 1.5.1).
-    return _SCHEMA if propose_cogeo(contexte) else None
+    # Moduléo configuré, compte rattaché à un groupe Cogeo (garde des
+    # droits, #188).
+    return _SCHEMA if propose(contexte, _ROUTE_RECHERCHE) else None
 
 
 def _chercher(
@@ -304,9 +305,8 @@ def _fiches(lecteur: LecteurModuleo, ids: list[int]) -> list[Fiche]:
 
 
 def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
-    if contexte.droits_moduleo.groupe_cogeo is None:
-        # Revérifié à l'exécution : un outil non proposé peut être appelé.
-        return ResultatOutil(SANS_GROUPE_COGEO)
+    if (refus := refus_du_garde(contexte, _ROUTE_RECHERCHE)) is not None:
+        return refus
     numero = lire_argument(arguments, "numero")
     texte = lire_argument(arguments, "texte")
     noms = {nom: valeur for nom in _NOMS if (valeur := lire_argument(arguments, nom))}
@@ -329,7 +329,14 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
         return ids, _fiches(lecteur, recents[:n]) if recents else []
 
     return lire_fiches(
-        contexte, contexte.client_moduleo, lire, aucune, trouvees, _SANS_LECTURE, entete_toujours=recentes
+        contexte,
+        contexte.client_moduleo,
+        "affaires",
+        lire,
+        aucune,
+        trouvees,
+        _SANS_LECTURE,
+        entete_toujours=recentes,
     )
 
 

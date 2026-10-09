@@ -8,7 +8,7 @@ const ETAPES: Record<Variante, {ou: string; fait: string}[]> = {
   appel: [
     {ou: 'Interface', fait: 'Question du collaborateur, ex. « Qui sont les intervenants de l’affaire 2024-123 ? »'},
     {ou: 'Modèle', fait: 'Décide d’appeler chercher_affaires_moduleo ou chercher_contacts_moduleo, avec des noms'},
-    {ou: 'VM centrale', fait: 'Statut « Consultation Moduléo », puis noms → ids'},
+    {ou: 'VM centrale', fait: 'Garde des droits, statut « Consultation Moduléo : <domaine> », puis noms → ids'},
     {ou: 'Moduléo', fait: 'Lectures GET seulement, avec la clé d’API et le code de sécurité'},
     {ou: 'VM centrale', fait: 'Ids → noms, une Fiche Moduléo par résultat, enregistrée dans la Conversation'},
     {ou: 'Modèle', fait: 'Répond à partir des fiches'},

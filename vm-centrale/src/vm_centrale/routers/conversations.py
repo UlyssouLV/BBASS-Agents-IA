@@ -69,7 +69,7 @@ from vm_centrale.lectures_outils import (
     rattacher_lectures_au_message,
     supprimer_lectures,
 )
-from vm_centrale.moduleo.client import LecteurModuleo, get_client_moduleo
+from vm_centrale.moduleo.client import ClientModuleo, get_client_moduleo
 from vm_centrale.moduleo.droits import droits_du_compte
 from vm_centrale.moteur_recherche import MoteurRecherche, get_moteur_recherche
 from vm_centrale.questions_couvertes import (
@@ -934,7 +934,7 @@ def creer_conversation(
     client: MistralClient = Depends(get_mistral_client),
     moteur_recherche: MoteurRecherche = Depends(get_moteur_recherche),
     telechargeur_pages: TelechargeurPages = Depends(get_telechargeur_pages),
-    client_moduleo: LecteurModuleo | None = Depends(get_client_moduleo),
+    client_moduleo: ClientModuleo | None = Depends(get_client_moduleo),
     fabrique_session: FabriqueSession = Depends(get_fabrique_session),
 ) -> StreamingResponse:
     reponse_en_cache = _reponse_en_cache(identifiant_compte, requete.cle_idempotence)
@@ -1038,7 +1038,7 @@ def _tour_creer_conversation(
     client: MistralClient,
     moteur_recherche: MoteurRecherche,
     telechargeur_pages: TelechargeurPages,
-    client_moduleo: LecteurModuleo | None,
+    client_moduleo: ClientModuleo | None,
 ) -> ConversationCreeResponse:
     maintenant = datetime.now(timezone.utc)
     conversation = Conversation(
@@ -1836,7 +1836,7 @@ def envoyer_message(
     client: MistralClient = Depends(get_mistral_client),
     moteur_recherche: MoteurRecherche = Depends(get_moteur_recherche),
     telechargeur_pages: TelechargeurPages = Depends(get_telechargeur_pages),
-    client_moduleo: LecteurModuleo | None = Depends(get_client_moduleo),
+    client_moduleo: ClientModuleo | None = Depends(get_client_moduleo),
     fabrique_session: FabriqueSession = Depends(get_fabrique_session),
 ) -> StreamingResponse:
     reponse_en_cache = _reponse_en_cache(identifiant_compte, requete.cle_idempotence)
@@ -1874,7 +1874,7 @@ def _tour_envoyer_message(
     client: MistralClient,
     moteur_recherche: MoteurRecherche,
     telechargeur_pages: TelechargeurPages,
-    client_moduleo: LecteurModuleo | None,
+    client_moduleo: ClientModuleo | None,
 ) -> MessageEnvoyeResponse:
     conversation = _recuperer_conversation_du_compte(db, conversation_id, identifiant_compte)
 

@@ -4,13 +4,15 @@ from collections.abc import Callable
 from typing import Any
 
 from vm_centrale.lectures_outils import Fiche, enregistrer_lectures
-from vm_centrale.moduleo.client import ErreurModuleo, LecteurModuleo, ModuleoRefuse, RequeteInterdite
+from vm_centrale.moduleo.client import ClientModuleo, ErreurModuleo, LecteurModuleo, ModuleoRefuse, RequeteInterdite
+from vm_centrale.moduleo.droits import DroitManquant, DroitsModuleo, autorise, verifier
 from vm_centrale.moduleo.resolution import NomNonResolu
 from vm_centrale.outils.base import ContexteTour, ResultatOutil
-from vm_centrale.statut_tour import CONSULTATION_MODULEO
+from vm_centrale.statut_tour import consultation_moduleo
 
 # Ce que les outils Moduléo partagent (spec 1.5.0) : plafond des fiches,
-# trace des routes, phrases de panne / refus, enregistrement des lectures.
+# trace des routes, phrases de panne / refus, garde des droits (1.5.1),
+# enregistrement des lectures.
 # Règles : README.md.
 
 # Fiches renvoyées au modèle : 5 par défaut, 10 au plus.
@@ -23,36 +25,49 @@ IDS_MAX = 200
 # Phrases fixes au modèle : le détail technique ne va qu'à l'inspecteur.
 INDISPONIBLE = "Moduléo est indisponible pour le moment."
 REFUS = "Moduléo refuse l'accès à cette donnée."
-# Compte sans groupe Cogeo qui appelle quand même un outil Cogeo (spec
-# 1.5.1) : l'outil n'était pas proposé, rien n'est lu.
-SANS_GROUPE_COGEO = (
-    "Votre compte n'est rattaché à aucun groupe Moduléo Cogeo. Aucune lecture n'a été faite. "
-    "Demandez à un compte administrateur si vous en avez besoin."
-)
 
 logger = logging.getLogger(__name__)
 
 
 class LecteurTrace:
     # Chaque route lue, avec ses paramètres, pour l'inspecteur. Jamais les
-    # en-têtes : la clé et le SecurityCode restent dans ClientModuleo. Sûr
-    # entre threads : les outils lisent en parallèle (#176).
-    def __init__(self, lecteur: LecteurModuleo) -> None:
-        self._lecteur = lecteur
+    # en-têtes : la clé et le SecurityCode restent dans TransportHttp. Une
+    # route refusée par le garde des droits n'est pas tracée : elle n'est
+    # pas partie. Sûr entre threads : les outils lisent en parallèle (#176).
+    def __init__(self, client: ClientModuleo, droits: DroitsModuleo) -> None:
+        self._client = client
+        self._droits = droits
         self._verrou = threading.Lock()
         self.routes: list[dict[str, Any]] = []
 
     def lire(self, route: str, parametres: dict[str, Any] | None = None) -> Any:
+        verifier(route, self._droits)
         with self._verrou:
             self.routes.append({"route": route, "parametres": parametres or {}})
-        return self._lecteur.lire(route, parametres)
+        return self._client.lire(route, parametres, self._droits)
 
 
-def propose_cogeo(contexte: ContexteTour) -> bool:
-    # Outil Cogeo (affaires, contacts) : Moduléo configuré et compte
-    # rattaché à un groupe Cogeo (spec 1.5.1). Sans groupe, aucun outil
-    # Moduléo, même pour un compte administrateur.
-    return contexte.client_moduleo is not None and contexte.droits_moduleo.groupe_cogeo is not None
+def propose(contexte: ContexteTour, route: str) -> bool:
+    # Outil proposé au modèle (spec 1.5.1) : Moduléo configuré et `route`,
+    # la recherche de l'outil, autorisée par le garde des droits pour ce
+    # compte. Sans groupe, aucun outil Moduléo, même pour un compte
+    # administrateur.
+    return contexte.client_moduleo is not None and autorise(route, contexte.droits_moduleo)
+
+
+def refus_du_garde(contexte: ContexteTour, route: str) -> ResultatOutil | None:
+    # Revérifié à l'exécution, avant toute lecture (même libre) : un outil
+    # non proposé peut être appelé.
+    try:
+        verifier(route, contexte.droits_moduleo)
+    except DroitManquant as refus:
+        return _refuse(refus, [])
+    return None
+
+
+def _refuse(refus: DroitManquant, routes: list[dict[str, Any]]) -> ResultatOutil:
+    logger.info("Garde des droits Moduléo : %s", refus.refus)
+    return ResultatOutil(refus.phrase, trace={"routes": routes, "garde_des_droits": refus.refus})
 
 
 def nb_max(valeur: Any) -> int:
@@ -74,22 +89,26 @@ def liste_ids(ids: list[int]) -> str:
 
 def lire_fiches(
     contexte: ContexteTour,
-    client: LecteurModuleo,
+    client: ClientModuleo,
+    domaine: str,
     lire: Callable[[LecteurModuleo], tuple[list[int], list[Fiche]]],
     aucun: str,
     trouves: str,
     sans_lecture: str,
     entete_toujours: bool = False,
 ) -> ResultatOutil:
-    # `client` : celui du contexte, déjà vérifié. `lire` : les ids trouvés
+    # `client` : celui du contexte, déjà vérifié ; `domaine` : celui du
+    # statut (« affaires »). `lire` : les ids trouvés
     # et les fiches des premiers. `aucun` : la phrase sans résultat ;
     # `trouves` : « {n} affaires trouvées, {m} affichées », en tête quand il
     # y a plus d'ids que de fiches, ou toujours avec `entete_toujours`.
     # `sans_lecture` : ajoutée à la phrase d'un nom non résolu (#182).
-    contexte.publier(CONSULTATION_MODULEO)
-    lecteur = LecteurTrace(client)
+    contexte.publier(consultation_moduleo(domaine))
+    lecteur = LecteurTrace(client, contexte.droits_moduleo)
     try:
         ids, fiches = lire(lecteur)
+    except DroitManquant as refus:
+        return _refuse(refus, lecteur.routes)
     except NomNonResolu as erreur:
         return ResultatOutil(
             f"{erreur} {sans_lecture}", trace={"routes": lecteur.routes, "non_resolu": str(erreur)}

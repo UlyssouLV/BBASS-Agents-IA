@@ -111,6 +111,7 @@ class FauxModuleo:
         type_contact: int = 1,
         type_donneur_ordre: int = 0,
         qualifications: tuple[int, ...] = (),
+        code_comptabilite: str = "",
     ) -> None:
         self._contacts[id_contact] = {
             "IdContact": id_contact,
@@ -120,7 +121,7 @@ class FauxModuleo:
             "Qualifications": list(qualifications),
             "MotsCles": "",
             "Commentaire": "",
-            "CodeComptabilite": "",
+            "CodeComptabilite": code_comptabilite,
         }
 
     def ajouter_qualification(self, id_qualification: int, libelle: str) -> None:

@@ -23,7 +23,7 @@ from vm_centrale.mistral_client import (
     get_mistral_client,
 )
 from vm_centrale.models import Compte, ComptePole
-from vm_centrale.moduleo.client import get_client_moduleo
+from vm_centrale.moduleo.client import ClientModuleo, get_client_moduleo
 from vm_centrale.moduleo.droits import GROUPE_DEV, charger_catalogue, creer_groupes_dev, rattacher
 from vm_centrale.moteur_recherche import MoteurIndisponible, ResultatRecherche, get_moteur_recherche
 from vm_centrale.outils.lire_pages_web import CONSIGNE_LECTURE_PAGE, CONSIGNE_REVERIFICATION_PAGE
@@ -627,9 +627,10 @@ def compte_tous_droits_moduleo(db_session):
 
 @pytest.fixture
 def faux_moduleo(client, compte_tous_droits_moduleo):
-    # Moduléo configuré, servi par le faux de tests/faux_moduleo.py.
+    # Moduléo configuré, servi par le faux de tests/faux_moduleo.py, derrière
+    # le vrai client : le garde des droits passe avant le faux (#188).
     faux = FauxModuleo()
-    app.dependency_overrides[get_client_moduleo] = lambda: faux
+    app.dependency_overrides[get_client_moduleo] = lambda: ClientModuleo(faux)
     return faux
 
 

@@ -16,6 +16,7 @@ from vm_centrale.moduleo.droits.compte import (
     droits_du_compte,
     rattacher,
 )
+from vm_centrale.moduleo.droits.garde import DroitManquant, autorise, verifier
 
 __all__ = [
     "APPLICATIONS",
@@ -23,11 +24,14 @@ __all__ = [
     "COGEO",
     "GROUPE_DEV",
     "PLANNING",
+    "DroitManquant",
     "DroitsModuleo",
     "GroupeInconnu",
+    "autorise",
     "charger_catalogue",
     "chemin",
     "creer_groupes_dev",
     "droits_du_compte",
     "rattacher",
+    "verifier",
 ]

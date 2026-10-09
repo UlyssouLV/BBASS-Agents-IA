@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
-from sqlalchemy.orm import Session
+from sqlalchemy import or_
+from sqlalchemy.orm import Session, aliased
 
 from vm_centrale.models import DroitModuleo, GroupeModuleo, GroupeModuleoDroit, RattachementModuleo
 from vm_centrale.moduleo.droits.catalogue import COGEO, PLANNING
@@ -25,27 +26,44 @@ class DroitsModuleo:
     def a(self, chemin: str) -> bool:
         return chemin in self.droits
 
+    def section(self, chemin: str, titre: str) -> str | None:
+        # Vérification par champ des fiches (#188) : None si le droit est
+        # accordé, sinon la mention qui remplace la section retirée, pour
+        # que le modèle ne dise jamais « absent de Moduléo ».
+        return None if self.a(chemin) else f"{titre} : non autorisés pour votre compte"
+
 
 # Compte sans rattachement : aucun outil Moduléo.
 AUCUN_DROIT = DroitsModuleo()
 
 
 def droits_du_compte(db: Session, identifiant_compte: str) -> DroitsModuleo:
-    rattachement = db.get(RattachementModuleo, identifiant_compte)
-    if rattachement is None:
-        return AUCUN_DROIT
-    ids_groupes = [i for i in (rattachement.groupe_cogeo_id, rattachement.groupe_planning_id) if i is not None]
-    groupes = {g.id: g.nom for g in db.query(GroupeModuleo).filter(GroupeModuleo.id.in_(ids_groupes))}
-    chemins = (
-        db.query(DroitModuleo.chemin)
-        .join(GroupeModuleoDroit, GroupeModuleoDroit.droit_id == DroitModuleo.id)
-        .filter(GroupeModuleoDroit.groupe_id.in_(ids_groupes))
+    # Une seule requête SQL (#188) : appelée une fois par tour, les droits
+    # sont ensuite vérifiés en mémoire par le garde.
+    cogeo, planning = aliased(GroupeModuleo), aliased(GroupeModuleo)
+    lignes = (
+        db.query(RattachementModuleo.id_utilisateur_moduleo, cogeo.nom, planning.nom, DroitModuleo.chemin)
+        .outerjoin(cogeo, cogeo.id == RattachementModuleo.groupe_cogeo_id)
+        .outerjoin(planning, planning.id == RattachementModuleo.groupe_planning_id)
+        .outerjoin(
+            GroupeModuleoDroit,
+            or_(
+                GroupeModuleoDroit.groupe_id == RattachementModuleo.groupe_cogeo_id,
+                GroupeModuleoDroit.groupe_id == RattachementModuleo.groupe_planning_id,
+            ),
+        )
+        .outerjoin(DroitModuleo, DroitModuleo.id == GroupeModuleoDroit.droit_id)
+        .filter(RattachementModuleo.identifiant_compte == identifiant_compte)
+        .all()
     )
+    if not lignes:
+        return AUCUN_DROIT
+    id_utilisateur, groupe_cogeo, groupe_planning, _ = lignes[0]
     return DroitsModuleo(
-        groupe_cogeo=groupes.get(rattachement.groupe_cogeo_id) if rattachement.groupe_cogeo_id else None,
-        groupe_planning=groupes.get(rattachement.groupe_planning_id) if rattachement.groupe_planning_id else None,
-        id_utilisateur_moduleo=rattachement.id_utilisateur_moduleo,
-        droits=frozenset(c for (c,) in chemins),
+        groupe_cogeo=groupe_cogeo,
+        groupe_planning=groupe_planning,
+        id_utilisateur_moduleo=id_utilisateur,
+        droits=frozenset(c for *_, c in lignes if c is not None),
     )
 
 

@@ -18,11 +18,13 @@ Retrouve des contacts Moduléo et leurs coordonnées quand le modèle le décide
 3. Les `nb_max` premiers : `cogeo/contact/multi?ids=`.
 4. Par contact, **en parallèle** (au plus 16 lectures à la fois) : téléphones (`cogeo/contact/{id}/telephones` puis `moduleo/telephone/{id}`), emails (`…/emails` puis `cogeo/email/{id}`), adresses (`…/adresses` puis `moduleo/adresse/{id}`), affaires (`…/affaires` pour client, `…/affaireintervenant` pour intervenant, puis une lecture `cogeo/affaire/multi?ids=` pour les numéros). Une coordonnée en 404 est sautée ; toute autre panne, dans n'importe quel thread, donne la phrase de panne.
 5. Communes des adresses, dédoublonnées sur l'appel (`moduleo/commune/multi`).
-6. Une Fiche Moduléo par contact (`fiche_contact`, `moduleo/fiches.py`) : type, nom, téléphones, emails et adresses avec leur lieu (« Bureau », « Siège »), numéros des affaires dont il est client puis intervenant (20 au plus par rôle, « et N autres »). Enregistrée dans `lectures_outils`, référence « contact <nom> » : un téléphone de la fiche reste dans la réponse et la ligne « Sources : » cite « Moduléo, contact <nom> ».
+6. Une Fiche Moduléo par contact (`fiche_contact`, `moduleo/fiches.py`) : type, nom, code de comptabilité (avec le sous-droit, sinon « Codes de comptabilité : non autorisés pour votre compte », #188), téléphones, emails et adresses avec leur lieu (« Bureau », « Siège »), numéros des affaires dont il est client puis intervenant (20 au plus par rôle, « et N autres »). Enregistrée dans `lectures_outils`, référence « contact <nom> » : un téléphone de la fiche reste dans la réponse et la ligne « Sources : » cite « Moduléo, contact <nom> ».
 
 **Au modèle.** Les fiches, séparées par une ligne vide. Plus de contacts que de fiches : « N contacts trouvés, M affichés, précise la recherche. » en tête (« Au moins 200 » au plafond des ids). Aucun : « Aucun contact Moduléo ne correspond à cette recherche. »
 
-**Inspecteur** (`outil:chercher_contacts_moduleo`) : arguments, `routes`, `trouvees`, `fiches`, `non_resolu` ou `erreur`.
+**Droits** (#188) : proposé et exécuté seulement avec « Rechercher des contacts » (garde des droits, `../README.md`).
+
+**Inspecteur** (`outil:chercher_contacts_moduleo`) : arguments, `routes`, `trouvees`, `fiches`, `non_resolu`, `erreur` ou `garde_des_droits`.
 
 **Depuis.** 1.5.0 (#176). `TypeContact` relevé sur le serveur réel (#180) : 1 Personne, 3 Société, 4 Collectivité, 5 Groupe de contacts (`moduleo/README.md`). À confirmer à l'essai réel (#178) : valeurs de `typeDonneurOrdreGE`, combinaison de plusieurs `idsQualifications` (« et » ou « ou »).
 

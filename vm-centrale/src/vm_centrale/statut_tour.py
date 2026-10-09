@@ -20,8 +20,6 @@ REFLEXION = "Réflexion…"
 VERIFICATION = "Vérification de la réponse…"
 TITRAGE = "Titre de la conversation…"
 ATTENTE = "En attente de la réponse en cours dans une autre conversation…"
-# Avant toute lecture d'un outil Moduléo (spec 1.5.0, #174), sans détail.
-CONSULTATION_MODULEO = "Consultation Moduléo"
 
 Publier = Callable[[str], None]
 
@@ -53,6 +51,12 @@ def lecture_de(url: str) -> str:
 
 def relecture_de(nom_fichier: str) -> str:
     return f"Relecture de {_tronquer(nom_fichier)}"
+
+
+def consultation_moduleo(domaine: str) -> str:
+    # Avant toute lecture d'un outil Moduléo (spec 1.5.0, #174), avec son
+    # domaine depuis 1.5.1 (#188) : « Consultation Moduléo : affaires ».
+    return f"Consultation Moduléo : {domaine}"
 
 
 def _evenement(nom: str, donnees: dict) -> str:

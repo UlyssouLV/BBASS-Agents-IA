@@ -301,7 +301,7 @@ def test_le_flux_publie_consultation_moduleo_avant_la_lecture(
 
     assert statuts(reponse) == [
         "Réflexion…",
-        "Consultation Moduléo",
+        "Consultation Moduléo : affaires",
         "Réflexion…",
         "Vérification de la réponse…",
         "Titre de la conversation…",
