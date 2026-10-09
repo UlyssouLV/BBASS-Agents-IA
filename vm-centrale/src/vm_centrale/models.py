@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, Numeric, String
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, Numeric, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from vm_centrale.database import Base
@@ -304,3 +304,63 @@ class ProfilTravail(Base):
     identifiant_compte: Mapped[str] = mapped_column(String, primary_key=True)
     contenu: Mapped[str] = mapped_column(String, default="")
     date_derniere_maj: Mapped[datetime] = mapped_column(DateTime)
+
+
+class DroitModuleo(Base):
+    # Une case du catalogue des droits de Moduléo, Cogeo ou Planning (spec
+    # 1.5.1, ADR-0018), recopiée de moduleo/droits/catalogue.json au
+    # démarrage. `chemin` : catégorie puis libellés des droits parents, un
+    # même libellé pouvant revenir sous deux parents (« Émettre à la fin du
+    # mois précédent » des devis et des factures).
+    __tablename__ = "droits_moduleo"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    # `cogeo` / `planning`.
+    application: Mapped[str] = mapped_column(String)
+    categorie: Mapped[str] = mapped_column(String)
+    libelle: Mapped[str] = mapped_column(String)
+    chemin: Mapped[str] = mapped_column(String, unique=True, index=True)
+    parent_id: Mapped[int | None] = mapped_column(ForeignKey("droits_moduleo.id"), nullable=True)
+    # Ordre d'affichage dans Moduléo, sur toute l'application.
+    ordre: Mapped[int] = mapped_column(Integer)
+    # Planning seulement : les conditions qu'un groupe peut poser sur
+    # l'action (participation, activité, créateur) et leurs champs.
+    conditions: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+
+class GroupeModuleo(Base):
+    # Un groupe d'utilisateurs Moduléo recopié dans BBASS (Glossaire,
+    # « Groupe Moduléo »). En 1.5.1 : Admin (Cogeo et Planning), et le
+    # groupe de dev « Tous droits (dev) » quand il a été créé.
+    __tablename__ = "groupes_moduleo"
+    __table_args__ = (UniqueConstraint("application", "nom"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    application: Mapped[str] = mapped_column(String)
+    nom: Mapped[str] = mapped_column(String)
+
+
+class GroupeModuleoDroit(Base):
+    # Un droit accordé par un groupe ; un droit absent vaut refus.
+    __tablename__ = "groupes_moduleo_droits"
+
+    groupe_id: Mapped[int] = mapped_column(ForeignKey("groupes_moduleo.id"), primary_key=True)
+    droit_id: Mapped[int] = mapped_column(ForeignKey("droits_moduleo.id"), primary_key=True)
+    # Planning : les conditions que le groupe pose sur l'action, par
+    # libellé de condition.
+    conditions: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+
+class RattachementModuleo(Base):
+    # Rattachement d'un compte à ses groupes Moduléo et à son utilisateur
+    # Moduléo (spec 1.5.1), toujours explicite (scripts/
+    # affecter_groupes_moduleo.py) : être compte administrateur n'en donne
+    # aucun. Pas de ForeignKey vers comptes.identifiant : même convention
+    # que Conversation/Jeton ci-dessus.
+    __tablename__ = "rattachements_moduleo"
+
+    identifiant_compte: Mapped[str] = mapped_column(String, primary_key=True)
+    groupe_cogeo_id: Mapped[int | None] = mapped_column(ForeignKey("groupes_moduleo.id"), nullable=True)
+    groupe_planning_id: Mapped[int | None] = mapped_column(ForeignKey("groupes_moduleo.id"), nullable=True)
+    # Id de l'utilisateur Moduléo du compte (ses temps passés), ou NULL.
+    id_utilisateur_moduleo: Mapped[int | None] = mapped_column(Integer, nullable=True)

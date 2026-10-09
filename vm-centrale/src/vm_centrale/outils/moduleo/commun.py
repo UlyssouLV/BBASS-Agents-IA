@@ -23,6 +23,12 @@ IDS_MAX = 200
 # Phrases fixes au modèle : le détail technique ne va qu'à l'inspecteur.
 INDISPONIBLE = "Moduléo est indisponible pour le moment."
 REFUS = "Moduléo refuse l'accès à cette donnée."
+# Compte sans groupe Cogeo qui appelle quand même un outil Cogeo (spec
+# 1.5.1) : l'outil n'était pas proposé, rien n'est lu.
+SANS_GROUPE_COGEO = (
+    "Votre compte n'est rattaché à aucun groupe Moduléo Cogeo. Aucune lecture n'a été faite. "
+    "Demandez à un compte administrateur si vous en avez besoin."
+)
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +46,13 @@ class LecteurTrace:
         with self._verrou:
             self.routes.append({"route": route, "parametres": parametres or {}})
         return self._lecteur.lire(route, parametres)
+
+
+def propose_cogeo(contexte: ContexteTour) -> bool:
+    # Outil Cogeo (affaires, contacts) : Moduléo configuré et compte
+    # rattaché à un groupe Cogeo (spec 1.5.1). Sans groupe, aucun outil
+    # Moduléo, même pour un compte administrateur.
+    return contexte.client_moduleo is not None and contexte.droits_moduleo.groupe_cogeo is not None
 
 
 def nb_max(valeur: Any) -> int:

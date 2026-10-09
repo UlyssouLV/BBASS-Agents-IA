@@ -24,6 +24,7 @@ from vm_centrale.mistral_client import (
 )
 from vm_centrale.models import Compte, ComptePole
 from vm_centrale.moduleo.client import get_client_moduleo
+from vm_centrale.moduleo.droits import GROUPE_DEV, charger_catalogue, creer_groupes_dev, rattacher
 from vm_centrale.moteur_recherche import MoteurIndisponible, ResultatRecherche, get_moteur_recherche
 from vm_centrale.outils.lire_pages_web import CONSIGNE_LECTURE_PAGE, CONSIGNE_REVERIFICATION_PAGE
 from vm_centrale.outils.piece_jointe import CONSIGNE_RELECTURE_PIECES_JOINTES
@@ -615,7 +616,17 @@ def client(
 
 
 @pytest.fixture
-def faux_moduleo(client):
+def compte_tous_droits_moduleo(db_session):
+    # Le compte j.dupont rattaché aux groupes « Tous droits (dev) » (spec
+    # 1.5.1) : sans groupe, aucun outil Moduléo ne lui serait proposé.
+    charger_catalogue(db_session)
+    creer_groupes_dev(db_session)
+    rattacher(db_session, "j.dupont", GROUPE_DEV, GROUPE_DEV, None)
+    db_session.commit()
+
+
+@pytest.fixture
+def faux_moduleo(client, compte_tous_droits_moduleo):
     # Moduléo configuré, servi par le faux de tests/faux_moduleo.py.
     faux = FauxModuleo()
     app.dependency_overrides[get_client_moduleo] = lambda: faux

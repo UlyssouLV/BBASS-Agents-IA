@@ -4,7 +4,7 @@ import SchemaFlux from '@site/src/components/moduleo/SchemaFlux';
 
 Depuis la 1.5.0, le chat lit Moduléo, le logiciel métier du cabinet : affaires, intervenants, contacts et leurs coordonnées. Un collaborateur demande « retrouve l’affaire 2024-123 » ou « coordonnées de Dupont » sans quitter le chat.
 
-Ce n’est pas un Agent Moduléo. Comme pour la recherche web, **le modèle décide** d’appeler un outil. Il en a deux, proposés à tous les comptes dès que la config Moduléo est présente :
+Ce n’est pas un Agent Moduléo. Comme pour la recherche web, **le modèle décide** d’appeler un outil. Il en a deux, proposés dès que la config Moduléo est présente, aux comptes rattachés à un groupe Moduléo Cogeo (depuis la 1.5.1 ; sans groupe, aucun outil Moduléo) :
 
 | Outil | Ce qu’il fait |
 | --- | --- |
@@ -18,7 +18,7 @@ Pendant la lecture, le fil affiche **« Consultation Moduléo »**. Le modèle d
 Trois règles tiennent l’ensemble ([ADR-0017](../../adr/0017-lecture-moduleo-par-outil.md)) :
 
 - **Lecture seule.** La clé d’API BBASS n’a que le droit de lecture dans Moduléo, et la VM n’envoie de toute façon que des GET.
-- **Une seule clé, chiffrée.** Une clé d’API dédiée à BBASS et le code de sécurité d’un utilisateur de test, chiffrés dans `.env`. Ce que voit le chat est ce que voit cet utilisateur dans Moduléo, quel que soit le compte BBASS.
+- **Une seule clé, chiffrée.** Une clé d’API dédiée à BBASS et le code de sécurité d’un utilisateur de test, chiffrés dans `.env`. Depuis la 1.5.1, BBASS recopie les groupes et droits de Moduléo et n’ouvre les outils qu’aux comptes rattachés à un groupe ([ADR-0018](../../adr/0018-droits-moduleo-appliques-par-bbass.md)).
 - **Aucune copie hors de la Conversation.** Moduléo est relu à chaque appel. Une fiche lue reste dans sa Conversation, jamais dans une autre.
 
 Sans config Moduléo complète, la VM démarre normalement et les deux outils ne sont simplement pas proposés.

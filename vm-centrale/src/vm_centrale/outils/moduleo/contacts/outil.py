@@ -12,10 +12,12 @@ from vm_centrale.outils.moduleo.commun import (
     IDS_MAX,
     NB_DEFAUT,
     NB_PLAFOND,
+    SANS_GROUPE_COGEO,
     liste_ids,
     lire_argument,
     lire_fiches,
     nb_max,
+    propose_cogeo,
 )
 
 _NOM = "chercher_contacts_moduleo"
@@ -91,8 +93,8 @@ _SCHEMA = {
 
 
 def _declarer(contexte: ContexteTour) -> dict | None:
-    # Pour tous les comptes, dès que Moduléo est configuré (spec 1.5.0).
-    return _SCHEMA if contexte.client_moduleo is not None else None
+    # Moduléo configuré, compte rattaché à un groupe Cogeo (spec 1.5.1).
+    return _SCHEMA if propose_cogeo(contexte) else None
 
 
 def _type_contact(valeur: str) -> str:
@@ -173,6 +175,9 @@ def _fiches(lecteur: LecteurModuleo, ids: list[int]) -> list[Fiche]:
 
 
 def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
+    if contexte.droits_moduleo.groupe_cogeo is None:
+        # Revérifié à l'exécution : un outil non proposé peut être appelé.
+        return ResultatOutil(SANS_GROUPE_COGEO)
     texte = lire_argument(arguments, "texte")
     donneur = lire_argument(arguments, "type_donneur_ordre")
     qualifications = _qualifications(arguments)

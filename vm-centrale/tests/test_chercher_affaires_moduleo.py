@@ -352,7 +352,7 @@ def test_linspecteur_trace_les_arguments_les_fiches_et_les_routes_appelees(
 
 
 @pytest.fixture
-def moduleo_reel_configure(client, monkeypatch, tmp_path):
+def moduleo_reel_configure(client, compte_tous_droits_moduleo, monkeypatch, tmp_path):
     # Vraie config chiffrée et vrai ClientModuleo, transport HTTP simulé :
     # la clé et le SecurityCode réels existent, et ne doivent fuiter nulle
     # part.

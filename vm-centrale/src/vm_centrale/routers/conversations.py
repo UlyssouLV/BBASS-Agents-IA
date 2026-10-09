@@ -70,6 +70,7 @@ from vm_centrale.lectures_outils import (
     supprimer_lectures,
 )
 from vm_centrale.moduleo.client import LecteurModuleo, get_client_moduleo
+from vm_centrale.moduleo.droits import droits_du_compte
 from vm_centrale.moteur_recherche import MoteurRecherche, get_moteur_recherche
 from vm_centrale.questions_couvertes import (
     AppelQuestionsPieceJointe,
@@ -1093,7 +1094,8 @@ def _tour_creer_conversation(
     # conversation pointer vers une pièce jointe disparue.
     # Outils sur l'appel principal dès le premier message (spec 1.4.0) :
     # aucune pièce jointe d'un tour précédent ici, seuls rechercher_web et,
-    # si Moduléo est configuré, chercher_affaires_moduleo sont éligibles.
+    # si Moduléo est configuré et le compte rattaché à un groupe Moduléo,
+    # les outils Moduléo sont éligibles.
     contexte_outils = ContexteTour(
         db=db,
         conversation_id=conversation.id,
@@ -1103,6 +1105,7 @@ def _tour_creer_conversation(
         message_du_tour=requete.message,
         publier=publier,
         client_moduleo=client_moduleo,
+        droits_moduleo=droits_du_compte(db, identifiant_compte),
     )
     tools = outils_du_tour(contexte_outils)
     attendre_questions = _lancer_questions_piece_jointe(client, piece_jointe, requete.message)
@@ -1925,6 +1928,7 @@ def _tour_envoyer_message(
         message_du_tour=requete.message,
         publier=publier,
         client_moduleo=client_moduleo,
+        droits_moduleo=droits_du_compte(db, identifiant_compte),
     )
     tools = outils_du_tour(contexte_outils)
 

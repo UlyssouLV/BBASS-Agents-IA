@@ -194,13 +194,13 @@ Ce qu'un Outil a lu dans un logiciel pour une Conversation (en 1.5.0 : une Fiche
 
 ## Groupe Moduléo {#groupe-moduleo}
 
-Un groupe d'utilisateurs de Moduléo (Cogeo ou Planning : Admin, Production, Stagiaire…) recopié dans BBASS avec ses Droits Moduléo. Un Compte est rattaché à au plus un groupe Cogeo et un groupe Planning ; sans groupe, aucun Outil Moduléo ne lui est proposé ([ADR-0018](./adr/0018-droits-moduleo-appliques-par-bbass.md)).
+Un groupe d'utilisateurs de Moduléo (Cogeo ou Planning : Admin, Production, Stagiaire…) recopié dans BBASS avec ses Droits Moduléo. Un Compte est rattaché à au plus un groupe Cogeo et un groupe Planning, et à son utilisateur Moduléo, toujours explicitement : être Compte administrateur n'en donne aucun. Sans groupe, aucun Outil Moduléo ne lui est proposé ([ADR-0018](./adr/0018-droits-moduleo-appliques-par-bbass.md)). En 1.5.1, seul le groupe Admin est recopié ; « Tous droits (dev) » est un groupe local, pour le dev et les tests, jamais dans Moduléo.
 
 À éviter : rôle, profil, pôle (le Pôle est un domaine métier du cabinet).
 
 ## Droit Moduléo {#droit-moduleo}
 
-Une case du catalogue des droits de Moduléo (« Consulter les devis », « Voir le prix de vente des temps passés »…), recopiée dans BBASS avec son application et sa catégorie. Un Groupe Moduléo l'accorde ou non ; un droit absent vaut refus.
+Une case du catalogue des droits de Moduléo (« Consulter les devis », « Voir le prix de vente des temps passés »…), recopiée dans BBASS avec son application et sa catégorie (Planning : une action, « Créer une tâche », avec ses conditions de participation, d'activité ou de créateur). Un Groupe Moduléo l'accorde ou non ; un droit absent vaut refus.
 
 À éviter : permission, habilitation, droit de compte (le droit administrateur est un autre droit, celui du Compte BBASS).
 
