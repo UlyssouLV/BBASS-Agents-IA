@@ -39,11 +39,17 @@ TYPES_CONTACT = (
     Valeur(5, "GroupeContacts", "Groupe de contacts"),
 )
 
-# `Etat` d'un devis (#189) : pas encore relevé sur le serveur du cabinet
-# (à l'essai réel, #178) ; 0, valeur par défaut, n'a pas de ligne, toute
-# autre valeur est affichée en chiffre. Pas de filtre `etat` d'ici là :
-# Moduléo ignorerait un nom inconnu.
-ETATS_DEVIS: tuple[Valeur, ...] = ()
+# `Etat` d'un devis (#189) : relevé le 2026-10-26 sur le serveur du cabinet
+# (#194, scripts/essai_reel_moduleo_151.py) : filtre `etat=` puis valeur
+# JSON. `NonEmis` (6) : tous les devis `emis=false` ; pas de nom de filtre
+# reconnu. `Expire` renvoie un mélange d'Accepté et d'En attente : non mappé.
+ETATS_DEVIS = (
+    Valeur(0, "Accepte", "Accepté"),
+    Valeur(1, "Refuse", "Refusé"),
+    Valeur(2, "EnAttente", "En attente"),
+    Valeur(3, "Annule", "Annulé"),
+    Valeur(6, "NonEmis", "Non émis"),
+)
 
 
 def libelle(valeurs: tuple[Valeur, ...], brute: object) -> str:

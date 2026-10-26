@@ -300,8 +300,8 @@ def test_un_seul_sous_droit_un_seul_prix(
 @pytest.mark.parametrize(
     ("arguments", "attendu"),
     [
-        ({"date_min": "2026-10-01"}, {"dateMin": "2026-10-01"}),
-        ({"date_max": "07/10/2026"}, {"dateMax": "2026-10-07"}),
+        ({"date_min": "2026-10-01"}, {"dateMin": "01/10/2026"}),
+        ({"date_max": "07/10/2026"}, {"dateMax": "07/10/2026"}),
         ({"collaborateur": "Martin"}, {"idsUtilisateurs": "7"}),
         ({"code_activite": "Relevé terrain"}, {"idCodeActivite": 1}),
         ({"affaire": "2024-123"}, {"idAffaire": 101}),
@@ -373,7 +373,7 @@ def test_sans_critere_les_7_derniers_jours_periode_annoncee(
     _chercher(client, mistral_client_factice, jeton_valide, {"nb_max": 10})
 
     (recherche,) = _recherches(faux_moduleo)
-    assert (recherche["dateMin"], recherche["dateMax"]) == ("2026-10-02", "2026-10-09")
+    assert (recherche["dateMin"], recherche["dateMax"]) == ("02/10/2026", "09/10/2026")
     contenu = _contenu_outil(mistral_client_factice)
     assert contenu.startswith("3 temps passés saisis du 02/10/2026 au 09/10/2026 (7 derniers jours), total 7,5 h.")
     assert "20/09/2026" not in contenu

@@ -208,8 +208,8 @@ def test_une_tache_sur_plusieurs_jours(client, faux_moduleo, mistral_client_fact
 @pytest.mark.parametrize(
     ("arguments", "attendu"),
     [
-        ({"date_min": "2026-10-13"}, {"dateDebut": "2026-10-13"}),
-        ({"date_max": "12/10/2026"}, {"dateFin": "2026-10-12"}),
+        ({"date_min": "2026-10-13"}, {"dateDebut": "13/10/2026"}),
+        ({"date_max": "12/10/2026"}, {"dateFin": "12/10/2026"}),
         ({"collaborateur": "Martin"}, {"idsParticipants": "70"}),
         ({"activite": "Terrain"}, {"idActivite": 1}),
         ({"mot_cle": "Bornage"}, {"libelle": "Bornage"}),
@@ -289,7 +289,7 @@ def test_sans_critere_aujourdhui_et_7_jours_periode_annoncee(
     _chercher(client, mistral_client_factice, jeton_valide, {})
 
     (recherche,) = _recherches(faux_moduleo)
-    assert (recherche["dateDebut"], recherche["dateFin"]) == ("2026-10-09", "2026-10-16")
+    assert (recherche["dateDebut"], recherche["dateFin"]) == ("09/10/2026", "16/10/2026")
     contenu = _contenu_outil(mistral_client_factice)
     assert contenu.startswith(
         "2 tâches au planning du 09/10/2026 au 16/10/2026 (aujourd'hui et les 7 jours suivants)."

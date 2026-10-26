@@ -19,6 +19,7 @@ from vm_centrale.outils.moduleo.commun import (
     Lecture,
     date_api,
     dates_api,
+    jour_api,
     id_affaire,
     liste_ids,
     lire_argument,
@@ -81,7 +82,7 @@ _SCHEMA = {
                         "type": "string",
                         "description": (
                             f"Date {'au plus tôt' if argument.endswith('_min') else 'au plus tard'}, "
-                            "au format AAAA-MM-JJ."
+                            "au format AAAA-MM-JJ ou JJ/MM/AAAA."
                         ),
                     }
                     for argument in _DATES
@@ -168,7 +169,7 @@ def _criteres(arguments: dict, noms: dict[str, str], restreint: bool) -> str:
     # « affaire 2024-123, vos temps seulement » : la portée des totaux,
     # dans le résultat et la référence de leur lecture.
     criteres = [
-        f"{libelle} {date.fromisoformat(date_api(valeur)).strftime('%d/%m/%Y')}"
+        f"{libelle} {date_api(valeur)}"
         for argument, (_, libelle) in _DATES.items()
         if (valeur := lire_argument(arguments, argument))
     ]
@@ -200,8 +201,8 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
     else:
         aujourdhui = _date_du_jour()
         depuis = aujourdhui - timedelta(days=_JOURS_DEFAUT)
-        dates = {"dateMin": depuis.isoformat(), "dateMax": aujourdhui.isoformat()}
-        du, au = depuis.strftime("%d/%m/%Y"), aujourdhui.strftime("%d/%m/%Y")
+        dates = {"dateMin": jour_api(depuis), "dateMax": jour_api(aujourdhui)}
+        du, au = jour_api(depuis), jour_api(aujourdhui)
         vos = f", {_VOS_TEMPS}" if restreint else ""
         reference = f"temps passés du {du} au {au}" + (f" ({_VOS_TEMPS})" if restreint else "")
         aucun = _AUCUN_RECENT.format(du=du, au=au, jours=_JOURS_DEFAUT, vos=vos)

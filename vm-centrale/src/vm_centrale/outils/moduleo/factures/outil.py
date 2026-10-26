@@ -20,6 +20,7 @@ from vm_centrale.outils.moduleo.commun import (
     chercher_avec_affaire,
     date_api,
     dates_api,
+    jour_api,
     liste_ids,
     lire_argument,
     lire_fiches,
@@ -96,7 +97,7 @@ _SCHEMA = {
                         "type": "string",
                         "description": (
                             f"Date d’émission {'au plus tôt' if argument.endswith('_min') else 'au plus tard'}, "
-                            "au format AAAA-MM-JJ."
+                            "au format AAAA-MM-JJ ou JJ/MM/AAAA."
                         ),
                     }
                     for argument in _DATES
@@ -151,18 +152,27 @@ def _lire_si_present(lecteur: LecteurModuleo, route: str, parametres: dict) -> d
         return None
 
 
+# Types de règlement observés en lecture seule (#194) : 0 (WADL Inconnu),
+# 1 (tous les règlements du serveur du cabinet). Tout autre type : reste
+# non déductible.
+_TYPES_REGLEMENT_DEDUIABLES = (None, 0, 1)
+
+
 def _paiements(lecteur: LecteurModuleo, facture: dict, avec_echeances: bool) -> Paiements:
     # Règlements (`IdsReglements` de la facture), avec leurs échéances pour
     # une fiche affichée. Complets seulement si tous sont lus, sans avoir
-    # sur la facture, sans pénalités ni type de règlement autre que 0 : sens
-    # non relevé, à confirmer à l'essai réel.
+    # sur la facture, sans pénalités ni type de règlement hors
+    # `_TYPES_REGLEMENT_DEDUIABLES` (#194).
     avoirs = lecteur.lire(_ROUTE_AVOIRS, {"idFacture": facture["IdFacture"]})
     lus = [_lire_si_present(lecteur, _ROUTE_REGLEMENT, {"idReglement": i}) for i in facture.get("IdsReglements") or []]
     reglements = tuple(r for r in lus if r is not None)
     complets = (
         not avoirs
         and len(reglements) == len(lus)
-        and all(not r.get("MontantReglementPenalitesTTC") and r.get("TypeReglement") in (None, 0) for r in reglements)
+        and all(
+            not r.get("MontantReglementPenalitesTTC") and r.get("TypeReglement") in _TYPES_REGLEMENT_DEDUIABLES
+            for r in reglements
+        )
     )
     echeances: dict[int, dict] = {}
     if avec_echeances:
@@ -243,7 +253,7 @@ def _criteres(texte: str, emise: bool | None, arguments: dict, noms: dict[str, s
         criteres.append("émise" if emise else "non émise")
     for argument, (_, libelle) in _DATES.items():
         if valeur := lire_argument(arguments, argument):
-            criteres.append(f"{libelle} {date.fromisoformat(date_api(valeur)).strftime('%d/%m/%Y')}")
+            criteres.append(f"{libelle} {date_api(valeur)}")
     criteres.extend(f"{_NOMS[nom]} {valeur}" for nom, valeur in noms.items())
     return ", ".join(criteres)
 
@@ -270,8 +280,8 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
     else:
         aujourdhui = _date_du_jour()
         depuis = aujourdhui - timedelta(days=_JOURS_DEFAUT)
-        emise, dates = True, {"dateEmissionMin": depuis.isoformat()}
-        du, au = depuis.strftime("%d/%m/%Y"), aujourdhui.strftime("%d/%m/%Y")
+        emise, dates = True, {"dateEmissionMin": jour_api(depuis)}
+        du, au = jour_api(depuis), jour_api(aujourdhui)
         reference = f"factures émises du {du} au {au}"
         aucun = _AUCUN_RECENT.format(depuis=du, jours=_JOURS_DEFAUT)
 

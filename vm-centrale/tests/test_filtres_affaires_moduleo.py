@@ -139,14 +139,14 @@ def test_dates_et_etat_transmis_au_format_de_lapi(client, faux_moduleo, mistral_
 
     (recherche,) = _recherches(faux_moduleo)
     assert recherche["etatAffaire"] == "Production"
-    assert recherche["dateOuvertureMin"] == "2024-01-01"
-    assert recherche["dateOuvertureMax"] == "2024-12-31"
-    assert recherche["dateCreationMin"] == "2023-06-01"
-    assert recherche["dateCreationMax"] == "2024-12-31"
-    assert recherche["dateLivraisonMin"] == "2024-01-01"
-    assert recherche["dateLivraisonMax"] == "2024-12-31"
-    assert recherche["dateClotureMin"] == "2024-01-01"
-    assert recherche["dateClotureMax"] == "2024-12-31"
+    assert recherche["dateOuvertureMin"] == "01/01/2024"
+    assert recherche["dateOuvertureMax"] == "31/12/2024"
+    assert recherche["dateCreationMin"] == "01/06/2023"
+    assert recherche["dateCreationMax"] == "31/12/2024"
+    assert recherche["dateLivraisonMin"] == "01/01/2024"
+    assert recherche["dateLivraisonMax"] == "31/12/2024"
+    assert recherche["dateClotureMin"] == "01/01/2024"
+    assert recherche["dateClotureMax"] == "31/12/2024"
 
 
 def test_affaires_ouvertes_depuis_janvier(client, faux_moduleo, mistral_client_factice, jeton_valide):

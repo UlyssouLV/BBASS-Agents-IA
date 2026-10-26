@@ -2,7 +2,7 @@ import logging
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from vm_centrale.lectures_outils import Fiche, enregistrer_lectures
@@ -105,19 +105,34 @@ def lire_argument(arguments: dict, nom: str) -> str:
     return str(arguments.get(nom) or "").strip()
 
 
-# Formats de date acceptés du modèle ; l'API reçoit AAAA-MM-JJ.
+# Formats de date acceptés du modèle ; l'API Moduléo attend JJ/MM/AAAA
+# (#194) : AAAA-MM-JJ est ignoré sans erreur (tous les éléments reviennent).
 _FORMATS_DATE = ("%Y-%m-%d", "%d/%m/%Y")
+
+
+def jour_api(jour: date) -> str:
+    return jour.strftime("%d/%m/%Y")
+
+
+def lire_jour(valeur: str) -> date:
+    # JJ/MM/AAAA (filtre API) ou AAAA-MM-JJ → date.
+    for format_date in _FORMATS_DATE:
+        try:
+            return datetime.strptime(valeur, format_date).date()
+        except ValueError:
+            continue
+    raise ValueError(f"Date illisible : {valeur!r}")
 
 
 def date_api(valeur: str) -> str:
     # Une date illisible lève NomNonResolu : jamais une recherche sans le
-    # filtre demandé.
-    for format_date in _FORMATS_DATE:
-        try:
-            return datetime.strptime(valeur, format_date).date().isoformat()
-        except ValueError:
-            continue
-    raise NomNonResolu(f"Date « {valeur} » illisible : donne-la au format AAAA-MM-JJ. Recherche non lancée.")
+    # filtre demandé. Sortie : JJ/MM/AAAA pour Moduléo (#194).
+    try:
+        return jour_api(lire_jour(valeur))
+    except ValueError:
+        raise NomNonResolu(
+            f"Date « {valeur} » illisible : donne-la au format AAAA-MM-JJ ou JJ/MM/AAAA. Recherche non lancée."
+        ) from None
 
 
 def booleen(valeur: Any) -> bool | None:
@@ -159,7 +174,7 @@ def id_affaire(lecteur: LecteurModuleo, numero: str) -> int:
 
 
 def dates_api(arguments: dict, dates: dict[str, tuple[str, str]]) -> dict[str, str]:
-    # Arguments de date du modèle → {paramètre de la route: AAAA-MM-JJ} ;
+    # Arguments de date du modèle → {paramètre de la route: JJ/MM/AAAA} ;
     # `dates` : argument → (paramètre, libellé). Illisible : NomNonResolu.
     return {
         parametre: date_api(valeur)

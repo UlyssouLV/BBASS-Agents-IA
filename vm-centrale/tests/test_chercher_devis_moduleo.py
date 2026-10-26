@@ -167,6 +167,7 @@ def test_fiche_dun_devis_en_noms_avec_affaire_client_dates_et_montants(
         "Date de création : 10/09/2026\n"
         "Date d'émission : 15/09/2026\n"
         "Date de réponse : 28/09/2026\n"
+        "État : Accepté\n"
         "Responsable : Jean Martin\n"
         "Rédacteur : Sophie Bernard\n"
         "Montant HT : 1 200,00 €\n"
@@ -192,10 +193,10 @@ def test_un_devis_non_emis_le_dit(client, faux_moduleo, mistral_client_factice, 
     [
         ({"texte": "Bornage"}, {"texte": "Bornage"}),
         ({"emis": True}, {"emis": "true"}),
-        ({"date_emission_min": "2026-09-01"}, {"dateEmissionMin": "2026-09-01"}),
-        ({"date_emission_max": "30/09/2026"}, {"dateEmissionMax": "2026-09-30"}),
-        ({"date_reponse_min": "2026-09-20"}, {"dateReponseMin": "2026-09-20"}),
-        ({"date_reponse_max": "2026-09-30"}, {"dateReponseMax": "2026-09-30"}),
+        ({"date_emission_min": "2026-09-01"}, {"dateEmissionMin": "01/09/2026"}),
+        ({"date_emission_max": "30/09/2026"}, {"dateEmissionMax": "30/09/2026"}),
+        ({"date_reponse_min": "2026-09-20"}, {"dateReponseMin": "20/09/2026"}),
+        ({"date_reponse_max": "2026-09-30"}, {"dateReponseMax": "30/09/2026"}),
         ({"responsable": "Martin"}, {"idsResponsable": "7"}),
         ({"redacteur": "Sophie Bernard"}, {"idsRedacteur": "8"}),
         ({"service": "Topographie"}, {"idsService": "3"}),
@@ -272,7 +273,7 @@ def test_sans_critere_les_devis_emis_ces_30_derniers_jours_periode_annoncee(
     _chercher(client, mistral_client_factice, jeton_valide, {"nb_max": 10})
 
     (recherche,) = _recherches(faux_moduleo)
-    assert (recherche["emis"], recherche["dateEmissionMin"]) == ("true", "2026-09-09")
+    assert (recherche["emis"], recherche["dateEmissionMin"]) == ("true", "09/09/2026")
     contenu = _contenu_outil(mistral_client_factice)
     assert contenu.startswith(
         "1 devis émis depuis le 09/09/2026 (30 derniers jours), total 1 200,00 € HT, 1 440,00 € TTC."
@@ -412,7 +413,9 @@ def test_questions_couvertes_du_devis_et_des_totaux_ecrites_par_script(
 
     questions = {q.question: q.reponse for q in db_session.query(QuestionCouverte)}
     assert questions["Quel est le montant du devis D-2026-042 ?"] == "1 200,00 € HT, 1 440,00 € TTC"
-    assert questions["Où en est le devis D-2026-042 ?"] == "Émis le 15/09/2026 ; réponse le 28/09/2026"
+    assert questions["Où en est le devis D-2026-042 ?"] == (
+        "Émis le 15/09/2026 ; réponse le 28/09/2026 ; état Accepté"
+    )
     assert questions["À quelle affaire se rattache le devis D-2026-042 ?"] == "2024-123, client Étude Dupont"
     assert questions["Combien de devis (texte « Bornage ») ?"] == "1"
     assert questions["Quel est le montant total des devis (texte « Bornage ») ?"] == "1 200,00 € HT, 1 440,00 € TTC"

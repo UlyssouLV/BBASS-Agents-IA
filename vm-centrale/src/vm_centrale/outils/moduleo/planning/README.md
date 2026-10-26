@@ -6,7 +6,7 @@ Retrouve des tâches du planning Moduléo par **collaborateur** (participant), *
 
 **Paramètres**, combinés en « et » :
 
-- `date_{min,max}` : AAAA-MM-JJ ou JJ/MM/AAAA, transmis en AAAA-MM-JJ (`dateDebut`, `dateFin`). Un jour donné : les deux à ce jour.
+- `date_{min,max}` : AAAA-MM-JJ ou JJ/MM/AAAA, transmis en **JJ/MM/AAAA** (`dateDebut`, `dateFin`) : Moduléo ignore AAAA-MM-JJ (#194, 86 813 tâches sans filtre). Un jour donné : les deux à ce jour.
 - `collaborateur` : un utilisateur Moduléo (`chercher_utilisateur`), puis son utilisateur planning (`chercher_participant`, `planning/utilisateurplanning/utilisateur/{id}`), transmis en `idsParticipants`. Un utilisateur sans utilisateur planning : « Paul Durand n'est pas au planning Moduléo : recherche non lancée. ».
 - `activite` : libellé d'une activité (`chercher_activite`, `moduleo/resolution.py`, `idActivite`). Activités lues dans Moduléo (`planning/activite`, route libre) : une activité créée dans Moduléo est reconnue sans changer le code. Libellé exact (casse et accents indifférents), sinon la seule qui contient le nom ; plusieurs : `NomNonResolu` avec les candidates.
 - `mot_cle` : transmis tel quel en `libelle`.
@@ -31,6 +31,6 @@ Retrouve des tâches du planning Moduléo par **collaborateur** (participant), *
 
 **Inspecteur** (`outil:chercher_planning_moduleo`) : arguments, `routes`, `trouvees`, `synthese`, `fiches`, `non_resolu`, `erreur` ou `garde_des_droits`.
 
-**Depuis.** 1.5.1 (#192). À confirmer à l'essai réel : `Participants` et `idsParticipants` en ids d'utilisateurs planning (et non d'utilisateurs Moduléo), sens de `dateDebut` / `dateFin` (chevauchement ou début dans la période), heures des tâches sans heure, tâches privées.
+**Depuis.** 1.5.1 (#192). Confirmé à l'essai réel (#194) : `Participants` = ids d'utilisateurs planning (`planning/utilisateurplanning/{id}` → `IdUtilisateurModuleo`) ; dates en JJ/MM/AAAA (chevauchement au jour) ; champ `Privee` présent (False sur l'échantillon, non filtré) ; tâches sans `IdActivite` possibles ; recherche période ~0,5 s.
 
 Code : `outil.py`.

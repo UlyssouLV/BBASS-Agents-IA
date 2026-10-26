@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any
 
 from vm_centrale.moduleo.client import ModuleoIntrouvable
@@ -188,7 +189,8 @@ class FauxModuleo:
             "NumeroPiece": None,
             "Date": date,
             "IdEcheance": None,
-            "TypeReglement": 0,
+            # 1 : type observé sur le serveur du cabinet (#194) ; 0 = Inconnu (WADL).
+            "TypeReglement": 1,
             "MontantReglementPenalitesTTC": 0.0,
             "MontantTVA": 0.0,
             "MontantHT": 0.0,
@@ -570,6 +572,23 @@ def _contient(valeur: str, recherche: str | None) -> bool:
     return not recherche or recherche.lower() in valeur.lower()
 
 
+def _en_jour(valeur: object) -> str:
+    # Normalise en AAAA-MM-JJ pour comparer (#194) : le JSON du faux est en
+    # ISO, les filtres API en JJ/MM/AAAA (ou encore AAAA-MM-JJ en tests
+    # anciens).
+    texte = str(valeur or "").strip()
+    if not texte:
+        return ""
+    if "T" in texte:
+        texte = texte[:10]
+    for format_date in ("%Y-%m-%d", "%d/%m/%Y"):
+        try:
+            return datetime.strptime(texte, format_date).date().isoformat()
+        except ValueError:
+            continue
+    return texte[:10]
+
+
 # Filtres de cogeo/affaire?… (#175) : paramètre → champ de l'affaire.
 _FILTRES_IDS = {
     "idsSite": "IdSite",
@@ -601,11 +620,11 @@ def _correspond(affaire: dict, parametres: dict[str, Any]) -> bool:
         if parametres.get(parametre) is not None and affaire[champ] not in _ids({"ids": parametres[parametre]}):
             return False
     for suffixe, champ in _FILTRES_DATES.items():
-        jour = (affaire[champ] or "")[:10]
+        jour = _en_jour(affaire[champ])
         minimum, maximum = parametres.get(f"date{suffixe}Min"), parametres.get(f"date{suffixe}Max")
-        if minimum is not None and not (jour and jour >= minimum):
+        if minimum is not None and not (jour and jour >= _en_jour(minimum)):
             return False
-        if maximum is not None and not (jour and jour <= maximum):
+        if maximum is not None and not (jour and jour <= _en_jour(maximum)):
             return False
     return True
 
@@ -625,11 +644,11 @@ def _devis_correspond(devis: dict, parametres: dict[str, Any]) -> bool:
         if parametres.get(parametre) is not None and devis[champ] not in _ids({"ids": parametres[parametre]}):
             return False
     for suffixe, champ in _FILTRES_DATES_DEVIS.items():
-        jour = (devis[champ] or "")[:10]
+        jour = _en_jour(devis[champ])
         minimum, maximum = parametres.get(f"date{suffixe}Min"), parametres.get(f"date{suffixe}Max")
-        if minimum is not None and not (jour and jour >= minimum):
+        if minimum is not None and not (jour and jour >= _en_jour(minimum)):
             return False
-        if maximum is not None and not (jour and jour <= maximum):
+        if maximum is not None and not (jour and jour <= _en_jour(maximum)):
             return False
     return True
 
@@ -645,10 +664,10 @@ def _facture_correspond(facture: dict, parametres: dict[str, Any]) -> bool:
 
 def _temps_passe_correspond(temps: dict, parametres: dict[str, Any]) -> bool:
     # Filtres de cogeo/tempspasse?… (#191) ; dates comparées au jour.
-    jour = (temps["Date"] or "")[:10]
-    if parametres.get("dateMin") is not None and not (jour and jour >= parametres["dateMin"]):
+    jour = _en_jour(temps["Date"])
+    if parametres.get("dateMin") is not None and not (jour and jour >= _en_jour(parametres["dateMin"])):
         return False
-    if parametres.get("dateMax") is not None and not (jour and jour <= parametres["dateMax"]):
+    if parametres.get("dateMax") is not None and not (jour and jour <= _en_jour(parametres["dateMax"])):
         return False
     utilisateurs = parametres.get("idsUtilisateurs")
     if utilisateurs is not None and temps["IdUtilisateur"] not in _ids({"ids": utilisateurs}):
@@ -666,10 +685,10 @@ def _tache_correspond(tache: dict, parametres: dict[str, Any]) -> bool:
         return False
     if not _contient(tache["Libelle"], parametres.get("libelle")):
         return False
-    debut, fin = tache["DateHeureDebut"][:10], tache["DateHeureFin"][:10]
-    if parametres.get("dateDebut") is not None and fin < parametres["dateDebut"]:
+    debut, fin = _en_jour(tache["DateHeureDebut"]), _en_jour(tache["DateHeureFin"])
+    if parametres.get("dateDebut") is not None and fin < _en_jour(parametres["dateDebut"]):
         return False
-    if parametres.get("dateFin") is not None and debut > parametres["dateFin"]:
+    if parametres.get("dateFin") is not None and debut > _en_jour(parametres["dateFin"]):
         return False
     if parametres.get("idActivite") is not None and tache["IdActivite"] != parametres["idActivite"]:
         return False

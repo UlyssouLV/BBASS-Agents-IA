@@ -166,8 +166,8 @@ def fiche_contact(contact: dict, details: DetailsContact, communes: dict[int, st
     return Fiche(f"contact {nom}", "\n".join(lignes), questions)
 
 
-# Devis (#189). `Etat` 0 : valeur par défaut, pas de ligne.
-_ETATS_DEVIS_SANS_LIGNE = (None, 0, "")
+# Devis (#189). Sans `Etat` : pas de ligne ; 0 = Accepté (#194), affiché.
+_ETATS_DEVIS_SANS_LIGNE = (None, "")
 
 
 def fiche_devis(devis: dict, affaire: dict | None, noms: Noms) -> Fiche:
@@ -255,8 +255,8 @@ class Paiements:
 
 
 def facture_emise(facture: dict) -> bool:
-    # Une date d'émission (#190, sens de `emise` à confirmer à l'essai
-    # réel) ; l'an 1 est un champ vide côté Moduléo.
+    # Une date d'émission (#190, #194) : `emise=true` et une `DateEmission`
+    # hors an 1 (champ vide côté Moduléo) coïncident sur le serveur réel.
     return bool(_date(facture.get("DateEmission")))
 
 
@@ -362,8 +362,8 @@ def synthese_factures(
 
 
 # Temps passés (#191). Prix seulement avec leur sous-droit, sinon une
-# mention (vérification par champ, #188) ; sens exact (taux horaire ou
-# prix de la ligne) à confirmer à l'essai réel : affichés tels que lus.
+# mention (vérification par champ, #188) ; sur le serveur réel (#194) les
+# prix lus étaient 0,0 (affichés tels quels, taux ou ligne non départagé).
 _PRIX_REVIENT = ("Affaires, groupes et archivage", "Voir l'onglet prix de revient")
 _PRIX_TEMPS_PASSES = (
     ("PrixVenteCollaborateur", "Prix de vente", chemin(*_PRIX_REVIENT, "Voir le prix de vente des temps passés")),
@@ -727,8 +727,8 @@ def _parcelle(noms: Noms, parcelle: dict, parcelles: ParcellesAffaire) -> str:
 
 
 def _surface(valeur: float) -> str:
-    # Contenance cadastrale, en m² (unité à confirmer à l'essai réel,
-    # #178) : 1234.0 → « 1 234 m² », 560.5 → « 560,5 m² ».
+    # Contenance cadastrale en m² (#178, confirmé #194 : 2381.0 → parcelle
+    # plausible) : 1234.0 → « 1 234 m² », 560.5 → « 560,5 m² ».
     entier = f"{valeur:,.2f}".rstrip("0").rstrip(".")
     return entier.replace(",", " ").replace(".", ",") + " m²"
 

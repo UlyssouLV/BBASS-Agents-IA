@@ -8,7 +8,7 @@ Retrouve des devis Moduléo par **texte** ou par **filtres en noms** quand le mo
 
 - `texte` : un mot du numéro ou de l'objet.
 - `emis` : `true` (émis) ou `false` (pas encore émis), transmis en `emis=true|false`.
-- `date_{emission,reponse}_{min,max}` : AAAA-MM-JJ ou JJ/MM/AAAA, transmis en AAAA-MM-JJ (`dateEmissionMin`…).
+- `date_{emission,reponse}_{min,max}` : AAAA-MM-JJ ou JJ/MM/AAAA, transmis en **JJ/MM/AAAA** (`dateEmissionMin`…) : Moduléo ignore AAAA-MM-JJ (#194).
 - `service` : tous les services qui portent ce nom (`idsService`).
 - `responsable`, `redacteur` : un utilisateur (`idsResponsable`, `idsRedacteur`).
 - `affaire` : un numéro d'affaire (`cogeo/affaire/numeroAffaire`). La recherche de devis n'a pas de filtre d'affaire : les devis de l'affaire (`cogeo/affaire/{id}/devis`), croisés avec la recherche s'il y a d'autres filtres.
@@ -33,6 +33,6 @@ Retrouve des devis Moduléo par **texte** ou par **filtres en noms** quand le mo
 
 **Inspecteur** (`outil:chercher_devis_moduleo`) : arguments, `routes`, `trouvees`, `synthese`, `fiches`, `non_resolu`, `erreur` ou `garde_des_droits`.
 
-**Depuis.** 1.5.1 (#189). À confirmer à l'essai réel : valeurs d'`Etat` d'un devis, sens exact de `emis`, ordre et format des dates attendus par l'API.
+**Depuis.** 1.5.1 (#189). Confirmé à l'essai réel (#194) : `Etat` relevé (`enumerations.ETATS_DEVIS`) ; `emis=true|false` coïncide avec une `DateEmission` hors an 1 ; filtres de dates en JJ/MM/AAAA (≈ 0,7–4 s pour la recherche des 30 derniers jours émis).
 
 Code : `outil.py`.

@@ -206,6 +206,16 @@ def test_une_facture_sans_reglement_reste_due_en_entier(client, faux_moduleo, mi
     assert "Reste à payer : 1 440,00 €" in contenu
 
 
+def test_type_reglement_1_permet_le_reste_a_payer(client, faux_moduleo, mistral_client_factice, jeton_valide):
+    # TypeReglement=1 : seul type rencontré sur le serveur réel (#194).
+    _bornage(faux_moduleo)
+    faux_moduleo.ajouter_reglement(80, 600.0, "2026-09-25", TypeReglement=1, Mode="Virement", IdEcheance=70)
+
+    _chercher(client, mistral_client_factice, jeton_valide, {"texte": "Bornage"})
+
+    assert "reste à payer 840,00 €" in _contenu_outil(mistral_client_factice)
+
+
 def test_une_facture_reglee_en_totalite(client, faux_moduleo, mistral_client_factice, jeton_valide):
     _bornage(faux_moduleo, IdsReglements=[80, 81])
     faux_moduleo.ajouter_reglement(81, 840.0, "2026-10-02", Mode="Chèque")
@@ -219,7 +229,7 @@ def test_une_facture_reglee_en_totalite(client, faux_moduleo, mistral_client_fac
 
 @pytest.mark.parametrize(
     "cas",
-    ["reglement_illisible", "avoir", "penalites", "non_emise"],
+    ["reglement_illisible", "avoir", "penalites", "type_reglement", "non_emise"],
 )
 def test_reste_a_payer_jamais_estime_quand_moduleo_ne_permet_pas_de_le_deduire(
     client, faux_moduleo, mistral_client_factice, jeton_valide, cas
@@ -232,6 +242,10 @@ def test_reste_a_payer_jamais_estime_quand_moduleo_ne_permet_pas_de_le_deduire(
     elif cas == "penalites":
         _bornage(faux_moduleo)
         faux_moduleo.ajouter_reglement(80, 600.0, "2026-09-25", MontantReglementPenalitesTTC=40.0)
+    elif cas == "type_reglement":
+        # TypeReglement hors 0 / 1 (#194 : 1 est le type réel du cabinet).
+        _bornage(faux_moduleo)
+        faux_moduleo.ajouter_reglement(80, 600.0, "2026-09-25", TypeReglement=2)
     else:
         _bornage(faux_moduleo, DateEmission=None, IdsReglements=[])
 
@@ -262,8 +276,8 @@ def test_une_facture_non_emise_le_dit(client, faux_moduleo, mistral_client_facti
     [
         ({"texte": "Bornage"}, {"texte": "Bornage"}),
         ({"emise": True}, {"emise": "true"}),
-        ({"date_emission_min": "2026-09-01"}, {"dateEmissionMin": "2026-09-01"}),
-        ({"date_emission_max": "30/09/2026"}, {"dateEmissionMax": "2026-09-30"}),
+        ({"date_emission_min": "2026-09-01"}, {"dateEmissionMin": "01/09/2026"}),
+        ({"date_emission_max": "30/09/2026"}, {"dateEmissionMax": "30/09/2026"}),
         ({"responsable": "Martin"}, {"idsResponsable": "7"}),
         ({"redacteur": "Sophie Bernard"}, {"idsRedacteur": "8"}),
         ({"service": "Topographie"}, {"idsService": "3"}),
@@ -343,7 +357,7 @@ def test_sans_critere_les_factures_emises_ces_30_derniers_jours_periode_annoncee
     _chercher(client, mistral_client_factice, jeton_valide, {"nb_max": 10})
 
     (recherche,) = _recherches(faux_moduleo)
-    assert (recherche["emise"], recherche["dateEmissionMin"]) == ("true", "2026-09-09")
+    assert (recherche["emise"], recherche["dateEmissionMin"]) == ("true", "09/09/2026")
     contenu = _contenu_outil(mistral_client_factice)
     assert contenu.startswith(
         "1 facture émise depuis le 09/09/2026 (30 derniers jours), "

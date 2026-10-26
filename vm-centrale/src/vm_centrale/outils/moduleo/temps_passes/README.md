@@ -12,7 +12,7 @@ Retrouve des temps passés Moduléo par **période** ou par **filtres en noms** 
 
 **Paramètres**, combinés en « et » :
 
-- `date_{min,max}` : AAAA-MM-JJ ou JJ/MM/AAAA, transmis en AAAA-MM-JJ (`dateMin`, `dateMax`).
+- `date_{min,max}` : AAAA-MM-JJ ou JJ/MM/AAAA, transmis en **JJ/MM/AAAA** (`dateMin`, `dateMax`) : Moduléo ignore AAAA-MM-JJ (#194).
 - `collaborateur` : un utilisateur (`chercher_utilisateur`, `idsUtilisateurs`).
 - `code_activite` : nom ou code d'un code activité (`chercher_code_activite`, `moduleo/resolution.py`, `idCodeActivite`). Codes lus dans Moduléo (`cogeo/codeactivite`, puis `cogeo/codeactivite/{id}`, routes libres) : un code créé dans Moduléo est reconnu sans changer le code. Nom ou code exact (casse et accents indifférents), sinon le seul qui contient le nom ; plusieurs : `NomNonResolu` avec les candidats.
 - `affaire` : un numéro d'affaire (`id_affaire`, `../commun.py`, `idAffaire`).
@@ -37,6 +37,6 @@ Retrouve des temps passés Moduléo par **période** ou par **filtres en noms** 
 
 **Inspecteur** (`outil:chercher_temps_passes_moduleo`) : arguments, `routes`, `trouvees`, `synthese`, `fiches`, `non_resolu`, `erreur` ou `garde_des_droits`.
 
-**Depuis.** 1.5.1 (#191). À confirmer à l'essai réel : sens des prix (taux horaire ou prix de la ligne), format des dates attendu par l'API, limite éventuelle de la recherche sans `nbMaxResultat`.
+**Depuis.** 1.5.1 (#191). Confirmé à l'essai réel (#194) : dates en JJ/MM/AAAA (ISO renvoyait des temps de 1943…) ; `NombreHeure` décimal OK ; `PrixVenteCollaborateur` / `PrixRevientCollaborateur` lus à 0,0 sur l'échantillon (affichés tels quels, taux ou ligne non départagé) ; recherche 7 jours ~2 s.
 
 Code : `outil.py`.

@@ -227,7 +227,7 @@ def _ambigu(genre: str, nom: str, noms: list[str], total: int) -> str:
 # Planning (#192). Activités lues dans Moduléo (`planning/activite`, toutes
 # en une lecture) : une activité créée dans Moduléo est reconnue sans
 # changer le code. Participants d'une tâche : des utilisateurs planning,
-# chacun lié à un utilisateur Moduléo (à confirmer à l'essai réel).
+# chacun lié à un utilisateur Moduléo (`IdUtilisateurModuleo`, confirmé #194).
 _ROUTE_UTILISATEUR_PLANNING = "planning/utilisateurplanning/{idUtilisateurPlanning}"
 
 

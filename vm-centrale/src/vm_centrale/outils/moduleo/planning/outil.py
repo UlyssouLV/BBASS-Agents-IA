@@ -19,6 +19,7 @@ from vm_centrale.outils.moduleo.commun import (
     NB_PLAFOND,
     Lecture,
     date_api,
+    jour_api,
     liste_ids,
     lire_argument,
     lire_fiches,
@@ -78,7 +79,7 @@ _SCHEMA = {
                         "type": "string",
                         "description": (
                             f"Date {'au plus tôt' if argument.endswith('_min') else 'au plus tard'}, "
-                            "au format AAAA-MM-JJ."
+                            "au format AAAA-MM-JJ ou JJ/MM/AAAA."
                         ),
                     }
                     for argument in _DATES
@@ -159,7 +160,7 @@ def _criteres(arguments: dict, filtres: dict[str, str]) -> str:
     # « collaborateur Jean Martin, activité Terrain » : la portée du
     # résultat et la référence de sa lecture.
     criteres = [
-        f"{libelle} {date.fromisoformat(date_api(valeur)).strftime('%d/%m/%Y')}"
+        f"{libelle} {date_api(valeur)}"
         for argument, (_, libelle) in _DATES.items()
         if (valeur := lire_argument(arguments, argument))
     ]
@@ -192,8 +193,8 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
     else:
         aujourdhui = _date_du_jour()
         jusqua = aujourdhui + timedelta(days=_JOURS_DEFAUT)
-        dates = {"dateDebut": aujourdhui.isoformat(), "dateFin": jusqua.isoformat()}
-        du, au = aujourdhui.strftime("%d/%m/%Y"), jusqua.strftime("%d/%m/%Y")
+        dates = {"dateDebut": jour_api(aujourdhui), "dateFin": jour_api(jusqua)}
+        du, au = jour_api(aujourdhui), jour_api(jusqua)
         reference = f"planning du {du} au {au}"
         aucun = _AUCUN_PROCHE.format(du=du, au=au, defaut=_DEFAUT)
 

@@ -8,7 +8,7 @@ Retrouve des factures Moduléo par **texte** ou par **filtres en noms** quand le
 
 - `texte` : un mot du numéro ou de l'objet.
 - `emise` : `true` (émise) ou `false` (pas encore émise), transmis en `emise=true|false`.
-- `date_emission_{min,max}` : AAAA-MM-JJ ou JJ/MM/AAAA, transmis en AAAA-MM-JJ (`dateEmissionMin`, `dateEmissionMax`).
+- `date_emission_{min,max}` : AAAA-MM-JJ ou JJ/MM/AAAA, transmis en **JJ/MM/AAAA** (`dateEmissionMin`, `dateEmissionMax`) : Moduléo ignore AAAA-MM-JJ (#194).
 - `service` : tous les services qui portent ce nom (`idsService`).
 - `responsable`, `redacteur` : un utilisateur (`idsResponsable`, `idsRedacteur`).
 - `affaire` : un numéro d'affaire (`id_affaire`, `../commun.py`). La recherche de factures n'a pas de filtre d'affaire : les factures de l'affaire (`cogeo/affaire/{id}/factures`), croisées avec la recherche s'il y a d'autres filtres.
@@ -19,7 +19,7 @@ Retrouve des factures Moduléo par **texte** ou par **filtres en noms** quand le
 
 **Noms non résolus.** Date illisible, numéro d'affaire inconnu, nom qui ne désigne rien, plusieurs utilisateurs : une phrase au modèle, **aucune recherche**, aucune lecture enregistrée, terminée par « Aucune lecture faite dans Moduléo : n'invente aucune facture, demande au collaborateur un numéro, un nom ou une période. ». Trace : `non_resolu`.
 
-**Reste à payer.** TTC de la facture moins ses règlements (`MontantTTC`), affiché **seulement** quand Moduléo permet de le déduire : facture émise, montants lus, tous ses `IdsReglements` lus (`cogeo/reglement/{id}`, un 404 n'est pas une panne mais rend le reste non déductible), aucun avoir sur la facture (`cogeo/avoir/facture?idFacture=`), aucun règlement avec pénalités (`MontantReglementPenalitesTTC`) ni `TypeReglement` autre que 0. Sinon, pas de ligne « Reste à payer » : jamais estimé. Échéances : celle de chaque règlement (`IdEcheance`, `cogeo/echeance/{id}`) ; Moduléo n'a pas de route des échéances d'une facture.
+**Reste à payer.** TTC de la facture moins ses règlements (`MontantTTC`), affiché **seulement** quand Moduléo permet de le déduire : facture émise, montants lus, tous ses `IdsReglements` lus (`cogeo/reglement/{id}`, un 404 n'est pas une panne mais rend le reste non déductible), aucun avoir sur la facture (`cogeo/avoir/facture?idFacture=`), aucun règlement avec pénalités (`MontantReglementPenalitesTTC`) ni `TypeReglement` hors 0 / 1. Confirmé #194 : sur le serveur du cabinet, les règlements ont `TypeReglement=1` (0 = Inconnu du WADL) ; le reste est bien TTC − somme des `MontantTTC`. `IdEcheance` souvent absent. Sinon, pas de ligne « Reste à payer » : jamais estimé. Échéances : celle de chaque règlement (`IdEcheance`, `cogeo/echeance/{id}`) ; Moduléo n'a pas de route des échéances d'une facture.
 
 **Déroulé.**
 
@@ -36,6 +36,6 @@ Retrouve des factures Moduléo par **texte** ou par **filtres en noms** quand le
 
 **Inspecteur** (`outil:chercher_factures_moduleo`) : arguments, `routes`, `trouvees`, `synthese`, `fiches`, `non_resolu`, `erreur` ou `garde_des_droits`.
 
-**Depuis.** 1.5.1 (#190). À confirmer à l'essai réel : sens exact de `emise`, nature des `IdsReglements` d'une facture, valeurs de `TypeReglement`, ordre et format des dates attendus par l'API.
+**Depuis.** 1.5.1 (#190). Confirmé à l'essai réel (#194) : `emise` ↔ `DateEmission` hors an 1 ; `IdsReglements` = ids de `cogeo/reglement/{id}` ; `TypeReglement` 0 ou 1 déductibles ; dates en JJ/MM/AAAA (recherche ~0,5 s, règlement ~0,1 s).
 
 Code : `outil.py`.

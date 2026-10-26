@@ -25,6 +25,8 @@ from vm_centrale.outils.moduleo.commun import (
     NB_PLAFOND,
     booleen,
     date_api,
+    jour_api,
+    lire_jour,
     liste_ids,
     lire_argument,
     lire_fiches,
@@ -129,7 +131,7 @@ _SCHEMA = {
                         "description": (
                             f"Date {_EVENEMENTS[argument.split('_')[1]][1]} "
                             f"{'au plus tôt' if argument.endswith('_min') else 'au plus tard'}, "
-                            "au format AAAA-MM-JJ."
+                            "au format AAAA-MM-JJ ou JJ/MM/AAAA."
                         ),
                     }
                     for argument in _DATES
@@ -222,15 +224,15 @@ def _plus_recents(lecteur: LecteurModuleo, parametres: dict[str, Any], plafonnes
     # plus récentes peuvent manquer. La fenêtre de création est resserrée
     # depuis sa fin, par dichotomie, jusqu'à passer sous le plafond avec au
     # moins `n` affaires : celles-là sont toutes les plus récentes.
-    fin = date.fromisoformat(parametres.get("dateCreationMax") or _date_du_jour().isoformat())
+    fin = lire_jour(parametres["dateCreationMax"]) if parametres.get("dateCreationMax") else _date_du_jour()
     minimum = parametres.get("dateCreationMin")
-    debut = date.fromisoformat(minimum) if minimum else _DEBUT_MODULEO
+    debut = lire_jour(minimum) if minimum else _DEBUT_MODULEO
     # Jours avant `fin` : `plafonne` donne IDS_MAX ids, `complet` moins.
     plafonne, complet = (fin - debut).days, -1
     meilleurs: set[int] = set()
     while plafonne - complet > 1:
         jours = (plafonne + complet) // 2
-        ids = _ids(lecteur, {**parametres, "dateCreationMin": (fin - timedelta(days=jours)).isoformat()})
+        ids = _ids(lecteur, {**parametres, "dateCreationMin": jour_api(fin - timedelta(days=jours))})
         if len(ids) >= IDS_MAX:
             plafonne = jours
             continue
@@ -366,9 +368,9 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
     aucune, trouvees, recentes = _AUCUNE_AFFAIRE, _TROUVEES, not (numero or texte or filtres or noms)
     if recentes:
         depuis = _date_du_jour() - timedelta(days=_JOURS_RECENTS)
-        filtres = {"dateCreationMin": depuis.isoformat()}
-        aucune = _AUCUNE_RECENTE.format(depuis=depuis.strftime("%d/%m/%Y"))
-        trouvees = _RECENTES.format(depuis=depuis.strftime("%d/%m/%Y"))
+        filtres = {"dateCreationMin": jour_api(depuis)}
+        aucune = _AUCUNE_RECENTE.format(depuis=jour_api(depuis))
+        trouvees = _RECENTES.format(depuis=jour_api(depuis))
 
     def lire(lecteur: LecteurModuleo) -> tuple[list[int], list[Fiche]]:
         n = nb_max(arguments.get("nb_max"))

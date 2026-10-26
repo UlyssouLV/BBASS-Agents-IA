@@ -37,7 +37,19 @@ Intégration Moduléo de la VM centrale, commune à tous les outils (et plus tar
 | 4 | `Collectivite` | Collectivité |
 | 5 | `GroupeContacts` | Groupe de contacts |
 
-`Etat` 3 et `TypeContact` 2 n'ont pas été rencontrés : affichés en chiffre. `Etat` d'un devis (`ETATS_DEVIS`, #189) : pas encore relevé ; 0 n'a pas de ligne, toute autre valeur est affichée en chiffre, et l'outil devis n'a pas de filtre d'état. Relancer le script après une mise à jour de Moduléo.
+`Etat` 3 et `TypeContact` 2 n'ont pas été rencontrés : affichés en chiffre. `Etat` d'un devis (`ETATS_DEVIS`, #189, relevé #194) :
+
+| `Etat` (JSON) | `etat` (filtre) | Interface |
+| --- | --- | --- |
+| 0 | `Accepte` | Accepté |
+| 1 | `Refuse` | Refusé |
+| 2 | `EnAttente` | En attente |
+| 3 | `Annule` | Annulé |
+| 6 | *(aucun filtre reconnu)* | Non émis |
+
+L'outil devis n'a pas encore de filtre d'état. `Expire` mélange Accepté et En attente : non mappé. Relancer `scripts/relever_enumerations_moduleo.py` / `scripts/essai_reel_moduleo_151.py` après une mise à jour de Moduléo.
+
+**Dates des filtres** (#194) : Moduléo attend **JJ/MM/AAAA**. Un `AAAA-MM-JJ` est ignoré sans erreur (tous les éléments reviennent). `date_api` / `jour_api` (`outils/moduleo/commun.py`) envoient donc toujours JJ/MM/AAAA.
 
 Une route s'écrit comme dans le WADL : `client.lire("cogeo/affaire/{idAffaire}", {"idAffaire": 12})`, `client.lire("cogeo/affaire?texte={texte}&…&nbMaxResultats={nbMaxResultats}", {"texte": "Castries", "nbMaxResultats": 5})`.
 

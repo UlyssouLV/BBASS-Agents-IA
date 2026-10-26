@@ -19,6 +19,7 @@ from vm_centrale.outils.moduleo.commun import (
     chercher_avec_affaire,
     date_api,
     dates_api,
+    jour_api,
     liste_ids,
     lire_argument,
     lire_par_lots,
@@ -85,7 +86,7 @@ _SCHEMA = {
                         "description": (
                             f"Date {'d’émission' if 'emission' in argument else 'de réponse'} "
                             f"{'au plus tôt' if argument.endswith('_min') else 'au plus tard'}, "
-                            "au format AAAA-MM-JJ."
+                            "au format AAAA-MM-JJ ou JJ/MM/AAAA."
                         ),
                     }
                     for argument in _DATES
@@ -155,7 +156,7 @@ def _criteres(texte: str, emis: bool | None, arguments: dict, noms: dict[str, st
         criteres.append("émis" if emis else "non émis")
     for argument, (_, libelle) in _DATES.items():
         if valeur := lire_argument(arguments, argument):
-            criteres.append(f"{libelle} {date.fromisoformat(date_api(valeur)).strftime('%d/%m/%Y')}")
+            criteres.append(f"{libelle} {date_api(valeur)}")
     criteres.extend(f"{_NOMS[nom]} {valeur}" for nom, valeur in noms.items())
     return ", ".join(criteres)
 
@@ -182,8 +183,8 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
     else:
         aujourdhui = _date_du_jour()
         depuis = aujourdhui - timedelta(days=_JOURS_DEFAUT)
-        emis, dates = True, {"dateEmissionMin": depuis.isoformat()}
-        du, au = depuis.strftime("%d/%m/%Y"), aujourdhui.strftime("%d/%m/%Y")
+        emis, dates = True, {"dateEmissionMin": jour_api(depuis)}
+        du, au = jour_api(depuis), jour_api(aujourdhui)
         reference = f"devis émis du {du} au {au}"
         aucun = _AUCUN_RECENT.format(depuis=du, jours=_JOURS_DEFAUT)
 

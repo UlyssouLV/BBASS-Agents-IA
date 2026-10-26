@@ -5,7 +5,7 @@ Retrouve des affaires Moduléo par **numéro**, par **texte** ou par **filtres e
 **Paramètres.** `numero` (prioritaire : les autres sont alors ignorés), sinon `texte` (un mot de l'objet, de l'adresse ou du client) et / ou des filtres, combinés en « et » :
 
 - `etat` : un état de l'interface Moduléo (Créée, En attente, Acceptée, Production, Suspendue, Prod. terminée, Clôturée, Annulée ; casse, accents et accord indifférents), transmis en `etatAffaire` par le nom de l'énumération (`Acceptee`…, `moduleo/enumerations.py`). Un autre état (« en retard ») : une phrase au modèle qui liste les états, aucune recherche, car Moduléo ignore un nom inconnu et renverrait toutes les affaires (test humain 1.5.0, conversation 113, #180).
-- `date_{creation,ouverture,livraison,cloture}_{min,max}` : AAAA-MM-JJ ou JJ/MM/AAAA, transmis en AAAA-MM-JJ (`dateOuvertureMin`…).
+- `date_{creation,ouverture,livraison,cloture}_{min,max}` : AAAA-MM-JJ ou JJ/MM/AAAA, transmis en **JJ/MM/AAAA** (`dateOuvertureMin`…) : Moduléo ignore AAAA-MM-JJ (#194).
 - `site`, `service` : tous les sites / services qui portent ce nom (`idsSite`, `idsService`).
 - `responsable`, `charge_affaire` : un utilisateur (`idsResponsable`, `idsActeurEnCharge`).
 - `suivi_par` : un utilisateur, responsable **ou** chargé d'affaire ; remplace les deux précédents.
@@ -30,6 +30,6 @@ Retrouve des affaires Moduléo par **numéro**, par **texte** ou par **filtres e
 
 **Inspecteur** (`outil:chercher_affaires_moduleo`) : arguments, `routes`, `trouvees`, `fiches`, `non_resolu` ou `erreur`.
 
-**Depuis.** 1.5.0 (#174), filtres en noms (#175), affaires récentes sans critère et plus récentes d'abord (#182), renvoi vers `chercher_contacts_moduleo` pour les coordonnées (#183), parcelles à la demande (#193). Valeurs d'`Etat` relevées sur le serveur réel et affichées en libellés (#180). À confirmer à l'essai réel (#178) : format de date attendu par l'API, recherche par nom exacte ou partielle, unité de `ContenanceCadatrale` (affichée en m²), `TypeDroit` d'un propriétaire (non affiché).
+**Depuis.** 1.5.0 (#174), filtres en noms (#175), affaires récentes sans critère et plus récentes d'abord (#182), renvoi vers `chercher_contacts_moduleo` pour les coordonnées (#183), parcelles à la demande (#193). Valeurs d'`Etat` relevées sur le serveur réel et affichées en libellés (#180). Confirmé #194 : dates en JJ/MM/AAAA ; `ContenanceCadatrale` en m² (ex. 2381) ; préfixe `000` non affiché ; `TypeDroit` du propriétaire non affiché ; propriétaires via `cogeo/proprietaire/{id}` → `IdContact`.
 
 Code : `outil.py`.
