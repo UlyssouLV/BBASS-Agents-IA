@@ -10,7 +10,7 @@ _CHAMP_DE_MODELE = re.compile(r"\$[A-Za-z][\w.]*\$")
 _MARQUE = "\x00"
 # La ponctuation qui ne sert qu'à un champ retiré : « lot B, $Affaire.Commune$ ».
 _AVANT_LE_CHAMP = re.compile(rf"[\s,;:]*{_MARQUE}")
-_BORDS = re.compile(r"^[\s,;:–-]+|[\s,;:–-]+$")
+_BORDS = " \t\r\n\f\v ,;:–-"
 
 # Groupes RTF sans texte affiché : polices, couleurs, styles, propriétés.
 _DESTINATIONS_IGNOREES = {"fonttbl", "colortbl", "stylesheet", "info", "pict", "header", "footer", "generator"}
@@ -34,7 +34,7 @@ def _sans_champs_de_modele(ligne: str) -> str:
     # « $Affaire.Commune$ : Section $…$ » : un libellé seul ne dit rien.
     if len(re.findall(r"\w+", reste)) <= 1:
         return ""
-    return _BORDS.sub("", _AVANT_LE_CHAMP.sub("", reste).replace(_MARQUE, ""))
+    return _AVANT_LE_CHAMP.sub("", reste).replace(_MARQUE, "").strip(_BORDS)
 
 
 def _sans_rtf(texte: str) -> str:
