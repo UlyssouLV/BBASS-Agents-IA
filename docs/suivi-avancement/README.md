@@ -9,7 +9,7 @@ Outils branchés dessus :
 - skill **Finalise la version** — appelle `/msa` (soft-skip s’il n’y a pas de semaine) ;
 - script `generer-pdf.mjs` — resync agenda puis Chrome / Edge headless ;
 - script `sync-agenda.mjs` — lit l’Excel de la semaine dans le dossier externe **Suivi** → `agenda-quotidien-tableau.png` + section HTML ;
-- script `docs-site/scripts/capturer-travail-realise.mjs` — aperçu README (lit le HTML de la semaine courante).
+- script `docs-site/scripts/capturer-apercus-readme.mjs` — aperçus README (travail réalisé + accueil/bugs doc + sync architecture) dans le **même** commit docs que Finalise / `/msa` ; **aucun** commit bot (aligné ArgOS).
 
 Rôle agents : **`suivi-avancement`** → `docs/suivi-avancement/` (`agents/roles.yml`).
 
@@ -82,9 +82,9 @@ node docs/suivi-avancement/generer-pdf.mjs docs/suivi-avancement/semaine-JJ-JJ-m
 | Moment | Action |
 | --- | --- |
 | Début de semaine (ou avant la 1ʳᵉ finalisation de la semaine) | **`/os`** — crée dossier + HTML (attendus = Prochaine/Ensuite roadmap, surcharge possible dans le prompt) |
-| À chaque **Finalise la version** | **`/msa`** (via finaliser) — met à jour le HTML pour `X.Y.Z`, régénère le PDF |
+| À chaque **Finalise la version** | **`/msa`** (via finaliser) — met à jour le HTML pour `X.Y.Z`, régénère le PDF, puis aperçus README (`capturer-apercus-readme.mjs`, soft-skip si Playwright / build absents) |
 | Pas de dossier pour la semaine courante à la finalisation | **soft-skip** + rappel de lancer `/os` ; on ne bloque pas le release |
-| Commit / push | **ni `/os` ni `/msa`** — via `/c` (finaliser fait `/c -a -p` sur le lot docs) |
+| Commit / push | **ni `/os` ni `/msa`** — via `/c` (finaliser fait `/c -a -p` sur le lot docs **incluant** les aperçus) |
 
 ## Langage
 

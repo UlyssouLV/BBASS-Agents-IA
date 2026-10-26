@@ -55,7 +55,17 @@ node docs/suivi-avancement/generer-pdf.mjs <chemin-du-html-ou-dossier-semaine>
 
 If the script fails (PDF locked, no Chrome/Edge, …): **stop**. HTML may already be updated — say so in one line and tell the user how to fix (close the PDF, install Chrome/Edge, rerun the command). Do not invent another print method.
 
-Done when: HTML updated and PDF regenerated, or soft-skip (no week / no script / parent finaliser).
+## 4. Aperçus README (même commit docs)
+
+From repo root, after the HTML/PDF step (even if PDF soft-skipped for missing script — still run when the week HTML exists):
+
+```bash
+node docs-site/scripts/capturer-apercus-readme.mjs
+```
+
+Soft-skip (script prints `[apercus-readme] soft-skip` and exits 0) if Playwright / build / serve are missing — **do not** block `/msa` or a parent finaliser. Do **not** leave aperçu refresh to GitHub Actions (no bot commit; ArgOS-aligned). Include any changed `docs/img/apercu-*.png` / `README.md` in the same later `/c` as the suivi HTML.
+
+Done when: HTML updated and PDF regenerated (or soft-skip), and aperçus attempted (or soft-skip).
 
 ## Not this skill
 

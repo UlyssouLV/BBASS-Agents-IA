@@ -2,7 +2,7 @@
   <img src="docs/img/readme-banniere.jpg" alt="BBASS Agents IA" width="480" />
 </p>
 
-<!-- Compteurs publiés avec le site de doc (Deploy docs) : aucun commit de bot. -->
+<!-- Compteurs via Pages (Deploy docs). Aperçus PNG : commit docs Finalise / /msa — aucun bot. -->
 <p align="center">
   <img src="https://img.shields.io/endpoint?style=for-the-badge&url=https%3A%2F%2Fulyssoulv.github.io%2FBBASS-Agents-IA%2Fstats%2Fcommits-main.json" alt="Commits sur main" />
   <img src="https://img.shields.io/endpoint?style=for-the-badge&url=https%3A%2F%2Fulyssoulv.github.io%2FBBASS-Agents-IA%2Fstats%2Fcommits-pr.json" alt="Commits dans les PR mergées" />

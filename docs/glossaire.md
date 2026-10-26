@@ -176,13 +176,13 @@ L'étape en cours d'un tour de chat, publiée en direct par la VM centrale et af
 
 ## Moduléo {#moduleo}
 
-Le logiciel métier du cabinet (affaires, contacts, planning, GED…), édité par Kipaware. La VM centrale le lit par son API, en lecture seule, avec une seule clé dédiée à BBASS ([ADR-0017](./adr/0017-lecture-moduleo-par-outil.md)).
+Le logiciel métier du cabinet (affaires, contacts, planning, GED…), édité par Kipaware. La VM centrale le lit par son API, en lecture seule, avec une seule clé dédiée à BBASS ([ADR-0017](./adr/0017-lecture-moduleo-par-outil.md)) ; elle n'y écrit que sur un Serveur Moduléo de test (Écriture Moduléo, 1.5.2).
 
 À éviter : Agent Moduléo (Moduléo est lu par des Outils communs, pas par un Agent), Cogeo (un module de Moduléo).
 
 ## Fiche Moduléo {#fiche-moduleo}
 
-Le texte dense qu'un Outil Moduléo renvoie au modèle pour une affaire ou un contact : champs utiles, ids résolus en noms (client, responsable, intervenants, commune). Jamais la réponse brute de l'API.
+Le texte dense qu'un Outil Moduléo renvoie au modèle pour une affaire ou un contact : champs utiles, ids résolus en noms (client, responsable, intervenants, commune). Jamais la réponse brute de l'API. Depuis 1.5.2, sa ligne de référence porte l'id de l'élément au format `[id Moduléo <n>]`, pour que le modèle puisse proposer une Écriture Moduléo ; ce motif est retiré de la réponse affichée.
 
 À éviter : résultat, JSON, enregistrement.
 
@@ -209,3 +209,27 @@ Une case du catalogue des droits de Moduléo (« Consulter les devis », « Voir
 Le contrôle que la VM centrale fait avant tout appel à l'API Moduléo : la route doit être classée, et le Compte doit avoir le Droit Moduléo qu'elle exige. Fermé par défaut ; un refus est dit au modèle par une phrase fixe qui nomme le droit manquant, distincte du refus de Moduléo.
 
 À éviter : garde-fou (les Garde-fous contrôlent la réponse du modèle, après coup), filtre, middleware.
+
+## Écriture Moduléo {#ecriture-moduleo}
+
+Une création, une modification ou une suppression (POST, PUT, DELETE) envoyée à l'API Moduléo par la VM centrale, seulement après le clic du collaborateur sur une Carte de confirmation, et seulement vers un Serveur Moduléo de test ([ADR-0019](./adr/0019-ecriture-moduleo-confirmee-serveur-de-test.md)). Proposée par le modèle (`ecrire_moduleo`), jamais envoyée par lui.
+
+À éviter : action, mise à jour, synchronisation.
+
+## Carte de confirmation {#carte-de-confirmation}
+
+Ce que le poste affiche dans le fil quand le modèle propose une Écriture Moduléo : ce qui sera écrit, en noms (pour une modification, ce qui change ; pour une suppression, la fiche entière), et deux boutons, Confirmer et Annuler, traités par la VM hors du modèle. Expire dès qu'un nouveau message est envoyé. Un « oui » tapé dans le chat ne confirme rien.
+
+À éviter : popup, validation, consentement.
+
+## Serveur Moduléo de test {#serveur-moduleo-de-test}
+
+Le serveur Moduléo que Kipaware dédie aux essais de l'API (compte pseudonymisé, données fictives ou anonymisées). Son URL figure dans la liste versionnée des serveurs de test : c'est la seule condition, avec `MODULEO_ECRITURE`, pour qu'une Écriture Moduléo parte. Le serveur du cabinet n'y figure jamais.
+
+À éviter : serveur de dev, bac à sable, préproduction.
+
+## Journal des écritures {#journal-des-ecritures}
+
+L'enregistrement en base de chaque Écriture Moduléo proposée, avec son sort (confirmée, annulée, expirée, refusée, en échec) : Compte, heure, route, contenu envoyé, id renvoyé par Moduléo. Lu dans l'inspecteur.
+
+À éviter : log, historique, audit (pas d'écran d'administration en 1.5.2).

@@ -2,6 +2,8 @@ name: Deploy docs
 
 # À chaque push sur main (pas seulement la doc) : le site publie aussi les
 # compteurs de commits lus par les badges du README (static/stats/).
+# Aucun commit de bot : aperçus README régénérés dans le commit docs
+# (Finalise / /msa), comme ArgOS.
 on:
   push:
     branches:
@@ -75,111 +77,6 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: docs-site/build
-
-      - name: Upload build for screenshot
-        uses: actions/upload-artifact@v4
-        with:
-          name: docs-site-build
-          path: docs-site/build
-          retention-days: 1
-
-  # Aperçus README : seulement si la doc / le site a bougé (évite un bot à chaque
-  # merge code-only). Les compteurs ne sont plus commités (badges endpoint Pages).
-  capture-readme:
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: main
-          fetch-depth: 0
-
-      - name: Skip si pas de changement doc / aperçu
-        id: gate
-        if: github.event_name == 'push'
-        env:
-          BEFORE: ${{ github.event.before }}
-          AFTER: ${{ github.sha }}
-        run: |
-          if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          if git diff --name-only "$BEFORE" "$AFTER" | grep -qE '^(docs/|docs-site/|poste/frontend/|vm-centrale/src/vm_centrale/moduleo/docs/|README\.md|\.github/workflows/deploy-docs\.yml)'; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=false" >> "$GITHUB_OUTPUT"
-            echo "Pas de chemin doc : skip aperçus (compteurs déjà sur Pages)."
-          fi
-
-      - name: Setup Node
-        if: github.event_name != 'push' || steps.gate.outputs.run == 'true'
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: docs-site/package-lock.json
-
-      - name: Install dependencies
-        if: github.event_name != 'push' || steps.gate.outputs.run == 'true'
-        working-directory: docs-site
-        run: npm ci --ignore-scripts
-
-      - name: Install Playwright Chromium
-        if: github.event_name != 'push' || steps.gate.outputs.run == 'true'
-        working-directory: docs-site
-        run: node node_modules/playwright/cli.js install --with-deps chromium
-
-      - name: Download build
-        if: github.event_name != 'push' || steps.gate.outputs.run == 'true'
-        uses: actions/download-artifact@v4
-        with:
-          name: docs-site-build
-          path: docs-site/build
-
-      - name: Serve and capture homepage
-        if: github.event_name != 'push' || steps.gate.outputs.run == 'true'
-        working-directory: docs-site
-        run: |
-          node node_modules/@docusaurus/core/bin/docusaurus.mjs serve --host 127.0.0.1 --port 4173 &
-          for i in $(seq 1 60); do
-            if curl -sf "http://127.0.0.1:4173/BBASS-Agents-IA/" >/dev/null; then
-              break
-            fi
-            sleep 1
-          done
-          npm run capturer-accueil
-          npm run capturer-bugs
-
-      - name: Capture suivi « Travail réalisé »
-        if: github.event_name != 'push' || steps.gate.outputs.run == 'true'
-        working-directory: docs-site
-        run: npm run capturer-travail-realise
-
-      - name: Sync architecture Mermaid → README
-        if: github.event_name != 'push' || steps.gate.outputs.run == 'true'
-        working-directory: docs-site
-        run: npm run sync-architecture-readme
-
-      - name: Commit aperçus si changés
-        if: github.event_name != 'push' || steps.gate.outputs.run == 'true'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/img/apercu-docs-accueil.png docs/img/apercu-docs-bugs.png docs/img/apercu-travail-realise.png README.md
-          if git diff --staged --quiet; then
-            echo "Aperçus inchangés."
-            exit 0
-          fi
-          git commit -m "Met à jour les aperçus README [skip ci]"
-          for essai in 1 2 3; do
-            git pull --rebase origin main && git push origin HEAD:main && exit 0
-            sleep 5
-          done
-          exit 1
 
   deploy:
     if: github.event_name != 'release'
