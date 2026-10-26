@@ -34,3 +34,6 @@ docs/bugs/**
 !docs/bugs/README.md
 # Fichiers de verrou Office (Excel, Word ouverts).
 ~$*
+# Caches explorateur (macOS / Windows).
+.DS_Store
+Thumbs.db
