@@ -252,3 +252,29 @@ def test_le_statut_nomme_le_domaine(outil, domaine, client, faux_moduleo, mistra
     reponse = _envoyer(client, mistral_client_factice, jeton_valide, (outil, {"texte": "Dupont"}))
 
     assert f"Consultation Moduléo : {domaine}" in statuts(reponse)
+
+
+def test_un_droit_sorti_du_catalogue_est_retire_de_la_base_et_des_groupes(db_session, tmp_path):
+    # Revue 1.5.1 : un droit renommé ou retiré du fichier ne doit pas rester
+    # accordé aux groupes (droit fantôme).
+    charger_catalogue(db_session)
+    groupe = GroupeModuleo(application=COGEO, nom="Test")
+    db_session.add(groupe)
+    db_session.flush()
+    fantome = DroitModuleo(
+        chemin="Ancienne catégorie › Ancien droit",
+        application=COGEO,
+        categorie="Ancienne catégorie",
+        libelle="Ancien droit",
+        ordre=0,
+    )
+    db_session.add(fantome)
+    db_session.flush()
+    db_session.add(GroupeModuleoDroit(groupe_id=groupe.id, droit_id=fantome.id))
+    db_session.flush()
+
+    charger_catalogue(db_session)
+
+    assert db_session.query(DroitModuleo).filter_by(chemin="Ancienne catégorie › Ancien droit").count() == 0
+    assert db_session.query(GroupeModuleoDroit).filter_by(droit_id=fantome.id).count() == 0
+    assert db_session.query(DroitModuleo).count() > 0

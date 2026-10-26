@@ -62,6 +62,26 @@ class TestBloqueEcritureModuleo(unittest.TestCase):
         }
         self.assertTrue(doit_bloquer(payload))
 
+    def test_laisse_passer_une_suppression_sqlalchemy(self) -> None:
+        payload = {
+            "tool_name": "Edit",
+            "tool_input": {
+                "file_path": "vm-centrale/src/vm_centrale/moduleo/droits/catalogue.py",
+                "new_string": "db.query(GroupeModuleoDroit).filter_by(groupe_id=groupe.id).delete()\n",
+            },
+        }
+        self.assertFalse(doit_bloquer(payload))
+
+    def test_refuse_un_delete_http_sur_le_client(self) -> None:
+        payload = {
+            "tool_name": "Edit",
+            "tool_input": {
+                "file_path": _CLIENT,
+                "new_string": "_http_client.delete(url)\n",
+            },
+        }
+        self.assertTrue(doit_bloquer(payload))
+
 
 if __name__ == "__main__":
     unittest.main()

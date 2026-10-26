@@ -1,6 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, timedelta
 
+from vm_centrale.dates import date_du_jour
 from vm_centrale.lectures_outils import Fiche
 from vm_centrale.moduleo.client import LecteurModuleo, ModuleoIntrouvable
 from vm_centrale.moduleo.fiches import Paiements, facture_emise, fiche_facture, reste_a_payer, synthese_factures
@@ -123,7 +124,7 @@ _SCHEMA = {
 
 
 def _date_du_jour() -> date:
-    return datetime.now(timezone.utc).date()
+    return date_du_jour()
 
 
 def _declarer(contexte: ContexteTour) -> dict | None:

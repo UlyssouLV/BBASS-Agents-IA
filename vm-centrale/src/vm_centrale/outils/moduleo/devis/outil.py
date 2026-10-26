@@ -1,5 +1,6 @@
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, timedelta
 
+from vm_centrale.dates import date_du_jour
 from vm_centrale.lectures_outils import Fiche
 from vm_centrale.moduleo.client import LecteurModuleo
 from vm_centrale.moduleo.fiches import fiche_devis, synthese_devis
@@ -112,7 +113,7 @@ _SCHEMA = {
 
 
 def _date_du_jour() -> date:
-    return datetime.now(timezone.utc).date()
+    return date_du_jour()
 
 
 def _declarer(contexte: ContexteTour) -> dict | None:

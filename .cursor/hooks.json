@@ -3,19 +3,19 @@
   "hooks": {
     "preToolUse": [
       {
-        "command": "python3 agents/hooks/gate-code-review/hook.py || py -3 agents/hooks/gate-code-review/hook.py",
+        "command": "sh .cursor/hooks/gate-code-review.sh",
         "matcher": "Task|Skill|Agent",
         "failClosed": true
       },
       {
-        "command": "python3 agents/hooks/bloque-ecriture-moduleo/hook.py || py -3 agents/hooks/bloque-ecriture-moduleo/hook.py",
+        "command": "sh .cursor/hooks/bloque-ecriture-moduleo.sh",
         "matcher": "Write|StrReplace",
         "failClosed": false
       }
     ],
     "subagentStart": [
       {
-        "command": "python3 agents/hooks/gate-code-review/hook.py || py -3 agents/hooks/gate-code-review/hook.py",
+        "command": "sh .cursor/hooks/gate-code-review.sh",
         "failClosed": true
       }
     ]

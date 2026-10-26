@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .claude/hooks/gate-code-review.py || py -3 .claude/hooks/gate-code-review.py",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && { python3 -c \"\" </dev/null >/dev/null 2>&1 && exec python3 .claude/hooks/gate-code-review.py; exec py -3 .claude/hooks/gate-code-review.py; }",
             "statusMessage": "Vérifie que /code-review est bien demandé"
           }
         ]

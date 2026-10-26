@@ -1,6 +1,7 @@
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, timedelta
 from typing import Any
 
+from vm_centrale.dates import date_du_jour
 from vm_centrale.moduleo.client import LecteurModuleo
 from vm_centrale.moduleo.droits import autorise
 from vm_centrale.moduleo.fiches import NomsPlanning, fiche_tache, synthese_planning
@@ -20,12 +21,13 @@ from vm_centrale.outils.moduleo.commun import (
     NB_PLAFOND,
     SANS_UTILISATEUR_LIE,
     Lecture,
+    booleen,
     date_api,
     jour_api,
-    liste_ids,
     lire_argument,
     lire_fiches,
     lire_par_lots,
+    liste_ids,
     nb_max,
     propose,
     refus_du_garde,
@@ -127,7 +129,7 @@ _SCHEMA = {
 
 
 def _date_du_jour() -> date:
-    return datetime.now(timezone.utc).date()
+    return date_du_jour()
 
 
 def _declarer(contexte: ContexteTour) -> dict | None:
@@ -200,7 +202,7 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
         return refus
     # « Mon planning » (test humain #195) : les tâches de l'utilisateur
     # Moduléo lié au compte ; un collaborateur nommé est ignoré.
-    les_miens = arguments.get("les_miens") is True
+    les_miens = booleen(arguments.get("les_miens")) is True
     moi = contexte.droits_moduleo.id_utilisateur_moduleo if les_miens else None
     if les_miens and moi is None:
         return ResultatOutil(SANS_UTILISATEUR_LIE, trace={"routes": []})

@@ -310,6 +310,24 @@ def test_les_miens_seules_les_taches_de_lutilisateur_planning_du_compte(
     assert "Calculs lot B" not in contenu
 
 
+def test_les_miens_ecrit_en_texte_seules_les_taches_du_compte(
+    client, faux_moduleo, mistral_client_factice, jeton_valide, db_session
+):
+    # Le modèle écrit parfois « true » en texte : ne pas lire toute l'équipe.
+    _lier(db_session, 7)
+    _semaine(faux_moduleo)
+
+    _chercher(
+        client,
+        mistral_client_factice,
+        jeton_valide,
+        {"les_miens": "true", "date_min": "2026-10-12", "date_max": "2026-10-18"},
+    )
+
+    (recherche,) = _recherches(faux_moduleo)
+    assert recherche["idsParticipants"] == "70"
+
+
 def test_les_miens_lemporte_sur_un_collaborateur_nomme(
     client, faux_moduleo, mistral_client_factice, jeton_valide, db_session
 ):

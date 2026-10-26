@@ -25,6 +25,7 @@ from vm_centrale.config import (
 )
 from vm_centrale.consommation import enregistrer_consommation
 from vm_centrale.database import FabriqueSession, get_db, get_fabrique_session
+from vm_centrale.dates import date_du_jour
 from vm_centrale.garde_fous import (
     PHRASE_CONTACT_NON_LU,
     LectureSource,
@@ -230,7 +231,7 @@ _PROMPT_STYLE = (
 
 
 def _date_du_jour() -> date:
-    return datetime.now(timezone.utc).date()
+    return date_du_jour()
 
 
 def _consigne_date_du_jour() -> str:

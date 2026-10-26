@@ -19,7 +19,7 @@ Retrouve des temps passés Moduléo par **période** ou par **filtres en noms** 
 
 `nb_max`, 5 par défaut, ramené entre 1 et 10 : il ne borne que le détail, jamais les totaux.
 
-**Sans critère** (`{}`, `{"nb_max": 10}`) : les 7 derniers jours (`dateMin` = aujourd'hui − 7 jours, `dateMax` = aujourd'hui), et le résultat le dit : « 14 temps passés saisis du 02/10/2026 au 09/10/2026 (7 derniers jours), total … ». Dès qu'un critère est donné, la période par défaut ne s'applique plus.
+**Sans critère** (`{}`, `{"nb_max": 10}`) : les 7 derniers jours (`dateMin` = aujourd'hui − 6 jours, `dateMax` = aujourd'hui, aujourd'hui compris), et le résultat le dit : « 14 temps passés saisis du 03/10/2026 au 09/10/2026 (7 derniers jours), total … ». Dès qu'un critère est donné, la période par défaut ne s'applique plus.
 
 **Noms non résolus.** Date illisible, numéro d'affaire inconnu, collaborateur ou code activité qui ne désigne rien ou plusieurs : une phrase au modèle, **aucune recherche**, aucune lecture enregistrée, terminée par « Aucune lecture faite dans Moduléo : n'invente aucun temps passé, demande au collaborateur un nom, une affaire ou une période. ». Trace : `non_resolu`.
 

@@ -2,6 +2,7 @@ import os
 from dataclasses import dataclass
 from datetime import timedelta
 from decimal import Decimal
+from functools import cache
 
 from dotenv import load_dotenv
 
@@ -126,13 +127,20 @@ def get_mistral_api_key() -> str:
     # les secrets Moduléo ; MISTRAL_API_KEY en clair n'est plus lue. Le
     # démarrage de la VM l'appelle une fois (main.py) : sans clé
     # utilisable, la VM refuse de démarrer. Lu à l'appel ensuite, comme
-    # get_config_moduleo_chiffree.
+    # get_config_moduleo_chiffree, mais déchiffré une fois par couple de
+    # variables : chaque tour fait plusieurs appels Mistral.
     valeur_chiffree = os.environ.get("MISTRAL_API_KEY_CHIFFREE") or None
     fichier_cle_maitre = os.environ.get("VM_CLE_MAITRE_FICHIER") or None
     if valeur_chiffree is None:
         raise CleMistralInutilisable("MISTRAL_API_KEY_CHIFFREE manquant dans .env.")
     if fichier_cle_maitre is None:
         raise CleMistralInutilisable("VM_CLE_MAITRE_FICHIER manquant dans .env.")
+    return _dechiffrer_cle_mistral(valeur_chiffree, fichier_cle_maitre)
+
+
+@cache
+def _dechiffrer_cle_mistral(valeur_chiffree: str, fichier_cle_maitre: str) -> str:
+    # Une levée n'est pas mise en cache : une clé réparée est relue.
     try:
         cle_maitre = lire_cle_maitre(fichier_cle_maitre)
     except OSError as erreur:

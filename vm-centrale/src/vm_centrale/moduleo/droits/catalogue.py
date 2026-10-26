@@ -31,13 +31,15 @@ def charger_catalogue(db: Session, fichier: Path = FICHIER_CATALOGUE) -> None:
     # Idempotent : un droit est retrouvé par son chemin, un groupe par
     # (application, nom) ; les droits d'un groupe du fichier sont remplacés
     # par ceux du fichier. Les groupes de dev existants reçoivent les droits
-    # ajoutés au catalogue. Ne valide pas : l'appelant committe.
+    # ajoutés au catalogue. Un droit sorti du fichier est retiré de la base
+    # et des groupes qui l'accordaient. Ne valide pas : l'appelant committe.
     donnees = json.loads(fichier.read_text(encoding="utf-8"))
     droits = {droit.chemin: droit for droit in db.query(DroitModuleo)}
     for application in APPLICATIONS:
         ordre = 0
         for categorie in donnees["catalogue"][application]:
             ordre = _inscrire(db, droits, application, categorie["categorie"], categorie["droits"], [], None, ordre)
+    _retirer_sortis(db, droits, _chemins_du_fichier(donnees))
     for groupe in donnees["groupes"]:
         _accorder(db, _groupe(db, groupe["application"], groupe["nom"]), droits, groupe["droits"])
     for groupe in db.query(GroupeModuleo).filter(GroupeModuleo.nom == GROUPE_DEV):
@@ -87,6 +89,32 @@ def _inscrire(
             ordre + 1,
         )
     return ordre
+
+
+def _chemins_du_fichier(donnees: dict) -> set[str]:
+    def parcourir(categorie: str, entrees: list[dict], parents: list[str]) -> list[str]:
+        trouves = []
+        for entree in entrees:
+            trouves.append(chemin(categorie, *parents, entree["libelle"]))
+            trouves += parcourir(categorie, entree.get("sous_droits", []), [*parents, entree["libelle"]])
+        return trouves
+
+    return {
+        cle
+        for application in APPLICATIONS
+        for categorie in donnees["catalogue"][application]
+        for cle in parcourir(categorie["categorie"], categorie["droits"], [])
+    }
+
+
+def _retirer_sortis(db: Session, droits: dict[str, DroitModuleo], gardes: set[str]) -> None:
+    # Sinon un droit renommé ou retiré resterait accordé (droit fantôme).
+    sortis = [droits.pop(cle).id for cle in list(droits) if cle not in gardes]
+    if not sortis:
+        return
+    db.query(GroupeModuleoDroit).filter(GroupeModuleoDroit.droit_id.in_(sortis)).delete(synchronize_session=False)
+    db.query(DroitModuleo).filter(DroitModuleo.id.in_(sortis)).delete(synchronize_session=False)
+    db.flush()
 
 
 def _groupe(db: Session, application: str, nom: str) -> GroupeModuleo:

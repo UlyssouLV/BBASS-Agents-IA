@@ -1,6 +1,7 @@
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, timedelta
 from typing import Any
 
+from vm_centrale.dates import date_du_jour
 from vm_centrale.moduleo.client import LecteurModuleo
 from vm_centrale.moduleo.droits import DroitsModuleo, chemin
 from vm_centrale.moduleo.fiches import NomsTempsPasses, fiche_temps_passe, synthese_temps_passes
@@ -18,14 +19,15 @@ from vm_centrale.outils.moduleo.commun import (
     NB_PLAFOND,
     SANS_UTILISATEUR_LIE,
     Lecture,
+    booleen,
     date_api,
     dates_api,
-    jour_api,
     id_affaire,
-    liste_ids,
+    jour_api,
     lire_argument,
     lire_fiches,
     lire_par_lots,
+    liste_ids,
     nb_max,
     propose,
     refus_du_garde,
@@ -118,7 +120,7 @@ _SCHEMA = {
 
 
 def _date_du_jour() -> date:
-    return datetime.now(timezone.utc).date()
+    return date_du_jour()
 
 
 def _siens(droits: DroitsModuleo) -> dict[str, Any] | None:
@@ -198,7 +200,7 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
         return refus
     # « Mes temps » (test humain #195) : les temps de l'utilisateur Moduléo
     # lié, même avec le droit « autres » ; un collaborateur nommé est ignoré.
-    les_miens = arguments.get("les_miens") is True
+    les_miens = booleen(arguments.get("les_miens")) is True
     if les_miens and droits.id_utilisateur_moduleo is None:
         return ResultatOutil(SANS_UTILISATEUR_LIE, trace={"routes": []})
     restreint = les_miens or not droits.a(_DROIT_AUTRES)
@@ -222,7 +224,8 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
             return f"{'trouvé' if nombre == 1 else 'trouvés'} ({criteres})"
     else:
         aujourdhui = _date_du_jour()
-        depuis = aujourdhui - timedelta(days=_JOURS_DEFAUT)
+        # Aujourd'hui compris : 7 jours, pas 8.
+        depuis = aujourdhui - timedelta(days=_JOURS_DEFAUT - 1)
         dates = {"dateMin": jour_api(depuis), "dateMax": jour_api(aujourdhui)}
         du, au = jour_api(depuis), jour_api(aujourdhui)
         vos = f", {_VOS_TEMPS}" if restreint else ""

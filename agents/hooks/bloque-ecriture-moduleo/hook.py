@@ -30,7 +30,9 @@ _SUFFIXES_IGNORER = (".md", ".json", ".png")
 
 _APPEL_ECRITURE = re.compile(
     r"(?:"
-    r"\.(?:post|put|patch|delete)\s*\("
+    # Un appel HTTP passe une URL : `.delete()` / `.delete(synchronize_session=…)`
+    # sont des suppressions SQLAlchemy (droits/catalogue.py), pas Moduléo.
+    r"\.(?:post|put|patch|delete)\s*\((?!\s*(?:\)|synchronize_session))"
     r"|httpx\.(?:post|put|patch|delete)"
     r"|requests\.(?:post|put|patch|delete)"
     r"|envoyer\s*\(\s*['\"](?:POST|PUT|PATCH|DELETE)"

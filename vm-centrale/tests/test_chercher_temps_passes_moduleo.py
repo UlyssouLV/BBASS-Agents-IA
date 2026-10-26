@@ -252,6 +252,24 @@ def test_les_miens_avec_le_droit_autres_seuls_les_temps_du_compte_lie(
     assert "Sophie Bernard" not in contenu
 
 
+def test_les_miens_ecrit_en_texte_reste_restreint_au_compte_lie(
+    client, faux_moduleo, compte_restreint, mistral_client_factice, jeton_valide
+):
+    # Le modèle écrit parfois « true » en texte : ne pas lire tout le cabinet.
+    compte_restreint(_AUTRES)
+    _semaine(faux_moduleo)
+
+    _chercher(
+        client,
+        mistral_client_factice,
+        jeton_valide,
+        {"les_miens": "true", "date_min": "2026-10-05", "date_max": "2026-10-11"},
+    )
+
+    (recherche,) = _recherches(faux_moduleo)
+    assert recherche["idsUtilisateurs"] == "7"
+
+
 def test_les_miens_lemporte_sur_un_collaborateur_nomme(
     client, faux_moduleo, compte_restreint, mistral_client_factice, jeton_valide
 ):
@@ -273,7 +291,7 @@ def test_les_miens_sans_critere_les_7_derniers_jours_du_compte(
     _chercher(client, mistral_client_factice, jeton_valide, {"les_miens": True})
 
     assert _contenu_outil(mistral_client_factice).startswith(
-        "2 temps passés saisis du 02/10/2026 au 09/10/2026 (7 derniers jours, vos temps seulement), total 6 h."
+        "2 temps passés saisis du 03/10/2026 au 09/10/2026 (7 derniers jours, vos temps seulement), total 6 h."
     )
 
 
@@ -441,9 +459,9 @@ def test_sans_critere_les_7_derniers_jours_periode_annoncee(
     _chercher(client, mistral_client_factice, jeton_valide, {"nb_max": 10})
 
     (recherche,) = _recherches(faux_moduleo)
-    assert (recherche["dateMin"], recherche["dateMax"]) == ("02/10/2026", "09/10/2026")
+    assert (recherche["dateMin"], recherche["dateMax"]) == ("03/10/2026", "09/10/2026")
     contenu = _contenu_outil(mistral_client_factice)
-    assert contenu.startswith("3 temps passés saisis du 02/10/2026 au 09/10/2026 (7 derniers jours), total 7,5 h.")
+    assert contenu.startswith("3 temps passés saisis du 03/10/2026 au 09/10/2026 (7 derniers jours), total 7,5 h.")
     assert "20/09/2026" not in contenu
 
 
@@ -456,7 +474,7 @@ def test_sans_critere_et_sans_le_droit_autres_la_periode_et_la_portee_sont_annon
     _chercher(client, mistral_client_factice, jeton_valide, {})
 
     assert _contenu_outil(mistral_client_factice).startswith(
-        "2 temps passés saisis du 02/10/2026 au 09/10/2026 (7 derniers jours, vos temps seulement), total 6 h."
+        "2 temps passés saisis du 03/10/2026 au 09/10/2026 (7 derniers jours, vos temps seulement), total 6 h."
     )
 
 
@@ -464,7 +482,7 @@ def test_sans_temps_recent_le_resultat_dit_la_periode(client, faux_moduleo, mist
     _chercher(client, mistral_client_factice, jeton_valide, {})
 
     assert _contenu_outil(mistral_client_factice) == (
-        "Aucun temps passé saisi dans Moduléo du 02/10/2026 au 09/10/2026 (7 derniers jours)."
+        "Aucun temps passé saisi dans Moduléo du 03/10/2026 au 09/10/2026 (7 derniers jours)."
     )
 
 
