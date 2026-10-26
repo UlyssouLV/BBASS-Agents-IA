@@ -9,6 +9,8 @@ Un hook = un dossier `agents/hooks/<nom>/` (script canonique `hook.py`). `/ch` l
 | Claude Code | `.claude/settings.json` (`PreToolUse`, …) → souvent un wrapper `.claude/hooks/` |
 | Cursor | `.cursor/hooks.json` (`version: 1`, `preToolUse` / `subagentStart`, …) |
 
+Commandes portables : `python3 … || py -3 …` (macOS/Linux vs lanceur Windows). Les hooks distinguent Cursor (`preToolUse` camelCase / `cursor_version`) et Claude Code (`PreToolUse` PascalCase) — ne pas lower-caser l’événement.
+
 Nouveau hook : skill **`creer-hook`** (`/ch`). Il ajoute (ou remplace) une section ici, même forme que les pairs.
 
 ---

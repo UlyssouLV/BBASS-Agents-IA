@@ -37,3 +37,5 @@ docs/bugs/**
 # Caches explorateur (macOS / Windows).
 .DS_Store
 Thumbs.db
+# Compteurs shields (générés au build Pages, pas versionnés).
+docs-site/static/stats/

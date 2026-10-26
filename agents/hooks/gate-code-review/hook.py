@@ -33,10 +33,13 @@ def _charge() -> dict:
 
 
 def _est_cursor(payload: dict) -> bool:
-    evenement = str(payload.get("hook_event_name") or "").lower()
-    if evenement in {"pretooluse", "subagentstart"}:
+    # Cursor : camelCase (preToolUse / subagentStart) ou cursor_version.
+    # Claude Code : PascalCase (PreToolUse). Ne pas lower() — sinon Claude
+    # est pris pour Cursor et le JSON de deny/allow est au mauvais format.
+    if payload.get("cursor_version"):
         return True
-    return bool(payload.get("cursor_version"))
+    evenement = str(payload.get("hook_event_name") or "")
+    return evenement in {"preToolUse", "subagentStart"}
 
 
 def _est_identifiant_code_review(valeur: object) -> bool:

@@ -54,10 +54,12 @@ def _charge() -> dict:
 
 
 def _est_cursor(payload: dict) -> bool:
-    evenement = str(payload.get("hook_event_name") or "").lower()
-    if evenement in {"pretooluse", "subagentstart"}:
+    # Cursor : camelCase (preToolUse) ou cursor_version.
+    # Claude Code : PascalCase (PreToolUse). Ne pas lower().
+    if payload.get("cursor_version"):
         return True
-    return bool(payload.get("cursor_version"))
+    evenement = str(payload.get("hook_event_name") or "")
+    return evenement in {"preToolUse", "subagentStart"}
 
 
 def _entree(payload: dict) -> dict:

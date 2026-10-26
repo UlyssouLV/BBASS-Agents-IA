@@ -3,19 +3,19 @@
   "hooks": {
     "preToolUse": [
       {
-        "command": "python3 -c \"import runpy, subprocess; from pathlib import Path; r = Path(subprocess.check_output(['git', 'rev-parse', '--show-toplevel'], text=True).strip()); runpy.run_path(str(r / 'agents' / 'hooks' / 'gate-code-review' / 'hook.py'), run_name='__main__')\" || py -3 -c \"import runpy, subprocess; from pathlib import Path; r = Path(subprocess.check_output(['git', 'rev-parse', '--show-toplevel'], text=True).strip()); runpy.run_path(str(r / 'agents' / 'hooks' / 'gate-code-review' / 'hook.py'), run_name='__main__')\"",
+        "command": "python3 agents/hooks/gate-code-review/hook.py || py -3 agents/hooks/gate-code-review/hook.py",
         "matcher": "Task|Skill|Agent",
         "failClosed": true
       },
       {
-        "command": "python3 -c \"import runpy, subprocess; from pathlib import Path; r = Path(subprocess.check_output(['git', 'rev-parse', '--show-toplevel'], text=True).strip()); runpy.run_path(str(r / 'agents' / 'hooks' / 'bloque-ecriture-moduleo' / 'hook.py'), run_name='__main__')\" || py -3 -c \"import runpy, subprocess; from pathlib import Path; r = Path(subprocess.check_output(['git', 'rev-parse', '--show-toplevel'], text=True).strip()); runpy.run_path(str(r / 'agents' / 'hooks' / 'bloque-ecriture-moduleo' / 'hook.py'), run_name='__main__')\"",
+        "command": "python3 agents/hooks/bloque-ecriture-moduleo/hook.py || py -3 agents/hooks/bloque-ecriture-moduleo/hook.py",
         "matcher": "Write|StrReplace",
         "failClosed": false
       }
     ],
     "subagentStart": [
       {
-        "command": "python3 -c \"import runpy, subprocess; from pathlib import Path; r = Path(subprocess.check_output(['git', 'rev-parse', '--show-toplevel'], text=True).strip()); runpy.run_path(str(r / 'agents' / 'hooks' / 'gate-code-review' / 'hook.py'), run_name='__main__')\" || py -3 -c \"import runpy, subprocess; from pathlib import Path; r = Path(subprocess.check_output(['git', 'rev-parse', '--show-toplevel'], text=True).strip()); runpy.run_path(str(r / 'agents' / 'hooks' / 'gate-code-review' / 'hook.py'), run_name='__main__')\"",
+        "command": "python3 agents/hooks/gate-code-review/hook.py || py -3 agents/hooks/gate-code-review/hook.py",
         "failClosed": true
       }
     ]

@@ -34,6 +34,10 @@ fi
 PROMPT="/implement #${N}"
 # shellcheck disable=SC2016
 INNER=$(printf 'cd %q && exec claude %q' "$REPO" "$PROMPT")
+# Git Bash / MSYS réécrit les args qui commencent par / (ex. /implement →
+# C:/Program Files/Git/implement). Couper la conversion avant exec claude.
+# shellcheck disable=SC2016
+INNER_WIN=$(printf 'cd %q && export MSYS2_ARG_CONV_EXCL=* MSYS_NO_PATHCONV=1 && exec claude %q' "$REPO" "$PROMPT")
 
 ouvrir_macos() {
   osascript \
@@ -88,12 +92,13 @@ ouvrir_linux() {
 
 ouvrir_windows() {
   # Git Bash / MSYS / Cygwin : nouvelle console Windows avec Claude.
+  # INNER_WIN : voir MSYS2_ARG_CONV_EXCL ci-dessus (sinon /implement est mangé).
   if command -v wt.exe >/dev/null 2>&1; then
-    wt.exe new-tab -- bash -lc "$INNER" &
+    wt.exe new-tab -- bash -lc "$INNER_WIN" &
     return 0
   fi
   if command -v cmd.exe >/dev/null 2>&1; then
-    cmd.exe //c start "" bash -lc "$INNER" &
+    cmd.exe //c start "" bash -lc "$INNER_WIN" &
     return 0
   fi
   echo "Enchaînement auto : ni wt.exe ni cmd.exe pour ouvrir une nouvelle fenêtre." >&2

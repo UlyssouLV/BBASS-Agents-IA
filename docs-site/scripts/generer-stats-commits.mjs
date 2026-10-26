@@ -1,7 +1,8 @@
 /**
  * Compte les commits sur main + la somme des commits des PR mergées
- * (historique des branches squashées), puis met à jour le README
- * entre <!-- sync:stats-commits --> … <!-- /sync:stats-commits -->.
+ * (historique des branches squashées), puis écrit deux fichiers
+ * shields.io « endpoint » dans static/stats/, publiés avec le site.
+ * Les badges du README les lisent : aucun commit de bot.
  *
  * Env : GITHUB_TOKEN ou GH_TOKEN, GITHUB_REPOSITORY (owner/repo).
  *
@@ -13,9 +14,7 @@ import {fileURLToPath} from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../..');
-const README = path.join(REPO_ROOT, 'README.md');
-const START = '<!-- sync:stats-commits -->';
-const END = '<!-- /sync:stats-commits -->';
+const SORTIE = path.resolve(__dirname, '../static/stats');
 
 function repoSlug() {
   if (process.env.GITHUB_REPOSITORY) return process.env.GITHUB_REPOSITORY;
@@ -86,37 +85,20 @@ async function commitsDunePr(owner, repo, number) {
   return Number(pr.commits) || 0;
 }
 
-function blocMarkdown({main, prs}) {
-  const badgeMain = `https://img.shields.io/badge/commits_main-${main}-c8102e?style=for-the-badge`;
-  const badgePrs = `https://img.shields.io/badge/commits_PR_(historique)-${prs}-1e3a5f?style=for-the-badge`;
-  return `${START}
-<p align="center">
-  <img src="${badgeMain}" alt="${main} commits sur main" />
-  <img src="${badgePrs}" alt="${prs} commits dans les PR mergées" />
-</p>
-${END}`;
+function badge(label, message, color) {
+  return {schemaVersion: 1, label, message: String(message), color};
 }
 
-function majReadme(bloc) {
-  let readme = fs.readFileSync(README, 'utf8');
-  if (!readme.includes(START) || !readme.includes(END)) {
-    throw new Error(`Marqueurs manquants dans README.md (${START} … ${END}).`);
+function ecrireBadges({main, prs}) {
+  fs.mkdirSync(SORTIE, {recursive: true});
+  const fichiers = {
+    'commits-main.json': badge('commits main', main, 'c8102e'),
+    'commits-pr.json': badge('commits PR (historique)', prs, '1e3a5f'),
+  };
+  for (const [nom, contenu] of Object.entries(fichiers)) {
+    fs.writeFileSync(path.join(SORTIE, nom), `${JSON.stringify(contenu)}\n`, 'utf8');
   }
-  const pattern = new RegExp(
-    `${escapeRegExp(START)}[\\s\\S]*?${escapeRegExp(END)}`,
-  );
-  const apres = readme.replace(pattern, bloc);
-  if (apres === readme) {
-    console.log('[stats] README déjà à jour.');
-    return false;
-  }
-  fs.writeFileSync(README, apres, 'utf8');
-  console.log('[stats] README mis à jour.');
-  return true;
-}
-
-function escapeRegExp(s) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  console.log(`[stats] badges écrits dans ${path.relative(REPO_ROOT, SORTIE)}/`);
 }
 
 async function main() {
@@ -131,8 +113,10 @@ async function main() {
     prCommits += await commitsDunePr(owner, repo, n);
   }
 
-  console.log(`[stats] main=${mainCount} · PR mergées=${numeros.length} · commits PR=${prCommits}`);
-  majReadme(blocMarkdown({main: mainCount, prs: prCommits}));
+  console.log(
+    `[stats] main=${mainCount} · PR mergées=${numeros.length} · commits PR=${prCommits}`,
+  );
+  ecrireBadges({main: mainCount, prs: prCommits});
 }
 
 main().catch((e) => {

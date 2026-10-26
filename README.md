@@ -2,12 +2,11 @@
   <img src="docs/img/readme-banniere.jpg" alt="BBASS Agents IA" width="480" />
 </p>
 
-<!-- sync:stats-commits -->
+<!-- Compteurs publiés avec le site de doc (Deploy docs) : aucun commit de bot. -->
 <p align="center">
-  <img src="https://img.shields.io/badge/commits_main-28-c8102e?style=for-the-badge" alt="28 commits sur main" />
-  <img src="https://img.shields.io/badge/commits_PR_(historique)-277-1e3a5f?style=for-the-badge" alt="277 commits dans les PR mergées" />
+  <img src="https://img.shields.io/endpoint?style=for-the-badge&url=https%3A%2F%2Fulyssoulv.github.io%2FBBASS-Agents-IA%2Fstats%2Fcommits-main.json" alt="Commits sur main" />
+  <img src="https://img.shields.io/endpoint?style=for-the-badge&url=https%3A%2F%2Fulyssoulv.github.io%2FBBASS-Agents-IA%2Fstats%2Fcommits-pr.json" alt="Commits dans les PR mergées" />
 </p>
-<!-- /sync:stats-commits -->
 
 # Un copilote multi-agents pour le cabinet
 
