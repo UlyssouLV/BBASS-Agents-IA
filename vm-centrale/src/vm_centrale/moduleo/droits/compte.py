@@ -26,6 +26,11 @@ class DroitsModuleo:
     def a(self, chemin: str) -> bool:
         return chemin in self.droits
 
+    @property
+    def sans_groupe(self) -> bool:
+        # Ni Cogeo ni Planning : Moduléo est fermé au compte (#199).
+        return self.groupe_cogeo is None and self.groupe_planning is None
+
     def section(self, chemin: str, titre: str) -> str | None:
         # Vérification par champ des fiches (#188) : None si le droit est
         # accordé, sinon la mention qui remplace la section retirée, pour

@@ -70,7 +70,7 @@ from vm_centrale.lectures_outils import (
     supprimer_lectures,
 )
 from vm_centrale.moduleo.client import ClientModuleo, get_client_moduleo
-from vm_centrale.moduleo.droits import droits_du_compte
+from vm_centrale.moduleo.droits import SANS_AUCUN_GROUPE, droits_du_compte
 from vm_centrale.moteur_recherche import MoteurRecherche, get_moteur_recherche
 from vm_centrale.questions_couvertes import (
     AppelQuestionsPieceJointe,
@@ -272,6 +272,23 @@ def _date_du_jour_ecrite() -> re.Pattern[str]:
 
 def _message_systeme_style() -> dict[str, str]:
     return {"role": "system", "content": f"{_PROMPT_STYLE}\n{_consigne_date_du_jour()}"}
+
+
+# Compte sans groupe Moduléo, config présente (#199, test humain #195
+# scénario 7) : sans outil Moduléo, le modèle cherchait le devis sur le web
+# puis répondait « aucune information en ligne », un refus pris pour une
+# absence de données. rechercher_web refuse en plus toute référence
+# interne, pour tout compte.
+_MESSAGE_MODULEO_FERME = {
+    "role": "system",
+    "content": (
+        "Moduléo est fermé à ce compte. Pour toute donnée Moduléo (devis, facture, "
+        "affaire, temps passés, planning, parcelle, contact du cabinet), réponds "
+        f"exactement : « {SANS_AUCUN_GROUPE} » N'appelle jamais rechercher_web avec "
+        "une référence interne (numéro de devis, de facture ou d'affaire). La "
+        "recherche web reste ouverte pour le reste."
+    ),
+}
 
 
 def _prompt_titrage(message_utilisateur: str, reponse_assistant: str) -> str:
@@ -489,6 +506,7 @@ def _construire_messages_pour_mistral(
     profil_travail: str,
     piece_jointe: PieceJointe | None = None,
     memoire: str | None = None,
+    moduleo_ferme: bool = False,
 ) -> list[dict[str, str]]:
     # Historique borné (résumé glissant + fenêtre courte) plutôt que
     # l'intégralité de la conversation, pour maîtriser le coût en tokens
@@ -503,6 +521,8 @@ def _construire_messages_pour_mistral(
     # ce même builder avec une liste vide et une chaîne vide plutôt que de
     # dupliquer l'assemblage [style, pièce jointe ?, user].
     messages: list[dict[str, str]] = [_message_systeme_style()]
+    if moduleo_ferme:
+        messages.append(_MESSAGE_MODULEO_FERME)
     if resume_contexte:
         messages.append({"role": "system", "content": resume_contexte})
     if profil_travail:
@@ -1070,6 +1090,7 @@ def _tour_creer_conversation(
     # tout premier message d'une conversation (jamais de résumé glissant
     # ni d'historique à ce stade), l'autre chemin menant au même appel de
     # chat principal (spec 1.2.2).
+    droits_moduleo = droits_du_compte(db, identifiant_compte)
     message_pour_mistral = _construire_messages_pour_mistral(
         "",
         [],
@@ -1077,6 +1098,7 @@ def _tour_creer_conversation(
         "",
         piece_jointe,
         _memoire_de_la_conversation(db, conversation.id, requete.message),
+        moduleo_ferme=client_moduleo is not None and droits_moduleo.sans_groupe,
     )
 
     # Les deux appels Mistral (réponse, puis titrage) sont faits avant
@@ -1105,7 +1127,7 @@ def _tour_creer_conversation(
         message_du_tour=requete.message,
         publier=publier,
         client_moduleo=client_moduleo,
-        droits_moduleo=droits_du_compte(db, identifiant_compte),
+        droits_moduleo=droits_moduleo,
     )
     tools = outils_du_tour(contexte_outils)
     attendre_questions = _lancer_questions_piece_jointe(client, piece_jointe, requete.message)
@@ -1902,6 +1924,7 @@ def _tour_envoyer_message(
     # requêtes concurrentes pouvaient toutes deux lire l'ancienne valeur
     # puis écraser l'une des deux mises à jour au commit).
     profil_actuel = _contenu_profil_actuel(db, identifiant_compte)
+    droits_moduleo = droits_du_compte(db, identifiant_compte)
     messages_pour_mistral = _construire_messages_pour_mistral(
         conversation.resume_contexte,
         derniers_messages,
@@ -1909,6 +1932,7 @@ def _tour_envoyer_message(
         profil_actuel,
         piece_jointe,
         _memoire_de_la_conversation(db, conversation.id, requete.message),
+        moduleo_ferme=client_moduleo is not None and droits_moduleo.sans_groupe,
     )
 
     # Un message sort de la fenêtre des 3 derniers dès que ce tour (2 nouveaux
@@ -1928,7 +1952,7 @@ def _tour_envoyer_message(
         message_du_tour=requete.message,
         publier=publier,
         client_moduleo=client_moduleo,
-        droits_moduleo=droits_du_compte(db, identifiant_compte),
+        droits_moduleo=droits_moduleo,
     )
     tools = outils_du_tour(contexte_outils)
 

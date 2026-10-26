@@ -16,6 +16,9 @@ FICHIER_CLASSEMENT = Path(__file__).parent / "routes.json"
 _SANS_LECTURE = "Aucune lecture n'a été faite."
 _DEMANDER = "Demandez à un compte administrateur si vous en avez besoin."
 _NOMS_APPLICATIONS = {COGEO: "Cogeo", PLANNING: "Planning"}
+# Compte sans aucun groupe (#199) : la phrase que le modèle rend pour une
+# donnée Moduléo, aucun outil Moduléo ne lui étant proposé.
+SANS_AUCUN_GROUPE = f"Votre compte n'est rattaché à aucun groupe Moduléo. {_SANS_LECTURE} {_DEMANDER}"
 
 
 @dataclass(frozen=True)
