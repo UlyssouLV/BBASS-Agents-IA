@@ -34,6 +34,12 @@ IDS_MAX = 200
 # Phrases fixes au modèle : le détail technique ne va qu'à l'inspecteur.
 INDISPONIBLE = "Moduléo est indisponible pour le moment."
 REFUS = "Moduléo refuse l'accès à cette donnée."
+# « Mes temps », « mon planning » (`les_miens`) sans utilisateur Moduléo lié
+# au compte : la VM ne sait pas ce qui le concerne (test humain #195).
+SANS_UTILISATEUR_LIE = (
+    "Votre compte n'est lié à aucun utilisateur Moduléo : impossible de savoir ce qui vous concerne. "
+    "Aucune lecture n'a été faite. Demandez à un compte administrateur si vous en avez besoin."
+)
 
 logger = logging.getLogger(__name__)
 

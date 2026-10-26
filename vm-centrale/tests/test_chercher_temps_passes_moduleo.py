@@ -121,7 +121,10 @@ def test_le_schema_decrit_les_filtres_et_la_periode_par_defaut(
 
     (schema,) = [o for o in mistral_client_factice.tools_appels_reponse[0] if o["function"]["name"] == _OUTIL]
     proprietes = schema["function"]["parameters"]["properties"]
-    assert set(proprietes) == {"date_min", "date_max", "collaborateur", "code_activite", "affaire", "nb_max"}
+    assert set(proprietes) == {
+        "date_min", "date_max", "collaborateur", "les_miens", "code_activite", "affaire", "nb_max"
+    }
+    assert proprietes["les_miens"]["type"] == "boolean"
     assert "7 derniers jours" in schema["function"]["description"]
 
 
@@ -220,6 +223,71 @@ def test_sans_le_droit_autres_son_propre_nom_est_accepte(
     assert _contenu_outil(mistral_client_factice).startswith(
         "2 temps passés trouvés (collaborateur Jean Martin), total 6 h."
     )
+
+
+# « Mes temps » (test humain #195, récit 5) : avec le droit « autres », le
+# modèle ne sait pas qui est « moi » et lisait tout le cabinet. La VM
+# filtre sur l'utilisateur Moduléo lié au compte.
+
+
+def test_les_miens_avec_le_droit_autres_seuls_les_temps_du_compte_lie(
+    client, faux_moduleo, compte_restreint, mistral_client_factice, jeton_valide
+):
+    compte_restreint(_AUTRES)
+    _semaine(faux_moduleo)
+
+    _chercher(
+        client,
+        mistral_client_factice,
+        jeton_valide,
+        {"les_miens": True, "date_min": "2026-10-05", "date_max": "2026-10-11"},
+    )
+
+    (recherche,) = _recherches(faux_moduleo)
+    assert recherche["idsUtilisateurs"] == "7"
+    contenu = _contenu_outil(mistral_client_factice)
+    assert contenu.startswith(
+        "2 temps passés trouvés (depuis le 05/10/2026, jusqu'au 11/10/2026, vos temps seulement), total 6 h."
+    )
+    assert "Sophie Bernard" not in contenu
+
+
+def test_les_miens_lemporte_sur_un_collaborateur_nomme(
+    client, faux_moduleo, compte_restreint, mistral_client_factice, jeton_valide
+):
+    compte_restreint(_AUTRES)
+    _semaine(faux_moduleo)
+
+    _chercher(client, mistral_client_factice, jeton_valide, {"les_miens": True, "collaborateur": "Sophie Bernard"})
+
+    (recherche,) = _recherches(faux_moduleo)
+    assert recherche["idsUtilisateurs"] == "7"
+
+
+def test_les_miens_sans_critere_les_7_derniers_jours_du_compte(
+    client, faux_moduleo, compte_restreint, mistral_client_factice, jeton_valide
+):
+    compte_restreint(_AUTRES)
+    _semaine(faux_moduleo)
+
+    _chercher(client, mistral_client_factice, jeton_valide, {"les_miens": True})
+
+    assert _contenu_outil(mistral_client_factice).startswith(
+        "2 temps passés saisis du 02/10/2026 au 09/10/2026 (7 derniers jours, vos temps seulement), total 6 h."
+    )
+
+
+def test_les_miens_sans_utilisateur_moduleo_lie_phrase_fixe_et_rien_nest_lu(
+    client, faux_moduleo, compte_restreint, mistral_client_factice, jeton_valide, db_session
+):
+    compte_restreint(_AUTRES, id_utilisateur=None)
+    _semaine(faux_moduleo)
+
+    _chercher(client, mistral_client_factice, jeton_valide, {"les_miens": True})
+
+    assert _contenu_outil(mistral_client_factice) == outil_temps_passes.SANS_UTILISATEUR_LIE
+    assert faux_moduleo.appels == []
+    assert db_session.query(LectureOutil).count() == 0
 
 
 def test_un_temps_dun_autre_renvoye_par_moduleo_est_refuse_par_le_garde(

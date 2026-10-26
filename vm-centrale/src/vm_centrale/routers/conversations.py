@@ -240,16 +240,18 @@ def _consigne_date_du_jour() -> str:
     # dans la requête de rechercher_web.
     # Jour de la semaine et bornes lundi–dimanche (#200, test humain #195
     # scénario 4) : avec la seule date ISO, « la semaine dernière » le lundi
-    # 26/10/2026 devenait les sept derniers jours.
+    # 26/10/2026 devenait les sept derniers jours. Bornes de la semaine
+    # dernière données toutes calculées (rejeu #195) : le modèle les
+    # calculait faux (« du lundi 20 au dimanche 26 octobre »).
     aujourdhui = _date_du_jour()
-    lundi, dimanche = _semaine_en_cours()
     return (
         f"Date du jour : {_en_lettres(aujourdhui)} ({aujourdhui.isoformat()}). "
-        f"Semaine en cours : du {_en_lettres(lundi)} ({lundi.isoformat()}) au "
-        f"{_en_lettres(dimanche)} ({dimanche.isoformat()}). Une semaine va du "
-        "lundi au dimanche : « cette semaine » est la semaine en cours, "
-        "« la semaine dernière » celle d'avant, et un jour nommé seul "
-        "(« mercredi ») celui de la semaine en cours. Pour une actualité ou une "
+        f"Semaine en cours : {_bornes_en_lettres(*_semaine_en_cours())}. "
+        f"Semaine dernière : {_bornes_en_lettres(*_semaine_derniere())}. Une "
+        "semaine va du lundi au dimanche : « cette semaine » est la semaine en "
+        "cours, « la semaine dernière » celle d'avant, avec ces dates exactes, "
+        "sans les recalculer, et un jour nommé seul (« mercredi ») celui de la "
+        "semaine en cours. Pour une actualité ou une "
         "information récente, mets l'année "
         f"{aujourdhui.year} dans la requête de rechercher_web, jamais une année "
         "plus ancienne de ta mémoire ; pour un texte déjà nommé (article de "
@@ -270,6 +272,15 @@ def _semaine_en_cours() -> tuple[date, date]:
     return lundi, lundi + timedelta(days=6)
 
 
+def _semaine_derniere() -> tuple[date, date]:
+    lundi, dimanche = _semaine_en_cours()
+    return lundi - timedelta(days=7), dimanche - timedelta(days=7)
+
+
+def _bornes_en_lettres(lundi: date, dimanche: date) -> str:
+    return f"du {_en_lettres(lundi)} ({lundi.isoformat()}) au {_en_lettres(dimanche)} ({dimanche.isoformat()})"
+
+
 def _en_lettres(jour: date) -> str:
     quantieme = "1er" if jour.day == 1 else str(jour.day)
     return f"{_JOURS[jour.weekday()]} {quantieme} {_MOIS[jour.month - 1]} {jour.year}"
@@ -284,11 +295,13 @@ def _annee_du_jour_source() -> str:
 
 
 def _dates_de_la_consigne_ecrites() -> list[re.Pattern[str]]:
-    # La date du jour et les bornes de la semaine en cours (#200), écrites
-    # dans la réponse (« 15 octobre », « lundi 26 », « 1er novembre 2026 »,
-    # « 26/10/2026 ») : leurs chiffres ne sont pas contrôlés, le quantième
-    # seul l'est.
-    return [_date_ecrite(jour) for jour in {_date_du_jour(), *_semaine_en_cours()}]
+    # La date du jour et les bornes de la semaine en cours et de la semaine
+    # dernière (#200), écrites dans la réponse (« 15 octobre », « lundi 26 »,
+    # « 1er novembre 2026 », « 26/10/2026 ») : leurs chiffres ne sont pas
+    # contrôlés, le quantième seul l'est.
+    return [
+        _date_ecrite(jour) for jour in {_date_du_jour(), *_semaine_en_cours(), *_semaine_derniere()}
+    ]
 
 
 def _date_ecrite(jour: date) -> re.Pattern[str]:

@@ -252,7 +252,12 @@ def chercher_activite(lecteur: LecteurModuleo, nom: str) -> int:
 
 def chercher_participant(lecteur: LecteurModuleo, nom: str) -> int:
     # Nom → utilisateur Moduléo → son utilisateur planning.
-    id_utilisateur = chercher_utilisateur(lecteur, nom)
+    return participant_planning(lecteur, chercher_utilisateur(lecteur, nom), nom)
+
+
+def participant_planning(lecteur: LecteurModuleo, id_utilisateur: int, nom: str = "Votre utilisateur Moduléo") -> int:
+    # Utilisateur Moduléo → son utilisateur planning, qui a un autre id
+    # (« mon planning », test humain #195).
     try:
         planning = lecteur.lire(
             "planning/utilisateurplanning/utilisateur/{idUtilisateur}", {"idUtilisateur": id_utilisateur}

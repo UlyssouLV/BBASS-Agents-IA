@@ -9,6 +9,7 @@ from vm_centrale.moduleo.resolution import (
     activites,
     chercher_activite,
     chercher_participant,
+    participant_planning,
     resoudre_equipements,
     resoudre_participants,
 )
@@ -17,6 +18,7 @@ from vm_centrale.outils.base import ContexteTour, Outil, ResultatOutil
 from vm_centrale.outils.moduleo.commun import (
     NB_DEFAUT,
     NB_PLAFOND,
+    SANS_UTILISATEUR_LIE,
     Lecture,
     date_api,
     jour_api,
@@ -56,6 +58,11 @@ _DATES = {"date_min": ("dateDebut", "depuis le"), "date_max": ("dateFin", "jusqu
 # Filtres du modèle et leur libellé ; collaborateur et activité en noms,
 # résolus en ids par la VM.
 _FILTRES = {"collaborateur": "collaborateur", "activite": "activité", "mot_cle": "mot-clé"}
+_VOS_TACHES = "vos tâches seulement"
+# Planning d'une seule personne (collaborateur nommé ou `les_miens`, test
+# humain #195) : toutes ses tâches de la période, sans le plafond de 10,
+# jusqu'à cette limite.
+_PLAFOND_UNE_PERSONNE = 60
 
 _SCHEMA = {
     "type": "function",
@@ -69,7 +76,9 @@ _SCHEMA = {
             "(bornes dans la date du jour), date_min au lundi et date_max au dimanche. Renvoie en tête le nombre de tâches trouvées et les participants avec leur "
             "nombre de tâches, calculés sur toutes les tâches trouvées : cite-les tels quels. Puis les "
             "premières tâches dans l'ordre chronologique : libellé, date et heures, participants, "
-            "activité, matériel, affaire liée, lieu. Sans aucun critère, renvoie les tâches "
+            "activité, matériel, affaire liée, lieu. Pour le planning d'une seule personne "
+            "(collaborateur ou les_miens), toutes ses tâches de la période : présente-les toutes, "
+            "jour par jour. Sans aucun critère, renvoie les tâches "
             f"d'{_DEFAUT}, et le dit."
         ),
         "parameters": {
@@ -89,6 +98,14 @@ _SCHEMA = {
                     "type": "string",
                     "description": "Nom et / ou prénom d'un participant aux tâches.",
                 },
+                "les_miens": {
+                    "type": "boolean",
+                    "description": (
+                        "true quand le collaborateur parle de son propre planning (« mon planning », "
+                        "« mes tâches », « qu'est-ce que j'ai ») : seulement ses tâches, sans le nommer "
+                        "dans collaborateur."
+                    ),
+                },
                 "activite": {
                     "type": "string",
                     "description": "Nom de l'activité du planning tel qu'il est dans Moduléo.",
@@ -98,7 +115,9 @@ _SCHEMA = {
                     "type": "integer",
                     "description": (
                         f"Nombre de tâches voulues, {NB_DEFAUT} par défaut, {NB_PLAFOND} au plus ; "
-                        "le nombre et les participants portent toujours sur toutes les tâches trouvées."
+                        "le nombre et les participants portent toujours sur toutes les tâches trouvées. "
+                        "Ignoré pour le planning d'une seule personne (collaborateur ou les_miens) : "
+                        f"toutes ses tâches de la période, {_PLAFOND_UNE_PERSONNE} au plus."
                     ),
                 },
             },
@@ -116,11 +135,16 @@ def _declarer(contexte: ContexteTour) -> dict | None:
     return _SCHEMA if propose(contexte, _ROUTE_RECHERCHE) else None
 
 
-def _parametres(lecteur: LecteurModuleo, dates: dict[str, str], filtres: dict[str, str]) -> dict[str, Any]:
+def _parametres(
+    lecteur: LecteurModuleo, dates: dict[str, str], filtres: dict[str, str], moi: int | None
+) -> dict[str, Any]:
     # Tous les noms avant la recherche : NomNonResolu l'empêche. Tâches
-    # supprimées jamais lues.
+    # supprimées jamais lues. `moi` : l'utilisateur Moduléo du compte
+    # (`les_miens`).
     parametres: dict[str, Any] = {**dates, "recupererTachesSupprimees": "false"}
-    if "collaborateur" in filtres:
+    if moi is not None:
+        parametres["idsParticipants"] = str(participant_planning(lecteur, moi))
+    elif "collaborateur" in filtres:
         parametres["idsParticipants"] = str(chercher_participant(lecteur, filtres["collaborateur"]))
     if "activite" in filtres:
         parametres["idActivite"] = chercher_activite(lecteur, filtres["activite"])
@@ -157,7 +181,7 @@ def _noms(lecteur: LecteurModuleo, contexte: ContexteTour, taches: list[dict], a
     )
 
 
-def _criteres(arguments: dict, filtres: dict[str, str]) -> str:
+def _criteres(arguments: dict, filtres: dict[str, str], les_miens: bool) -> str:
     # « collaborateur Jean Martin, activité Terrain » : la portée du
     # résultat et la référence de sa lecture.
     criteres = [
@@ -166,13 +190,25 @@ def _criteres(arguments: dict, filtres: dict[str, str]) -> str:
         if (valeur := lire_argument(arguments, argument))
     ]
     criteres.extend(f"{_FILTRES[nom]} {valeur}" for nom, valeur in filtres.items())
+    if les_miens:
+        criteres.append(_VOS_TACHES)
     return ", ".join(criteres)
 
 
 def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
     if (refus := refus_du_garde(contexte, _ROUTE_RECHERCHE)) is not None:
         return refus
-    filtres = {nom: valeur for nom in _FILTRES if (valeur := lire_argument(arguments, nom))}
+    # « Mon planning » (test humain #195) : les tâches de l'utilisateur
+    # Moduléo lié au compte ; un collaborateur nommé est ignoré.
+    les_miens = arguments.get("les_miens") is True
+    moi = contexte.droits_moduleo.id_utilisateur_moduleo if les_miens else None
+    if les_miens and moi is None:
+        return ResultatOutil(SANS_UTILISATEUR_LIE, trace={"routes": []})
+    filtres = {
+        nom: valeur
+        for nom in _FILTRES
+        if (valeur := lire_argument(arguments, nom)) and not (les_miens and nom == "collaborateur")
+    }
     try:
         dates = {
             parametre: date_api(valeur)
@@ -185,7 +221,7 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
         return ResultatOutil(_RIEN_A_CHERCHER)
 
     if dates or filtres:
-        criteres = _criteres(arguments, filtres)
+        criteres = _criteres(arguments, filtres, les_miens)
         reference, aucun = f"planning ({criteres})", _AUCUN
 
         def entete(nombre: int) -> str:
@@ -196,18 +232,20 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
         jusqua = aujourdhui + timedelta(days=_JOURS_DEFAUT)
         dates = {"dateDebut": jour_api(aujourdhui), "dateFin": jour_api(jusqua)}
         du, au = jour_api(aujourdhui), jour_api(jusqua)
-        reference = f"planning du {du} au {au}"
-        aucun = _AUCUN_PROCHE.format(du=du, au=au, defaut=_DEFAUT)
+        portee = f"{_DEFAUT}, {_VOS_TACHES}" if les_miens else _DEFAUT
+        reference = f"planning du {du} au {au}" + (f" ({_VOS_TACHES})" if les_miens else "")
+        aucun = _AUCUN_PROCHE.format(du=du, au=au, defaut=portee)
 
         def entete(nombre: int) -> str:
-            return f"{nombre} {'tâche' if nombre == 1 else 'tâches'} au planning du {du} au {au} ({_DEFAUT})"
+            return f"{nombre} {'tâche' if nombre == 1 else 'tâches'} au planning du {du} au {au} ({portee})"
 
     def lire(lecteur: LecteurModuleo) -> Lecture:
-        ids = [int(i) for i in lecteur.lire(_ROUTE_RECHERCHE, _parametres(lecteur, dates, filtres))]
+        ids = [int(i) for i in lecteur.lire(_ROUTE_RECHERCHE, _parametres(lecteur, dates, filtres, moi))]
         if not ids:
             return Lecture([], [])
         taches = _lire_taches(lecteur, ids)
-        affichees = taches[: nb_max(arguments.get("nb_max"))]
+        une_personne = les_miens or "collaborateur" in filtres
+        affichees = taches[: _PLAFOND_UNE_PERSONNE if une_personne else nb_max(arguments.get("nb_max"))]
         noms = _noms(lecteur, contexte, taches, affichees)
         fiches = [fiche_tache(t, noms) for t in affichees]
         synthese = synthese_planning(taches, noms.participants, len(fiches), entete(len(taches)), reference)

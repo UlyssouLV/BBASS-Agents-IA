@@ -103,7 +103,8 @@ def test_le_schema_decrit_les_filtres_et_la_periode_par_defaut(
 
     (schema,) = [o for o in mistral_client_factice.tools_appels_reponse[0] if o["function"]["name"] == _OUTIL]
     proprietes = schema["function"]["parameters"]["properties"]
-    assert set(proprietes) == {"date_min", "date_max", "collaborateur", "activite", "mot_cle", "nb_max"}
+    assert set(proprietes) == {"date_min", "date_max", "collaborateur", "les_miens", "activite", "mot_cle", "nb_max"}
+    assert proprietes["les_miens"]["type"] == "boolean"
     assert "aujourd'hui et les 7 jours suivants" in schema["function"]["description"]
 
 
@@ -277,6 +278,76 @@ def test_un_nom_non_resolu_ne_lance_pas_la_recherche(
     assert db_session.query(LectureOutil).count() == 0
 
 
+# « Mon planning » (test humain #195) : le modèle ne sait pas qui est
+# « moi » ; la VM passe de l'utilisateur Moduléo lié au compte à son
+# utilisateur planning, qui a un autre id.
+
+
+def _lier(db_session, id_utilisateur: int | None) -> None:
+    rattacher(db_session, "j.dupont", GROUPE_DEV, GROUPE_DEV, id_utilisateur)
+    db_session.commit()
+
+
+def test_les_miens_seules_les_taches_de_lutilisateur_planning_du_compte(
+    client, faux_moduleo, mistral_client_factice, jeton_valide, db_session
+):
+    _lier(db_session, 7)
+    _semaine(faux_moduleo)
+
+    _chercher(
+        client,
+        mistral_client_factice,
+        jeton_valide,
+        {"les_miens": True, "date_min": "2026-10-12", "date_max": "2026-10-18"},
+    )
+
+    (recherche,) = _recherches(faux_moduleo)
+    assert recherche["idsParticipants"] == "70"
+    contenu = _contenu_outil(mistral_client_factice)
+    assert contenu.startswith(
+        "1 tâche trouvée au planning (depuis le 12/10/2026, jusqu'au 18/10/2026, vos tâches seulement)."
+    )
+    assert "Calculs lot B" not in contenu
+
+
+def test_les_miens_lemporte_sur_un_collaborateur_nomme(
+    client, faux_moduleo, mistral_client_factice, jeton_valide, db_session
+):
+    _lier(db_session, 7)
+    _semaine(faux_moduleo)
+
+    _chercher(client, mistral_client_factice, jeton_valide, {"les_miens": True, "collaborateur": "Sophie Bernard"})
+
+    (recherche,) = _recherches(faux_moduleo)
+    assert recherche["idsParticipants"] == "70"
+
+
+def test_les_miens_sans_utilisateur_moduleo_lie_phrase_fixe_et_rien_nest_lu(
+    client, faux_moduleo, mistral_client_factice, jeton_valide, db_session
+):
+    _lier(db_session, None)
+    _semaine(faux_moduleo)
+
+    _chercher(client, mistral_client_factice, jeton_valide, {"les_miens": True})
+
+    assert _contenu_outil(mistral_client_factice) == outil_planning.SANS_UTILISATEUR_LIE
+    assert faux_moduleo.appels == []
+    assert db_session.query(LectureOutil).count() == 0
+
+
+def test_les_miens_hors_du_planning_la_recherche_nest_pas_lancee(
+    client, faux_moduleo, mistral_client_factice, jeton_valide, db_session
+):
+    _lier(db_session, 9)
+    _semaine(faux_moduleo)
+    faux_moduleo.ajouter_utilisateur(9, "Paul", "Durand")
+
+    _chercher(client, mistral_client_factice, jeton_valide, {"les_miens": True})
+
+    assert _contenu_outil(mistral_client_factice).startswith("Paul Durand n'est pas au planning Moduléo")
+    assert _recherches(faux_moduleo) == []
+
+
 # Période par défaut.
 
 
@@ -328,10 +399,12 @@ def test_aucune_tache_message_clair(client, faux_moduleo, mistral_client_factice
 # Plafond.
 
 
-def _taches_de_novembre(faux_moduleo, nombre: int) -> None:
+def _taches_de_novembre(faux_moduleo, nombre: int, **champs) -> None:
     for n in range(1, nombre + 1):
         jour = f"2026-11-{n % 28 + 1:02d}"
-        faux_moduleo.ajouter_tache(3000 + n, f"Tâche {n}", f"{jour}T08:00:00+01:00", f"{jour}T09:00:00+01:00")
+        faux_moduleo.ajouter_tache(
+            3000 + n, f"Tâche {n}", f"{jour}T08:00:00+01:00", f"{jour}T09:00:00+01:00", **champs
+        )
 
 
 def test_cinq_taches_par_defaut_les_premieres(client, faux_moduleo, mistral_client_factice, jeton_valide):
@@ -353,6 +426,55 @@ def test_le_detail_est_plafonne_a_dix_taches(client, faux_moduleo, mistral_clien
     _chercher(client, mistral_client_factice, jeton_valide, {"date_min": "2026-11-01", "nb_max": 50})
 
     assert _contenu_outil(mistral_client_factice).count("Tâche « ") == 10
+
+
+# Planning d'une seule personne (test humain #195) : « le planning de
+# Noémie cette semaine » s'arrêtait au lundi, cinq tâches affichées.
+
+
+def _jean_martin(faux_moduleo) -> None:
+    faux_moduleo.ajouter_utilisateur(7, "Jean", "Martin")
+    faux_moduleo.ajouter_utilisateur_planning(70, 7)
+
+
+def test_le_planning_dun_collaborateur_nomme_est_detaille_en_entier(
+    client, faux_moduleo, mistral_client_factice, jeton_valide
+):
+    _jean_martin(faux_moduleo)
+    _taches_de_novembre(faux_moduleo, 12, Participants=[70])
+
+    _chercher(client, mistral_client_factice, jeton_valide, {"collaborateur": "Jean Martin", "date_min": "2026-11-01"})
+
+    contenu = _contenu_outil(mistral_client_factice)
+    assert contenu.count("Tâche « ") == 12
+    assert "premières affichées" not in contenu
+
+
+def test_mon_planning_est_detaille_en_entier(client, faux_moduleo, mistral_client_factice, jeton_valide, db_session):
+    _lier(db_session, 7)
+    _jean_martin(faux_moduleo)
+    _taches_de_novembre(faux_moduleo, 12, Participants=[70])
+
+    _chercher(client, mistral_client_factice, jeton_valide, {"les_miens": True, "date_min": "2026-11-01"})
+
+    assert _contenu_outil(mistral_client_factice).count("Tâche « ") == 12
+
+
+def test_le_planning_dune_personne_est_plafonne_a_soixante_taches(
+    client, faux_moduleo, mistral_client_factice, jeton_valide
+):
+    _jean_martin(faux_moduleo)
+    for n in range(1, 66):
+        jour = f"2026-11-{(n - 1) // 3 + 1:02d}"
+        faux_moduleo.ajouter_tache(
+            4000 + n, f"Tâche {n}", f"{jour}T{8 + (n - 1) % 3:02d}:00:00+01:00", f"{jour}T18:00:00+01:00", Participants=[70]
+        )
+
+    _chercher(client, mistral_client_factice, jeton_valide, {"collaborateur": "Jean Martin", "date_min": "2026-11-01"})
+
+    contenu = _contenu_outil(mistral_client_factice)
+    assert contenu.count("Tâche « ") == 60
+    assert "65 tâches trouvées" in contenu and "Les 60 premières affichées, précise la recherche." in contenu
 
 
 def test_le_statut_nomme_le_domaine(client, faux_moduleo, mistral_client_factice, jeton_valide):

@@ -45,6 +45,30 @@ def test_un_lundi_la_consigne_donne_le_jour_en_lettres_et_la_semaine_en_cours(
     assert "« la semaine dernière »" in consigne
 
 
+def test_la_consigne_donne_les_bornes_de_la_semaine_derniere_toutes_calculees(
+    client, mistral_client_factice, jeton_valide, monkeypatch
+):
+    # Rejeu du test humain #195 (scénario 4) après #200 : avec la seule
+    # semaine en cours, le modèle calculait lui-même « la semaine dernière »
+    # le lundi 26/10/2026 et appelait du 20 au 26/10, « du lundi 20 au
+    # dimanche 26 octobre ». Les bornes sont données, à recopier.
+    monkeypatch.setattr(conversations, "_date_du_jour", lambda: date(2026, 10, 26))
+
+    consigne = _consigne(client, mistral_client_factice, jeton_valide)
+
+    assert "Semaine dernière : du lundi 19 octobre 2026 (2026-10-19) au dimanche 25 octobre 2026 (2026-10-25)" in consigne
+
+
+def test_un_dimanche_la_semaine_derniere_finit_le_dimanche_precedent(
+    client, mistral_client_factice, jeton_valide, monkeypatch
+):
+    monkeypatch.setattr(conversations, "_date_du_jour", lambda: date(2026, 11, 1))
+
+    consigne = _consigne(client, mistral_client_factice, jeton_valide)
+
+    assert "Semaine dernière : du lundi 19 octobre 2026 (2026-10-19) au dimanche 25 octobre 2026 (2026-10-25)" in consigne
+
+
 def test_un_dimanche_la_semaine_en_cours_commence_le_lundi_precedent(
     client, mistral_client_factice, jeton_valide, monkeypatch
 ):
@@ -79,9 +103,11 @@ def test_les_descriptions_temps_passes_et_planning_disent_du_lundi_au_dimanche(
         "Cette semaine va du lundi 26 octobre au dimanche 1er novembre 2026.",
         "Cette semaine va du 26/10/2026 au 01/11/2026.",
         "Nous sommes le lundi 26.",
+        "La semaine dernière va du lundi 19 octobre au dimanche 25 octobre 2026.",
+        "La semaine dernière va du 19/10/2026 au 25/10/2026.",
     ],
 )
-def test_les_bornes_de_la_semaine_en_cours_restent_dans_la_reponse(
+def test_les_bornes_des_deux_semaines_restent_dans_la_reponse(
     client, mistral_client_factice, jeton_valide, monkeypatch, reponse
 ):
     monkeypatch.setattr(conversations, "_date_du_jour", lambda: date(2026, 10, 26))

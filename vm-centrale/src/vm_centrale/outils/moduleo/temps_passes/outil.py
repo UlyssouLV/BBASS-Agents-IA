@@ -16,6 +16,7 @@ from vm_centrale.outils.base import ContexteTour, Outil, ResultatOutil
 from vm_centrale.outils.moduleo.commun import (
     NB_DEFAUT,
     NB_PLAFOND,
+    SANS_UTILISATEUR_LIE,
     Lecture,
     date_api,
     dates_api,
@@ -90,6 +91,14 @@ _SCHEMA = {
                     for argument in _DATES
                 },
                 "collaborateur": {"type": "string", "description": "Nom et / ou prénom du collaborateur."},
+                "les_miens": {
+                    "type": "boolean",
+                    "description": (
+                        "true quand le collaborateur parle de ses propres temps (« mes temps », « ma "
+                        "saisie », « combien d'heures j'ai fait ») : seulement les temps de son "
+                        "utilisateur Moduléo, sans le nommer dans collaborateur."
+                    ),
+                },
                 "code_activite": {
                     "type": "string",
                     "description": "Nom ou code de l'activité tel qu'il est dans Moduléo.",
@@ -126,14 +135,16 @@ def _declarer(contexte: ContexteTour) -> dict | None:
     return _SCHEMA if propose(contexte, _ROUTE_RECHERCHE, _siens(contexte.droits_moduleo)) else None
 
 
-def _parametres(lecteur: LecteurModuleo, dates: dict[str, str], noms: dict[str, str], droits: DroitsModuleo) -> dict:
+def _parametres(
+    lecteur: LecteurModuleo, dates: dict[str, str], noms: dict[str, str], droits: DroitsModuleo, restreint: bool
+) -> dict:
     # Tous les noms avant la recherche : NomNonResolu l'empêche. Sans le
     # droit « autres », un autre collaborateur part tel quel : le garde le
     # refuse, avec sa phrase fixe.
     parametres: dict[str, Any] = dict(dates)
     if "collaborateur" in noms:
         parametres["idsUtilisateurs"] = str(chercher_utilisateur(lecteur, noms["collaborateur"]))
-    elif not droits.a(_DROIT_AUTRES):
+    elif restreint:
         parametres |= _siens(droits) or {}
     if "code_activite" in noms:
         parametres["idCodeActivite"] = chercher_code_activite(lecteur, noms["code_activite"])
@@ -185,8 +196,17 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
     droits = contexte.droits_moduleo
     if (refus := refus_du_garde(contexte, _ROUTE_RECHERCHE, _siens(droits))) is not None:
         return refus
-    restreint = not droits.a(_DROIT_AUTRES)
-    noms = {nom: valeur for nom in _NOMS if (valeur := lire_argument(arguments, nom))}
+    # « Mes temps » (test humain #195) : les temps de l'utilisateur Moduléo
+    # lié, même avec le droit « autres » ; un collaborateur nommé est ignoré.
+    les_miens = arguments.get("les_miens") is True
+    if les_miens and droits.id_utilisateur_moduleo is None:
+        return ResultatOutil(SANS_UTILISATEUR_LIE, trace={"routes": []})
+    restreint = les_miens or not droits.a(_DROIT_AUTRES)
+    noms = {
+        nom: valeur
+        for nom in _NOMS
+        if (valeur := lire_argument(arguments, nom)) and not (les_miens and nom == "collaborateur")
+    }
     try:
         dates = dates_api(arguments, _DATES)
     except NomNonResolu as erreur:
@@ -213,7 +233,7 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
             return f"{'saisi' if nombre == 1 else 'saisis'} du {du} au {au} ({_JOURS_DEFAUT} derniers jours{vos})"
 
     def lire(lecteur: LecteurModuleo) -> Lecture:
-        ids = [int(i) for i in lecteur.lire(_ROUTE_RECHERCHE, _parametres(lecteur, dates, noms, droits))]
+        ids = [int(i) for i in lecteur.lire(_ROUTE_RECHERCHE, _parametres(lecteur, dates, noms, droits, restreint))]
         if not ids:
             return Lecture([], [])
         temps = _lire_temps(lecteur, ids)
