@@ -68,7 +68,9 @@ _SCHEMA = {
         "description": (
             "Cherche des temps passés dans Moduléo, le logiciel de gestion du cabinet, par période, "
             "collaborateur, code activité ou numéro d'affaire, filtres combinables donnés en noms tels "
-            "que le collaborateur les dit. Renvoie en tête le nombre de lignes trouvées et le total "
+            "que le collaborateur les dit. « Cette semaine » et « la semaine dernière » vont du lundi "
+            "au dimanche (bornes dans la date du jour), date_min au lundi et date_max au dimanche, "
+            "jamais les derniers jours. Renvoie en tête le nombre de lignes trouvées et le total "
             "d'heures, général, par collaborateur et par code activité, calculés sur tous les temps "
             "trouvés : cite-les tels quels, ne fais jamais d'addition toi-même. Puis le détail des "
             "lignes les plus récentes : date, collaborateur, affaire, code activité, heures. Sans aucun "

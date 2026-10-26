@@ -5,7 +5,7 @@ import re
 from bisect import bisect_right
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
@@ -238,9 +238,18 @@ def _consigne_date_du_jour() -> str:
     # conversation 87) : sans elle, mistral-small-latest traduisait
     # « dernières annonces » par les années de sa mémoire (« 2024 2025 »)
     # dans la requête de rechercher_web.
+    # Jour de la semaine et bornes lundi–dimanche (#200, test humain #195
+    # scénario 4) : avec la seule date ISO, « la semaine dernière » le lundi
+    # 26/10/2026 devenait les sept derniers jours.
     aujourdhui = _date_du_jour()
+    lundi, dimanche = _semaine_en_cours()
     return (
-        f"Date du jour : {aujourdhui.isoformat()}. Pour une actualité ou une "
+        f"Date du jour : {_en_lettres(aujourdhui)} ({aujourdhui.isoformat()}). "
+        f"Semaine en cours : du {_en_lettres(lundi)} ({lundi.isoformat()}) au "
+        f"{_en_lettres(dimanche)} ({dimanche.isoformat()}). Une semaine va du "
+        "lundi au dimanche : « cette semaine » est la semaine en cours, "
+        "« la semaine dernière » celle d'avant, et un jour nommé seul "
+        "(« mercredi ») celui de la semaine en cours. Pour une actualité ou une "
         "information récente, mets l'année "
         f"{aujourdhui.year} dans la requête de rechercher_web, jamais une année "
         "plus ancienne de ta mémoire ; pour un texte déjà nommé (article de "
@@ -248,10 +257,22 @@ def _consigne_date_du_jour() -> str:
     )
 
 
+_JOURS = ("lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche")
 _MOIS = (
     "janvier", "février", "mars", "avril", "mai", "juin",
     "juillet", "août", "septembre", "octobre", "novembre", "décembre",
 )
+
+
+def _semaine_en_cours() -> tuple[date, date]:
+    aujourdhui = _date_du_jour()
+    lundi = aujourdhui - timedelta(days=aujourdhui.weekday())
+    return lundi, lundi + timedelta(days=6)
+
+
+def _en_lettres(jour: date) -> str:
+    quantieme = "1er" if jour.day == 1 else str(jour.day)
+    return f"{_JOURS[jour.weekday()]} {quantieme} {_MOIS[jour.month - 1]} {jour.year}"
 
 
 def _annee_du_jour_source() -> str:
@@ -262,12 +283,22 @@ def _annee_du_jour_source() -> str:
     return str(_date_du_jour().year)
 
 
-def _date_du_jour_ecrite() -> re.Pattern[str]:
-    # La date du jour en lettres dans la réponse (« 15 octobre », « 1er
-    # octobre 2026 ») : ses chiffres ne sont pas contrôlés, le jour seul l'est.
-    aujourdhui = _date_du_jour()
-    jour = "1(?:er)?" if aujourdhui.day == 1 else str(aujourdhui.day)
-    return re.compile(rf"(?<!\d){jour}\s+{_MOIS[aujourdhui.month - 1]}(?:\s+{aujourdhui.year})?\b", re.IGNORECASE)
+def _dates_de_la_consigne_ecrites() -> list[re.Pattern[str]]:
+    # La date du jour et les bornes de la semaine en cours (#200), écrites
+    # dans la réponse (« 15 octobre », « lundi 26 », « 1er novembre 2026 »,
+    # « 26/10/2026 ») : leurs chiffres ne sont pas contrôlés, le quantième
+    # seul l'est.
+    return [_date_ecrite(jour) for jour in {_date_du_jour(), *_semaine_en_cours()}]
+
+
+def _date_ecrite(jour: date) -> re.Pattern[str]:
+    quantieme = "1(?:er)?" if jour.day == 1 else str(jour.day)
+    en_lettres = (
+        rf"(?:{_JOURS[jour.weekday()]}\s+{quantieme}(?:\s+{_MOIS[jour.month - 1]})?"
+        rf"|{quantieme}\s+{_MOIS[jour.month - 1]})(?:\s+{jour.year})?\b"
+    )
+    en_chiffres = rf"0?{jour.day}/0?{jour.month}(?:/{jour.year})?(?!\d)"
+    return re.compile(rf"(?<![\d/])(?:{en_lettres}|{en_chiffres})", re.IGNORECASE)
 
 
 def _message_systeme_style() -> dict[str, str]:
@@ -762,7 +793,7 @@ def _appliquer_garde_fous(
     # Une fiche lue par un outil (Moduléo, spec 1.5.0) aussi.
     extraits += [lecture.texte for lecture in lectures]
     textes_source = [*_messages_du_compte(db, conversation_id, nouveau_message), _annee_du_jour_source(), *extraits]
-    sans_chiffre_invente = retirer_chiffres_hors_source(reponse, textes_source, [_date_du_jour_ecrite()])
+    sans_chiffre_invente = retirer_chiffres_hors_source(reponse, textes_source, _dates_de_la_consigne_ecrites())
     if sans_chiffre_invente == reponse:
         return reponse
     # Un document, ou un chiffre déjà écrit dans le message du tour : on
