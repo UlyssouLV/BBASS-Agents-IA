@@ -4,24 +4,28 @@ import SchemaFlux from '@site/src/components/moduleo/SchemaFlux';
 
 Depuis la 1.5.0, le chat lit Moduléo, le logiciel métier du cabinet : affaires, intervenants, contacts et leurs coordonnées. Un collaborateur demande « retrouve l’affaire 2024-123 » ou « coordonnées de Dupont » sans quitter le chat.
 
-Ce n’est pas un Agent Moduléo. Comme pour la recherche web, **le modèle décide** d’appeler un outil. Il en a deux, proposés à tous les comptes dès que la config Moduléo est présente :
+Ce n’est pas un Agent Moduléo. Comme pour la recherche web, **le modèle décide** d’appeler un outil. Il en a plusieurs, proposés dès que la config Moduléo est présente, aux comptes dont le groupe Moduléo a le droit (depuis la 1.5.1 ; sans groupe, aucun outil Moduléo) :
 
 | Outil | Ce qu’il fait |
 | --- | --- |
 | `chercher_affaires_moduleo` | Retrouve des affaires par numéro, texte, état, dates, site, service, responsable, chargé d’affaire, dossier de production. |
 | `chercher_contacts_moduleo` | Retrouve des contacts par texte, type, type de donneur d’ordre, qualifications, avec leurs coordonnées et leurs affaires. |
+| `chercher_devis_moduleo` | Retrouve des devis par texte, émission, dates, service, responsable, rédacteur, affaire, avec nombre et totaux HT / TTC calculés par la VM (depuis la 1.5.1). |
+| `chercher_factures_moduleo` | Retrouve des factures par texte, émission, dates, service, responsable, rédacteur, affaire, avec échéances, règlements, reste à payer quand Moduléo permet de le déduire, et totaux calculés par la VM (depuis la 1.5.1). |
+| `chercher_temps_passes_moduleo` | Retrouve des temps passés par période, collaborateur, code activité, affaire, avec totaux d’heures général, par collaborateur et par code activité calculés par la VM ; sans le droit « autres collaborateurs », seulement ses propres temps (depuis la 1.5.1). |
+| `chercher_planning_moduleo` | Retrouve des tâches du planning par collaborateur, période, activité, mot-clé du libellé, avec participants, matériel et affaire liée ; tout compte rattaché à un groupe Planning (depuis la 1.5.1). |
 
 <SchemaFlux variante="appel" />
 
-Pendant la lecture, le fil affiche **« Consultation Moduléo »**. Le modèle donne des **noms**, jamais des ids Moduléo : la VM centrale les traduit dans les deux sens.
+Pendant la lecture, le fil affiche **« Consultation Moduléo : affaires »** (ou « : contacts », « : devis », « : factures », « : temps passés », « : planning »). Le modèle donne des **noms**, jamais des ids Moduléo : la VM centrale les traduit dans les deux sens.
 
 Trois règles tiennent l’ensemble ([ADR-0017](../../adr/0017-lecture-moduleo-par-outil.md)) :
 
 - **Lecture seule.** La clé d’API BBASS n’a que le droit de lecture dans Moduléo, et la VM n’envoie de toute façon que des GET.
-- **Une seule clé, chiffrée.** Une clé d’API dédiée à BBASS et le code de sécurité d’un utilisateur de test, chiffrés dans `.env`. Ce que voit le chat est ce que voit cet utilisateur dans Moduléo, quel que soit le compte BBASS.
+- **Une seule clé, chiffrée.** Une clé d’API dédiée à BBASS et le code de sécurité d’un utilisateur de test, chiffrés dans `.env`. Depuis la 1.5.1, BBASS recopie les groupes et droits de Moduléo ; un **garde des droits**, fermé par défaut, vérifie chaque route avant tout envoi et dit au modèle le droit manquant (« Votre compte n’a pas le droit Moduléo « Rechercher des contacts ». Aucune lecture n’a été faite… ») ([ADR-0018](../../adr/0018-droits-moduleo-appliques-par-bbass.md)).
 - **Aucune copie hors de la Conversation.** Moduléo est relu à chaque appel. Une fiche lue reste dans sa Conversation, jamais dans une autre.
 
-Sans config Moduléo complète, la VM démarre normalement et les deux outils ne sont simplement pas proposés.
+Sans config Moduléo complète, la VM démarre normalement et les outils Moduléo ne sont simplement pas proposés.
 
 ## Ensuite
 
@@ -29,5 +33,9 @@ Sans config Moduléo complète, la VM démarre normalement et les deux outils ne
 2. [Lecture seule](./lecture-seule.mdx)
 3. [Chercher des affaires](./affaires.mdx)
 4. [Chercher des contacts](./contacts.mdx)
-5. [Sources et mémoire](./sources-et-memoire.mdx)
-6. [Panne et refus](./panne-et-refus.mdx)
+5. [Chercher des devis](./devis.mdx)
+6. [Chercher des factures](./factures.mdx)
+7. [Chercher des temps passés](./temps-passes.mdx)
+8. [Chercher dans le planning](./planning.mdx)
+9. [Sources et mémoire](./sources-et-memoire.mdx)
+10. [Panne et refus](./panne-et-refus.mdx)

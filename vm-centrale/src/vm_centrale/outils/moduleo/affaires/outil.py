@@ -1,10 +1,12 @@
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, timedelta
 from typing import Any
 
+from vm_centrale.dates import date_du_jour
 from vm_centrale.lectures_outils import Fiche
 from vm_centrale.moduleo.client import LecteurModuleo, ModuleoIntrouvable
 from vm_centrale.moduleo.enumerations import ETATS_AFFAIRE, libelles, nom_api
-from vm_centrale.moduleo.fiches import fiche_affaire
+from vm_centrale.moduleo.droits import DroitsModuleo, autorise
+from vm_centrale.moduleo.fiches import ParcellesAffaire, fiche_affaire
 from vm_centrale.moduleo.resolution import (
     Noms,
     NomNonResolu,
@@ -22,10 +24,16 @@ from vm_centrale.outils.moduleo.commun import (
     IDS_MAX,
     NB_DEFAUT,
     NB_PLAFOND,
+    booleen,
+    date_api,
+    jour_api,
+    lire_jour,
     liste_ids,
     lire_argument,
     lire_fiches,
     nb_max,
+    propose,
+    refus_du_garde,
 )
 
 _NOM = "chercher_affaires_moduleo"
@@ -35,6 +43,12 @@ _ROUTE_RECHERCHE = next(route for route in ROUTES_GET if route.startswith("cogeo
 _ROUTE_AFFAIRES = "cogeo/affaire/multi?ids={ids}"
 _ROUTE_INTERVENANTS_AFFAIRE = "cogeo/affaire/{idAffaire}/intervenants"
 _ROUTE_INTERVENANTS = "cogeo/intervenant/multi?ids={ids}"
+# Parcelles (#193) : Moduléo n'a qu'une route par parcelle et par
+# propriétaire.
+_ROUTE_PARCELLES = "cogeo/affaire/{idAffaire}/parcelles"
+_ROUTE_PARCELLE = "cogeo/parcelle/{idParcelle}"
+_ROUTE_PROPRIETAIRES = "cogeo/parcelle/{idParcelle}/proprietaires"
+_ROUTE_PROPRIETAIRE = "cogeo/proprietaire/{idProprietaire}"
 
 _AUCUNE_AFFAIRE = "Aucune affaire Moduléo ne correspond à cette recherche."
 _TROUVEES = "{n} affaires trouvées, {m} affichées"
@@ -52,6 +66,10 @@ _SANS_LECTURE = (
     "un numéro, un nom ou une période."
 )
 _RIEN_A_CHERCHER = f"Moduléo n'est pas configuré. {_SANS_LECTURE}"
+_UNE_SEULE_AFFAIRE = (
+    "Les parcelles ne se lisent que pour une seule affaire, et {n} affaires correspondent : "
+    "demande au collaborateur le numéro de l'affaire voulue."
+)
 
 # Filtres de dates (#175) : argument du modèle → paramètre de cogeo/affaire?…
 _EVENEMENTS = {
@@ -65,8 +83,6 @@ _DATES = {
     for evenement, (api, _) in _EVENEMENTS.items()
     for borne in ("min", "max")
 }
-# Formats de date acceptés du modèle ; l'API reçoit AAAA-MM-JJ.
-_FORMATS_DATE = ("%Y-%m-%d", "%d/%m/%Y")
 # Filtres en noms, résolus en ids par la VM.
 _NOMS = ("site", "service", "suivi_par", "responsable", "charge_affaire", "dossier_production")
 
@@ -86,7 +102,8 @@ _SCHEMA = {
             "collaborateur les demande, jamais d'office. À utiliser pour "
             "toute question sur une affaire du cabinet : ces données ne sont pas "
             f"sur Internet. Sans aucun critère, renvoie les affaires créées ces {_JOURS_RECENTS} "
-            "derniers jours. Les plus récentes d'abord."
+            "derniers jours. Les plus récentes d'abord. Avec avec_parcelles, pour une seule affaire, "
+            "ajoute ses parcelles (référence cadastrale, commune, contenance) et leurs propriétaires."
         ),
         "parameters": {
             "type": "object",
@@ -115,7 +132,7 @@ _SCHEMA = {
                         "description": (
                             f"Date {_EVENEMENTS[argument.split('_')[1]][1]} "
                             f"{'au plus tôt' if argument.endswith('_min') else 'au plus tard'}, "
-                            "au format AAAA-MM-JJ."
+                            "au format AAAA-MM-JJ ou JJ/MM/AAAA."
                         ),
                     }
                     for argument in _DATES
@@ -142,6 +159,14 @@ _SCHEMA = {
                     "type": "string",
                     "description": "Nom du dossier de production de l'affaire.",
                 },
+                "avec_parcelles": {
+                    "type": "boolean",
+                    "description": (
+                        "Vrai seulement quand le collaborateur demande les parcelles ou leurs "
+                        "propriétaires, et pour une seule affaire (de préférence par numéro) : "
+                        "refusé si plusieurs affaires correspondent. Jamais d'office."
+                    ),
+                },
                 "nb_max": {
                     "type": "integer",
                     "description": (
@@ -155,12 +180,13 @@ _SCHEMA = {
 
 
 def _date_du_jour() -> date:
-    return datetime.now(timezone.utc).date()
+    return date_du_jour()
 
 
 def _declarer(contexte: ContexteTour) -> dict | None:
-    # Pour tous les comptes, dès que Moduléo est configuré (spec 1.5.0).
-    return _SCHEMA if contexte.client_moduleo is not None else None
+    # Moduléo configuré, compte rattaché à un groupe Cogeo (garde des
+    # droits, #188).
+    return _SCHEMA if propose(contexte, _ROUTE_RECHERCHE) else None
 
 
 def _chercher(
@@ -199,15 +225,15 @@ def _plus_recents(lecteur: LecteurModuleo, parametres: dict[str, Any], plafonnes
     # plus récentes peuvent manquer. La fenêtre de création est resserrée
     # depuis sa fin, par dichotomie, jusqu'à passer sous le plafond avec au
     # moins `n` affaires : celles-là sont toutes les plus récentes.
-    fin = date.fromisoformat(parametres.get("dateCreationMax") or _date_du_jour().isoformat())
+    fin = lire_jour(parametres["dateCreationMax"]) if parametres.get("dateCreationMax") else _date_du_jour()
     minimum = parametres.get("dateCreationMin")
-    debut = date.fromisoformat(minimum) if minimum else _DEBUT_MODULEO
+    debut = lire_jour(minimum) if minimum else _DEBUT_MODULEO
     # Jours avant `fin` : `plafonne` donne IDS_MAX ids, `complet` moins.
     plafonne, complet = (fin - debut).days, -1
     meilleurs: set[int] = set()
     while plafonne - complet > 1:
         jours = (plafonne + complet) // 2
-        ids = _ids(lecteur, {**parametres, "dateCreationMin": (fin - timedelta(days=jours)).isoformat()})
+        ids = _ids(lecteur, {**parametres, "dateCreationMin": jour_api(fin - timedelta(days=jours))})
         if len(ids) >= IDS_MAX:
             plafonne = jours
             continue
@@ -247,7 +273,7 @@ def _filtres(arguments: dict) -> dict[str, str]:
         filtres["etatAffaire"] = _etat_api(etat)
     for argument, parametre in _DATES.items():
         if valeur := lire_argument(arguments, argument):
-            filtres[parametre] = _date_api(valeur)
+            filtres[parametre] = date_api(valeur)
     return filtres
 
 
@@ -260,17 +286,38 @@ def _etat_api(valeur: str) -> str:
     return nom
 
 
-def _date_api(valeur: str) -> str:
-    for format_date in _FORMATS_DATE:
-        try:
-            return datetime.strptime(valeur, format_date).date().isoformat()
-        except ValueError:
-            continue
-    raise NomNonResolu(f"Date « {valeur} » illisible : donne-la au format AAAA-MM-JJ. Recherche non lancée.")
+def _parcelles(lecteur: LecteurModuleo, id_affaire: int, droits: DroitsModuleo) -> ParcellesAffaire:
+    # Parcelle par parcelle, puis propriétaire par propriétaire, à travers
+    # le garde. Sans le droit des propriétaires, ils ne sont pas lus.
+    # Une liste vide vient `null` de Moduléo (#197).
+    parcelles = [
+        lecteur.lire(_ROUTE_PARCELLE, {"idParcelle": id_parcelle})
+        for id_parcelle in lecteur.lire(_ROUTE_PARCELLES, {"idAffaire": id_affaire}) or []
+    ]
+    if not autorise(_ROUTE_PROPRIETAIRE, droits):
+        return ParcellesAffaire(parcelles, None)
+    proprietaires = {
+        parcelle["IdParcelle"]: [
+            lecteur.lire(_ROUTE_PROPRIETAIRE, {"idProprietaire": id_proprietaire}).get("IdContact")
+            for id_proprietaire in lecteur.lire(_ROUTE_PROPRIETAIRES, {"idParcelle": parcelle["IdParcelle"]}) or []
+        ]
+        for parcelle in parcelles
+    }
+    return ParcellesAffaire(parcelles, proprietaires)
 
 
-def _fiches(lecteur: LecteurModuleo, ids: list[int]) -> list[Fiche]:
+def _fiches(
+    lecteur: LecteurModuleo, ids: list[int], droits: DroitsModuleo, avec_parcelles: bool = False
+) -> list[Fiche]:
     affaires = {affaire["IdAffaire"]: affaire for affaire in lecteur.lire(_ROUTE_AFFAIRES, {"ids": liste_ids(ids)})}
+    # Une seule affaire avec `avec_parcelles` (vérifié par _executer).
+    parcelles = {i: _parcelles(lecteur, i, droits) for i in affaires} if avec_parcelles else {}
+    ids_proprietaires = [
+        id_contact
+        for lues in parcelles.values()
+        for ids_contacts in (lues.proprietaires or {}).values()
+        for id_contact in ids_contacts
+    ]
     ids_intervenants = [
         id_intervenant
         for id_affaire in ids
@@ -286,15 +333,21 @@ def _fiches(lecteur: LecteurModuleo, ids: list[int]) -> list[Fiche]:
         contacts=resoudre_contacts(
             lecteur,
             [a.get(champ) for a in affaires.values() for champ in ("IdClient", "IdRepresentant")]
-            + [i.get(champ) for i in intervenants for champ in ("IdContact", "IdRepresentant")],
+            + [i.get(champ) for i in intervenants for champ in ("IdContact", "IdRepresentant")]
+            + ids_proprietaires,
         ),
-        communes=resoudre_communes(lecteur, [a.get("IdCommune") for a in affaires.values()]),
+        communes=resoudre_communes(
+            lecteur,
+            [a.get("IdCommune") for a in affaires.values()]
+            + [parcelle.get("IdCommune") for lues in parcelles.values() for parcelle in lues.parcelles],
+        ),
     )
     return [
         fiche_affaire(
             affaires[id_affaire],
             [intervenant for intervenant in intervenants if intervenant.get("IdAffaire") == id_affaire],
             noms,
+            parcelles.get(id_affaire),
         )
         for id_affaire in ids
         if id_affaire in affaires
@@ -302,6 +355,8 @@ def _fiches(lecteur: LecteurModuleo, ids: list[int]) -> list[Fiche]:
 
 
 def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
+    if (refus := refus_du_garde(contexte, _ROUTE_RECHERCHE)) is not None:
+        return refus
     numero = lire_argument(arguments, "numero")
     texte = lire_argument(arguments, "texte")
     noms = {nom: valeur for nom in _NOMS if (valeur := lire_argument(arguments, nom))}
@@ -311,20 +366,33 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
         return ResultatOutil(f"{erreur} {_SANS_LECTURE}", trace={"routes": [], "non_resolu": str(erreur)})
     if contexte.client_moduleo is None:
         return ResultatOutil(_RIEN_A_CHERCHER)
+    avec_parcelles = booleen(arguments.get("avec_parcelles")) is True
     aucune, trouvees, recentes = _AUCUNE_AFFAIRE, _TROUVEES, not (numero or texte or filtres or noms)
     if recentes:
         depuis = _date_du_jour() - timedelta(days=_JOURS_RECENTS)
-        filtres = {"dateCreationMin": depuis.isoformat()}
-        aucune = _AUCUNE_RECENTE.format(depuis=depuis.strftime("%d/%m/%Y"))
-        trouvees = _RECENTES.format(depuis=depuis.strftime("%d/%m/%Y"))
+        filtres = {"dateCreationMin": jour_api(depuis)}
+        aucune = _AUCUNE_RECENTE.format(depuis=jour_api(depuis))
+        trouvees = _RECENTES.format(depuis=jour_api(depuis))
 
     def lire(lecteur: LecteurModuleo) -> tuple[list[int], list[Fiche]]:
         n = nb_max(arguments.get("nb_max"))
         ids, recents = _chercher(lecteur, numero, texte, filtres, noms, n)
-        return ids, _fiches(lecteur, recents[:n]) if recents else []
+        if avec_parcelles and len(ids) > 1:
+            # Refusé avant toute fiche ni parcelle : la phrase du nom non
+            # résolu, sans lecture à inventer.
+            nombre = f"au moins {len(ids)}" if len(ids) >= IDS_MAX else len(ids)
+            raise NomNonResolu(_UNE_SEULE_AFFAIRE.format(n=nombre))
+        return ids, _fiches(lecteur, recents[:n], contexte.droits_moduleo, avec_parcelles) if recents else []
 
     return lire_fiches(
-        contexte, contexte.client_moduleo, lire, aucune, trouvees, _SANS_LECTURE, entete_toujours=recentes
+        contexte,
+        contexte.client_moduleo,
+        "affaires",
+        lire,
+        aucune,
+        trouvees,
+        _SANS_LECTURE,
+        entete_toujours=recentes,
     )
 
 

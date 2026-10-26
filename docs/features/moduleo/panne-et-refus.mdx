@@ -8,6 +8,7 @@ Quand Moduléo ne répond pas comme prévu, l’outil renvoie au modèle **une p
 | --- | --- |
 | Délai dépassé, serveur injoignable, réponse inexploitable | « Moduléo est indisponible pour le moment. » |
 | Clé ou code de sécurité refusé, droit manquant (401 / 403) | « Moduléo refuse l’accès à cette donnée. » |
+| Garde des droits (depuis la 1.5.1) : le groupe du compte n’a pas le droit, rien n’est envoyé | « Votre compte n’a pas le droit Moduléo « Rechercher des contacts ». Aucune lecture n’a été faite. Demandez à un compte administrateur si vous en avez besoin. » |
 
 Aucune lecture n’est enregistrée : rien ne devient source des garde-fous.
 
@@ -30,4 +31,4 @@ Chaque appel est une étiquette [Outil](../inspecteur/outil.mdx), badge **Local*
   </SectionApercu>
 </CarteApercu>
 
-En **Entrée**, les arguments du modèle. En **Sortie** : `contenu` (ce que lit le modèle), `routes` (chaque route lue, avec ses paramètres), puis selon le cas `trouvees` et `fiches`, `erreur` (le détail technique), ou `non_resolu` (le nom que Moduléo ne connaît pas). **Jamais** la clé d’API ni le code de sécurité.
+En **Entrée**, les arguments du modèle. En **Sortie** : `contenu` (ce que lit le modèle), `routes` (chaque route lue, avec ses paramètres), puis selon le cas `trouvees` et `fiches`, `erreur` (le détail technique), `non_resolu` (le nom que Moduléo ne connaît pas), ou `garde_des_droits` (« refusé, droit manquant « Contacts › Rechercher des contacts » (cogeo/contact?texte=…) »). **Jamais** la clé d’API ni le code de sécurité.

@@ -2,10 +2,12 @@
 name: encadrer-implement
 description: >-
   Green pytest after a child GitHub ticket, or the implement plugin's closing
-  step: `/t`, `/c -p`, `/cci #<n>`, then the next unblocked ready-for-agent
-  child, or fill the human-test plan and point to `/th`, or (all Closed)
-  `/code-review` then Finalise. Do not wait for the quality gate. Do not run
-  `/code-review` here. Load this as soon as /implement tests pass.
+  step: `/t`, `/c -p`, `/cci #<n>`, then auto-chain the next unblocked
+  ready-for-agent child in a new blank Claude Code conversation (fallback:
+  ask the human to open one and `/implement`), or fill the human-test plan
+  and point to `/th`, or (all Closed) `/code-review` then Finalise. Do not
+  wait for the quality gate. Do not run `/code-review` here. Load this as
+  soon as /implement tests pass.
 ---
 
 # Wrap `/implement`
@@ -42,8 +44,18 @@ A remaining ticket is **unblocked** when GitHub reports no open blockers (`issue
 
 **If at least one unblocked `ready-for-agent` child remains:**
 
-- Propose the **next** unblocked child (lowest issue number among unblocked `ready-for-agent`).
-- Ask the user to `/clear` then `/implement #<next>`. Wait. Do not start the next implement in this same compacted window.
+Only reach this block when steps **1–3 succeeded** (tests green, commit+push OK, child closed). Any failure earlier → **stop** here; never auto-chain.
+
+1. Pick the **next** unblocked child (lowest issue number among unblocked `ready-for-agent`). Never the parent. Never a `ready-for-human` child.
+2. In one French sentence, name `#<next>` and quote its `## Blocked by` clause (`vraie dépendance` / `ordre de confort`), so the human sees what would have broken.
+3. **Do not** start `/implement #<next>` inside **this** conversation (keep this session as the finished ticket’s log).
+4. **Auto-chain** (preferred when possible):
+   - From the **repo root**, run **exactly** (do not expand env vars yourself):
+     `bash agents/scripts/enchainer-implement.sh <next>`
+   - That script either (a) runs `$WAP_ENCHAINER <next>` when set — macOS **or** session de l’orchestrateur — or (b) opens a **new** terminal window and a **blank** Claude Code conversation on `/implement #<next>` (macOS Terminal.app, Linux graphical terminal, or Windows `wt`/`cmd`; fresh context, no `/clear` of this chat).
+   - If the script exits 0: tell the human in French that `#<next>` démarre dans une **nouvelle** conversation (Claude locale ou session suivante du runner). **Leave this conversation open** — do not kill this terminal, do not `/clear`, do not wait on the next implement here.
+   - If the script fails (no `claude`, no terminal, `WAP_ENCHAINER` error, etc.): **fallback** — ask the user to open a new Claude session (or cockpit session) and run `/implement #<next>`, and **wait**. Do not pretend the next ticket started.
+5. Never auto-chain on red tests, failed push, refused `/cci`, ambiguous parent/next, or when more than one “next” is unclear — ask and wait instead.
 
 **Else if an open `ready-for-human` human-test child remains** (format: `agents/issue-tracker.md`, *Human-test child*):
 
@@ -75,3 +87,6 @@ A remaining ticket is **unblocked** when GitHub reports no open blockers (`issue
 - Re-implementing Closed children
 - `needs-triage` work that is not a child of this PR
 - A two-axis review vs `main`: only if the human typed `/code-review` this turn
+- Starting the next `/implement` **inside** this same conversation (use `enchainer-implement.sh` or ask for a new Claude session)
+- Killing / `/clear` of the finished conversation (keep it; only open a new one)
+- Auto-chain after any failure in steps 1–3

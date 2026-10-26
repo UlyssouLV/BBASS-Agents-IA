@@ -67,7 +67,7 @@ def test_sans_critere_lit_les_affaires_creees_ces_90_derniers_jours(
     _appeler(client, mistral_client_factice, jeton_valide, {"nb_max": 10})
 
     (recherche,) = _recherches(faux_moduleo)
-    assert recherche["dateCreationMin"] == "2026-07-10"
+    assert recherche["dateCreationMin"] == "10/07/2026"
     contenu = _contenu_outil(mistral_client_factice)
     assert contenu.startswith("2 affaires créées depuis le 10/07/2026, 2 plus récentes affichées")
     assert contenu.index("Affaire 2026-002") < contenu.index("Affaire 2026-001")

@@ -3,6 +3,7 @@ import threading
 from contextlib import contextmanager
 
 import pytest
+from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -22,7 +23,8 @@ from vm_centrale.mistral_client import (
     get_mistral_client,
 )
 from vm_centrale.models import Compte, ComptePole
-from vm_centrale.moduleo.client import get_client_moduleo
+from vm_centrale.moduleo.client import ClientModuleo, get_client_moduleo
+from vm_centrale.moduleo.droits import GROUPE_DEV, charger_catalogue, creer_groupes_dev, rattacher
 from vm_centrale.moteur_recherche import MoteurIndisponible, ResultatRecherche, get_moteur_recherche
 from vm_centrale.outils.lire_pages_web import CONSIGNE_LECTURE_PAGE, CONSIGNE_REVERIFICATION_PAGE
 from vm_centrale.outils.piece_jointe import CONSIGNE_RELECTURE_PIECES_JOINTES
@@ -56,6 +58,25 @@ def _sans_init_db_reel(monkeypatch):
     # mémoire (fixture `db_session`) et ne doivent dépendre d'aucun service
     # externe.
     monkeypatch.setattr("vm_centrale.main.init_db", lambda: None)
+
+
+# Clé Mistral de tous les tests (spec 1.5.1, #186) : chiffrée avec une clé
+# maître temporaire, comme en production, faute de quoi la VM refuse de
+# démarrer. Le .env de vm-centrale/ (load_dotenv dans config.py) ne doit pas
+# fuiter ici : MISTRAL_API_KEY en clair est retirée.
+CLE_API_MISTRAL_DE_TEST = "cle-api-mistral-de-test-0123456789"
+
+
+@pytest.fixture(autouse=True)
+def _cle_mistral_chiffree(monkeypatch, tmp_path_factory):
+    cle_maitre = Fernet.generate_key()
+    fichier_cle_maitre = tmp_path_factory.mktemp("cle_maitre") / "cle_maitre.key"
+    fichier_cle_maitre.write_bytes(cle_maitre)
+    monkeypatch.setenv("VM_CLE_MAITRE_FICHIER", str(fichier_cle_maitre))
+    monkeypatch.setenv(
+        "MISTRAL_API_KEY_CHIFFREE", Fernet(cle_maitre).encrypt(CLE_API_MISTRAL_DE_TEST.encode()).decode()
+    )
+    monkeypatch.delenv("MISTRAL_API_KEY", raising=False)
 
 
 # Usage/pages_processed factices (spec 1.1.3) : ce double ne sert encore
@@ -595,10 +616,21 @@ def client(
 
 
 @pytest.fixture
-def faux_moduleo(client):
-    # Moduléo configuré, servi par le faux de tests/faux_moduleo.py.
+def compte_tous_droits_moduleo(db_session):
+    # Le compte j.dupont rattaché aux groupes « Tous droits (dev) » (spec
+    # 1.5.1) : sans groupe, aucun outil Moduléo ne lui serait proposé.
+    charger_catalogue(db_session)
+    creer_groupes_dev(db_session)
+    rattacher(db_session, "j.dupont", GROUPE_DEV, GROUPE_DEV, None)
+    db_session.commit()
+
+
+@pytest.fixture
+def faux_moduleo(client, compte_tous_droits_moduleo):
+    # Moduléo configuré, servi par le faux de tests/faux_moduleo.py, derrière
+    # le vrai client : le garde des droits passe avant le faux (#188).
     faux = FauxModuleo()
-    app.dependency_overrides[get_client_moduleo] = lambda: faux
+    app.dependency_overrides[get_client_moduleo] = lambda: ClientModuleo(faux)
     return faux
 
 

@@ -1,13 +1,15 @@
-"""Chiffre un secret Moduléo pour le .env de la VM centrale.
+"""Chiffre un secret pour le .env de la VM centrale.
 
-La clé d'API Moduléo et le SecurityCode sont chiffrés (Fernet) dans .env
-(spec 1.5.0, ADR-0017) ; la clé maître est un fichier hors du dépôt, dont le
+La clé d'API Moduléo et le SecurityCode (spec 1.5.0, ADR-0017), puis la clé
+d'API Mistral (spec 1.5.1, ADR-0018), sont chiffrés (Fernet) dans .env avec
+la même clé maître ; celle-ci est un fichier hors du dépôt, dont le
 chemin est VM_CLE_MAITRE_FICHIER. Le script crée la clé maître si le fichier
 n'existe pas (jamais il ne l'écrase : les secrets déjà chiffrés deviendraient
 illisibles), demande le secret sans l'afficher, puis imprime la ligne à coller
 dans .env.
 
 Lancement, depuis vm-centrale/ :
+    python scripts/chiffrer_secret.py MISTRAL_API_KEY_CHIFFREE
     python scripts/chiffrer_secret.py MODULEO_API_KEY_CHIFFREE
     python scripts/chiffrer_secret.py MODULEO_SECURITY_CODE_CHIFFRE
 Le chemin de la clé maître ne vient que de .env : pas d'option en ligne de
@@ -44,7 +46,7 @@ def chiffrer(secret: str, chemin_cle_maitre: Path) -> str:
 
 
 def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(description="Chiffre un secret Moduléo pour .env.")
+    parser = argparse.ArgumentParser(description="Chiffre un secret pour .env.")
     parser.add_argument("variable", help="Nom de la variable .env, ex. MODULEO_API_KEY_CHIFFREE")
     arguments = parser.parse_args(argv)
     chemin = os.environ.get("VM_CLE_MAITRE_FICHIER")

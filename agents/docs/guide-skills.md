@@ -45,6 +45,22 @@ Grill si besoin, **décrit le hook et attend un oui**, puis écrit `agents/hooks
 Bloquer /code-review sauf si l’utilisateur l’a demandé, ou Finalise la version.
 ```
 
+### Lire Moduléo en lecture seule
+
+**Commande :** (aucun `/` — l’agent l’atteint seul)
+
+**Options :** aucune.
+
+**Corps :** inutile ; le skill se charge quand on touche `outils/moduleo/`, `moduleo/client.py` ou `moduleo/droits/`.
+
+Contraint un outil Moduléo : GET via `ClientModuleo.lire(..., droits)`, route classée, refus avant envoi, jamais d’écriture HTTP. Ne se déclenche pas pour le poste, la feuille de route ou un ticket tests humains. Skill `lire-moduleo-en-lecture-seule`.
+
+**Exemple :** (l’agent le lit tout seul sur un `/implement` devis / garde / client)
+
+```
+/implement #189
+```
+
 ### Message de commit
 
 **Commande :** `/mc`
@@ -162,7 +178,7 @@ Fixes #13
 
 **Options :** aucune.
 
-**Corps :** titre + ce que le ticket livre (critères d’acceptation) ; `#parent` si besoin ; éventuellement `Blocked by #n`.
+**Corps :** titre + ce que le ticket livre (critères d’acceptation) ; `#parent` si besoin ; éventuellement `Blocked by #n` **avec** `vraie dépendance : <ce qui casse>` ou `ordre de confort : …` (`agents/issue-tracker.md`). Sans cette phrase : l’agent demande, il n’invente pas.
 
 Crée **un** enfant GitHub (`Part of`, sub-issue, parent bloqué par l’enfant). Corps au format Matt `/to-tickets` : `## What to build` / `## Acceptance criteria` / `## Blocked by` (`agents/issue-tracker.md`). Avant : le ticket tient dans `docs/specs/vX.Y.Z-*.md`. Après : le corps de l’issue parente GitHub = ce fichier ; si une PR ouverte cite déjà le parent, ajoute les `Fixes #n` manquants. Pas de nouvelle PR. Équivalent : « crée un ticket ». Skill `creer-ticket`.
 
@@ -172,7 +188,7 @@ Crée **un** enfant GitHub (`Part of`, sub-issue, parent bloqué par l’enfant)
 /ct #12
 Titre : garde-fou chiffres manquants après reverse
 Le reverse d’un message avec chiffres doit rejouer le garde-fou avant envoi.
-Blocked by #40
+Blocked by #40 — vraie dépendance : sans #40 le reverse n’a pas de garde-fou à rejouer
 ```
 
 ### Créer un bug
@@ -346,7 +362,7 @@ Retire `ready-for-agent` et ferme l’issue. Refuse s’il n’y a pas `Part of`
 
 **Corps :** seulement si la version n’est pas déjà dans le rôle **`roadmap`** — à quoi elle sert (un job).
 
-Grill + spec, puis **`/ob`**, écriture de la spec, **`/c -a -p`**, tickets d’implémentation + **un enfant tests humains** (`ready-for-human` ; chaque enfant : `Part of`, **sub-issue** GitHub pour le compteur Y/Z du parent, `blocked_by`), **`/opr -draft`**, puis propose le premier `/implement` (pas le ticket tests humains). Skill `ouvrir-la-version`.
+Grill + spec, puis **`/ob`**, écriture de la spec, **`/c -a -p`**, tickets d’implémentation + **un enfant tests humains** (`ready-for-human` ; chaque enfant : `Part of`, **sub-issue** GitHub pour le compteur Y/Z du parent, `blocked_by` **avec** `vraie dépendance` / `ordre de confort` — sans inventer d’edge), **`/opr -draft`**, puis propose le premier `/implement` (pas le ticket tests humains). Skill `ouvrir-la-version`.
 
 **Exemple :**
 

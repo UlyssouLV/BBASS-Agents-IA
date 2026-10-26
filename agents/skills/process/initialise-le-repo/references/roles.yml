@@ -6,6 +6,10 @@
 # Tell the user: to continue, run **Créer <name>** (creates the missing
 # file and, if needed, the key here). A listed directory that exists may
 # be empty.
+#
+# Optional roles added only when enabled at /init (or adopter/update flags):
+#   suivi-avancement  — --with-suivi / init o
+#   docs-site         — --with-docs / init o  → docs-site/
 
 roles:
   roadmap:

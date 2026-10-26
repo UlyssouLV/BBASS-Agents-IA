@@ -1,4 +1,6 @@
+import unicodedata
 from collections.abc import Iterable
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 
 from vm_centrale.moduleo.client import LecteurModuleo, ModuleoIntrouvable
@@ -29,6 +31,28 @@ def _uniques(ids: Iterable[int | None]) -> list[int]:
     return sorted({i for i in ids if i})
 
 
+# Lectures simultanées d'une résolution sans route `multi` : une équipe
+# entière ou tous les codes activité ne s'attendent pas un par un.
+_LECTURES_PARALLELES = 16
+
+
+def _lire_chacun(lecteur: LecteurModuleo, route: str, parametre: str, ids: Iterable[int | None]) -> dict[int, dict]:
+    # Pas de route `multi` : une lecture par id, en parallèle. Un id absent
+    # de Moduléo est sauté ; toute autre panne remonte.
+    def lire(id_element: int) -> dict | None:
+        try:
+            return lecteur.lire(route, {parametre: id_element})
+        except ModuleoIntrouvable:
+            return None
+
+    uniques = _uniques(ids)
+    if not uniques:
+        return {}
+    with ThreadPoolExecutor(max_workers=min(len(uniques), _LECTURES_PARALLELES)) as executeur:
+        lus = list(executeur.map(lire, uniques))
+    return {id_element: fiche for id_element, fiche in zip(uniques, lus) if fiche is not None}
+
+
 def _texte(valeur: object) -> str:
     return str(valeur or "").strip()
 
@@ -36,11 +60,8 @@ def _texte(valeur: object) -> str:
 def resoudre_utilisateurs(lecteur: LecteurModuleo, ids: Iterable[int | None]) -> dict[int, Utilisateur]:
     # Pas de route `multi` pour les utilisateurs : une lecture par id.
     utilisateurs = {}
-    for id_utilisateur in _uniques(ids):
-        try:
-            fiche = lecteur.lire("moduleo/utilisateur/{idUtilisateur}", {"idUtilisateur": id_utilisateur})
-        except ModuleoIntrouvable:
-            continue
+    fiches = _lire_chacun(lecteur, "moduleo/utilisateur/{idUtilisateur}", "idUtilisateur", ids)
+    for id_utilisateur, fiche in fiches.items():
         nom = " ".join(part for part in (_texte(fiche.get("Prenom")), _texte(fiche.get("Nom"))) if part)
         utilisateurs[id_utilisateur] = Utilisateur(
             nom=nom,
@@ -152,6 +173,43 @@ def chercher_qualifications(lecteur: LecteurModuleo, noms: list[str]) -> str:
     return ",".join(map(str, dict.fromkeys(ids)))
 
 
+def resoudre_codes_activite(lecteur: LecteurModuleo, ids: Iterable[int | None]) -> dict[int, str]:
+    # Temps passés (#191) : pas de route `multi`, une lecture par code.
+    return {
+        id_code: _nom_code_activite(code)
+        for id_code, code in _lire_chacun(lecteur, _ROUTE_CODE_ACTIVITE, "idCodeActivite", ids).items()
+    }
+
+
+def chercher_code_activite(lecteur: LecteurModuleo, nom: str) -> int:
+    # Codes lus dans Moduléo (#191) : un code créé dans Moduléo est reconnu
+    # sans changer le code. Nom ou code exact (casse indifférente), sinon le
+    # seul qui contient le nom.
+    codes = _lire_chacun(lecteur, _ROUTE_CODE_ACTIVITE, "idCodeActivite", lecteur.lire("cogeo/codeactivite"))
+    cherche = _cle(nom)
+    exacts = [i for i, c in codes.items() if cherche in (_cle(c.get("Nom")), _cle(c.get("Code")))]
+    proches = exacts or [i for i, c in codes.items() if cherche in f"{_cle(c.get('Nom'))} {_cle(c.get('Code'))}"]
+    if not proches:
+        raise NomNonResolu(f"Aucun code activité Moduléo ne correspond à « {nom} » : recherche non lancée.")
+    if len(proches) > 1:
+        noms = sorted(_nom_code_activite(codes[i]) for i in proches[:_CANDIDATS_MAX])
+        raise NomNonResolu(_ambigu("codes activité", nom, noms, len(proches)))
+    return proches[0]
+
+
+_ROUTE_CODE_ACTIVITE = "cogeo/codeactivite/{idCodeActivite}"
+
+
+def _cle(valeur: object) -> str:
+    # Casse et accents indifférents : « releve » trouve « Relevé ».
+    texte = unicodedata.normalize("NFD", _texte(valeur).casefold())
+    return "".join(c for c in texte if not unicodedata.combining(c))
+
+
+def _nom_code_activite(code: dict) -> str:
+    return _texte(code.get("Nom")) or _texte(code.get("Code"))
+
+
 def _essais_utilisateur(nom: str) -> list[dict[str, str]]:
     mots = nom.split()
     if len(mots) == 1:
@@ -178,3 +236,70 @@ def _ambigu(genre: str, nom: str, noms: list[str], total: int) -> str:
         f"Plusieurs {genre} Moduléo correspondent à « {nom} » : {', '.join(noms)}{autres}. "
         "Demande lequel, recherche non lancée."
     )
+
+
+# Planning (#192). Activités lues dans Moduléo (`planning/activite`, toutes
+# en une lecture) : une activité créée dans Moduléo est reconnue sans
+# changer le code. Participants d'une tâche : des utilisateurs planning,
+# chacun lié à un utilisateur Moduléo (`IdUtilisateurModuleo`, confirmé #194).
+_ROUTE_UTILISATEUR_PLANNING = "planning/utilisateurplanning/{idUtilisateurPlanning}"
+
+
+def activites(lecteur: LecteurModuleo) -> dict[int, str]:
+    return {a["IdActivite"]: _texte(a.get("Libelle")) for a in lecteur.lire("planning/activite")}
+
+
+def chercher_activite(lecteur: LecteurModuleo, nom: str) -> int:
+    # Libellé exact (casse et accents indifférents), sinon le seul qui
+    # contient le nom.
+    toutes = activites(lecteur)
+    cherche = _cle(nom)
+    exactes = [i for i, libelle in toutes.items() if _cle(libelle) == cherche]
+    proches = exactes or [i for i, libelle in toutes.items() if cherche in _cle(libelle)]
+    if not proches:
+        raise NomNonResolu(f"Aucune activité Moduléo ne correspond à « {nom} » : recherche non lancée.")
+    if len(proches) > 1:
+        libelles = sorted(toutes[i] for i in proches[:_CANDIDATS_MAX])
+        raise NomNonResolu(_ambigu("activités", nom, libelles, len(proches)))
+    return proches[0]
+
+
+def chercher_participant(lecteur: LecteurModuleo, nom: str) -> int:
+    # Nom → utilisateur Moduléo → son utilisateur planning.
+    return participant_planning(lecteur, chercher_utilisateur(lecteur, nom), nom)
+
+
+def participant_planning(lecteur: LecteurModuleo, id_utilisateur: int, nom: str = "Votre utilisateur Moduléo") -> int:
+    # Utilisateur Moduléo → son utilisateur planning, qui a un autre id
+    # (« mon planning », test humain #195).
+    try:
+        planning = lecteur.lire(
+            "planning/utilisateurplanning/utilisateur/{idUtilisateur}", {"idUtilisateur": id_utilisateur}
+        )
+    except ModuleoIntrouvable:
+        planning = None
+    if not planning:
+        utilisateur = resoudre_utilisateurs(lecteur, [id_utilisateur]).get(id_utilisateur)
+        nom_trouve = utilisateur.nom if utilisateur is not None and utilisateur.nom else nom
+        raise NomNonResolu(f"{nom_trouve} n'est pas au planning Moduléo : recherche non lancée.")
+    return int(planning["IdUtilisateurPlanning"])
+
+
+def resoudre_participants(lecteur: LecteurModuleo, ids: Iterable[int | None]) -> dict[int, str]:
+    # Utilisateur planning → nom de son utilisateur Moduléo ; pas de route
+    # `multi`, une lecture par id.
+    moduleo = _lire_chacun(lecteur, _ROUTE_UTILISATEUR_PLANNING, "idUtilisateurPlanning", ids)
+    utilisateurs = resoudre_utilisateurs(lecteur, [u.get("IdUtilisateurModuleo") for u in moduleo.values()])
+    return {
+        id_planning: utilisateurs[id_utilisateur].nom
+        for id_planning, planning in moduleo.items()
+        if (id_utilisateur := planning.get("IdUtilisateurModuleo")) in utilisateurs
+    }
+
+
+def resoudre_equipements(lecteur: LecteurModuleo, ids: Iterable[int | None]) -> dict[int, str]:
+    # Matériel d'une tâche ; pas de route `multi`, une lecture par id.
+    return {
+        id_equipement: _texte(fiche.get("Libelle"))
+        for id_equipement, fiche in _lire_chacun(lecteur, "moduleo/equipement/{idEquipement}", "idEquipement", ids).items()
+    }

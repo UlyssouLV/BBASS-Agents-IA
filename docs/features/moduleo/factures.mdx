@@ -1,0 +1,39 @@
+# Chercher des factures
+
+Depuis la 1.5.1, `chercher_factures_moduleo` répond à des questions comme :
+
+- « La facture de l’affaire 2024-123 est-elle payée ? »
+- « Qu’est-ce qui reste à payer sur les factures de Martin émises en septembre ? »
+- « Les factures pas encore émises. »
+
+Il n’est proposé qu’aux comptes dont le groupe Moduléo a le droit **« Consulter les factures et les avoirs »**.
+
+## Ce que le modèle peut demander
+
+Combinés en « et » :
+
+- **Un texte** : un mot du numéro ou de l’objet de la facture.
+- **Émise ou non.**
+- **Des dates** d’émission, au plus tôt et au plus tard.
+- **Un service, un responsable, un rédacteur**, par leur nom.
+- **Un numéro d’affaire** : les factures de cette affaire.
+
+Sans aucun critère : les factures **émises ces 30 derniers jours**, et le résultat le dit (« 12 factures émises depuis le 09/09/2026 (30 derniers jours) … »).
+
+## Ce qui revient
+
+En tête, le **nombre** de factures trouvées, leurs **totaux HT et TTC** et leur **reste à payer**, calculés par la VM sur **toutes** les factures trouvées, pas seulement celles affichées : « 7 factures trouvées (responsable Martin), total 8 400,00 € HT, 10 080,00 € TTC, reste à payer 2 400,00 €. Les 5 plus récentes affichées, précise la recherche. »
+
+Puis une **Fiche Moduléo** par facture, les plus récentes d’abord : numéro, objet, affaire, client, dates de création et d’émission (ou « non émise »), responsable, rédacteur, montants HT et TTC, **échéances et règlements** (une ligne par règlement : date, montant, mode, échéance), **reste à payer**.
+
+**5 fiches** par défaut, **10** si le modèle le demande ; les totaux portent toujours sur l’ensemble. Aucune : « Aucune facture Moduléo ne correspond à cette recherche. »
+
+## Un reste à payer jamais estimé
+
+Le reste à payer, c’est le TTC de la facture moins ses règlements. Il n’apparaît **que si Moduléo permet de le déduire** : facture émise, tous ses règlements lus, aucun avoir sur la facture, aucun règlement avec pénalités. Sinon, la fiche n’a pas de ligne « Reste à payer », et le total dit « reste à payer non calculé (avoir ou règlement à vérifier dans Moduléo) ». Au-delà de 50 factures émises, seul le total du reste à payer n’est pas calculé ; chaque fiche affichée garde le sien.
+
+Comme pour les devis, les totaux et le reste à payer viennent de la VM : cités par le modèle, ils restent dans la réponse, avec « Sources : Moduléo, factures (…) » ; un total additionné par le modèle est retiré ([Sources et mémoire](./sources-et-memoire.mdx)).
+
+## À confirmer à l’essai réel
+
+Sens exact du filtre « émise », nature des règlements d’une facture et de leur type, format des dates attendu par l’API.

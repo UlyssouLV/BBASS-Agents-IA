@@ -1,7 +1,9 @@
 ---
 name: creer-release
 description: >-
-  Create a GitHub Release on the current feature-branch SHA (not main).
+  Create a GitHub Release on the current feature-branch SHA (not the
+  integration base). Tag is vX.Y.Z by default, or
+  {release_tag_prefix}X.Y.Z when agents/integration-channel.yml exists.
   Use when the user types `/crel` or says « crée une release », or when
   another skill tells you to run creer-release with vX.Y.Z. Do not squash
   or merge. Not « Finalise la version ».
@@ -9,23 +11,25 @@ description: >-
 
 # Create a GitHub Release
 
-`/` = this skill’s trigger. No hyphen options. Treat `/crel` as a whole token. The rest of the message is the tag (`vX.Y.Z` or `X.Y.Z`) plus optional purpose / notes.
+`/` = this skill’s trigger. No hyphen options. Treat `/crel` as a whole token. The rest of the message is the tag (`vX.Y.Z`, `orchestrator-vX.Y.Z`, or bare `X.Y.Z`) plus optional purpose / notes.
 
-`/crel` **is** permission to `gh release create` **targeting the current branch SHA**. Do not merge. Do not delete the branch. Do not `git commit`. Do not force-push. Do not retag an existing `vX.Y.Z`.
+**Base / tag:** resolve per `agents/docs/integration-channel.md` (*Résolution*). Default **base** = `main`, **tag(X.Y.Z)** = `vX.Y.Z`.
+
+`/crel` **is** permission to `gh release create` **targeting the current branch SHA**. Do not merge. Do not delete the branch. Do not `git commit`. Do not force-push. Do not retag an existing tag.
 
 Paths: **`agents/roles.yml`**.
 
 ## 1. Guards
 
-1. `git branch --show-current` is `main` or `master` → stop.
-2. Tag: from the message, or from the branch name `vX.Y.Z-<slug>`. Normalize to `vX.Y.Z`. If missing: ask and **wait**. Do not invent a bump.
-3. `git fetch`. `git tag -l 'vX.Y.Z'` or `gh release view vX.Y.Z` already exists → stop. Never retag.
+1. `git branch --show-current` is **protected** (base, `main`, `master`) → stop.
+2. Tag: from the message, or from the branch name `vX.Y.Z-<slug>`. Extract semver `X.Y.Z`, then set the Git tag to **tag(X.Y.Z)** (channel prefix or `v`). If the message already has the full prefixed tag, use it as-is when it matches **tag(X.Y.Z)**. If missing: ask and **wait**. Do not invent a bump.
+3. `git fetch`. `git tag -l '<full-tag>'` or `gh release view <full-tag>` already exists → stop. Never retag.
 
 ## 2. Target
 
 Tip of the **current** branch = `HEAD`. If an open PR exists for this branch, `HEAD` must match the PR head. If it does not: stop.
 
-Target = that SHA (or the branch name while it still exists), **not** `main`. Squash would drop this history.
+Target = that SHA (or the branch name while it still exists), **not** **base**. Squash would drop this history.
 
 ## 3. Title
 
@@ -33,7 +37,7 @@ Target = that SHA (or the branch name while it still exists), **not** `main`. Sq
 
 `VX.Y.Z — <purpose>`
 
-Purpose = the rest of the user / caller message after the tag, else the PR title after `VX.Y.Z —`, else the parent spec’s one-job sentence. Do not use a commit-subject dump as the title.
+Purpose = the rest of the user / caller message after the tag, else the PR title after `VX.Y.Z —`, else the parent spec’s one-job sentence. Do not use a commit-subject dump as the title. (Title keeps `VX.Y.Z` for humans; the Git tag may be `orchestrator-vX.Y.Z`.)
 
 ## 4. Notes (body)
 
@@ -61,39 +65,39 @@ Tickets (`Fixes`) : #<parent> #<enfant> …
 
 <what is not in this version if it could be confused>
 
-Spec : https://github.com/<owner>/<repo>/blob/vX.Y.Z/<spec-path>
+Spec : https://github.com/<owner>/<repo>/blob/<full-tag>/<spec-path>
 
-ADRs de cette version (liens **sur ce tag**, pas `main`) :
+ADRs de cette version (liens **sur ce tag**, pas la base) :
 
-- https://github.com/<owner>/<repo>/blob/vX.Y.Z/<adr-path>
+- https://github.com/<owner>/<repo>/blob/<full-tag>/<adr-path>
 
 Issues laissées de côté (PR / spec hors périmètre) : #…
 ```
 
-`<spec-path>` = parent spec under role **`spec`** (usually `docs/specs/…`). Link **on this tag**, not `main`. Always this one-line shape: `Spec : <url>`.
+`<full-tag>` = **tag(X.Y.Z)**. `<spec-path>` = parent spec under role **`spec`**. Always this one-line shape: `Spec : <url>`.
 
 `<adr-path>` = files under role **`adr`**.
 
 ### Fill order
 
 1. Draft from the PR body (`Fixes`, summary), parent spec, and role **`adr`** files added on this branch. If the caller already passed notes, **fit them into these headings** — do not replace the layout with a free-form blob.
-2. **Human-test child (product illustration).** If a Closed child titled **`Tests humains — VX.Y.Z`** exists (see `agents/issue-tracker.md`, *Human-test child*), read its `## Ce qu’on peut faire maintenant` and **merge it into** the release section of the same name (text + Markdown images). Prefer that ticket’s product bullets and screenshots as the primary illustration; keep or add short gaps from the spec/PR only when they are still missing. Do not invent a new top-level heading for preuves.
-3. **Gap pass (commits only to complete, not to rewrite).** Read `git log origin/main..HEAD --oneline` (or the PR commits). Compare to the draft. Add only what is **missing** from the notes and useful to a human: a real capability the spec/PR omitted, or a bugfix beyond the parent `Fixes`. Fold each gap into the existing headings — usually **Ce qu’on peut faire maintenant** (product wording) or **Historique des tickets** (extra `#n` if a ticket exists). Do **not** paste commit subjects, hashes, or a « changelog commits » section. Do **not** duplicate points already covered by the spec/PR or the human-test section. Skip chore / noise (typos, lockfile-only, WIP) unless they change what a user can do.
+2. **Human-test child (product illustration).** If a Closed child titled **`Tests humains — VX.Y.Z`** exists (see `agents/issue-tracker.md`, *Human-test child*), read its `## Ce qu’on peut faire maintenant` and **merge it into** the release section of the same name (text + Markdown images). Prefer that ticket’s product bullets and screenshots as the primary illustration; keep or add short gaps from the spec/PR only when they are still missing. Keep the pairing: each bullet **immediately followed by its proof screenshot** (blank line, image indented under the bullet), one image per sentence; never a block of images after the list. A gap without a screenshot is folded into the closest bullet's sentence or stays text-only. Do not invent a new top-level heading for preuves.
+3. **Gap pass (commits only to complete, not to rewrite).** Read `git log origin/<base>..HEAD --oneline` (or the PR commits). Compare to the draft. Add only what is **missing** from the notes and useful to a human: a real capability the spec/PR omitted, or a bugfix beyond the parent `Fixes`. Fold each gap into the existing headings — usually **Ce qu’on peut faire maintenant** (product wording) or **Historique des tickets** (extra `#n` if a ticket exists). Do **not** paste commit subjects, hashes, or a « changelog commits » section. Do **not** duplicate points already covered by the spec/PR or the human-test section. Skip chore / noise (typos, lockfile-only, WIP) unless they change what a user can do.
 
 Owner/repo from `git remote`. PR number from `gh pr view` for this branch.
 
 ## 5. Create
 
 ```bash
-gh release create vX.Y.Z --target <sha-or-branch> --title "VX.Y.Z — <purpose>" --notes "$(cat <<'EOF'
+gh release create <full-tag> --target <sha-or-branch> --title "VX.Y.Z — <purpose>" --notes "$(cat <<'EOF'
 <notes markdown>
 EOF
 )"
 ```
 
-The tag must be **pushed** and the release **visible** before any squash. After the branch is deleted, `git log vX.Y.Z` still shows the development commits.
+The tag must be **pushed** and the release **visible** before any squash. After the branch is deleted, `git log <full-tag>` still shows the development commits.
 
-Done when GitHub shows the release with that title, that body, and the tag on the feature SHA. Reply with the tag and URL.
+Done when GitHub shows the release with that title, that body, and the tag on the feature SHA. Reply with the full tag and URL.
 
 ## Not this skill
 

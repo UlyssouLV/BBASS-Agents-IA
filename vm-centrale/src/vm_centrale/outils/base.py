@@ -4,7 +4,8 @@ from dataclasses import dataclass, field
 from sqlalchemy.orm import Session
 
 from vm_centrale.mistral_client import MistralClient, Usage
-from vm_centrale.moduleo.client import LecteurModuleo
+from vm_centrale.moduleo.client import ClientModuleo
+from vm_centrale.moduleo.droits import AUCUN_DROIT, DroitsModuleo
 from vm_centrale.moteur_recherche import MoteurRecherche
 from vm_centrale.statut_tour import Publier, ne_rien_publier
 from vm_centrale.telechargement_pages import TelechargeurPages
@@ -38,7 +39,11 @@ class ContexteTour:
     publier: Publier = ne_rien_publier
     # None sans config Moduléo (spec 1.5.0, #173) : les outils Moduléo ne
     # sont alors pas proposés.
-    client_moduleo: LecteurModuleo | None = None
+    client_moduleo: ClientModuleo | None = None
+    # Droits Moduléo du compte, lus une fois pour le tour (spec 1.5.1) ;
+    # sans rattachement, aucun outil Moduléo n'est proposé. Chaque lecture
+    # les présente au garde des droits du client (#188).
+    droits_moduleo: DroitsModuleo = AUCUN_DROIT
     # Noms des outils appelés pendant ce tour, dans l'ordre (#182) : après
     # un appel Moduléo, la phrase fixe parle de Moduléo.
     outils_appeles: list[str] = field(default_factory=list)

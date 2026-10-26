@@ -8,7 +8,9 @@ Pour lire Moduléo, la VM centrale a besoin de **deux secrets** venus de Modulé
 | --- | --- | --- |
 | **Clé d’API** | Le compte administrateur, dans Moduléo | Autorise un logiciel tiers (BBASS) à interroger l’API. Se restreint par utilisateurs, par adresses IP et par catégories (Affaire, Contact, Utilisateur…), chacune en lecture ou en lecture et écriture. BBASS : **lecture seule**. |
 | **Code de sécurité** (SecurityCode) | Moduléo, pour chaque utilisateur autorisé sur la clé | Dit **quel utilisateur** lit. Personnel, ce n’est **pas** son mot de passe. |
-| **Clé maître** | Le script `chiffrer_secret.py`, sur la VM | Chiffre et déchiffre les deux secrets ci-dessus. N’existe que dans BBASS. |
+| **Clé maître** | Le script `chiffrer_secret.py`, sur la VM | Chiffre et déchiffre les deux secrets ci-dessus, et la clé d’API Mistral. N’existe que dans BBASS. |
+
+Depuis la 1.5.1, la **clé d’API Mistral** est chiffrée de la même façon, avec la même clé maître (`MISTRAL_API_KEY_CHIFFREE`). La clé maître est donc **obligatoire** : sans elle, la VM ne démarre pas.
 
 ## Le code de sécurité
 
@@ -20,7 +22,7 @@ Si le renouvellement périodique du code est activé sur la clé, le code change
 
 ## La clé maître
 
-La clé d’API et le code de sécurité ne sont jamais écrits en clair. Ils sont **chiffrés** (Fernet) dans `vm-centrale/.env`. La clé maître est le petit fichier qui sert à les chiffrer, puis à les déchiffrer au démarrage de la VM.
+La clé d’API, le code de sécurité et la clé Mistral ne sont jamais écrits en clair. Ils sont **chiffrés** (Fernet) dans `vm-centrale/.env`. La clé maître est le petit fichier qui sert à les chiffrer, puis à les déchiffrer au démarrage de la VM.
 
 Elle vit **dans un fichier séparé, hors du dépôt**. `.env` ne contient que son chemin, `VM_CLE_MAITRE_FICHIER`. Ainsi, un `.env` qui fuit (capture d’écran, ticket, sauvegarde) ne livre que des valeurs illisibles. Il faut les deux fichiers pour lire Moduléo.
 
@@ -48,8 +50,12 @@ Aujourd’hui, la clé maître est un fichier sur la VM. En production (1.7.0) :
    ```
    .venv\Scripts\python scripts\chiffrer_secret.py MODULEO_SECURITY_CODE_CHIFFRE
    ```
-4. Effacer toute copie en clair des deux secrets.
-5. Relancer la VM : la config est lue au démarrage.
+4. Même chose pour la clé d’API Mistral (`MISTRAL_API_KEY` en clair n’est plus lue) :
+   ```
+   .venv\Scripts\python scripts\chiffrer_secret.py MISTRAL_API_KEY_CHIFFREE
+   ```
+5. Effacer toute copie en clair des trois secrets.
+6. Relancer la VM : la config est lue au démarrage.
 
 Le script ne lit le chemin de la clé maître que dans `VM_CLE_MAITRE_FICHIER`. Changer de serveur Moduléo ou de clé ne touche que `.env`.
 
@@ -57,7 +63,11 @@ Le script ne lit le chemin de la clé maître que dans `VM_CLE_MAITRE_FICHIER`. 
 
 <SchemaFlux variante="demarrage" />
 
-Une variable vide, une clé maître absente ou fausse, un secret qui ne se déchiffre pas : la VM démarre quand même, sans les outils Moduléo. Son journal nomme la variable en cause, jamais une valeur :
+La VM déchiffre d’abord la clé Mistral. `MISTRAL_API_KEY_CHIFFREE` ou `VM_CLE_MAITRE_FICHIER` vide, clé maître absente ou fausse, clé qui ne se déchiffre pas : la VM **refuse de démarrer**. Le message nomme la variable en cause, jamais une valeur :
+
+« CleMistralInutilisable: MISTRAL_API_KEY_CHIFFREE ne se déchiffre pas avec la clé maître de VM_CLE_MAITRE_FICHIER. »
+
+Un secret Moduléo vide ou qui ne se déchiffre pas, lui, n’empêche pas le démarrage : la VM démarre sans les outils Moduléo. Son journal nomme la variable en cause, jamais une valeur :
 
 « Moduléo non configuré : MODULEO_SECURITY_CODE_CHIFFRE ne se déchiffre pas avec la clé maître … »
 

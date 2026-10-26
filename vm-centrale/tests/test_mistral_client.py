@@ -1,9 +1,13 @@
 import pytest
 
+from conftest import CLE_API_MISTRAL_DE_TEST
+
 from vm_centrale import mistral_client as mistral_client_module
 from vm_centrale.mistral_client import ErreurAppelMistral, MistralClient
 
-_CLE_API = "cle-secrete-ne-doit-jamais-fuiter"
+# Clé chiffrée par la fixture `_cle_mistral_chiffree` du conftest (spec
+# 1.5.1) : l'en-tête Authorization porte la clé déchiffrée.
+_CLE_API = CLE_API_MISTRAL_DE_TEST
 
 
 class _ReponseHttpFactice:
@@ -15,11 +19,6 @@ class _ReponseHttpFactice:
 
     def json(self) -> dict:
         return self._corps
-
-
-@pytest.fixture(autouse=True)
-def _cle_api(monkeypatch):
-    monkeypatch.setenv("MISTRAL_API_KEY", _CLE_API)
 
 
 def test_chat_payload_envoye_et_reponse_brute_ne_contiennent_jamais_la_cle_api(monkeypatch):

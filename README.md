@@ -2,12 +2,11 @@
   <img src="docs/img/readme-banniere.jpg" alt="BBASS Agents IA" width="480" />
 </p>
 
-<!-- sync:stats-commits -->
+<!-- Compteurs publiés avec le site de doc (Deploy docs) : aucun commit de bot. -->
 <p align="center">
-  <img src="https://img.shields.io/badge/commits_main-28-c8102e?style=for-the-badge" alt="28 commits sur main" />
-  <img src="https://img.shields.io/badge/commits_PR_(historique)-277-1e3a5f?style=for-the-badge" alt="277 commits dans les PR mergées" />
+  <img src="https://img.shields.io/endpoint?style=for-the-badge&url=https%3A%2F%2Fulyssoulv.github.io%2FBBASS-Agents-IA%2Fstats%2Fcommits-main.json" alt="Commits sur main" />
+  <img src="https://img.shields.io/endpoint?style=for-the-badge&url=https%3A%2F%2Fulyssoulv.github.io%2FBBASS-Agents-IA%2Fstats%2Fcommits-pr.json" alt="Commits dans les PR mergées" />
 </p>
-<!-- /sync:stats-commits -->
 
 # Un copilote multi-agents pour le cabinet
 
@@ -155,20 +154,17 @@ class node_collaborateur,node_mistral,node_searxng toneIndigo
 ```
 <!-- /sync:vue-systeme-mermaid -->
 
-## Semaine du 05 au 09 octobre 2026
+## Semaine du 26 au 30 octobre 2026
 
-**V1.5.0** livrée le 08/10 (Moduléo en lecture seule depuis le chat), puis **V1.5.1** (lecture de plus de données Moduléo) et **V1.5.2** (écriture Moduléo, dès que Kipaware aura confirmé un serveur de test). **V1.4.0** livrée le 06/10 (recherche web ; bug connu [#131](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/131) → **1.4.5**), **V1.4.1** livrée le 06/10 (mémoire de la conversation), **V1.4.2** livrée le 07/10 (contexte en vrais tokens), **V1.4.3** livrée le 07/10 (cache des pages web, relecture forcée), **V1.4.4** livrée le 07/10 (statut d’attente en direct pendant une réponse). Vendredi 9 : RTT.
+**V1.5.1 livrée** (lire plus de données Moduléo depuis le chat — devis, factures, temps passés, planning, parcelles ; droits par groupe Cogeo / Planning ; clé Mistral chiffrée). Suite sur la feuille de route : **V1.5.2** (écriture Moduléo sur le serveur de test Kipaware), **V1.5.3** (admin des groupes et droits Moduléo), **V1.6.x** (versions vérifiées, mise à jour de la VM, installation des postes), **V1.8.0** (workflows n8n), **V1.9.0** (pièces jointes approfondies).
 
 ```mermaid
 flowchart LR
-  L05["Lundi 5<br/>V1.2.3, V1.3.0 et V1.3.1 livrées"] --> V140["V1.4.0<br/>recherche web<br/>livrée le 06/10"]
-  V140 --> V141["V1.4.1<br/>mémoire de la conversation<br/>livrée le 06/10"]
-  V141 --> V142["V1.4.2<br/>contexte en vrais tokens<br/>livrée le 07/10"]
-  V142 --> V143["V1.4.3<br/>cache des pages web<br/>livrée le 07/10"]
-  V143 --> V144["V1.4.4<br/>statut d’attente en direct<br/>livrée le 07/10"]
-  V144 --> V150["V1.5.0<br/>Moduléo lecture<br/>livrée le 08/10"]
-  V150 --> V151["V1.5.1<br/>plus de lectures Moduléo"]
-  V151 --> V152["V1.5.2<br/>écriture Moduléo<br/>si serveur de test"]
+  V151["V1.5.1<br/>plus de lectures Moduléo<br/>livrée"] --> V152["V1.5.2<br/>écriture Moduléo<br/>serveur de test"]
+  V152 --> V153["V1.5.3<br/>admin groupes / droits"]
+  V153 --> V16x["V1.6.x<br/>livraison VM et postes"]
+  V16x --> V180["V1.8.0<br/>workflows n8n"]
+  V180 --> V190["V1.9.0<br/>pièces jointes approfondies"]
 ```
 
 ### Travail réalisé
@@ -201,6 +197,8 @@ Après avoir installé les prérequis ci-dessus (Python 3.11, Docker Desktop ins
 
 Les deux jeux de scripts sont autonomes : au besoin, ils installent [uv](https://docs.astral.sh/uv/) s’il manque ([ADR-0011](docs/adr/0011-gestion-dependances-python-avec-uv.md)), créent les environnements virtuels (`vm-centrale/.venv`, et `poste/.venv` pour `lancer-logiciel.*`), installent les dépendances (`uv sync`, versions figées par `uv.lock`) et créent les fichiers `.env` manquants à partir des `.env.example` correspondants (racine, `vm-centrale/`, `poste/`). Rien de manuel à faire au premier clone, ni après un `git pull` qui modifie un `pyproject.toml`/`uv.lock`. La logique commune aux deux scripts d'une même plateforme vit dans `scripts/` (`*.bat` pour Windows, `*.sh` pour macOS) afin d'éviter deux copies divergentes.
 
-Pour un vrai chat (pas seulement le compte de test), colle ta clé API Mistral dans `MISTRAL_API_KEY` du fichier `vm-centrale/.env` — jamais dans Git.
+Avant le premier lancement, chiffre ta clé API Mistral : renseigne `VM_CLE_MAITRE_FICHIER` (chemin de la clé maître, hors du dépôt) dans `vm-centrale/.env`, puis, depuis `vm-centrale/`, lance `.venv/bin/python scripts/chiffrer_secret.py MISTRAL_API_KEY_CHIFFREE` (Windows : `.venv\Scripts\python`) et colle la ligne imprimée dans `.env`. Sans clé utilisable, la VM refuse de démarrer et nomme la variable en cause. `MISTRAL_API_KEY` en clair n'est plus lue ; jamais de clé dans Git. Détails : [configuration](docs/features/moduleo/configuration.mdx).
+
+Les outils Moduléo ne sont proposés qu'aux comptes rattachés à un groupe Moduléo (1.5.1) ; être compte administrateur n'en donne aucun. Sans groupe, aucun outil Moduléo ; sans un droit (ex. factures), l'outil est absent du payload et le garde renvoie une phrase fixe. Depuis `vm-centrale/`, `.venv/bin/python scripts/affecter_groupes_moduleo.py j.dupont --cogeo Admin --planning Admin --utilisateur "Jean Dupont"` rattache un compte au groupe Admin et à son utilisateur Moduléo (nom résolu dans Moduléo) ; `--groupe-dev --cogeo "Tous droits (dev)" --planning "Tous droits (dev)"` pour un poste de dev. Essai réel 1.5.1 (#194) : filtres de dates en JJ/MM/AAAA (ISO ignoré), reste à payer confirmé, états de devis relevés — détail dans [`moduleo/README.md`](vm-centrale/src/vm_centrale/moduleo/README.md) et les README des outils.
 
 Fermer les fenêtres arrête les processus correspondants (PostgreSQL et SearXNG continuent de tourner en arrière-plan tant que `docker compose down` n'a pas été lancé). La VM trouve SearXNG via `VM_CENTRALE_SEARXNG_URL` (`vm-centrale/.env`, `http://localhost:8888` par défaut) ; s'il ne répond pas, le chat fonctionne et l'IA indique que la recherche est indisponible. Les `.env` (racine, `vm-centrale/`, `poste/`) portent des identifiants/secrets locaux — ne jamais les commiter (déjà dans `.gitignore`).

@@ -1,0 +1,37 @@
+# Chercher des devis
+
+Depuis la 1.5.1, `chercher_devis_moduleo` répond à des questions comme :
+
+- « Où en est le devis de l’affaire 2024-123 ? »
+- « Quels devis Martin a-t-il émis en septembre, et pour combien ? »
+- « Les devis pas encore émis. »
+
+Il n’est proposé qu’aux comptes dont le groupe Moduléo a le droit **« Consulter les devis »**.
+
+## Ce que le modèle peut demander
+
+Combinés en « et » :
+
+- **Un texte** : un mot du numéro ou de l’objet du devis.
+- **Émis ou non.**
+- **Des dates** d’émission ou de réponse, au plus tôt et au plus tard.
+- **Un service, un responsable, un rédacteur**, par leur nom.
+- **Un numéro d’affaire** : les devis de cette affaire.
+
+Sans aucun critère : les devis **émis ces 30 derniers jours**, et le résultat le dit (« 12 devis émis depuis le 09/09/2026 (30 derniers jours) … »).
+
+## Ce qui revient
+
+En tête, le **nombre** de devis trouvés et leurs **totaux HT et TTC**, calculés par la VM sur **tous** les devis trouvés, pas seulement ceux affichés : « 7 devis trouvés (responsable Martin), total 8 400,00 € HT, 10 080,00 € TTC. Les 5 plus récents affichés, précise la recherche. »
+
+Puis une **Fiche Moduléo** par devis, les plus récents d’abord : numéro, objet, affaire, client de l’affaire, dates de création, d’émission (ou « non émis »), de réponse et d’expiration, état, responsable, rédacteur, montants HT et TTC.
+
+**5 fiches** par défaut, **10** si le modèle le demande ; les totaux portent toujours sur l’ensemble. Aucun : « Aucun devis Moduléo ne correspond à cette recherche. »
+
+## Pourquoi les totaux viennent de la VM
+
+Un total additionné par le modèle ne figure dans aucune fiche : le garde-fou chiffres le retirerait ([Sources et mémoire](./sources-et-memoire.mdx)). Les totaux de la VM sont une lecture à part entière : cités par le modèle, ils restent dans la réponse, avec « Sources : Moduléo, devis (…) ».
+
+## À confirmer à l’essai réel
+
+Valeurs de l’état d’un devis (affiché en chiffre d’ici là), sens exact du filtre « émis », format des dates attendu par l’API.

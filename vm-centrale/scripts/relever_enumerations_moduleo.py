@@ -17,8 +17,9 @@ Reporter la correspondance dans `vm_centrale/moduleo/enumerations.py` et
 
 from collections import Counter
 
-from vm_centrale.moduleo.client import ClientModuleo, ErreurModuleo
+from vm_centrale.moduleo.client import ClientModuleo, ErreurModuleo, LecteurModuleo, TransportHttp
 from vm_centrale.moduleo.configuration import config_moduleo
+from vm_centrale.moduleo.droits import DroitsModuleo, chemin
 from vm_centrale.moduleo.routes import ROUTES_GET
 
 _ROUTE_AFFAIRES = next(route for route in ROUTES_GET if route.startswith("cogeo/affaire?texte="))
@@ -44,10 +45,15 @@ _TYPES = {
 }
 # Éléments lus par nom : assez pour voir si l'entier est constant.
 _ECHANTILLON = 5
+# Ce que le script lit, présenté au garde des droits (#188) : lancé par un
+# administrateur sur la VM, il n'est le compte de personne.
+_DROITS_DU_SCRIPT = DroitsModuleo(
+    groupe_cogeo="(script)", droits=frozenset({chemin("Contacts", "Rechercher des contacts")})
+)
 
 
 def _relever(
-    client: ClientModuleo, candidats: dict, route_ids: str, filtre: str, nb: str, route_multi: str, champ: str
+    client: LecteurModuleo, candidats: dict, route_ids: str, filtre: str, nb: str, route_multi: str, champ: str
 ) -> None:
     sans_filtre = client.lire(route_ids, {nb: _ECHANTILLON})
     for affiche, noms in candidats.items():
@@ -73,7 +79,7 @@ def main() -> None:
     config = config_moduleo()
     if config is None:
         raise SystemExit("Moduléo non configuré : voir les avertissements ci-dessus.")
-    client = ClientModuleo(config.url, config.api_key, config.security_code)
+    client = ClientModuleo(TransportHttp(config.url, config.api_key, config.security_code)).pour(_DROITS_DU_SCRIPT)
     print("États d'affaire (cogeo/affaire?etatAffaire=…) :")
     _relever(client, _ETATS, _ROUTE_AFFAIRES, "etatAffaire", "nbMaxResultats", "cogeo/affaire/multi?ids={ids}", "Etat")
     print("Types de contact (cogeo/contact?typeContact=…) :")

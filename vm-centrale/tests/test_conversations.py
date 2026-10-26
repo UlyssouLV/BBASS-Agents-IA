@@ -1041,32 +1041,6 @@ def test_envoyer_message_echec_mistral_ne_revele_jamais_la_cle_api(
     assert "sk-secrete-cle-api-mistral" not in reponse.text
 
 
-def test_cle_api_manquante_retourne_une_erreur_propre_et_pas_un_plantage(
-    db_session, fabrique_session, monkeypatch
-):
-    monkeypatch.delenv("MISTRAL_API_KEY", raising=False)
-
-    def override_get_db():
-        yield db_session
-
-    jeton_store = JetonStore(db_session)
-    jeton = jeton_store.emettre("j.dupont")
-
-    app.dependency_overrides[get_db] = override_get_db
-    app.dependency_overrides[get_jeton_store] = lambda: jeton_store
-    app.dependency_overrides[get_fabrique_session] = lambda: fabrique_session
-    try:
-        with TestClient(app) as test_client:
-            reponse = test_client.post(
-                "/conversations", json={"message": "Bonjour"}, headers=_autorisation(jeton)
-            )
-    finally:
-        app.dependency_overrides.clear()
-
-    assert erreur(reponse)["status"] == 502
-    assert "MISTRAL_API_KEY" not in reponse.text
-
-
 # Garde-fou URL (spec 1.3.1) : le modèle n'a aucun accès à Internet, toute
 # URL que le compte n'a pas lui-même écrite dans la conversation est
 # inventée.

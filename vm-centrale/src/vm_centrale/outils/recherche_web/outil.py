@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timedelta, timezone
@@ -35,6 +36,16 @@ _RECHERCHE_INDISPONIBLE = (
 _AUCUN_RESULTAT = (
     "Aucun résultat pour cette recherche. Reformule la requête, ou réponds sans "
     "résultat de recherche et sans lien."
+)
+# Référence interne au format Moduléo (#199, test humain #195 : « devis
+# 202610-31284 état 2026 » est parti vers SearXNG) : numéro de devis ou de
+# facture `AAAAMM-N…`, numéro d'affaire `AAAA-N…`. Jamais une période
+# (« 2024-2025 », « 2025-26 »), écartée par _est_une_periode.
+_MOTIF_REFERENCE_INTERNE = re.compile(r"(?<![\w-])((?:19|20)\d{2})(0[1-9]|1[0-2])?-(\d{2,})(?![\w-])")
+_REFERENCE_INTERNE = (
+    "Recherche non envoyée : la requête contient une référence interne du cabinet "
+    "(numéro de devis, de facture ou d'affaire). C'est une donnée interne, non "
+    "consultable sur le web : ne la cherche jamais sur Internet."
 )
 # Portée d'un fait, dans chaque consigne qui lit une page (extraction,
 # lire_pages_web) : au test humain 1.4.3 (conversation 103, #160), « 6 à
@@ -399,12 +410,31 @@ def _enregistrer_questions(
     contexte.db.flush()
 
 
+def _est_une_periode(annee: str, mois: str | None, suite: str) -> bool:
+    # « 2024-2025 » ou « 2025-26 » : l'année suivante, en entier ou en deux
+    # chiffres.
+    suivante = str(int(annee) + 1)
+    return mois is None and suite in (suivante, suivante[2:])
+
+
+def _reference_interne(requete: str) -> str | None:
+    for trouvee in _MOTIF_REFERENCE_INTERNE.finditer(requete):
+        if not _est_une_periode(*trouvee.groups()):
+            return trouvee.group(0)
+    return None
+
+
 def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
     # `besoin` ne part jamais vers le moteur (ADR-0013) : il ne va qu'à
     # l'appel d'extraction.
     requete = str(arguments.get("requete") or "").strip()
     if not requete:
         return ResultatOutil(_AUCUN_RESULTAT, trace={"resultats": []})
+    reference = _reference_interne(requete)
+    if reference is not None:
+        # Pour tout compte, rattaché ou non : la requête refusée reste dans
+        # l'échange local d'inspecteur (arguments), jamais chez le moteur.
+        return ResultatOutil(_REFERENCE_INTERNE, trace={"refusee": f"référence interne : {reference}"})
     contexte.publier(recherche_web(requete))
     try:
         resultats = contexte.moteur_recherche.rechercher(requete)[:_NOMBRE_RESULTATS]

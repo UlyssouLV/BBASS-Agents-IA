@@ -5,7 +5,7 @@ import re
 from bisect import bisect_right
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
@@ -25,6 +25,7 @@ from vm_centrale.config import (
 )
 from vm_centrale.consommation import enregistrer_consommation
 from vm_centrale.database import FabriqueSession, get_db, get_fabrique_session
+from vm_centrale.dates import date_du_jour
 from vm_centrale.garde_fous import (
     PHRASE_CONTACT_NON_LU,
     LectureSource,
@@ -69,7 +70,8 @@ from vm_centrale.lectures_outils import (
     rattacher_lectures_au_message,
     supprimer_lectures,
 )
-from vm_centrale.moduleo.client import LecteurModuleo, get_client_moduleo
+from vm_centrale.moduleo.client import ClientModuleo, get_client_moduleo
+from vm_centrale.moduleo.droits import SANS_AUCUN_GROUPE, droits_du_compte
 from vm_centrale.moteur_recherche import MoteurRecherche, get_moteur_recherche
 from vm_centrale.questions_couvertes import (
     AppelQuestionsPieceJointe,
@@ -229,7 +231,7 @@ _PROMPT_STYLE = (
 
 
 def _date_du_jour() -> date:
-    return datetime.now(timezone.utc).date()
+    return date_du_jour()
 
 
 def _consigne_date_du_jour() -> str:
@@ -237,9 +239,20 @@ def _consigne_date_du_jour() -> str:
     # conversation 87) : sans elle, mistral-small-latest traduisait
     # « dernières annonces » par les années de sa mémoire (« 2024 2025 »)
     # dans la requête de rechercher_web.
+    # Jour de la semaine et bornes lundi–dimanche (#200, test humain #195
+    # scénario 4) : avec la seule date ISO, « la semaine dernière » le lundi
+    # 26/10/2026 devenait les sept derniers jours. Bornes de la semaine
+    # dernière données toutes calculées (rejeu #195) : le modèle les
+    # calculait faux (« du lundi 20 au dimanche 26 octobre »).
     aujourdhui = _date_du_jour()
     return (
-        f"Date du jour : {aujourdhui.isoformat()}. Pour une actualité ou une "
+        f"Date du jour : {_en_lettres(aujourdhui)} ({aujourdhui.isoformat()}). "
+        f"Semaine en cours : {_bornes_en_lettres(*_semaine_en_cours())}. "
+        f"Semaine dernière : {_bornes_en_lettres(*_semaine_derniere())}. Une "
+        "semaine va du lundi au dimanche : « cette semaine » est la semaine en "
+        "cours, « la semaine dernière » celle d'avant, avec ces dates exactes, "
+        "sans les recalculer, et un jour nommé seul (« mercredi ») celui de la "
+        "semaine en cours. Pour une actualité ou une "
         "information récente, mets l'année "
         f"{aujourdhui.year} dans la requête de rechercher_web, jamais une année "
         "plus ancienne de ta mémoire ; pour un texte déjà nommé (article de "
@@ -247,10 +260,31 @@ def _consigne_date_du_jour() -> str:
     )
 
 
+_JOURS = ("lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche")
 _MOIS = (
     "janvier", "février", "mars", "avril", "mai", "juin",
     "juillet", "août", "septembre", "octobre", "novembre", "décembre",
 )
+
+
+def _semaine_en_cours() -> tuple[date, date]:
+    aujourdhui = _date_du_jour()
+    lundi = aujourdhui - timedelta(days=aujourdhui.weekday())
+    return lundi, lundi + timedelta(days=6)
+
+
+def _semaine_derniere() -> tuple[date, date]:
+    lundi, dimanche = _semaine_en_cours()
+    return lundi - timedelta(days=7), dimanche - timedelta(days=7)
+
+
+def _bornes_en_lettres(lundi: date, dimanche: date) -> str:
+    return f"du {_en_lettres(lundi)} ({lundi.isoformat()}) au {_en_lettres(dimanche)} ({dimanche.isoformat()})"
+
+
+def _en_lettres(jour: date) -> str:
+    quantieme = "1er" if jour.day == 1 else str(jour.day)
+    return f"{_JOURS[jour.weekday()]} {quantieme} {_MOIS[jour.month - 1]} {jour.year}"
 
 
 def _annee_du_jour_source() -> str:
@@ -261,16 +295,45 @@ def _annee_du_jour_source() -> str:
     return str(_date_du_jour().year)
 
 
-def _date_du_jour_ecrite() -> re.Pattern[str]:
-    # La date du jour en lettres dans la réponse (« 15 octobre », « 1er
-    # octobre 2026 ») : ses chiffres ne sont pas contrôlés, le jour seul l'est.
-    aujourdhui = _date_du_jour()
-    jour = "1(?:er)?" if aujourdhui.day == 1 else str(aujourdhui.day)
-    return re.compile(rf"(?<!\d){jour}\s+{_MOIS[aujourdhui.month - 1]}(?:\s+{aujourdhui.year})?\b", re.IGNORECASE)
+def _dates_de_la_consigne_ecrites() -> list[re.Pattern[str]]:
+    # La date du jour et les bornes de la semaine en cours et de la semaine
+    # dernière (#200), écrites dans la réponse (« 15 octobre », « lundi 26 »,
+    # « 1er novembre 2026 », « 26/10/2026 ») : leurs chiffres ne sont pas
+    # contrôlés, le quantième seul l'est.
+    return [
+        _date_ecrite(jour) for jour in {_date_du_jour(), *_semaine_en_cours(), *_semaine_derniere()}
+    ]
+
+
+def _date_ecrite(jour: date) -> re.Pattern[str]:
+    quantieme = "1(?:er)?" if jour.day == 1 else str(jour.day)
+    en_lettres = (
+        rf"(?:{_JOURS[jour.weekday()]}\s+{quantieme}(?:\s+{_MOIS[jour.month - 1]})?"
+        rf"|{quantieme}\s+{_MOIS[jour.month - 1]})(?:\s+{jour.year})?\b"
+    )
+    en_chiffres = rf"0?{jour.day}/0?{jour.month}(?:/{jour.year})?(?!\d)"
+    return re.compile(rf"(?<![\d/])(?:{en_lettres}|{en_chiffres})", re.IGNORECASE)
 
 
 def _message_systeme_style() -> dict[str, str]:
     return {"role": "system", "content": f"{_PROMPT_STYLE}\n{_consigne_date_du_jour()}"}
+
+
+# Compte sans groupe Moduléo, config présente (#199, test humain #195
+# scénario 7) : sans outil Moduléo, le modèle cherchait le devis sur le web
+# puis répondait « aucune information en ligne », un refus pris pour une
+# absence de données. rechercher_web refuse en plus toute référence
+# interne, pour tout compte.
+_MESSAGE_MODULEO_FERME = {
+    "role": "system",
+    "content": (
+        "Moduléo est fermé à ce compte. Pour toute donnée Moduléo (devis, facture, "
+        "affaire, temps passés, planning, parcelle, contact du cabinet), réponds "
+        f"exactement : « {SANS_AUCUN_GROUPE} » N'appelle jamais rechercher_web avec "
+        "une référence interne (numéro de devis, de facture ou d'affaire). La "
+        "recherche web reste ouverte pour le reste."
+    ),
+}
 
 
 def _prompt_titrage(message_utilisateur: str, reponse_assistant: str) -> str:
@@ -488,6 +551,7 @@ def _construire_messages_pour_mistral(
     profil_travail: str,
     piece_jointe: PieceJointe | None = None,
     memoire: str | None = None,
+    moduleo_ferme: bool = False,
 ) -> list[dict[str, str]]:
     # Historique borné (résumé glissant + fenêtre courte) plutôt que
     # l'intégralité de la conversation, pour maîtriser le coût en tokens
@@ -502,6 +566,8 @@ def _construire_messages_pour_mistral(
     # ce même builder avec une liste vide et une chaîne vide plutôt que de
     # dupliquer l'assemblage [style, pièce jointe ?, user].
     messages: list[dict[str, str]] = [_message_systeme_style()]
+    if moduleo_ferme:
+        messages.append(_MESSAGE_MODULEO_FERME)
     if resume_contexte:
         messages.append({"role": "system", "content": resume_contexte})
     if profil_travail:
@@ -741,7 +807,7 @@ def _appliquer_garde_fous(
     # Une fiche lue par un outil (Moduléo, spec 1.5.0) aussi.
     extraits += [lecture.texte for lecture in lectures]
     textes_source = [*_messages_du_compte(db, conversation_id, nouveau_message), _annee_du_jour_source(), *extraits]
-    sans_chiffre_invente = retirer_chiffres_hors_source(reponse, textes_source, [_date_du_jour_ecrite()])
+    sans_chiffre_invente = retirer_chiffres_hors_source(reponse, textes_source, _dates_de_la_consigne_ecrites())
     if sans_chiffre_invente == reponse:
         return reponse
     # Un document, ou un chiffre déjà écrit dans le message du tour : on
@@ -933,7 +999,7 @@ def creer_conversation(
     client: MistralClient = Depends(get_mistral_client),
     moteur_recherche: MoteurRecherche = Depends(get_moteur_recherche),
     telechargeur_pages: TelechargeurPages = Depends(get_telechargeur_pages),
-    client_moduleo: LecteurModuleo | None = Depends(get_client_moduleo),
+    client_moduleo: ClientModuleo | None = Depends(get_client_moduleo),
     fabrique_session: FabriqueSession = Depends(get_fabrique_session),
 ) -> StreamingResponse:
     reponse_en_cache = _reponse_en_cache(identifiant_compte, requete.cle_idempotence)
@@ -1037,7 +1103,7 @@ def _tour_creer_conversation(
     client: MistralClient,
     moteur_recherche: MoteurRecherche,
     telechargeur_pages: TelechargeurPages,
-    client_moduleo: LecteurModuleo | None,
+    client_moduleo: ClientModuleo | None,
 ) -> ConversationCreeResponse:
     maintenant = datetime.now(timezone.utc)
     conversation = Conversation(
@@ -1069,6 +1135,7 @@ def _tour_creer_conversation(
     # tout premier message d'une conversation (jamais de résumé glissant
     # ni d'historique à ce stade), l'autre chemin menant au même appel de
     # chat principal (spec 1.2.2).
+    droits_moduleo = droits_du_compte(db, identifiant_compte)
     message_pour_mistral = _construire_messages_pour_mistral(
         "",
         [],
@@ -1076,6 +1143,7 @@ def _tour_creer_conversation(
         "",
         piece_jointe,
         _memoire_de_la_conversation(db, conversation.id, requete.message),
+        moduleo_ferme=client_moduleo is not None and droits_moduleo.sans_groupe,
     )
 
     # Les deux appels Mistral (réponse, puis titrage) sont faits avant
@@ -1093,7 +1161,8 @@ def _tour_creer_conversation(
     # conversation pointer vers une pièce jointe disparue.
     # Outils sur l'appel principal dès le premier message (spec 1.4.0) :
     # aucune pièce jointe d'un tour précédent ici, seuls rechercher_web et,
-    # si Moduléo est configuré, chercher_affaires_moduleo sont éligibles.
+    # si Moduléo est configuré et le compte rattaché à un groupe Moduléo,
+    # les outils Moduléo sont éligibles.
     contexte_outils = ContexteTour(
         db=db,
         conversation_id=conversation.id,
@@ -1103,6 +1172,7 @@ def _tour_creer_conversation(
         message_du_tour=requete.message,
         publier=publier,
         client_moduleo=client_moduleo,
+        droits_moduleo=droits_moduleo,
     )
     tools = outils_du_tour(contexte_outils)
     attendre_questions = _lancer_questions_piece_jointe(client, piece_jointe, requete.message)
@@ -1833,7 +1903,7 @@ def envoyer_message(
     client: MistralClient = Depends(get_mistral_client),
     moteur_recherche: MoteurRecherche = Depends(get_moteur_recherche),
     telechargeur_pages: TelechargeurPages = Depends(get_telechargeur_pages),
-    client_moduleo: LecteurModuleo | None = Depends(get_client_moduleo),
+    client_moduleo: ClientModuleo | None = Depends(get_client_moduleo),
     fabrique_session: FabriqueSession = Depends(get_fabrique_session),
 ) -> StreamingResponse:
     reponse_en_cache = _reponse_en_cache(identifiant_compte, requete.cle_idempotence)
@@ -1871,7 +1941,7 @@ def _tour_envoyer_message(
     client: MistralClient,
     moteur_recherche: MoteurRecherche,
     telechargeur_pages: TelechargeurPages,
-    client_moduleo: LecteurModuleo | None,
+    client_moduleo: ClientModuleo | None,
 ) -> MessageEnvoyeResponse:
     conversation = _recuperer_conversation_du_compte(db, conversation_id, identifiant_compte)
 
@@ -1899,6 +1969,7 @@ def _tour_envoyer_message(
     # requêtes concurrentes pouvaient toutes deux lire l'ancienne valeur
     # puis écraser l'une des deux mises à jour au commit).
     profil_actuel = _contenu_profil_actuel(db, identifiant_compte)
+    droits_moduleo = droits_du_compte(db, identifiant_compte)
     messages_pour_mistral = _construire_messages_pour_mistral(
         conversation.resume_contexte,
         derniers_messages,
@@ -1906,6 +1977,7 @@ def _tour_envoyer_message(
         profil_actuel,
         piece_jointe,
         _memoire_de_la_conversation(db, conversation.id, requete.message),
+        moduleo_ferme=client_moduleo is not None and droits_moduleo.sans_groupe,
     )
 
     # Un message sort de la fenêtre des 3 derniers dès que ce tour (2 nouveaux
@@ -1925,6 +1997,7 @@ def _tour_envoyer_message(
         message_du_tour=requete.message,
         publier=publier,
         client_moduleo=client_moduleo,
+        droits_moduleo=droits_moduleo,
     )
     tools = outils_du_tour(contexte_outils)
 

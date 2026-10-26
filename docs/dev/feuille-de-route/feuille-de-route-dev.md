@@ -20,62 +20,77 @@ Ce n’est **pas** une spec (ça vient après « Ouvre la version »).
 - **1.4.0** — Recherche web dans le chat ([#117](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/117), [spec](../../specs/v1.4.0-recherche-web-dans-le-chat.md)) : outil `rechercher_web` exécuté par la VM sur un SearXNG auto-hébergé ([ADR-0013](../../adr/0013-recherche-web-searxng-auto-heberge.md)) ; pages entières nettoyées puis appel d’extraction isolé du contexte de la conversation ([ADR-0014](../../adr/0014-recherche-web-en-deux-temps-extraction-isolee.md)) ; outils du modèle centralisés dans `vm_centrale/outils/`, tous les appels d’outils traités sur 3 tours au plus ; seules les URL revenues de l’outil et les chiffres écrits dans les pages lues restent ; date du jour donnée au modèle pour les recherches d’actualité ; inspecteur chronologique Mistral / local avec ligne garde-fous. Pas de changement du contrat HTTP du poste. Bug connu à la livraison : quand la recherche ne trouve rien, l’IA invente encore au lieu de le dire ([#131](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/131), correction reportée en **Plus tard**).
 - **1.4.1** — Mémoire de la conversation ([#132](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/132), [spec](../../specs/v1.4.1-memoire-de-la-conversation.md)) : à chaque appel de chat, la VM envoie la liste recalculée de tout ce qui a été partagé (pièces jointes, recherches web, URL écrites par le compte, marquées comme telles), chacune avec ses **questions couvertes** (jusqu’à 8, produites par l’appel d’extraction devenu JSON pour une page, par un appel `questions_piece_jointe` à l’envoi pour une pièce jointe ; jamais une source des garde-fous) ; `relire_pieces_jointes` (plusieurs à la fois, dès le tour suivant) et `lire_pages_web` (page trouvée par une recherche relue sans retéléchargement, URL du compte téléchargée une fois puis source des garde-fous) avec un `besoin` facultatif dont la réponse, ou « non présent selon l’extraction », rejoint les questions couvertes ; boucle d’outils portée à 5 appels principaux par message ; garde-fous corrigés (URL en gras Markdown gardée, numéro groupé autrement que la source comparé chiffres bout à bout et retiré en entier). Pas de changement du contrat HTTP du poste.
 - **1.4.2** — Le contexte en vrais tokens ([#144](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/144), [spec](../../specs/v1.4.2-contexte-en-vrais-tokens.md)) : fiche de modèle dans `config.py` (fenêtre, tokenizer, tarifs), modèle de chat figé à `mistral-small-2603` (fenêtre 262 144) au lieu de l’alias `mistral-small-latest` ; `tekken.json` de Mistral Small 4 versionné et chargé avec `mistral-common` (la VM refuse de démarrer sans lui) ; plafond des pages de `rechercher_web` et de `lire_pages_web` avec `besoin` à 80 % de la fenêtre, compté en vrais tokens ; page trop longue non relue : consigne de réponse honnête avec son titre s’il est connu, même refus tout le tour, mention fixe en fin de réponse (garde-fou `pages_trop_longues`, un sous-dossier par garde-fou) ; jauge de contexte sous le champ de saisie (`prompt_tokens` du dernier appel principal sur la fenêtre, orange à partir de 80 %). Seul changement du contrat HTTP du poste : `tokens_contexte` et `fenetre_contexte` sur les messages.
-- **1.4.3** — Cache des pages web entre conversations ([#153](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/153), [spec](../../specs/v1.4.3-cache-des-pages-web.md), [ADR-0015](../../adr/0015-cache-commun-des-pages-web.md)) : une page lue avec succès est gardée 24 h, clé = URL exacte, partagée entre tous les comptes (texte et titre seulement) ; chaque conversation garde sa photo datée ; une page sans texte est retentée au tour suivant ; relecture forcée quand le collaborateur dit que la page a changé, questions déjà couvertes revérifiées ; en échec, l’ancienne version datée reste et l’IA le dit ; script de purge des lignes expirées, prêt pour une crontab (branchée au déploiement, 1.6.0). Pas de changement du contrat HTTP du poste.
+- **1.4.3** — Cache des pages web entre conversations ([#153](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/153), [spec](../../specs/v1.4.3-cache-des-pages-web.md), [ADR-0015](../../adr/0015-cache-commun-des-pages-web.md)) : une page lue avec succès est gardée 24 h, clé = URL exacte, partagée entre tous les comptes (texte et titre seulement) ; chaque conversation garde sa photo datée ; une page sans texte est retentée au tour suivant ; relecture forcée quand le collaborateur dit que la page a changé, questions déjà couvertes revérifiées ; en échec, l’ancienne version datée reste et l’IA le dit ; script de purge des lignes expirées, prêt pour une crontab (branchée au déploiement de la VM, **1.6.1**). Pas de changement du contrat HTTP du poste.
 - **1.4.4** — Statut d’attente dynamique pendant une réponse ([#163](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/163), [spec](../../specs/v1.4.4-statut-attente-dynamique.md), [ADR-0016](../../adr/0016-envoi-de-message-en-flux-sse.md)) : pendant un tour, le fil affiche l’étape en cours publiée par la VM (« Réflexion… », « Recherche sur le web : “…” », « Lecture de <domaine> », « Relecture de <fichier> », « Vérification de la réponse… », « Titre de la conversation… »), une à la fois, jamais persistée ; les deux envois de message répondent en flux SSE (`statut` / `fin` / `erreur`) de la VM au navigateur, relayé tel quel par le poste ; le tour s’exécute dans un thread et va au bout même si le flux est coupé ; rejeu idempotent = flux avec le seul `fin` en cache ; la bascule de conversation suit la sélection (envoi en cours et brouillon tenus par conversation, indicateur de chargement dans la sidebar, bug [#169](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/169) corrigé) ; envoi possible dans une autre conversation pendant un tour, mis en attente du verrou du compte avec le statut « En attente de la réponse en cours dans une autre conversation… ». Contrat HTTP du poste : `POST /conversations` et `POST /conversations/{id}/messages` en `text/event-stream`.
 - **1.5.0** — Lire Moduléo depuis le chat ([#171](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/171), [spec](../../specs/v1.5.0-lire-moduleo-depuis-le-chat.md), [ADR-0017](../../adr/0017-lecture-moduleo-par-outil.md)) : deux outils communs à tous les comptes, `chercher_affaires_moduleo` et `chercher_contacts_moduleo`, proposés dès que la config Moduléo est présente (statut « Consultation Moduléo ») ; le modèle donne des noms, la VM les résout en ids et renvoie des fiches denses en noms (5 par défaut, 10 au plus), affaires récentes (90 jours) sans critère ; client HTTP en lecture seule limité aux routes GET du WADL du cabinet, doc Moduléo copiée en local avec un script de mise à jour ; une seule clé d’API et le SecurityCode d’un utilisateur de test, chiffrés (Fernet), jamais envoyés au modèle ni visibles dans l’inspecteur ; chaque fiche enregistrée dans `lectures_outils`, source des garde-fous sur toute la conversation (« Sources : Moduléo, affaire … »), questions couvertes générées par script dans la Mémoire de la conversation ; panne ou refus Moduléo dit en une phrase fixe, détail dans l’inspecteur ; corrections des tests humains (garde-fou chiffres et date du jour, phrase fixe Moduléo, titrage, note système après une réponse remplacée, garde-fou `contact_non_lu`). Pas de changement du contrat HTTP du poste.
+- **1.5.1** — Lire plus de données Moduléo depuis le chat ([#185](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/185), [spec](../../specs/v1.5.1-lire-plus-de-donnees-moduleo.md), [ADR-0018](../../adr/0018-droits-moduleo-appliques-par-bbass.md)) : quatre outils de lecture, un par domaine — `chercher_devis_moduleo`, `chercher_factures_moduleo` (reste à payer quand Moduléo le permet), `chercher_temps_passes_moduleo`, `chercher_planning_moduleo` — et les parcelles d’une seule affaire à la demande (`avec_parcelles`, propriétaires compris) ; totaux (nombre, HT / TTC, reste à payer, heures par collaborateur et par code activité) calculés par la VM sur tout l’ensemble trouvé ; période par défaut toujours annoncée ; activités et codes activité lus dans Moduléo ; statut « Consultation Moduléo : <domaine> » ; « mes temps » / « mon planning » filtrés sur l’utilisateur Moduléo lié au compte, planning d’une seule personne détaillé en entier (60 tâches au plus) ; « cette semaine » / « la semaine dernière » du lundi au dimanche. Droits Moduléo appliqués par BBASS : groupes Cogeo et Planning recopiés (catalogue et groupe Admin versionnés, rattachement des comptes par script), outils proposés seulement aux comptes rattachés à un groupe qui a le droit, garde fermé par défaut dans le client (`lire(route, paramètres, droits)`, chaque route GET classée, route non classée refusée), champs retirés par sous-droit, phrase fixe quand un droit manque. `MISTRAL_API_KEY` remplacée par `MISTRAL_API_KEY_CHIFFREE` (Fernet, même clé maître que Moduléo) : la VM refuse de démarrer sans clé utilisable. Essai réel sur le serveur du cabinet (#194) : filtres de date en JJ/MM/AAAA. Pas de changement du contrat HTTP du poste.
 
-## Prochaine : 1.5.1 — Lire plus de données Moduléo depuis le chat
+## Prochaine : 1.5.2 — Écrire dans Moduléo depuis le chat
 
-**Objectif.** Le collaborateur obtient depuis le chat d’autres informations Moduléo que les affaires et les contacts, toujours en **lecture seule**, avec les mêmes garanties qu’en 1.5.0 : fiches denses en noms, lectures source des garde-fous et citées, Mémoire de la conversation, panne ou refus dit clairement. Le client GET de la 1.5.0 couvre déjà toutes les routes : cette version ajoute des outils, pas un nouveau client. Profite de la version pour **chiffrer `MISTRAL_API_KEY`** avec le mécanisme de la clé Moduléo (Fernet, clé maître hors `.env`).
+**Contexte.** Kipaware (Vincent Mourareau, développement) a ouvert un **serveur Moduléo dédié aux tests**. Accès prévu via le **Client Moduléo Windows** et l’**API Moduléo**.
 
-**À trancher au grilling.** Quels domaines lire (parcelles, devis, factures, temps passés, GED, planning…), d’après les questions réelles du cabinet. Un outil par domaine, ou un seul outil Moduléo « à capacités » (piste notée dans la spec 1.5.0 vers 5–6 capacités).
+- **Client Windows** : installateur [SetupModuleo_TestAPI.zip](https://download.kipaware.fr/moduleo/client/setup/demo/SetupModuleo_TestAPI.zip) ; à la première utilisation, saisir le **numéro de série** attribué personnellement par Kipaware (**ne pas le communiquer** — hors dépôt / hors feuille) ; **identifiant et mot de passe** de connexion envoyés dans un e-mail séparé (droits étendus) ; le Client se connecte au serveur en **HTTPS sur le port 5304**.
+- **API** : documentation [support Kipaware — API Moduléo](https://support.kipaware.fr/categories-moduleo/api-moduleo/) et [documentation interactive](https://mwa-kpw-api.kipaware.fr/api/documentation) ; **URL de connexion** et **clé d’API** à récupérer **une fois connecté au Client Windows** (détail dans le premier lien de doc).
+- **Données** : compte utilisateur **pseudonymisé** ; ne saisir que des données **anonymisées ou fictives**.
+- **Aide** : équipe de développement Kipaware — `developpement@kipaware.fr` ; [support.kipaware.fr](https://support.kipaware.fr/) ; [vidéos YouTube Kipaware](https://www.youtube.com/user/kipaware/videos).
 
-**Hors périmètre.** Écriture Moduléo (→ **1.5.2**). Clés par utilisateur et administration des clés (→ **1.5.3**). Agents par pôle (→ **Plus tard**). Questions couvertes à la demande (`besoin`, **Plus tard**).
+**Objectif.** Premiers outils d’**écriture** Moduléo depuis le chat, essayés **uniquement** sur ce serveur de test. Une **seule clé d’API**, avec les droits d’écriture (plus puissante que la clé de lecture de la 1.5.0), dans la config de la VM, chiffrée comme en 1.5.0. Le collaborateur confirme explicitement chaque écriture avant qu’elle parte.
 
-## Ensuite : 1.5.2 — Écrire dans Moduléo depuis le chat
+**À trancher au grilling.** Quelles écritures (laissé ouvert). Sécurité : confirmation, journal des écritures, client qui n’autorise que les routes d’écriture retenues. Écriture ouverte à tous les comptes ou réservée à certains (lien avec les Agents par pôle, **Plus tard**). Comment brancher BBASS sur ce serveur de test sans mélanger avec la lecture prod de la 1.5.0 / 1.5.1.
 
-**Condition d’ouverture.** Kipaware confirme un **serveur de test** Moduléo. Sans réponse quand la 1.5.1 est livrée, la 1.5.2 attend et la version suivante s’ouvre à sa place.
+**Hors périmètre.** Écriture sur le serveur de **production** tant que les essais sur le serveur de test ne sont pas validés. Administration des groupes et droits Moduléo (→ **1.5.3**).
 
-**Objectif.** Premiers outils d’**écriture** Moduléo depuis le chat, essayés sur le serveur de test seulement. Une **seule clé d’API**, avec les droits d’écriture (plus puissante que la clé de lecture de la 1.5.0), dans la config de la VM, chiffrée comme en 1.5.0. Le collaborateur confirme explicitement chaque écriture avant qu’elle parte.
+## Ensuite : 1.5.3 — Administration des groupes et droits Moduléo depuis le Panel d’administration
 
-**À trancher au grilling.** Quelles écritures (laissé ouvert). Sécurité : confirmation, journal des écritures, client qui n’autorise que les routes d’écriture retenues. Écriture ouverte à tous les comptes ou réservée à certains (lien avec les Agents par pôle, **Plus tard**).
+**Objectif.** Le compte administrateur gère depuis le Panel d’administration, dans une partie Moduléo, la copie des **groupes Cogeo et Planning** et de leurs **droits** introduite en 1.5.1 ([ADR-0018](../../adr/0018-droits-moduleo-appliques-par-bbass.md)) : créer un groupe, cocher ses droits comme dans Moduléo, le mettre à jour quand Moduléo change, et **rattacher chaque compte** à son groupe Cogeo, à son groupe Planning et à son utilisateur Moduléo. Remplace le fichier versionné et le script de la 1.5.1.
 
-**Hors périmètre.** Écriture sur le serveur de production tant que les essais sur le serveur de test ne sont pas validés. Clés par utilisateur (→ **1.5.3**).
+**À trancher au grilling.** Présentation du catalogue (catégories, sous-droits, conditions du Planning). Journal des changements de droits. Aide pour repérer une copie qui a dérivé de Moduléo.
 
-## Ensuite : 1.5.3 — Clés API Moduléo par utilisateur, administrées depuis le Panel d’administration
+**Hors périmètre.** Une clé d’API par collaborateur (→ **Plus tard**). Restriction d’accès par affaire (→ **Plus tard**). Agents par pôle (→ **Plus tard**).
 
-**Objectif.** Sur le serveur Moduléo, tous les utilisateurs n’ont pas accès aux mêmes choses ; une seule clé (1.5.0, 1.5.2) ne reflète pas ces droits. Le compte administrateur **associe** une clé d’API / un SecurityCode Moduléo à un compte BBASS (ou à un profil) et les **administre** depuis le Panel d’administration : ajout, remplacement, révocation. Les lectures et écritures Moduléo d’un compte passent par sa clé, donc par ses droits Moduléo. La création des clés reste côté Moduléo.
+## Ensuite : 1.6.0 — Versions vérifiées et prêtes à livrer
 
-**À trancher au grilling.** Une clé par collaborateur ou par profil ; stockage chiffré dans BBASS ; comportement quand un compte n’a pas de clé (clé commune, ou outils Moduléo non proposés). S’appuie sur ce que la 1.5.0 a appris de l’interface de paramétrage Moduléo. Avec plusieurs secrets (clés par compte, n8n, `MISTRAL_API_KEY`), réexaminer un coffre de secrets centralisé (rotation, révocation, journal des lectures) à la place du fichier clé maître.
+*(Anciennement un seul bloc « déploiement postes » 1.6.0 — découpé en **1.6.0** / **1.6.1** / **1.6.2**. La doc mémoire / souveraineté reste en **1.7.0** / **1.7.1**.)*
 
-**Hors périmètre.** Agents par pôle (→ **Plus tard**). Création des clés dans Moduléo.
+**Contexte.** Avant de pouvoir mettre à jour la VM ou installer les postes sans l’alternant, chaque version doit produire une **même référence** claire, vérifiée, prête à être reprise par le déploiement.
 
-## Ensuite : 1.6.0 — Déploiement postes (CI/CD, conteneurisation, installateur)
+**Objectif.** Chaque version produit un livrable **testé et versionné**, sans dépendre d’un build ou d’une validation faits à la main sur le poste de l’alternant. Le cabinet (ou le prochain déploiement) part toujours de cette référence.
 
-*(Anciennement 1.7.0 — passe en 1.6.0 quand la documentation mémoire / souveraineté sort en Plus tard.)*
+**Hors périmètre.** Mise à jour de la VM Castries (→ **1.6.1**). Installation et mise à jour des postes collab (→ **1.6.2**). Choix d’outillage (pipeline, artefacts, etc.) — **à trancher au grilling**.
 
-**Contexte.** Les collaborateurs peuvent vouloir **utiliser Moduléo** via le chat (lecture livrée en 1.5.0). Il faut donc pouvoir **déployer / mettre à jour** le logiciel sur les postes du cabinet de façon reproductible — pas seulement via les scripts de dev actuels.
+## Ensuite : 1.6.1 — Mise à jour de la VM Castries sans l’alternant
 
-**Objectif.** Une chaîne de **déploiement** : CI/CD (ex. GitHub Actions), **conteneurisation Docker** là où ça aide (au minimum ce qui est déjà Dockerisé + ce qui doit l’être pour un rollout propre), et un **installateur / logiciel poste** qui démarre le **backend local obligatoire** (ADR-0001) et donne accès au chat. Le cabinet peut ainsi installer et utiliser ce qui est déjà là, même en absence de l’alternant.
+**Objectif.** La machine centrale se **déploie et se met à jour** de façon **reproductible**, y compris ce qui doit tourner en continu (services, maintenance type purge du cache des pages web préparée en 1.4.3, secrets Moduléo en production hors du dépôt). Un admin cabinet peut le faire **sans cloner le dépôt** ni connaître la plomberie de développement.
 
-**Périmètre envisagé.**
-- CI : build front Vite (fin du commit systématique du seul `dist/` à la main — voir aussi les notes « Plus tard » historiques), tests, artefacts versionnés / release.
-- Conteneurisation : Postgres déjà en compose ; trancher ce qui est conteneurisé (VM centrale en prod/pilote, poste, ou les deux) vs process natif Windows sur le poste.
-- **Installateur Windows** (et éventuellement macOS plus tard) : installe / met à jour le poste, configure le lien vers la VM Castries, démarre le backend local.
-- **Accès UI** — archi à trancher à l’ouverture : fenêtre **pywebview** (ou équivalent) qui embarque l’UI, **ou** navigateur sur `localhost` du poste ; dans les deux cas le **backend Python par poste reste obligatoire**. Fermer la fenêtre ne devrait pas forcément tuer le process (accès encore possible en navigateur) — piste déjà notée sous « Lanceur poste ».
-- Doc d’installation collab / admin cabinet (quelques étapes, pas un clone git).
-- **Clé maître Moduléo en production** (ADR-0017 ; remplace la piste « clé USB », peu adaptée à une VM qui tourne en continu et redémarre sans personne pour la brancher). Niveau 1 au premier déploiement : fichier dans un répertoire système hors du dépôt et hors du dossier de `.env` (`/etc/bbass/` sous Linux, `C:\ProgramData\BBASS\secrets\` sous Windows, ou secret Docker monté dans `/run/secrets/` si la VM centrale est conteneurisée), lisible par le seul compte de service ; **exclu des sauvegardes de la VM** et sauvegardé à part (coffre / gestionnaire de mots de passe du cabinet) ; clé d’API Moduléo **restreinte à l’IP de la VM**, la vraie barrière si elle fuit. Niveau 2 si la VM est sous Linux avec un TPM (virtuel) : clé maître scellée par `systemd-creds`, illisible depuis une copie du disque ou un instantané, démarrage toujours automatique. Pas de service de clés séparé (Vault, OpenBao, Infisical) à ce stade : un seul secret, un seul consommateur, et l’accès au coffre demanderait lui-même un secret stocké sur la VM.
+**Hors périmètre.** Chaîne de vérification des livrables (→ **1.6.0**, déjà faite). Installation / mise à jour des postes (→ **1.6.2**). Détail technique (conteneurs, chemins secrets, etc.) — **à trancher au grilling**.
 
-**Recherche / décisions à trancher à l’ouverture.**
-- Clé maître : OS de la VM centrale et TPM virtuel disponible (niveau 2 possible ou non) ; politique de sauvegarde de la VM (exclusion du fichier). Décision à consigner dans un ADR qui complète ADR-0017.
-- pywebview vs navigateur seul vs les deux (lanceur + URL de secours).
-- Quoi Dockeriser sur le poste vs sur la VM ; prérequis Docker Desktop côté collab ou non.
-- Canal de mise à jour (GitHub Releases, partage interne Castries, etc.).
-- Périmètre « pilote » : une machine / quelques postes Admin avant rollout large.
+## Ensuite : 1.6.2 — Installer et mettre à jour le poste (installateur, fenêtre, accès web)
+
+**Objectif.** Un collaborateur (ou un admin) **installe ou met à jour** le logiciel poste **sans git**, via un **installateur propre**. Une fois lancé : une **fenêtre propre** pour travailler ; le logiciel **reste disponible en fond** si on ferme la fenêtre (comme Docker Desktop qui continue après fermeture de sa fenêtre) ; on peut aussi l’**ouvrir depuis le navigateur** (raccourci possible). Le backend local obligatoire démarre, le lien vers la VM Castries est configuré, le chat est utilisable. Doc courte collab / admin.
+
+**Hors périmètre.** Comment la VM se met à jour (→ **1.6.1**). Comment les livrables sont produits et vérifiés (→ **1.6.0**). Choix techniques d’embarquer la fenêtre ou le raccourci — **à trancher au grilling**.
+
+## Ensuite : 1.7.0 — Documentation fonctionnelle : mémoire et souveraineté des données
+
+*(Reprise du bloc Plus tard « Documentation : mémoire conversationnelle et souveraineté des données (ex-1.6.0) », élargi en série 1.7.x de documentation fonctionnelle.)*
+
+**Objectif.** Le cabinet dispose d’un **wiki produit** consultable par des non-techniciens (partie **fonctionnelle** du doc-site) : d’abord une **convention courte** de format (structure type : objectif, schémas, tableaux « où vit / qui voit / ce qui sort », sans dump de code) qui servira de modèle aux documentations suivantes ; puis deux documents dans `docs/features/` **et** sur le site de doc, chacun porté par une issue GitHub labellee **`documentation`** (plan, schémas, captures, exemples). Pas de changement de code produit hors ajustements de doc / schémas / exemples de tests cités.
+
+1. **Persistance de la mémoire** (`docs/features/memoire-conversationnelle.md` ou équivalent). Schéma compréhensible (conversations, messages, résumé glissant, profil de travail, pièces jointes, résultats de recherche web, etc.), flux tour par tour (ce qui entre, ce qui sort de la fenêtre de 3, ce qui est plafonné, ce que le modèle relit via outils), choix déjà pris et **pourquoi** (persistance VM vs API Conversations Mistral, séparation identité / profil, etc.). Exemples concrets (inspecteur, états) et renvois aux tests HTTP-boundary en annexe courte. Inclut la Mémoire de la conversation et les questions couvertes (1.4.1), le cache des pages web (1.4.3).
+
+2. **Souveraineté des données** (`docs/features/souverainete-des-donnees.md` ou équivalent). Cartographie de tous les choix qui font que **seul le cabinet** détient les données persistées : Postgres et fichiers sur la VM Castries, SearXNG auto-hébergé, pas de Files API / Conversations Mistral, ZDR / `chat/completions` sans rétention côté modèle, clé API unique derrière la VM, LAN uniquement, etc. Expliquer **pourquoi** chaque décision rend le cabinet souverain. **Carte globale** « où vit la donnée » et **ce qui quitte le cabinet** (Mistral, Moduléo, SearXNG, rien d’autre) pour les chemins critiques ; liens ADR / specs. Le détail *par outil* de ce qui part / revient est en **1.7.1**.
+
+**Hors périmètre.** Inventaire des outils du modèle et flux par outil (→ **1.7.1**). Doc détaillée du tool calling recherche web (→ **Optimisation de la recherche web**, Plus tard). Doc-site administration des groupes et droits Moduléo (reste **hors version**). Déploiement (→ **1.6.0** / **1.6.1** / **1.6.2**), n8n (→ **1.8.0**), Agents par pôle, bugs connus. Implémentation de nouvelles capacités mémoire ou cache.
+
+## Ensuite : 1.7.1 — Documentation fonctionnelle : outils du modèle et flux par outil
+
+**Objectif.** Suite du wiki fonctionnel (même convention que la **1.7.0**) : un document (ou un ensemble de pages liées) qui inventorie **tous les outils** exposés au modèle — recherche web, relecture de pièces jointes / pages, Moduléo, etc. Pour chaque outil : à quoi il sert, paramètres utiles en langage produit, **ce qu’il envoie / reçoit / persiste**, ce qui reste sur la VM, lien avec l’inspecteur. Complète la carte souveraineté de la 1.7.0 **sans la réécrire**. Issue(s) GitHub **`documentation`** ; pages sur le doc-site partie fonctionnelle. Pas de changement de code produit hors doc / schémas / exemples.
+
+**Hors périmètre.** Doc ultra-détaillée du tool calling recherche web (paramètres fins, tous les cheminements d’échec) — reste le livrable doc de **Optimisation de la recherche web** (Plus tard). Nouveaux outils, Agents par pôle, n8n (**1.8.0**), écriture Moduléo (**1.5.2**).
 
 ## Ensuite : 1.8.0 — Workflows n8n (socle d’automatisation), branchés sur Moduléo 1.5.0
 
-*(Anciennement 1.6.0, puis 1.7.0 — passe en 1.8.0 pour laisser 1.6.0 à la documentation mémoire / souveraineté.)*
+*(Anciennement 1.6.0 / 1.7.0 — passé en 1.8.0 ; le créneau 1.7.x est repris par la documentation fonctionnelle.)*
 
 S’appuie sur les **outils / client Moduléo lecture** livrés en 1.5.0. n8n devient le **runtime d’automatisation** (scénarios multi-étapes, plus tard d’autres logiciels), pas un miroir 1:1 de chaque route API.
 
@@ -95,7 +110,7 @@ S’appuie sur les **outils / client Moduléo lecture** livrés en 1.5.0. n8n de
 
 ## Ensuite : 1.9.0 — Analyse et traitement des pièces jointes, approfondis
 
-*(Anciennement 1.5.0, puis 1.6.0, puis 1.7.0, puis 1.8.0 — passe en 1.9.0 pour laisser 1.6.0 à la documentation mémoire / souveraineté.)*
+*(Anciennement 1.5.0 → 1.8.0 selon les décalages ; reste en 1.9.0. La documentation fonctionnelle est en **1.7.0** / **1.7.1**.)*
 
 S’appuie sur la [1.1.2](../../specs/v1.1.2-pieces-jointes.md) (pipeline d’extraction, une pièce jointe par message). Le traitement par pôle suppose les **Agents métier par pôle** (Plus tard) : à livrer avant, ou à faire entrer ici. Deux limites actées volontairement en 1.1.2 sont à lever ici, pas avant : **plusieurs pièces jointes par message**, et un **traitement spécifique par pôle** (un agent Foncier ne traite pas un document comme un agent Urbanisme) — demande explicite du cabinet dès le grilling de 1.1.2, remise à plus tard faute d’Agent réel pour la justifier.
 
@@ -109,18 +124,6 @@ S’appuie sur la [1.1.2](../../specs/v1.1.2-pieces-jointes.md) (pipeline d’ex
 - Conservation d’une pièce jointe au-delà de sa conversation d’origine (usage multi-conversationnel, matière pour entraîner les futurs Agents) : piste évoquée dès le grilling 1.1.2, pas tranchée.
 
 ## Plus tard (pas encore numéroté)
-
-### Documentation : mémoire conversationnelle et souveraineté des données (ex-1.6.0)
-
-*(Sortie de la 1.6.0 le 08/10/2026 : plus à l’ordre de la semaine, numéro laissé au déploiement postes.)*
-
-**Objectif.** Deux documents produit / fonctionnels (même format que la doc recherche web prévue ailleurs dans cette feuille), rédigés dans `docs/features/` **et** portés chacun par une issue GitHub labellee **`documentation`** (plan, schémas, captures, exemples). Pas de changement de code produit hors ajustements de doc / schémas / exemples de tests cités.
-
-1. **Persistance de la mémoire** (`docs/features/memoire-conversationnelle.md` ou équivalent). Schéma complet (tables / relations : conversations, messages, résumé glissant, profil de travail, pièces jointes, résultats de recherche web, etc.), flux tour par tour (ce qui entre, ce qui sort de la fenêtre de 3, ce qui est plafonné, ce que le modèle relit via outils), choix et décisions déjà prises et **pourquoi** (persistance VM vs API Conversations Mistral, séparation identité / profil, etc.). Exemples concrets (inspecteur, états en base) et références aux tests HTTP-boundary qui verrouillent ces comportements. Inclut la Mémoire de la conversation et les questions couvertes (1.4.1), le cache des pages web (1.4.3).
-
-2. **Souveraineté des données** (`docs/features/souverainete-des-donnees.md` ou équivalent). Cartographie de tous les choix qui font que **seul le cabinet** détient les données persistées : Postgres et fichiers sur la VM Castries, SearXNG auto-hébergé, pas de Files API / Conversations Mistral, ZDR / `chat/completions` sans rétention côté modèle, clé API unique derrière la VM, LAN uniquement, etc. Expliquer **pourquoi** chaque décision rend le cabinet souverain (Mistral ne stocke pas nos fils ni nos fichiers ; aucun service externe n’héberge notre mémoire métier ; tout ce qui persiste est hébergé par nous). Relier ADR et specs déjà actées ; schémas « où vit la donnée » (poste / VM / Mistral / SearXNG) pour les chemins critiques.
-
-**Hors périmètre.** Implémentation de nouvelles capacités mémoire ou cache (→ **1.4.1**, **1.4.3**). Déploiement postes (→ **1.6.0**), n8n (→ **1.8.0**). Doc tool calling recherche web (déjà prévue dans « Optimisation de la recherche web » / livrable doc associé).
 
 ### Agents métier par pôle (consigne et capacités par pôle)
 
@@ -193,13 +196,13 @@ Implications déjà identifiées à creuser plus tard :
 - Reste à définir : à quoi ressemble concrètement le flux de validation (où/comment un compte administrateur voit et approuve un changement), le périmètre de ce que l'agent peut faire seul vs ce qui nécessite une validation, et les garde-fous (rollback, tests obligatoires avant validation, etc.).
 - Tests front (grilling 1.2.0) : pas de tests dédiés côté UI React en 1.2.0 (on reste sur les tests pytest HTTP-boundary existants + validation visuelle par l'admin). À une version pas encore numérotée : ajouter un filet de sécurité automatisé côté UI (ex. Playwright) puisque seul un agent IA maintient ce code sans relecture humaine technique — pertinent surtout quand le volume d'écrans aura grossi (1.3.0, 1.4.0, 1.5.0, 1.6.0, 1.7.0, 1.8.0, 1.9.0 et au-delà).
 
-### Lanceur poste (exécutable, pywebview)
+### Lanceur poste (exécutable, fenêtre + accès web)
 
-→ **Repris et numéroté en 1.6.0** (déploiement postes : installateur + accès UI, pywebview vs navigateur à trancher). Cette entrée « Plus tard » ne fait plus office de file d’attente séparée.
+→ **Repris et numéroté en 1.6.2** (installateur propre, fenêtre propre, logiciel en fond après fermeture de la fenêtre, ouverture possible depuis le navigateur / raccourci). Cette entrée « Plus tard » ne fait plus office de file d’attente séparée.
 
-### Déploiement, CI/CD, retours utilisateurs
+### Déploiement, livrables, retours utilisateurs
 
-→ **Repris et numéroté en 1.6.0**. Contraintes déjà vues à réintégrer dans la spec à l’ouverture : pas forcément de VM centrale physique pour un CD du relais ; LAN Castries vs Internet ; Actions pour pytest + build front ; pilote sur quelques machines. Depuis 1.2.0 le `dist/` front est committé — la CI 1.6.0 doit prendre en charge le build Vite.
+→ **Repris et numéroté en 1.6.0** (versions vérifiées et prêtes à livrer), **1.6.1** (mise à jour VM Castries) et **1.6.2** (installateur postes). Contraintes déjà vues à réintégrer dans la spec à l’ouverture de chaque version : pas forcément de VM centrale physique pour déployer le relais ; LAN Castries vs Internet ; pilote sur quelques machines ; fin du build front fait uniquement à la main.
 
 ### Mémoire / RAG / plateforme LLM tierce (Open WebUI, Mem0…) — en réserve, pas prioritaire
 
@@ -253,6 +256,18 @@ Constat (ouverture 1.4.1) : la boucle d’outils est bornée par une limite fixe
 ### Questions couvertes à la demande pour Moduléo (`besoin`)
 
 Constat (1.5.0, [#177](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/177)) : une lecture Moduléo n’a que les questions couvertes écrites par script, champ par champ, sans appel IA. Une question imprévue (« l’affaire est-elle en retard ? ») oblige le modèle à rappeler Moduléo, et sa réponse n’est gardée nulle part. Piste : un `besoin` sur les outils Moduléo, sur le modèle de `lire_pages_web` (1.4.1) : un appel d’extraction isolé sur la fiche relue, avec une réponse (ou « non présent selon l’extraction ») enregistrée en question couverte d’origine `besoin`. **Déclencheur** : l’essai réel ([#178](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/178)) ou l’usage montre beaucoup de rappels de Moduléo pour une même question. Sinon, ne rien changer : relire Moduléo garde une donnée fraîche, et une fiche est courte.
+
+### Une clé d’API Moduléo par collaborateur
+
+Constat (grilling 1.5.1) : les droits de la clé d’API Moduléo font foi sur ceux des groupes utilisateur ; BBASS garde donc une seule clé de lecture et applique lui-même les droits recopiés ([ADR-0018](../../adr/0018-droits-moduleo-appliques-par-bbass.md)). Une clé par collaborateur, réglée dans Moduléo, serait plus sûre (une fuite de la VM ne livrerait pas tout) mais lourde à administrer. **Déclencheur** : Kipaware fait primer les droits des groupes sur ceux de la clé, ou le risque d’une clé unique devient inacceptable (écriture, 1.5.2).
+
+### Restriction d’accès Moduléo par affaire
+
+Constat (grilling 1.5.1) : Moduléo peut limiter l’accès à certaines affaires (« Limiter l’accès à des affaires aux autres collaborateurs », groupes rattachés à une affaire). La copie des droits de la 1.5.1 ne s’applique qu’aux catégories, pas affaire par affaire. Piste : lire les groupes de chaque affaire trouvée et filtrer les fiches dans le garde des droits.
+
+### Doc-site : administration des groupes et droits Moduléo (hors version)
+
+Constat (grilling 1.5.1) : une page `features/moduleo` du site de documentation rappelle comment les droits Moduléo s’appliquent dans BBASS : groupes Cogeo et Planning, catalogue des droits, rattachement des comptes, mise à jour quand Moduléo change. Rédigée hors version par le développeur.
 
 ### Vérification de la fiabilité des sources web
 

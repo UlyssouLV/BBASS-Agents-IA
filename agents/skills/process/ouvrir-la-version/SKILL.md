@@ -10,7 +10,7 @@ description: >-
 
 Triggered by **« Ouvre la version »**. The user **must** give a semver **`X.Y.Z`** (e.g. `1.2.0`). If they omit it, ask and **wait** — do not invent a number.
 
-Do **not** `/implement` here. Do **not** merge. Do **not** `git commit` on **`main`**. Git branch / commit / PR go through the skills below, not inline.
+Do **not** `/implement` here. Do **not** merge. Do **not** `git commit` on the integration **base** (`main` by default, or `base_branch` from `agents/integration-channel.yml` — see `agents/docs/integration-channel.md`). Git branch / commit / PR go through the skills below, not inline.
 
 Paths: **`agents/roles.yml`**. Roadmap writing standards: **`docs/dev/feuille-de-route/README.md`** (this skill does **not** edit the roadmap — adding / renumbering versions is **`/afr`**).
 
@@ -26,38 +26,45 @@ If that file already describes version **`X.Y.Z`**:
 
 If **`X.Y.Z` is absent** from that file: tell them to add it with **`/afr`** (standards in the README), **or** ask **what is this version for?** (one job, product language) and **wait** — do not invent a number or rewrite the feuille here.
 
-## 2. `/grill-with-docs` (conversation only if you are on `main`)
+## 2. `/grill-with-docs` (conversation only if you are on the base)
 
 Call **grill-with-docs**. Rounds until the tree is empty. **Wait** for shared-understanding confirmation.
 
-If the current branch is **`main`**: do **not** write roles **`spec`**, **`glossary`**, or **`adr`** to disk yet (that would dirty `main`). Keep decisions in the conversation.
+Resolve **base** per `agents/docs/integration-channel.md`. If the current branch is **base** (including `main` when there is no channel file): do **not** write roles **`spec`**, **`glossary`**, or **`adr`** to disk yet (that would dirty **base**). Keep decisions in the conversation.
 
 ## 3. `/to-spec` (content first)
 
 Matt’s next step is **`/to-spec`**. Synthesize the full spec (problem, solution, user stories, implementation/testing, out of scope), plus **Changements apportés aux versions antérieures** in the format of `agents/issue-tracker.md` (*Changes to earlier versions*): `Aucun.` when this version changes nothing an earlier version shipped. Publish the **parent GitHub issue** (`ready-for-agent`). Do not overwrite a previous version’s spec issue.
 
-Still **do not** commit that spec onto `main`.
+Still **do not** commit that spec onto **base**.
 
 ## 4. Branch, write, init commit
 
-Run skill **`ouvrir-branche`** as if the user had typed **`/ob vX.Y.Z-<slug>`**. Slug = kebab-case of the purpose (ASCII). If that skill stops because the name exists: ask and wait.
+Run skill **`ouvrir-branche`** as if the user had typed **`/ob vX.Y.Z-<slug>`** (from **base**). Slug = kebab-case of the purpose (ASCII). If that skill stops because the name exists: ask and wait.
 
 Then write on **this** branch only:
 
 - role **`spec`** for this version (the `/to-spec` body)
 - roles **`glossary`**, **`agent-adapter`**, **`adr`** only if this version actually changes them (new ADR; never rewrite old ADR history)
 
-Then run skill **`commit`** as if the user had typed **`/c -a -p`**. That commit **is** the initialisation de la version. `main` stays unchanged.
+Then run skill **`commit`** as if the user had typed **`/c -a -p`**. That commit **is** the initialisation de la version. **base** stays unchanged.
 
 ## 5. `/to-tickets` — propose, **then** create
 
 You are not wrong: next is **`/to-tickets`**. Follow its quiz: numbered tickets, **Blocked by**, what each delivers, **vertical** slices if possible.
 
-Show the **implementation order**: tickets with no open blockers first (lowest number among that set).
+For **every** `Blocked by #n`, the quiz must classify the edge **before** you show the list:
+
+- `vraie dépendance` — say **what breaks** if a fresh agent implements the blocked ticket first (missing type, test that cannot be written, route that does not exist…).
+- `ordre de confort` — say **why nothing breaks** if the order is inverted.
+
+Do **not** invent an extra `#` to make the graph look denser. Parallel work (`- Aucun` on both) is valid. An edge with no “what breaks” is not ready.
+
+Show the **implementation order**: tickets with no open blockers first (lowest number among that set). Include the one-line justification next to each edge.
 
 **Wait for an explicit yes** on that list. Then for **each** implementation child, in order:
 
-1. `gh issue create` with label `ready-for-agent` and body in the **canonical Matt shape** from `agents/issue-tracker.md` (*Child ticket body*): first line `Part of #<parent>`, then `## What to build`, `## Acceptance criteria` (checkboxes), `## Blocked by` (`- Aucun` or `- #<n>`). If `/to-tickets` drafted French or free-form headings, **reshape** to those English headings before create. Do not use `Ce qu'il livre` / `Critères d'acceptation` / `Tests attendus` for new tickets.
+1. `gh issue create` with label `ready-for-agent` and body in the **canonical Matt shape** from `agents/issue-tracker.md` (*Child ticket body*): first line `Part of #<parent>`, then `## What to build`, `## Acceptance criteria` (checkboxes), `## Blocked by` (`- Aucun`, or `- #<n> — vraie dépendance : …` / `- #<n> — ordre de confort : …`). **Stop** if any peer edge is a bare `- #<n>` without that clause. If `/to-tickets` drafted French or free-form headings, **reshape** to those English headings before create. Do not use `Ce qu'il livre` / `Critères d'acceptation` / `Tests attendus` for new tickets.
 2. Attach it as a **GitHub sub-issue** of the parent (POST `issues/<parent>/sub_issues`, JSON integer `sub_issue_id` = the child’s **database id**) — this is what shows **Y/Z** on the parent. See `agents/issue-tracker.md` (*Version parent and children*).
 3. Set **GitHub native** blocked-by (POST `issues/<n>/dependencies/blocked_by`, JSON integer `issue_id` = the blocker’s **database id`):
    - **Between children**, as the quiz said.
@@ -65,7 +72,7 @@ Show the **implementation order**: tickets with no open blockers first (lowest n
 
 Then create **one human-test child** (format: `agents/issue-tracker.md`, *Human-test child*):
 
-1. Title `Tests humains — VX.Y.Z`. Label **`ready-for-human`** only (never `ready-for-agent`). Body skeleton: Matt headings + empty `## Plan de tests` / `## Résultats` / `## Ce qu’on peut faire maintenant` placeholders. `## Blocked by` = **every** implementation child just created.
+1. Title `Tests humains — VX.Y.Z`. Label **`ready-for-human`** only (never `ready-for-agent`). Body skeleton: Matt headings + empty `## Plan de tests` / `## Résultats` / `## Ce qu’on peut faire maintenant` placeholders. `## Blocked by` = **every** implementation child just created, each as `ordre de process` (see `agents/issue-tracker.md`). Do not add extra blockers.
 2. Attach as a **GitHub sub-issue** of the parent (same POST as above).
 3. Native blocked-by: this ticket blocked by **each** implementation child; **parent** blocked by this ticket as well.
 

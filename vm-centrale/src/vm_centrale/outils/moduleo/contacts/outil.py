@@ -3,6 +3,7 @@ from typing import Any
 
 from vm_centrale.lectures_outils import Fiche
 from vm_centrale.moduleo.client import LecteurModuleo, ModuleoIntrouvable
+from vm_centrale.moduleo.droits import DroitsModuleo
 from vm_centrale.moduleo.enumerations import TYPES_CONTACT, nom_api
 from vm_centrale.moduleo.fiches import DetailsContact, fiche_contact
 from vm_centrale.moduleo.resolution import NomNonResolu, chercher_qualifications, resoudre_communes
@@ -16,6 +17,8 @@ from vm_centrale.outils.moduleo.commun import (
     lire_argument,
     lire_fiches,
     nb_max,
+    propose,
+    refus_du_garde,
 )
 
 _NOM = "chercher_contacts_moduleo"
@@ -91,8 +94,9 @@ _SCHEMA = {
 
 
 def _declarer(contexte: ContexteTour) -> dict | None:
-    # Pour tous les comptes, dès que Moduléo est configuré (spec 1.5.0).
-    return _SCHEMA if contexte.client_moduleo is not None else None
+    # Moduléo configuré, droit « Rechercher des contacts » (garde des
+    # droits, #188).
+    return _SCHEMA if propose(contexte, _ROUTE_RECHERCHE) else None
 
 
 def _type_contact(valeur: str) -> str:
@@ -153,7 +157,7 @@ def _lire(lecteur: LecteurModuleo, id_contact: int, genre: str) -> Any:
         return [] if genre in _COORDONNEES else {role: [] for role in _AFFAIRES}
 
 
-def _fiches(lecteur: LecteurModuleo, ids: list[int]) -> list[Fiche]:
+def _fiches(lecteur: LecteurModuleo, ids: list[int], droits: DroitsModuleo) -> list[Fiche]:
     contacts = {contact["IdContact"]: contact for contact in lecteur.lire(_ROUTE_CONTACTS, {"ids": liste_ids(ids)})}
     trouves = [id_contact for id_contact in ids if id_contact in contacts]
     taches = [(id_contact, genre) for id_contact in trouves for genre in (*_COORDONNEES, "affaires")]
@@ -169,10 +173,12 @@ def _fiches(lecteur: LecteurModuleo, ids: list[int]) -> list[Fiche]:
     communes = resoudre_communes(
         lecteur, [adresse.get("IdCommune") for d in details.values() for adresse in d.adresses]
     )
-    return [fiche_contact(contacts[i], details[i], communes) for i in trouves]
+    return [fiche_contact(contacts[i], details[i], communes, droits) for i in trouves]
 
 
 def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
+    if (refus := refus_du_garde(contexte, _ROUTE_RECHERCHE)) is not None:
+        return refus
     texte = lire_argument(arguments, "texte")
     donneur = lire_argument(arguments, "type_donneur_ordre")
     qualifications = _qualifications(arguments)
@@ -190,9 +196,11 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
 
     def lire(lecteur: LecteurModuleo) -> tuple[list[int], list[Fiche]]:
         ids = _chercher(lecteur, parametres, qualifications)
-        return ids, _fiches(lecteur, ids[: nb_max(arguments.get("nb_max"))]) if ids else []
+        return ids, _fiches(lecteur, ids[: nb_max(arguments.get("nb_max"))], contexte.droits_moduleo) if ids else []
 
-    return lire_fiches(contexte, contexte.client_moduleo, lire, _AUCUN_CONTACT, _TROUVES, _SANS_LECTURE)
+    return lire_fiches(
+        contexte, contexte.client_moduleo, "contacts", lire, _AUCUN_CONTACT, _TROUVES, _SANS_LECTURE
+    )
 
 
 OUTIL = Outil(nom=_NOM, declarer=_declarer, executer=_executer)

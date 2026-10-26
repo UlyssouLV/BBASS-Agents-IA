@@ -1,0 +1,38 @@
+# Chercher des temps passés
+
+Depuis la 1.5.1, `chercher_temps_passes_moduleo` répond à des questions comme :
+
+- « Combien d’heures ont été passées sur l’affaire 2024-123, et par qui ? »
+- « Mes temps passés de la semaine. »
+- « Les heures de relevé terrain de Martin en septembre. »
+
+## Qui voit quoi
+
+- Avec le droit Moduléo **« Consulter les temps passés et les frais des temps passés des autres collaborateurs »** : les temps de tout le cabinet.
+- Sans ce droit : **seulement ses propres temps**, à condition que le compte soit lié à son utilisateur Moduléo (script de rattachement). Demander les heures d’un collègue donne la phrase fixe du garde des droits (« Votre compte n’a pas le droit Moduléo « Consulter les temps passés … des autres collaborateurs ». Aucune lecture n’a été faite… »), et le résultat dit « vos temps seulement ».
+- Sans ce droit et sans lien : l’outil n’est pas proposé.
+
+Les prix (prix de vente, prix de revient) n’apparaissent qu’avec les sous-droits « Voir le prix de vente des temps passés » et « Voir le prix de revient des temps passés » ; sinon la fiche dit « Prix de vente : non autorisés pour votre compte ».
+
+## Ce que le modèle peut demander
+
+Combinés en « et » :
+
+- **Une période** : date au plus tôt, au plus tard.
+- **Un collaborateur**, par son nom.
+- **Un code activité**, par son nom ou son code tels qu’ils sont dans Moduléo : les codes sont lus dans Moduléo, un code créé demain fonctionne sans changer BBASS.
+- **Un numéro d’affaire.**
+
+Sans aucun critère : les temps des **7 derniers jours**, et le résultat le dit (« 14 temps passés saisis du 02/10/2026 au 09/10/2026 (7 derniers jours), total 52 h … »).
+
+## Ce qui revient
+
+En tête, le **nombre** de lignes et le **total d’heures**, **par collaborateur** et **par code activité**, calculés par la VM sur **tous** les temps trouvés : « 3 temps passés trouvés (affaire 2024-123), total 7,5 h. Par collaborateur : Jean Martin 6 h, Sophie Bernard 1,5 h. Par code activité : Relevé terrain 6 h, Bureau 1,5 h. »
+
+Puis le **détail** des lignes les plus récentes : date, collaborateur, affaire, code activité, heures, kilomètres, lieu, commentaire, prix si autorisés. **5 lignes** par défaut, **10** au plus ; les totaux portent toujours sur l’ensemble.
+
+Comme pour les devis et les factures, les totaux viennent de la VM : cités par le modèle, ils restent dans la réponse, avec « Sources : Moduléo, temps passés (…) » ; un total additionné par le modèle est retiré ([Sources et mémoire](./sources-et-memoire.mdx)).
+
+## À confirmer à l’essai réel
+
+Sens des prix d’un temps passé (taux horaire ou prix de la ligne), format des dates attendu par l’API, limite éventuelle du nombre de résultats de la recherche.

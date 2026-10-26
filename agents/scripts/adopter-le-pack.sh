@@ -2,7 +2,26 @@
 # Adopt the pack in a project that already has code. No /init, no README
 # rewrite, no Sonar credentials. Creates missing skeleton/templates only.
 # If agents/skills/ already exists, use update-from-pack.sh instead.
+#
+# Usage: adopter-le-pack.sh [--with-suivi] [--with-docs]
 set -euo pipefail
+
+WITH_SUIVI=0
+WITH_DOCS=0
+for arg in "$@"; do
+  case "$arg" in
+    --with-suivi) WITH_SUIVI=1 ;;
+    --with-docs) WITH_DOCS=1 ;;
+    -h|--help)
+      echo "Usage: $0 [--with-suivi] [--with-docs]" >&2
+      exit 0
+      ;;
+    *)
+      echo "Option inconnue : $arg (attendu : --with-suivi | --with-docs)" >&2
+      exit 1
+      ;;
+  esac
+done
 
 PACK="$(cd "$(dirname "$0")/../.." && pwd)"
 TARGET="$(pwd)"
@@ -29,19 +48,78 @@ else
 fi
 
 mkdir -p "$TARGET/agents"
-rsync -a --exclude .DS_Store --exclude __pycache__ "$PACK/agents/" "$TARGET/agents/"
-echo "copié  agents/"
+# templates/ stays in the pack: scaffold-docs-site.sh reads it from $PACK.
+rsync -a --exclude .DS_Store --exclude __pycache__ --exclude /templates/ \
+  "$PACK/agents/" "$TARGET/agents/"
+echo "copié  agents/ (sans templates/)"
 
 if [ ! -f "$TARGET/docs/dev/feuille-de-route/feuille-de-route-dev.md" ]; then
   mkdir -p "$TARGET/docs/dev/feuille-de-route" "$TARGET/docs/dev/recherches"
   printf '%s\n' '# Feuille de route de dev' > "$TARGET/docs/dev/feuille-de-route/feuille-de-route-dev.md"
   echo "créé   docs/dev/feuille-de-route/feuille-de-route-dev.md"
 fi
-mkdir -p "$TARGET/docs/specs" "$TARGET/docs/adr"
-if [ ! -f "$TARGET/CONTEXT.md" ]; then
-  printf '%s\n' '# Glossary' > "$TARGET/CONTEXT.md"
-  echo "créé   CONTEXT.md"
+if [ ! -f "$TARGET/docs/dev/feuille-de-route/README.md" ] && [ -f "$REFS/feuille-de-route/README.md" ]; then
+  mkdir -p "$TARGET/docs/dev/feuille-de-route"
+  rsync -a "$REFS/feuille-de-route/README.md" "$TARGET/docs/dev/feuille-de-route/README.md"
+  echo "créé   docs/dev/feuille-de-route/README.md"
 fi
+mkdir -p "$TARGET/docs/specs" "$TARGET/docs/adr"
+if [ ! -f "$TARGET/docs/glossaire.md" ]; then
+  mkdir -p "$TARGET/docs"
+  printf '%s\n' '# Glossary' > "$TARGET/docs/glossaire.md"
+  echo "créé   docs/glossaire.md"
+fi
+
+if [ "$WITH_SUIVI" -eq 1 ]; then
+  mkdir -p "$TARGET/docs/suivi-avancement"
+  if [ ! -f "$TARGET/docs/suivi-avancement/README.md" ] && [ -f "$REFS/suivi-avancement/README.md" ]; then
+    rsync -a "$REFS/suivi-avancement/README.md" "$TARGET/docs/suivi-avancement/README.md"
+    echo "créé   docs/suivi-avancement/README.md"
+  fi
+  if [ ! -f "$TARGET/docs/suivi-avancement/template-semaine.html" ] && [ -f "$REFS/suivi-avancement/template-semaine.html" ]; then
+    rsync -a "$REFS/suivi-avancement/template-semaine.html" "$TARGET/docs/suivi-avancement/template-semaine.html"
+    echo "créé   docs/suivi-avancement/template-semaine.html"
+  fi
+  if [ -f "$TARGET/agents/roles.yml" ] && ! grep -q 'suivi-avancement:' "$TARGET/agents/roles.yml"; then
+    python3 - "$TARGET/agents/roles.yml" <<'PY'
+import sys
+from pathlib import Path
+path = Path(sys.argv[1])
+text = path.read_text()
+block = """  suivi-avancement:
+    paths:
+      - docs/suivi-avancement/
+"""
+# Insert after roadmap block if present, else append under roles:
+if "suivi-avancement:" in text:
+    pass
+elif "  roadmap:" in text:
+    # after roadmap paths list — insert before next top-level role key under roles
+    lines = text.splitlines(keepends=True)
+    out = []
+    i = 0
+    inserted = False
+    while i < len(lines):
+        out.append(lines[i])
+        if not inserted and lines[i].startswith("  roadmap:"):
+            i += 1
+            while i < len(lines) and (lines[i].startswith("    ") or lines[i].strip() == ""):
+                out.append(lines[i])
+                i += 1
+            out.append(block if block.endswith("\n") else block + "\n")
+            inserted = True
+            continue
+        i += 1
+    if not inserted:
+        out.append(block if block.endswith("\n") else block + "\n")
+    path.write_text("".join(out))
+else:
+    path.write_text(text.rstrip() + "\n" + block)
+PY
+    echo "ajouté rôle suivi-avancement dans agents/roles.yml"
+  fi
+fi
+
 if [ ! -f "$TARGET/AGENTS.md" ]; then
   rsync -a "$REFS/AGENTS.md" "$TARGET/AGENTS.md"
   echo "créé   AGENTS.md"
@@ -110,6 +188,20 @@ echo "câblé  hooks Claude + Cursor (merge, rien d’autre écrasé)"
   python3 agents/scripts/dispatch.py --check
 )
 
-echo "Sonar : désactivé (pas de credentials). /qg et le wrap /implement skippent tant que SONAR_* n’est pas dans .env."
+if [ "$WITH_DOCS" -eq 1 ]; then
+  bash "$PACK/agents/scripts/scaffold-docs-site.sh" "$TARGET"
+fi
+
+echo "Sonar : désactivé (pas de credentials). /qg skippe tant que SONAR_* n’est pas dans .env."
+if [ "$WITH_SUIVI" -eq 1 ]; then
+  echo "Suivi : activé (docs/suivi-avancement/ + rôle)."
+else
+  echo "Suivi : non activé (passe --with-suivi pour le scaffold). Finalise soft-skip /msa."
+fi
+if [ "$WITH_DOCS" -eq 1 ]; then
+  echo "Docs : activé (docs-site/ + workflow Pages). Active GitHub Pages → Actions après push."
+else
+  echo "Docs : non activé (passe --with-docs, ou plus tard update-from-pack.sh --with-docs)."
+fi
 echo "Ne lance pas /init : le README du projet est inchangé."
 echo "Pack adopté."

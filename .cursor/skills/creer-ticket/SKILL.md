@@ -44,8 +44,13 @@ From the user message:
   itself a `Part of` child). Zero or more than one open PR for this branch →
   **stop** and ask for `#parent`.
 - **`Blocked by #n`** — optional. If present, that child becomes a native
-  blocker of the new issue and the body lists `- #<n>`. If absent: body
-  `## Blocked by` → `- Aucun`; only parent ← child on GitHub.
+  blocker of the new issue. The body line **must** be
+  `- #<n> — vraie dépendance : <ce qui casse>` or
+  `- #<n> — ordre de confort : <pourquoi l’ordre est seulement préféré>`
+  (`agents/issue-tracker.md`). If the user gave a bare `Blocked by #n`
+  without that clause: **ask and wait** — do not invent the reason, do not
+  create. If absent: body `## Blocked by` → `- Aucun`; only parent ← child
+  on GitHub. Never add a `#` that the user did not name.
 
 A ticket with **no** parent is out of scope: ask for `#parent` and **wait**.
 

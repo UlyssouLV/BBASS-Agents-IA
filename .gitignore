@@ -34,3 +34,8 @@ docs/bugs/**
 !docs/bugs/README.md
 # Fichiers de verrou Office (Excel, Word ouverts).
 ~$*
+# Caches explorateur (macOS / Windows).
+.DS_Store
+Thumbs.db
+# Compteurs shields (générés au build Pages, pas versionnés).
+docs-site/static/stats/
