@@ -439,7 +439,7 @@
     <div class="jour">
       <h3>Lundi 26 octobre</h3>
       <ul>
-        <li>À compléter.</li>
+        <li>V1.5.1 livrée : le chat lit dans Moduléo les devis, les factures (avec le reste à payer), les temps passés, le planning et, à la demande, les parcelles d’une affaire ; les totaux sont calculés par le logiciel ; chaque compte ne lit que ce que son groupe Moduléo autorise ; essai réel sur le serveur du cabinet et tests humains validés.</li>
       </ul>
     </div>
     <div class="jour">
@@ -471,8 +471,7 @@
     <section class="bloc" id="reste-a-implementer">
     <h2>Reste à implémenter</h2>
     <ul>
-      <li><strong>V1.5.1</strong> — lire plus de données Moduléo depuis le chat (devis, factures, temps, planning, parcelles ; droits par groupe).</li>
-      <li><strong>V1.5.2</strong> — écrire dans Moduléo depuis le chat, dès qu’un serveur de test est confirmé.</li>
+      <li><strong>V1.5.2</strong> — écrire dans Moduléo depuis le chat, essayé sur le serveur de test fourni par Kipaware.</li>
       <li><strong>V1.5.3</strong> — administrer groupes et droits Moduléo depuis le Panel d’administration.</li>
       <li><strong>V1.6.0</strong> — déployer et mettre à jour le logiciel sur les postes du cabinet.</li>
       <li><strong>V1.8.0</strong> — automatisations n8n branchées sur Moduléo.</li>
@@ -484,7 +483,7 @@
     <section class="bloc" id="livre-pour">
     <h2>Livré pour le 29/10/2026</h2>
     <div class="recap">
-      <p><strong>Point jeudi 29 octobre — visé : V1.5.1 · livré : (rien encore)</strong></p>
+      <p><strong>Point jeudi 29 octobre — visé : V1.5.1 · livré : V1.5.1 (lundi 26 octobre)</strong></p>
     </div>
     </section>
 
@@ -495,10 +494,19 @@
       <div class="version" id="version-1-5-1">
         <div class="version-head">
           <h3>V1.5.1 — Lire plus de données Moduléo depuis le chat</h3>
-          <span class="prevu">Livraison prévue cette semaine</span>
+          <span class="deploye">Déployé le 26/10/2026 à 13:33</span>
         </div>
         <div class="version-body">
           <p>Le collaborateur obtient depuis le chat les devis, factures, temps passés, planning et, à la demande, les parcelles d’une affaire — toujours en lecture seule, avec les mêmes garanties qu’en 1.5.0. Chaque compte ne voit que ce que son groupe Moduléo (Cogeo, Planning) autorise.</p>
+          <ul>
+            <li><strong>Devis et factures</strong> : où en est un devis, si une facture est émise et payée, ce qui reste à payer ; sans précision, les 30 derniers jours, période toujours annoncée.</li>
+            <li><strong>Temps passés</strong> : heures sur une affaire ou une période, au total, par collaborateur et par activité ; « mes temps » ne montre que les siens.</li>
+            <li><strong>Planning</strong> : qui fait quoi et quand ; le planning d’une personne (« mon planning », ou un collaborateur nommé) est donné en entier sur la période ; « cette semaine » et « la semaine dernière » vont du lundi au dimanche.</li>
+            <li><strong>Parcelles</strong> : sur demande, pour une affaire, ses parcelles et leurs propriétaires.</li>
+            <li><strong>Totaux fiables</strong> : nombres, montants et heures calculés par le logiciel sur tout ce qui a été trouvé, jamais estimés par l’IA.</li>
+            <li><strong>Droits</strong> : les groupes Moduléo sont recopiés ; un compte sans groupe n’a aucun accès Moduléo, et un droit manquant est dit clairement, sans aucune lecture.</li>
+            <li><strong>Sécurité</strong> : la clé de l’IA est désormais chiffrée, comme celle de Moduléo.</li>
+          </ul>
         </div>
       </div>
 
