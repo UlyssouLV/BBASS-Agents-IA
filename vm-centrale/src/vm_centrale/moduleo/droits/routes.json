@@ -103,7 +103,6 @@
   "fermee": [
     "cogeo/contact/{idContact}/notes",
     "cogeo/elementged/{idElementGed}/download",
-    "cogeo/note/{idNote}",
     "fileo/arborescence",
     "fileo/arborescence/multi?ids={ids}",
     "fileo/arborescence/{idArborescence}",
@@ -238,6 +237,9 @@
     "Tâches à faire › Voir les tâches à faire des autres": [
       "moduleo/tacheafaire/user/{idUser}",
       "moduleo/tacheafaire/{idTacheAFaire}"
+    ],
+    "Notes › Supprimer / Éditer les notes des autres": [
+      "cogeo/note/{idNote}"
     ]
   },
   "siens": {

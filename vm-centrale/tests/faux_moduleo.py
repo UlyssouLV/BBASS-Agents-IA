@@ -74,6 +74,8 @@ class FauxModuleo:
         # Parcelles d'affaire et leurs propriétaires (#193).
         self._parcelles: dict[int, dict] = {}
         self._proprietaires: dict[int, dict] = {}
+        # Notes, relues avant leur modification ou suppression (#208).
+        self._notes: dict[int, dict] = {}
         self._filtre_utilisateurs = True
         self._exception: Exception | None = None
 
@@ -386,6 +388,11 @@ class FauxModuleo:
             "CodeComptabilite": code_comptabilite,
         }
 
+    def ajouter_note(self, id_note: int, message: str, **champs: Any) -> None:
+        # Champs de la réponse de GET cogeo/note/{idNote} (WADL) : IdContact,
+        # IdAffaire, TypeNote, IdCategorieNote…
+        self._notes[id_note] = {"IdNote": id_note, "Message": message, **champs}
+
     def ajouter_qualification(self, id_qualification: int, libelle: str) -> None:
         self._qualifications[id_qualification] = libelle
 
@@ -488,6 +495,10 @@ class FauxModuleo:
             if parametres["idProprietaire"] not in self._proprietaires:
                 raise ModuleoIntrouvable(f"404 sur {route}")
             return self._proprietaires[parametres["idProprietaire"]]
+        if route == "cogeo/note/{idNote}":
+            if parametres["idNote"] not in self._notes:
+                raise ModuleoIntrouvable(f"404 sur {route}")
+            return self._notes[parametres["idNote"]]
         if route == "cogeo/intervenant/multi?ids={ids}":
             return [self._intervenants[i] for i in _ids(parametres) if i in self._intervenants]
         if route == "moduleo/utilisateur/{idUtilisateur}":

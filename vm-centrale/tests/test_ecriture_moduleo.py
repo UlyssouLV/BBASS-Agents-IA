@@ -7,7 +7,7 @@ from flux_sse import evenements, fin
 
 from vm_centrale.main import app
 from vm_centrale.moduleo.client import ClientModuleo, get_client_moduleo
-from vm_centrale.models import EchangeInspecteur, EcritureModuleo, GroupeModuleo
+from vm_centrale.models import DroitModuleo, EchangeInspecteur, EcritureModuleo, GroupeModuleo, GroupeModuleoDroit
 from vm_centrale.moduleo.client import (
     ModuleoDonneesRefusees,
     ModuleoIndisponible,
@@ -613,13 +613,32 @@ def test_element_introuvable_a_la_relecture_pas_de_carte_phrase_fixe(
     assert _resultat_outil(mistral_client_factice) == _INTROUVABLE_A_LA_RELECTURE
 
 
+def _groupe_cogeo(db_session, *chemins: str) -> None:
+    # Rattache j.dupont au seul groupe Cogeo « Test », qui n'a que `chemins`.
+    groupe = GroupeModuleo(application="cogeo", nom="Test")
+    db_session.add(groupe)
+    db_session.flush()
+    for droit in db_session.query(DroitModuleo).filter(DroitModuleo.chemin.in_(chemins)):
+        db_session.add(GroupeModuleoDroit(groupe_id=groupe.id, droit_id=droit.id))
+    rattacher(db_session, "j.dupont", "Test", None, None)
+    db_session.commit()
+
+
 def test_relecture_refusee_par_le_garde_pas_de_carte_phrase_fixe(
     client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide, db_session
 ):
-    # Une note s'écrit avec le droit « Supprimer / Éditer les notes des
-    # autres » mais ne se lit par aucun compte : la VM ne peut pas montrer
-    # ce qui serait supprimé.
-    reponse = _proposer(client, mistral_client_factice, jeton_valide, _supprimer("cogeo/note/{idNote}", idNote=5))
+    # Une tâche à faire s'écrit avec « Supprimer / Éditer les tâches à faire
+    # dont il n'est pas le créateur » mais se lit avec « Voir les tâches à
+    # faire des autres » : sans ce dernier, la VM ne peut pas montrer ce qui
+    # changerait.
+    _groupe_cogeo(db_session, "Tâches à faire › Supprimer / Éditer les tâches à faire dont il n'est pas le créateur")
+    tache = {
+        "route": "PUT moduleo/tacheafaire/{idTacheAFaire}",
+        "parametres": {"idTacheAFaire": 5},
+        "corps": {"IdTacheAFaire": 5, "Libelle": "Relancer le client"},
+    }
+
+    reponse = _proposer(client, mistral_client_factice, jeton_valide, tache)
 
     assert _cartes(reponse) == []
     assert faux_moduleo.appels == [] and faux_moduleo.ecritures == []
@@ -661,3 +680,78 @@ def test_confirmer_put_ou_delete_une_seule_requete_avec_la_bonne_methode(
     assert (reponse.json()["lignes"], reponse.json()["rubrique"]) == (carte["lignes"], carte["rubrique"])
     assert faux_moduleo.ecritures == [attendue]
     assert [(e.methode, e.statut) for e in _journal(db_session)] == [(attendue[0], "confirmee")]
+
+
+# Notes (#208) : la relecture d'une note s'ouvre au droit de son écriture,
+# « Notes › Supprimer / Éditer les notes des autres ».
+
+_NOTE = "cogeo/note/{idNote}"
+
+
+def _note_existante(faux_moduleo) -> None:
+    _contact_et_affaire(faux_moduleo)
+    faux_moduleo.ajouter_affaire(13, "2024-124", "Division du lot C")
+    faux_moduleo.ajouter_note(5, "Rappeler le client", IdContact=40, IdAffaire=12, TypeNote=1)
+
+
+def _modifier_note(**corps) -> dict:
+    existant = {"IdNote": 5, "Message": "Rappeler le client", "IdContact": 40, "IdAffaire": 12, "TypeNote": 1}
+    return {"route": f"PUT {_NOTE}", "parametres": {"idNote": 5}, "corps": {**existant, **corps}}
+
+
+def test_put_note_carte_avec_les_seuls_champs_modifies_en_noms(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide
+):
+    _note_existante(faux_moduleo)
+
+    reponse = _proposer(
+        client, mistral_client_factice, jeton_valide, _modifier_note(Message="Relancer le géomètre", IdAffaire=13)
+    )
+
+    assert (_NOTE, {"idNote": 5}) in faux_moduleo.appels
+    assert faux_moduleo.ecritures == []
+    (carte,) = _cartes(reponse)
+    assert (carte["methode"], carte["statut"], carte["rubrique"]) == ("PUT", "proposee", None)
+    assert carte["lignes"] == [
+        {"champ": "Message", "avant": "Rappeler le client", "valeur": "Relancer le géomètre"},
+        {"champ": "Affaire", "avant": "affaire 2024-123", "valeur": "affaire 2024-124"},
+    ]
+
+
+def test_delete_note_carte_sera_supprime_avec_les_champs_en_noms(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide
+):
+    _note_existante(faux_moduleo)
+
+    reponse = _proposer(client, mistral_client_factice, jeton_valide, _supprimer(_NOTE, idNote=5))
+
+    assert faux_moduleo.ecritures == []
+    (carte,) = _cartes(reponse)
+    assert (carte["methode"], carte["rubrique"], carte["fiche"]) == ("DELETE", "Sera supprimé", None)
+    assert carte["lignes"] == [
+        {"champ": "Message", "valeur": "Rappeler le client", "avant": None},
+        {"champ": "Contact", "valeur": "Étude Dupont", "avant": None},
+        {"champ": "Affaire", "valeur": "affaire 2024-123", "avant": None},
+        {"champ": "TypeNote", "valeur": "1", "avant": None},
+    ]
+
+
+@pytest.mark.parametrize(
+    "appel", [_modifier_note(Message="Relancer le géomètre"), _supprimer(_NOTE, idNote=5)], ids=["PUT", "DELETE"]
+)
+def test_note_sans_le_droit_refusee_par_le_garde_sans_carte(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide, db_session, appel
+):
+    # « Supprimer / Éditer ses propres notes » n'ouvre ni la lecture ni
+    # l'écriture d'une note.
+    _note_existante(faux_moduleo)
+    _groupe_cogeo(db_session, "Notes › Supprimer / Éditer ses propres notes")
+
+    reponse = _proposer(client, mistral_client_factice, jeton_valide, appel)
+
+    assert _cartes(reponse) == []
+    assert faux_moduleo.appels == [] and faux_moduleo.ecritures == []
+    assert _resultat_outil(mistral_client_factice) == (
+        "Votre compte n'a pas le droit Moduléo « Supprimer / Éditer les notes des autres ». Rien n'a été écrit. "
+        "Demandez à un compte administrateur si vous en avez besoin."
+    )
