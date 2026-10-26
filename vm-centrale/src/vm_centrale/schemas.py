@@ -1,5 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -122,6 +123,30 @@ class ConversationResponse(BaseModel):
     date_derniere_activite: datetime
 
 
+class LigneCarteEcriture(BaseModel):
+    champ: str
+    valeur: str
+
+
+class CarteEcriture(BaseModel):
+    # Carte de confirmation d'une écriture Moduléo (spec 1.5.2, #204) : en
+    # noms, jamais le corps brut. `statut` : proposee, confirmee, annulee,
+    # expiree, refusee, en_echec ; `message` : « Écrit dans Moduléo. » ou la
+    # phrase fixe d'un refus, d'un échec, d'une annulation ou d'une
+    # expiration, null tant qu'elle est proposée.
+    id: int
+    statut: str
+    methode: str
+    route: str
+    titre: str
+    lignes: list[LigneCarteEcriture]
+    message: str | None
+
+
+class DecisionEcritureRequest(BaseModel):
+    decision: Literal["confirmer", "annuler"]
+
+
 class MessageResponse(BaseModel):
     id: int
     role: str
@@ -131,6 +156,9 @@ class MessageResponse(BaseModel):
     # 1.4.2.
     tokens_contexte: int | None
     fenetre_contexte: int
+    # Cartes de confirmation proposées pendant le tour de ce message
+    # `assistant` (spec 1.5.2, #204), rechargées avec la Conversation.
+    cartes: list[CarteEcriture] = []
 
 
 class ConversationDetailResponse(BaseModel):

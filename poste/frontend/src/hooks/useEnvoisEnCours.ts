@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { useCreerConversationMutation, useEnvoyerMessageMutation, type Message } from "@/hooks/useConversations";
+import {
+  useCreerConversationMutation,
+  useEnvoyerMessageMutation,
+  type CarteEcriture,
+  type Message,
+} from "@/hooks/useConversations";
 
 // Issue #166 : l'envoi en cours n'est plus un état unique d'OngletChat mais
 // un état **par conversation**, tenu par EcranCompte pour survivre à une
@@ -38,6 +43,9 @@ export interface EnvoiEnCours {
   // Titre renvoyé par la création, tant que la conversation n'est pas
   // chargée (issue #127).
   titre?: string;
+  // Cartes de confirmation Moduléo reçues pendant le tour (spec 1.5.2),
+  // affichées sous la réponse jusqu'à ce que la conversation les recharge.
+  cartes: CarteEcriture[];
 }
 
 // Ce qu'un envoi terminé laisse à afficher sous le champ de sa conversation.
@@ -121,10 +129,21 @@ export function useEnvoisEnCours(
   function demarrer(cle: CleEnvoi, message: string, messagesAvant: Message[]) {
     setRetours((precedents) => avec(precedents, cle, undefined));
     setEnvois((precedents) =>
-      avec(precedents, cle, { message, phase: "attente", reponse: "", statut: _STATUT_INITIAL, messagesAvant })
+      avec(precedents, cle, {
+        message,
+        phase: "attente",
+        reponse: "",
+        statut: _STATUT_INITIAL,
+        messagesAvant,
+        cartes: [],
+      })
     );
-    return (libelle: string) =>
-      mettreAJour(cle, (envoi) => (envoi.phase === "attente" ? { ...envoi, statut: libelle } : envoi));
+    return {
+      onStatut: (libelle: string) =>
+        mettreAJour(cle, (envoi) => (envoi.phase === "attente" ? { ...envoi, statut: libelle } : envoi)),
+      onCarte: (carte: CarteEcriture) =>
+        mettreAJour(cle, (envoi) => ({ ...envoi, cartes: [...envoi.cartes, carte] })),
+    };
   }
 
   function echouer(cle: CleEnvoi, erreur: unknown, message: string, fichier: File | null) {
@@ -147,13 +166,14 @@ export function useEnvoisEnCours(
   // composant démonté — or plusieurs conversations peuvent avoir un tour en
   // vol en même temps.
   async function envoyerPremierMessage(message: string, fichier: File | null) {
-    const onStatut = demarrer("nouvelle", message, []);
+    const { onStatut, onCarte } = demarrer("nouvelle", message, []);
     try {
       const donnees = await creerConversationMutation.mutateAsync({
         message,
         fichier,
         cleIdempotence: crypto.randomUUID(),
         onStatut,
+        onCarte,
       });
       const id = donnees.conversation.id;
       const ouverte = cleOuverteRef.current === "nouvelle";
@@ -166,6 +186,7 @@ export function useEnvoisEnCours(
           statut: "",
           messagesAvant: [],
           titre: donnees.conversation.titre,
+          cartes: precedents.get("nouvelle")?.cartes ?? [],
         });
         return suivants;
       });
@@ -179,7 +200,7 @@ export function useEnvoisEnCours(
   }
 
   async function envoyerMessage(conversationId: number, message: string, fichier: File | null, messagesAvant: Message[]) {
-    const onStatut = demarrer(conversationId, message, messagesAvant);
+    const { onStatut, onCarte } = demarrer(conversationId, message, messagesAvant);
     try {
       const donnees = await envoyerMessageMutation.mutateAsync({
         conversationId,
@@ -187,6 +208,7 @@ export function useEnvoisEnCours(
         fichier,
         cleIdempotence: crypto.randomUUID(),
         onStatut,
+        onCarte,
       });
       const ouverte = cleOuverteRef.current === conversationId;
       mettreAJour(conversationId, (envoi) => ({

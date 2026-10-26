@@ -76,13 +76,15 @@ function lireEvenement(bloc: string): EvenementFlux | null {
 // fetch + ReadableStream plutôt qu'EventSource. Chaque `statut` passe à
 // `onStatut` ; `fin` porte le JSON d'avant le flux ; `erreur` (pendant le
 // tour) devient la même ErreurApi qu'un statut HTTP en erreur. Les refus
-// d'avant le tour restent de vrais statuts HTTP.
+// d'avant le tour restent de vrais statuts HTTP. Chaque `carte` (Carte de
+// confirmation d'une écriture Moduléo, spec 1.5.2) passe à `onCarte`.
 export async function appelApiEnFlux<T>(
   chemin: string,
   options: RequestInit,
   onStatut: (libelle: string) => void,
   messageErreurReseau: string,
-  messageErreurParDefaut: string
+  messageErreurParDefaut: string,
+  onCarte?: (carte: unknown) => void
 ): Promise<T> {
   let reponse: Response;
   try {
@@ -116,6 +118,8 @@ export async function appelApiEnFlux<T>(
       separateur = tampon.indexOf("\n\n");
       if (evenement?.nom === "statut" && typeof evenement.donnees.libelle === "string") {
         onStatut(evenement.donnees.libelle);
+      } else if (evenement?.nom === "carte") {
+        onCarte?.(evenement.donnees);
       } else if (evenement?.nom === "fin") {
         await lecteur.cancel();
         return evenement.donnees as T;

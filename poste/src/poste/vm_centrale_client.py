@@ -1,6 +1,6 @@
 from collections.abc import Iterator
 from typing import NoReturn
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 from urllib.parse import quote
@@ -74,6 +74,21 @@ class EchangeIntrouvableError(Exception):
     pass
 
 
+class EcritureIntrouvableError(Exception):
+    # 404 de la VM sur POST /ecritures-moduleo/{id} : aucune écriture
+    # Moduléo de ce compte sous cet id (spec 1.5.2, #204).
+    pass
+
+
+class EcritureDejaDecideeError(Exception):
+    # 409 de la VM : la carte n'est plus proposée (déjà confirmée, annulée,
+    # expirée…) ou un tour du compte est en cours. `detail` : la carte à
+    # jour, ou la phrase de la VM.
+    def __init__(self, detail: object) -> None:
+        super().__init__(str(detail))
+        self.detail = detail
+
+
 class DernierAdministrateurError(Exception):
     # 409 de la VM : la rétrogradation ou la suppression ferait passer le
     # nombre de comptes administrateur à zéro (garde-fou dernier
@@ -138,6 +153,9 @@ class Message:
     # `user` ou d'avant la 1.4.2.
     tokens_contexte: int | None
     fenetre_contexte: int
+    # Cartes de confirmation Moduléo du tour (spec 1.5.2, #204), relayées
+    # telles quelles : voir vm_centrale.schemas.CarteEcriture.
+    cartes: list[dict] = field(default_factory=list)
 
 
 @dataclass
@@ -333,6 +351,7 @@ def _vers_message(corps: dict) -> Message:
         date_creation=datetime.fromisoformat(corps["date_creation"]),
         tokens_contexte=corps["tokens_contexte"],
         fenetre_contexte=corps["fenetre_contexte"],
+        cartes=corps.get("cartes", []),
     )
 
 
@@ -610,6 +629,22 @@ class VmCentraleClient:
             {"message": message, "cle_idempotence": cle_idempotence, "piece_jointe_id": piece_jointe_id},
             jeton,
         )
+
+    def decider_ecriture(self, jeton: str, ecriture_id: int, decision: str) -> dict:
+        # Clic Confirmer / Annuler d'une Carte de confirmation (spec 1.5.2,
+        # #204) : la carte à jour, relayée telle quelle.
+        reponse = _http_client.post(
+            f"{VM_CENTRALE_BASE_URL}/ecritures-moduleo/{ecriture_id}",
+            json={"decision": decision},
+            headers={"Authorization": f"Bearer {jeton}"},
+        )
+        _lever_si_jeton_invalide(reponse)
+        if reponse.status_code == 404:
+            raise EcritureIntrouvableError()
+        if reponse.status_code == 409:
+            raise EcritureDejaDecideeError(reponse.json()["detail"])
+        reponse.raise_for_status()
+        return reponse.json()
 
     def televerser_piece_jointe(
         self,

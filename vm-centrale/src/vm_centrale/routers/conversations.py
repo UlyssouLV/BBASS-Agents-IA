@@ -72,6 +72,13 @@ from vm_centrale.lectures_outils import (
 )
 from vm_centrale.moduleo.ids import retirer_ids_moduleo
 from vm_centrale.moduleo.client import ClientModuleo, get_client_moduleo
+from vm_centrale.moduleo.ecritures import (
+    cartes_par_message,
+    detacher_de_la_conversation,
+    expirer,
+    rattacher_ecritures_au_message,
+    resultats_par_message,
+)
 from vm_centrale.moduleo.droits import SANS_AUCUN_GROUPE, droits_du_compte
 from vm_centrale.moteur_recherche import MoteurRecherche, get_moteur_recherche
 from vm_centrale.questions_couvertes import (
@@ -87,10 +94,12 @@ from vm_centrale.statut_tour import (
     TITRAGE,
     VERIFICATION,
     Publier,
+    PublierCarte,
     flux_de_la_fin,
     lancer_tour,
 )
 from vm_centrale.schemas import (
+    CarteEcriture,
     ConversationCreeRequest,
     ConversationCreeResponse,
     ConversationDetailResponse,
@@ -575,6 +584,7 @@ def _construire_messages_pour_mistral(
     piece_jointe: PieceJointe | None = None,
     memoire: str | None = None,
     moduleo_ferme: bool = False,
+    resultats_ecritures: dict[int, list[str]] | None = None,
 ) -> list[dict[str, str]]:
     # Historique borné (résumé glissant + fenêtre courte) plutôt que
     # l'intégralité de la conversation, pour maîtriser le coût en tokens
@@ -601,7 +611,13 @@ def _construire_messages_pour_mistral(
         messages.append({"role": "system", "content": memoire})
     if piece_jointe is not None:
         messages.append(_message_systeme_piece_jointe(piece_jointe))
-    messages.extend({"role": m.role, "content": m.contenu} for m in derniers_messages)
+    for m in derniers_messages:
+        messages.append({"role": m.role, "content": m.contenu})
+        # Cartes de confirmation décidées depuis ce tour (spec 1.5.2, #204) :
+        # le résultat de l'appel à ecrire_moduleo, juste après la réponse.
+        messages.extend(
+            {"role": "system", "content": resultat} for resultat in (resultats_ecritures or {}).get(m.id, [])
+        )
     if (
         derniers_messages
         and derniers_messages[-1].role == "assistant"
@@ -1038,10 +1054,11 @@ def creer_conversation(
         with fabrique_session() as db:
             _recuperer_piece_jointe_du_compte(db, identifiant_compte, requete.piece_jointe_id, None)
 
-    def tour(db_tour: Session, publier: Publier) -> ConversationCreeResponse:
+    def tour(db_tour: Session, publier: Publier, publier_carte: PublierCarte) -> ConversationCreeResponse:
         return _tour_creer_conversation(
             db_tour,
             publier,
+            publier_carte,
             requete,
             identifiant_compte,
             client,
@@ -1087,7 +1104,7 @@ def _flux_du_tour(
     conversation_id: int | None,
     cle_idempotence: str | None,
     fabrique_session: FabriqueSession,
-    tour: Callable[[Session, Publier], BaseModel],
+    tour: Callable[[Session, Publier, PublierCarte], BaseModel],
 ) -> StreamingResponse:
     # Le tour, verrou par compte compris, s'exécute à part avec sa propre
     # session (ADR-0016) : il termine et commite même si personne ne lit
@@ -1095,7 +1112,7 @@ def _flux_du_tour(
     # le premier tour l'attend, puis ne renvoie que sa fin. Verrou déjà pris
     # (un tour du même compte) : le statut l'annonce, republié pendant
     # l'attente pour que le flux ne reste pas muet.
-    def executer(publier: Publier) -> BaseModel:
+    def executer(publier: Publier, publier_carte: PublierCarte) -> BaseModel:
         verrou = verrous_comptes.pour(identifiant_compte)
         if not verrou.acquire(blocking=False):
             statut = _statut_d_attente(identifiant_compte, conversation_id, cle_idempotence)
@@ -1108,7 +1125,7 @@ def _flux_du_tour(
             if reponse_en_cache is not None:
                 return reponse_en_cache
             with fabrique_session() as db:
-                resultat = tour(db, publier)
+                resultat = tour(db, publier, publier_carte)
             if cle_idempotence is not None:
                 cache_idempotence.enregistrer(identifiant_compte, cle_idempotence, resultat)
             return resultat
@@ -1122,6 +1139,7 @@ def _flux_du_tour(
 def _tour_creer_conversation(
     db: Session,
     publier: Publier,
+    publier_carte: PublierCarte,
     requete: ConversationCreeRequest,
     identifiant_compte: str,
     client: MistralClient,
@@ -1197,6 +1215,8 @@ def _tour_creer_conversation(
         publier=publier,
         client_moduleo=client_moduleo,
         droits_moduleo=droits_moduleo,
+        identifiant_compte=identifiant_compte,
+        publier_carte=publier_carte,
     )
     tools = outils_du_tour(contexte_outils)
     message_pour_mistral = _avec_consigne_ids_moduleo(message_pour_mistral, tools)
@@ -1277,6 +1297,7 @@ def _tour_creer_conversation(
     db.add_all([message_utilisateur, message_assistant])
     _rattacher_recherches_au_message(db, message_assistant)
     rattacher_lectures_au_message(db, message_assistant)
+    rattacher_ecritures_au_message(db, message_assistant)
     if piece_jointe is not None:
         _lier_piece_jointe_a_la_conversation(piece_jointe, conversation)
         piece_jointe.message_id = message_utilisateur.id
@@ -1333,6 +1354,7 @@ def consulter_conversation(
     messages_page_desc = requete_messages.order_by(Message.id.desc()).limit(limite + 1).all()
     a_des_messages_plus_anciens = len(messages_page_desc) > limite
     messages = list(reversed(messages_page_desc[:limite]))
+    cartes = cartes_par_message(db, [message.id for message in messages])
 
     return ConversationDetailResponse(
         id=conversation.id,
@@ -1347,6 +1369,7 @@ def consulter_conversation(
                 date_creation=message.date_creation,
                 tokens_contexte=message.tokens_contexte,
                 fenetre_contexte=_FENETRE_CONTEXTE,
+                cartes=[CarteEcriture.model_validate(carte) for carte in cartes.get(message.id, [])],
             )
             for message in messages
         ],
@@ -1399,6 +1422,8 @@ def supprimer_conversation(
         ResultatRechercheWeb.conversation_id == conversation.id
     ).delete()
     supprimer_lectures(db, conversation.id)
+    # Le Journal des écritures survit à la conversation (spec 1.5.2).
+    detacher_de_la_conversation(db, conversation.id)
 
     # Consommation n'a pas de cascade ORM déclarée sur Conversation (spec
     # 1.1.3) : la ligne survit à la conversation qui l'a produite, seul le
@@ -1941,10 +1966,11 @@ def envoyer_message(
         if requete.piece_jointe_id is not None:
             _recuperer_piece_jointe_du_compte(db, identifiant_compte, requete.piece_jointe_id, conversation_id)
 
-    def tour(db_tour: Session, publier: Publier) -> MessageEnvoyeResponse:
+    def tour(db_tour: Session, publier: Publier, publier_carte: PublierCarte) -> MessageEnvoyeResponse:
         return _tour_envoyer_message(
             db_tour,
             publier,
+            publier_carte,
             conversation_id,
             requete,
             identifiant_compte,
@@ -1960,6 +1986,7 @@ def envoyer_message(
 def _tour_envoyer_message(
     db: Session,
     publier: Publier,
+    publier_carte: PublierCarte,
     conversation_id: int,
     requete: MessageEnvoyeRequest,
     identifiant_compte: str,
@@ -1969,6 +1996,10 @@ def _tour_envoyer_message(
     client_moduleo: ClientModuleo | None,
 ) -> MessageEnvoyeResponse:
     conversation = _recuperer_conversation_du_compte(db, conversation_id, identifiant_compte)
+    # Un nouveau message fait expirer les cartes encore proposées (spec
+    # 1.5.2, #204) : commité tout de suite, même si le tour échoue ensuite.
+    expirer(db, conversation.id)
+    db.commit()
 
     # Revalidées dans la session du tour, comme pour creer_conversation.
     piece_jointe: PieceJointe | None = None
@@ -2003,6 +2034,7 @@ def _tour_envoyer_message(
         piece_jointe,
         _memoire_de_la_conversation(db, conversation.id, requete.message),
         moduleo_ferme=client_moduleo is not None and droits_moduleo.sans_groupe,
+        resultats_ecritures=resultats_par_message(db, [m.id for m in derniers_messages]),
     )
 
     # Un message sort de la fenêtre des 3 derniers dès que ce tour (2 nouveaux
@@ -2023,6 +2055,8 @@ def _tour_envoyer_message(
         publier=publier,
         client_moduleo=client_moduleo,
         droits_moduleo=droits_moduleo,
+        identifiant_compte=identifiant_compte,
+        publier_carte=publier_carte,
     )
     tools = outils_du_tour(contexte_outils)
     messages_pour_mistral = _avec_consigne_ids_moduleo(messages_pour_mistral, tools)
@@ -2083,6 +2117,7 @@ def _tour_envoyer_message(
     db.add_all([message_utilisateur, message_assistant])
     _rattacher_recherches_au_message(db, message_assistant)
     rattacher_lectures_au_message(db, message_assistant)
+    rattacher_ecritures_au_message(db, message_assistant)
     if piece_jointe is not None:
         _lier_piece_jointe_a_la_conversation(piece_jointe, conversation)
         piece_jointe.message_id = message_utilisateur.id

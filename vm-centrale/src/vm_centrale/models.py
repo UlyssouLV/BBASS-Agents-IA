@@ -351,6 +351,40 @@ class GroupeModuleoDroit(Base):
     conditions: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
 
+class EcritureModuleo(Base):
+    # Une écriture Moduléo proposée par le modèle (spec 1.5.2, #204) : la
+    # Carte de confirmation tant qu'elle est « proposee », puis la ligne du
+    # Journal des écritures (une seule table porte les deux). Survit à sa
+    # conversation, comme Consommation : conversation_id et message_id
+    # passent à NULL à sa suppression.
+    __tablename__ = "ecritures_moduleo"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    identifiant_compte: Mapped[str] = mapped_column(String, index=True)
+    conversation_id: Mapped[int | None] = mapped_column(
+        ForeignKey(_FK_CONVERSATIONS_ID), nullable=True, index=True
+    )
+    # Le message `assistant` du tour qui l'a proposée, renseigné à la
+    # persistance de sa réponse : la carte se recharge avec lui.
+    message_id: Mapped[int | None] = mapped_column(ForeignKey("messages.id"), nullable=True, index=True)
+    methode: Mapped[str] = mapped_column(String)
+    # Gabarit de ROUTES_ECRITURE.
+    route: Mapped[str] = mapped_column(String)
+    parametres: Mapped[dict] = mapped_column(JSON)
+    corps: Mapped[dict | list | None] = mapped_column(JSON, nullable=True)
+    # Ce que montre la carte : description de la route et lignes en noms.
+    # NULL pour une écriture refusée dès la proposition (aucune carte).
+    carte: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # proposee / confirmee / annulee / expiree / refusee / en_echec.
+    statut: Mapped[str] = mapped_column(String)
+    # Id renvoyé par Moduléo à une écriture confirmée.
+    id_renvoye: Mapped[str | None] = mapped_column(String, nullable=True)
+    # Phrase fixe d'un refus ou d'un échec, telle que la carte l'affiche.
+    erreur: Mapped[str | None] = mapped_column(String, nullable=True)
+    date_creation: Mapped[datetime] = mapped_column(DateTime)
+    date_decision: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
 class RattachementModuleo(Base):
     # Rattachement d'un compte à ses groupes Moduléo et à son utilisateur
     # Moduléo (spec 1.5.1), toujours explicite (scripts/

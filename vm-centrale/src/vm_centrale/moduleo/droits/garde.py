@@ -283,6 +283,25 @@ def _les_siens_en_ecriture(
     )
 
 
+def ecriture_possible(methode: str, route: str, droits: DroitsModuleo) -> bool:
+    # La route d'écriture peut-elle s'ouvrir au compte, avant d'en connaître
+    # le corps (#204) : les outils d'écriture la listent. Sans le droit, une
+    # route `siens_ecriture` reste possible pour un compte lié à son
+    # utilisateur Moduléo ; verifier_ecriture tranche à la proposition.
+    exigence = CLASSEMENT_ECRITURE.get((methode, route))
+    if exigence is None or exigence.fermee:
+        return False
+    if exigence.groupe is not None:
+        return _groupe(droits, exigence.groupe) is not None
+    if exigence.droit is None or droits.a(exigence.droit):
+        return True
+    return (
+        exigence.siens_ecriture is not None
+        and droits.id_utilisateur_moduleo is not None
+        and _groupe(droits, _APPLICATIONS[exigence.droit]) is not None
+    )
+
+
 def autorise(route: str, droits: DroitsModuleo, parametres: dict[str, Any] | None = None) -> bool:
     try:
         verifier(route, droits, parametres)

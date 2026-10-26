@@ -104,10 +104,18 @@ class ClientModuleo:
     def ecrire(
         self, methode: str, route: str, parametres: dict[str, Any] | None, corps: Any, droits: DroitsModuleo
     ) -> Any:
-        # Une seule requête, aucune nouvelle tentative. Refus avant tout
-        # envoi : route, paramètres et corps (RequeteInterdite), barrière
-        # serveur de test (RequeteInterdite), puis garde des droits
-        # (DroitManquant).
+        # Une seule requête, aucune nouvelle tentative, après verifier_ecriture.
+        parametres = parametres or {}
+        self.verifier_ecriture(methode, route, parametres, corps, droits)
+        return self._transport.ecrire(methode, route, parametres, corps)
+
+    def verifier_ecriture(
+        self, methode: str, route: str, parametres: dict[str, Any] | None, corps: Any, droits: DroitsModuleo
+    ) -> None:
+        # Tout ce que vérifie ecrire(), sans rien envoyer (ecrire_moduleo
+        # propose avec, #204) : route, paramètres et corps
+        # (RequeteInterdite), barrière serveur de test (RequeteInterdite),
+        # puis garde des droits (DroitManquant).
         parametres = parametres or {}
         _remplir_ecriture(methode, route, parametres)
         _verifier_corps(methode, route, corps)
@@ -118,7 +126,6 @@ class ClientModuleo:
         verifier_ecriture(
             methode, route, droits, parametres, corps, lambda lecture, p: self.lire(lecture, p, droits)
         )
-        return self._transport.ecrire(methode, route, parametres, corps)
 
     def envoyer(self, methode: str, route: str, parametres: dict[str, Any] | None, droits: DroitsModuleo) -> Any:
         if methode != "GET":
