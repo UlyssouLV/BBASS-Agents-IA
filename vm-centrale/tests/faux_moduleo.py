@@ -455,13 +455,16 @@ class FauxModuleo:
                 i for i, intervenant in self._intervenants.items() if intervenant["IdAffaire"] == parametres["idAffaire"]
             ]
         if route == "cogeo/affaire/{idAffaire}/parcelles":
-            return [i for i, parcelle in self._parcelles.items() if parcelle["IdAffaire"] == parametres["idAffaire"]]
+            # Comme Moduléo (#197) : `null`, et non `[]`, quand la liste est vide.
+            return [
+                i for i, parcelle in self._parcelles.items() if parcelle["IdAffaire"] == parametres["idAffaire"]
+            ] or None
         if route == "cogeo/parcelle/{idParcelle}":
             if parametres["idParcelle"] not in self._parcelles:
                 raise ModuleoIntrouvable(f"404 sur {route}")
             return self._parcelles[parametres["idParcelle"]]
         if route == "cogeo/parcelle/{idParcelle}/proprietaires":
-            return [i for i, p in self._proprietaires.items() if p["IdParcelle"] == parametres["idParcelle"]]
+            return [i for i, p in self._proprietaires.items() if p["IdParcelle"] == parametres["idParcelle"]] or None
         if route == "cogeo/proprietaire/{idProprietaire}":
             if parametres["idProprietaire"] not in self._proprietaires:
                 raise ModuleoIntrouvable(f"404 sur {route}")

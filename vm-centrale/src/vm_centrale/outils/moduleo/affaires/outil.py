@@ -288,16 +288,17 @@ def _etat_api(valeur: str) -> str:
 def _parcelles(lecteur: LecteurModuleo, id_affaire: int, droits: DroitsModuleo) -> ParcellesAffaire:
     # Parcelle par parcelle, puis propriétaire par propriétaire, à travers
     # le garde. Sans le droit des propriétaires, ils ne sont pas lus.
+    # Une liste vide vient `null` de Moduléo (#197).
     parcelles = [
         lecteur.lire(_ROUTE_PARCELLE, {"idParcelle": id_parcelle})
-        for id_parcelle in lecteur.lire(_ROUTE_PARCELLES, {"idAffaire": id_affaire})
+        for id_parcelle in lecteur.lire(_ROUTE_PARCELLES, {"idAffaire": id_affaire}) or []
     ]
     if not autorise(_ROUTE_PROPRIETAIRE, droits):
         return ParcellesAffaire(parcelles, None)
     proprietaires = {
         parcelle["IdParcelle"]: [
             lecteur.lire(_ROUTE_PROPRIETAIRE, {"idProprietaire": id_proprietaire}).get("IdContact")
-            for id_proprietaire in lecteur.lire(_ROUTE_PROPRIETAIRES, {"idParcelle": parcelle["IdParcelle"]})
+            for id_proprietaire in lecteur.lire(_ROUTE_PROPRIETAIRES, {"idParcelle": parcelle["IdParcelle"]}) or []
         ]
         for parcelle in parcelles
     }

@@ -182,3 +182,19 @@ def test_sans_le_droit_de_consulter_les_contacts_proprietaires_retires_avec_une_
     routes = faux_moduleo.routes_appelees()
     assert "cogeo/parcelle/{idParcelle}/proprietaires" not in routes
     assert "cogeo/proprietaire/{idProprietaire}" not in routes
+
+
+def test_parcelle_sans_proprietaire_lue_jamais_la_phrase_de_panne(
+    client, faux_moduleo, mistral_client_factice, jeton_valide
+):
+    # Moduléo renvoie `null`, et non `[]`, sur une parcelle sans
+    # propriétaire (#197, affaire TMP-019583).
+    _affaire_avec_parcelles(faux_moduleo)
+
+    _chercher(client, mistral_client_factice, jeton_valide, {"numero": "2024-123", "avec_parcelles": True})
+
+    contenu = _contenu_outil(mistral_client_factice)
+    assert "indisponible" not in contenu
+    assert "propriétaires : SCI Les Oliviers, Paul Durand" in contenu
+    (ligne,) = [ligne for ligne in contenu.splitlines() if ligne.startswith("- AB 124")]
+    assert ligne == "- AB 124, Vendargues (34740), contenance 560,5 m²"
