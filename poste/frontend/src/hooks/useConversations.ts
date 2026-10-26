@@ -33,7 +33,12 @@ export interface CarteEcriture {
   methode: string;
   route: string;
   titre: string;
-  lignes: { champ: string; valeur: string }[];
+  // PUT (#205) : `avant`, la valeur avant la modification (null hors
+  // différence). DELETE : `rubrique` (« Sera supprimé ») et `fiche`, le
+  // texte de l'élément quand il en a une.
+  lignes: { champ: string; valeur: string; avant?: string | null }[];
+  rubrique?: string | null;
+  fiche?: string | null;
   message: string | null;
 }
 

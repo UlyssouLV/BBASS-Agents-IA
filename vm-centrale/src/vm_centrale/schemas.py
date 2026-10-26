@@ -126,6 +126,8 @@ class ConversationResponse(BaseModel):
 class LigneCarteEcriture(BaseModel):
     champ: str
     valeur: str
+    # PUT (#205) : la valeur avant la modification ; null hors différence.
+    avant: str | None = None
 
 
 class CarteEcriture(BaseModel):
@@ -140,6 +142,10 @@ class CarteEcriture(BaseModel):
     route: str
     titre: str
     lignes: list[LigneCarteEcriture]
+    # DELETE (#205) : « Sera supprimé », et la fiche de l'élément quand il
+    # en a une (sinon ses champs dans `lignes`).
+    rubrique: str | None = None
+    fiche: str | None = None
     message: str | None
 
 

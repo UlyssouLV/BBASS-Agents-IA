@@ -9,7 +9,9 @@ import { cn } from "@/lib/utils";
 // Carte de confirmation d'une écriture Moduléo (spec 1.5.2, #204) : ce que
 // le modèle propose d'écrire, en noms, et deux boutons traités par la VM,
 // hors du modèle. Un « oui » tapé dans le chat ne confirme rien. Style
-// provisoire, revu avec les Agents par pôle.
+// provisoire, revu avec les Agents par pôle. PUT (#205) : « ancien →
+// nouveau » des seuls champs modifiés ; DELETE : la fiche sous « Sera
+// supprimé ».
 //
 // `desactivee` : tant que le tour qui l'a proposée n'est pas fini, la carte
 // n'est pas encore en base côté VM.
@@ -37,14 +39,26 @@ export function CarteConfirmationEcriture({
       className="flex max-w-[70%] flex-col gap-2 self-start rounded-md border bg-background px-3 py-2 text-sm"
     >
       <p className="font-medium">Écriture dans Moduléo : {affichee.titre}</p>
-      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
-        {affichee.lignes.map((ligne) => (
-          <div key={ligne.champ} className="contents">
-            <dt className="text-muted-foreground">{ligne.champ}</dt>
-            <dd className="break-words">{ligne.valeur}</dd>
-          </div>
-        ))}
-      </dl>
+      {affichee.rubrique && <p className="font-medium text-destructive">{affichee.rubrique}</p>}
+      {affichee.fiche && <p className="whitespace-pre-line break-words">{affichee.fiche}</p>}
+      {affichee.lignes.length > 0 && (
+        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
+          {affichee.lignes.map((ligne) => (
+            <div key={ligne.champ} className="contents">
+              <dt className="text-muted-foreground">{ligne.champ}</dt>
+              <dd className="break-words">
+                {ligne.avant == null ? (
+                  ligne.valeur
+                ) : (
+                  <>
+                    <span className="text-muted-foreground line-through">{ligne.avant}</span> → {ligne.valeur}
+                  </>
+                )}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
       {proposee ? (
         <div className="flex items-center gap-2">
           <Button size="sm" disabled={desactivee || decider.isPending} onClick={() => cliquer("confirmer")}>

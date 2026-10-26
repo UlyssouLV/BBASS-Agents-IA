@@ -409,7 +409,7 @@ class FauxModuleo:
         self._affaires_contact.setdefault(id_contact, {}).setdefault(role, []).append(id_affaire)
 
     def _ajouter_coordonnee(self, cle: str, id_coordonnee: int, id_contact: int, fiche: dict) -> None:
-        self._coordonnees[cle][id_coordonnee] = fiche
+        self._coordonnees[cle][id_coordonnee] = {**fiche, "IdContact": id_contact}
         self._coordonnees_contact.setdefault(id_contact, {}).setdefault(cle, []).append(id_coordonnee)
 
     def ajouter_commune(self, id_commune: int, nom: str, code_postal: str) -> None:

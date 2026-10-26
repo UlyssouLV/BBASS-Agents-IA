@@ -161,7 +161,7 @@ def test_decrire_route_du_telephone_avec_son_exemple(
     assert '"Numero": "sample string 1"' in resultat
 
 
-@pytest.mark.parametrize("route", ["POST moduleo/inconnue", "POST webhook", "cogeo/note", "DELETE moduleo/telephone/{idTelephone}"])
+@pytest.mark.parametrize("route", ["POST moduleo/inconnue", "POST webhook", "cogeo/note", "DELETE webhook"])
 def test_decrire_route_inconnue_ou_fermee_phrase_fixe(
     client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide, route
 ):
@@ -199,9 +199,9 @@ def test_ecrire_n_envoie_rien_et_la_carte_arrive_en_noms(
     assert carte["methode"] == "POST" and carte["route"] == "moduleo/telephone"
     assert carte["titre"] == "Crée un numéro de téléphone."
     assert carte["lignes"] == [
-        {"champ": "Contact", "valeur": "Étude Dupont"},
-        {"champ": "Numero", "valeur": "04 67 00 00 00"},
-        {"champ": "Lieu", "valeur": "Bureau"},
+        {"champ": "Contact", "valeur": "Étude Dupont", "avant": None},
+        {"champ": "Numero", "valeur": "04 67 00 00 00", "avant": None},
+        {"champ": "Lieu", "valeur": "Bureau", "avant": None},
     ]
     # La carte part avant la fin du tour.
     noms = [nom for nom, _ in evenements(reponse)]
@@ -222,10 +222,10 @@ def test_carte_nomme_affaire_et_utilisateur_et_signale_un_id_non_resolu(
 
     (carte,) = _cartes(reponse)
     assert carte["lignes"] == [
-        {"champ": "Message", "valeur": "Rappeler le client"},
-        {"champ": "Affaire", "valeur": "affaire 2024-123"},
-        {"champ": "Destinataires", "valeur": "Jean Martin, 99 (non résolu)"},
-        {"champ": "CategorieNote", "valeur": "3 (non résolu)"},
+        {"champ": "Message", "valeur": "Rappeler le client", "avant": None},
+        {"champ": "Affaire", "valeur": "affaire 2024-123", "avant": None},
+        {"champ": "Destinataires", "valeur": "Jean Martin, 99 (non résolu)", "avant": None},
+        {"champ": "CategorieNote", "valeur": "3 (non résolu)", "avant": None},
     ]
     assert faux_moduleo.ecritures == []
 
@@ -476,3 +476,188 @@ def test_inspecteur_proposition_et_confirmation_sans_cle_ni_security_code(
     assert "ApiKey" not in texte and "SecurityCode" not in texte
     (ecriture,) = _journal(db_session)
     assert ecriture.id_renvoye == "456"
+
+
+# PUT et DELETE (#205) : la VM relit l'élément avant la carte. PUT : les
+# seuls champs qui changent, ancien → nouveau, en noms. DELETE : la fiche
+# entière, sous « Sera supprimé ».
+
+_TELEPHONE_EXISTANT = "moduleo/telephone/{idTelephone}"
+_INTROUVABLE_A_LA_RELECTURE = (
+    "L'élément visé n'existe pas dans Moduléo : écriture non proposée. Rien n'a été écrit."
+)
+
+
+def _telephone_existant(faux_moduleo) -> None:
+    _contact_et_affaire(faux_moduleo)
+    faux_moduleo.ajouter_contact(41, "Cabinet Martin")
+    faux_moduleo.ajouter_telephone(30, 40, "04 67 00 00 00", "Bureau")
+
+
+def _modifier_telephone(id_telephone: int = 30, **corps) -> dict:
+    existant = {"IdTelephone": id_telephone, "IdContact": 40, "Numero": "04 67 00 00 00", "Lieu": "Bureau"}
+    return {
+        "route": f"PUT {_TELEPHONE_EXISTANT}",
+        "parametres": {"idTelephone": id_telephone},
+        "corps": {**existant, **corps},
+    }
+
+
+def _supprimer(route: str, **parametres) -> dict:
+    return {"route": f"DELETE {route}", "parametres": parametres}
+
+
+def test_put_relit_l_element_et_la_carte_montre_les_seuls_champs_modifies_en_noms(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide
+):
+    _telephone_existant(faux_moduleo)
+
+    reponse = _proposer(
+        client, mistral_client_factice, jeton_valide, _modifier_telephone(IdContact=41, Numero="04 67 11 11 11")
+    )
+
+    assert (_TELEPHONE_EXISTANT, {"idTelephone": 30}) in faux_moduleo.appels
+    assert faux_moduleo.ecritures == []
+    assert _resultat_outil(mistral_client_factice).startswith(_PROPOSEE)
+    (carte,) = _cartes(reponse)
+    assert (carte["methode"], carte["statut"], carte["rubrique"], carte["fiche"]) == ("PUT", "proposee", None, None)
+    assert carte["lignes"] == [
+        {"champ": "Contact", "avant": "Étude Dupont", "valeur": "Cabinet Martin"},
+        {"champ": "Numero", "avant": "04 67 00 00 00", "valeur": "04 67 11 11 11"},
+    ]
+
+
+def test_put_champ_vide_avant_ou_apres(client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide):
+    faux_moduleo.ajouter_tache(8, "Bornage", "2026-10-12T08:00:00", "2026-10-12T12:00:00", Emplacement="Lot A")
+    tache = {
+        "route": "PUT planning/tacheplanning/{idTachePlanning}",
+        "parametres": {"idTachePlanning": 8},
+        "corps": {"IdTachePlanning": 8, "Libelle": "Bornage lot B", "Emplacement": None, "Commentaire": "GPS"},
+    }
+
+    reponse = _proposer(client, mistral_client_factice, jeton_valide, tache)
+
+    (carte,) = _cartes(reponse)
+    assert carte["lignes"] == [
+        {"champ": "Libelle", "avant": "Bornage", "valeur": "Bornage lot B"},
+        {"champ": "Emplacement", "avant": "Lot A", "valeur": "(vide)"},
+        {"champ": "Commentaire", "avant": "(vide)", "valeur": "GPS"},
+    ]
+
+
+def test_put_sans_aucun_changement_pas_de_carte(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide, db_session
+):
+    _telephone_existant(faux_moduleo)
+
+    reponse = _proposer(client, mistral_client_factice, jeton_valide, _modifier_telephone())
+
+    assert _cartes(reponse) == []
+    assert _resultat_outil(mistral_client_factice) == (
+        "Écriture non proposée : le corps ne change aucun champ de l'élément visé. Rien n'a été écrit."
+    )
+    assert _journal(db_session) == []
+
+
+def test_delete_carte_sera_supprime_avec_la_fiche_existante(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide
+):
+    _contact_et_affaire(faux_moduleo)
+    faux_moduleo.ajouter_temps_passe(70, "2026-10-07T00:00:00", 4.0, 7, IdAffaire=12, Lieu="Terrain")
+
+    reponse = _proposer(
+        client, mistral_client_factice, jeton_valide, _supprimer("cogeo/tempspasse/{idTempsPasse}", idTempsPasse=70)
+    )
+
+    assert faux_moduleo.ecritures == []
+    (carte,) = _cartes(reponse)
+    assert (carte["methode"], carte["rubrique"], carte["lignes"]) == ("DELETE", "Sera supprimé", [])
+    assert carte["fiche"].startswith("Temps passé du 07/10/2026")
+    for attendu in ("Collaborateur : Jean Martin", "Affaire : 2024-123", "Heures : 4 h", "Lieu : Terrain"):
+        assert attendu in carte["fiche"]
+    assert "id Moduléo" not in carte["fiche"]
+
+
+def test_delete_sans_fiche_existante_les_champs_en_noms(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide
+):
+    _telephone_existant(faux_moduleo)
+
+    reponse = _proposer(
+        client, mistral_client_factice, jeton_valide, _supprimer(_TELEPHONE_EXISTANT, idTelephone=30)
+    )
+
+    (carte,) = _cartes(reponse)
+    assert (carte["rubrique"], carte["fiche"]) == ("Sera supprimé", None)
+    assert carte["lignes"] == [
+        {"champ": "Numero", "valeur": "04 67 00 00 00", "avant": None},
+        {"champ": "Lieu", "valeur": "Bureau", "avant": None},
+        {"champ": "Contact", "valeur": "Étude Dupont", "avant": None},
+    ]
+
+
+@pytest.mark.parametrize(
+    "appel",
+    [_modifier_telephone(999, Numero="06 00 00 00 00"), _supprimer(_TELEPHONE_EXISTANT, idTelephone=999)],
+    ids=["PUT", "DELETE"],
+)
+def test_element_introuvable_a_la_relecture_pas_de_carte_phrase_fixe(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide, appel
+):
+    _telephone_existant(faux_moduleo)
+
+    reponse = _proposer(client, mistral_client_factice, jeton_valide, appel)
+
+    assert _cartes(reponse) == []
+    assert faux_moduleo.ecritures == []
+    assert _resultat_outil(mistral_client_factice) == _INTROUVABLE_A_LA_RELECTURE
+
+
+def test_relecture_refusee_par_le_garde_pas_de_carte_phrase_fixe(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide, db_session
+):
+    # Une note s'écrit avec le droit « Supprimer / Éditer les notes des
+    # autres » mais ne se lit par aucun compte : la VM ne peut pas montrer
+    # ce qui serait supprimé.
+    reponse = _proposer(client, mistral_client_factice, jeton_valide, _supprimer("cogeo/note/{idNote}", idNote=5))
+
+    assert _cartes(reponse) == []
+    assert faux_moduleo.appels == [] and faux_moduleo.ecritures == []
+    phrase = (
+        "Votre compte ne peut pas lire l'élément visé dans Moduléo : écriture non proposée. Rien n'a été écrit. "
+        "Demandez à un compte administrateur si vous en avez besoin."
+    )
+    assert _resultat_outil(mistral_client_factice) == phrase
+    assert [(e.statut, e.carte, e.erreur) for e in _journal(db_session)] == [("refusee", None, phrase)]
+
+
+@pytest.mark.parametrize(
+    ("appel", "attendue"),
+    [
+        (
+            _modifier_telephone(Numero="04 67 11 11 11"),
+            (
+                "PUT",
+                _TELEPHONE_EXISTANT,
+                {"idTelephone": 30},
+                {"IdTelephone": 30, "IdContact": 40, "Numero": "04 67 11 11 11", "Lieu": "Bureau"},
+            ),
+        ),
+        (_supprimer(_TELEPHONE_EXISTANT, idTelephone=30), ("DELETE", _TELEPHONE_EXISTANT, {"idTelephone": 30}, None)),
+    ],
+    ids=["PUT", "DELETE"],
+)
+def test_confirmer_put_ou_delete_une_seule_requete_avec_la_bonne_methode(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide, db_session, appel, attendue
+):
+    _telephone_existant(faux_moduleo)
+    (carte,) = _cartes(_proposer(client, mistral_client_factice, jeton_valide, appel))
+
+    reponse = _decider(client, jeton_valide, carte["id"])
+
+    assert reponse.status_code == 200, reponse.text
+    assert reponse.json()["statut"] == "confirmee"
+    # La carte confirmée garde ce qu'elle montrait.
+    assert (reponse.json()["lignes"], reponse.json()["rubrique"]) == (carte["lignes"], carte["rubrique"])
+    assert faux_moduleo.ecritures == [attendue]
+    assert [(e.methode, e.statut) for e in _journal(db_session)] == [(attendue[0], "confirmee")]

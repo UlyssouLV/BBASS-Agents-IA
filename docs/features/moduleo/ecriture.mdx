@@ -17,13 +17,16 @@ Deux outils, proposés seulement si les trois conditions sont réunies :
 | `decrire_ecriture_moduleo` | Donne au modèle les champs d’une route d’écriture : paramètres, exemple de corps JSON et description, tirés du WADL versionné. N’appelle pas Moduléo. Route inconnue ou fermée : une phrase fixe. |
 | `ecrire_moduleo` | **Propose** une écriture : vérifie la route, les paramètres, le corps, la barrière serveur de test et les droits, prépare une Carte de confirmation. **N’envoie rien.** Sa description liste les routes ouvertes au compte, une ligne chacune. |
 
-En 1.5.2, les créations (POST) d’abord ; les modifications et suppressions viennent avec leur carte détaillée (ce qui change, la fiche entière).
+Créations (POST), modifications (PUT) et suppressions (DELETE) passent toutes par la carte.
 
 ## La Carte de confirmation
 
 Quand le modèle appelle `ecrire_moduleo`, une carte apparaît dans le fil, pendant la réponse :
 
 - ce qui sera écrit, **en noms** : l’affaire devient « affaire 2024-123 », le contact « Étude Dupont », l’utilisateur « Jean Martin ». Un id qu’aucun résolveur ne sait nommer s’affiche brut, avec « non résolu » ;
+- pour une **modification**, la VM relit d’abord l’élément dans Moduléo et la carte ne montre que ce qui change, champ par champ, ancien → nouveau (« Libellé : Bornage → Bornage lot B ») ; un champ vidé s’affiche « (vide) ». Un corps qui ne change rien n’ouvre pas de carte ;
+- pour une **suppression**, la carte montre l’élément entier sous **« Sera supprimé »** : sa fiche de lecture (temps passé, tâche du planning), sinon ses champs en noms ;
+- un élément introuvable à la relecture, ou que le compte n’a pas le droit de lire, n’ouvre pas de carte : le modèle reçoit une phrase fixe et rien n’est envoyé ;
 - deux boutons, **Confirmer** et **Annuler**, traités par la VM, **hors du modèle**. Un « oui » tapé dans le chat ne confirme rien.
 
 Après le clic, la carte affiche **« Écrit dans Moduléo. »**, ou une phrase fixe : annulée, refusée (droit retiré entre-temps), données refusées par Moduléo (avec son message), refus d’accès, élément introuvable, panne. Le clic ne relance pas le modèle ; le résultat lui est donné au message suivant, comme le résultat de son outil.

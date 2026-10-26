@@ -104,6 +104,9 @@ def proposer(
 def carte_de(ecriture: EcritureModuleo) -> dict[str, Any]:
     # Ce que reçoit le poste (événement `carte`, rechargement de la
     # Conversation, réponse au clic) : jamais le corps brut, la carte en noms.
+    # PUT (#205) : `avant` de chaque ligne, null hors différence. DELETE :
+    # `rubrique` (« Sera supprimé ») et `fiche`, le texte de l'élément quand
+    # il en a une.
     carte = ecriture.carte or {}
     return {
         "id": ecriture.id,
@@ -111,7 +114,9 @@ def carte_de(ecriture: EcritureModuleo) -> dict[str, Any]:
         "methode": ecriture.methode,
         "route": ecriture.route,
         "titre": carte.get("titre", ""),
-        "lignes": carte.get("lignes", []),
+        "lignes": [{"avant": None, **ligne} for ligne in carte.get("lignes", [])],
+        "rubrique": carte.get("rubrique"),
+        "fiche": carte.get("fiche"),
         "message": message_de(ecriture),
     }
 

@@ -21,8 +21,31 @@ _CARTE = {
     "methode": "POST",
     "route": "moduleo/telephone",
     "titre": "Crée un numéro de téléphone.",
-    "lignes": [{"champ": "Contact", "valeur": "Étude Dupont"}, {"champ": "Numero", "valeur": "04 67 00 00 00"}],
+    "lignes": [
+        {"champ": "Contact", "valeur": "Étude Dupont", "avant": None},
+        {"champ": "Numero", "valeur": "04 67 00 00 00", "avant": None},
+    ],
+    "rubrique": None,
+    "fiche": None,
     "message": None,
+}
+# PUT et DELETE (#205) : différences (`avant`), puis la fiche sous « Sera
+# supprimé ».
+_CARTE_PUT = {
+    **_CARTE,
+    "id": 8,
+    "methode": "PUT",
+    "route": "moduleo/telephone/{idTelephone}",
+    "lignes": [{"champ": "Numero", "valeur": "04 67 11 11 11", "avant": "04 67 00 00 00"}],
+}
+_CARTE_DELETE = {
+    **_CARTE,
+    "id": 9,
+    "methode": "DELETE",
+    "route": "cogeo/tempspasse/{idTempsPasse}",
+    "lignes": [],
+    "rubrique": "Sera supprimé",
+    "fiche": "Temps passé du 07/10/2026\nCollaborateur : Jean Martin\nHeures : 4 h",
 }
 _FIN = (
     "fin",
@@ -62,7 +85,15 @@ def test_les_cartes_sont_rechargees_avec_la_conversation(client, vm_centrale_cli
             date_derniere_activite=maintenant,
             messages=[
                 Message(1, "user", "Ajoute le téléphone", maintenant, None, 262_144),
-                Message(2, "assistant", "Voici la carte.", maintenant, 3_000, 262_144, cartes=[_CARTE]),
+                Message(
+                    2,
+                    "assistant",
+                    "Voici les cartes.",
+                    maintenant,
+                    3_000,
+                    262_144,
+                    cartes=[_CARTE, _CARTE_PUT, _CARTE_DELETE],
+                ),
             ],
             a_des_messages_plus_anciens=False,
         )
@@ -70,7 +101,7 @@ def test_les_cartes_sont_rechargees_avec_la_conversation(client, vm_centrale_cli
 
     corps = client.get("/conversations/1").json()
 
-    assert [m["cartes"] for m in corps["messages"]] == [[], [_CARTE]]
+    assert [m["cartes"] for m in corps["messages"]] == [[], [_CARTE, _CARTE_PUT, _CARTE_DELETE]]
 
 
 def test_confirmer_relaie_le_clic_et_renvoie_la_carte(client, vm_centrale_client_factice):

@@ -54,6 +54,7 @@ class ConversationResponse(BaseModel):
 class LigneCarteEcritureResponse(BaseModel):
     champ: str
     valeur: str
+    avant: str | None = None
 
 
 class CarteEcritureResponse(BaseModel):
@@ -65,6 +66,8 @@ class CarteEcritureResponse(BaseModel):
     route: str
     titre: str
     lignes: list[LigneCarteEcritureResponse]
+    rubrique: str | None = None
+    fiche: str | None = None
     message: str | None
 
 

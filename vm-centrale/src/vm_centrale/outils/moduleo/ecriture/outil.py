@@ -2,10 +2,11 @@ import json
 import logging
 from typing import Any
 
-from vm_centrale.moduleo.carte import lignes_en_noms
-from vm_centrale.moduleo.client import ErreurModuleo, RequeteInterdite
-from vm_centrale.moduleo.droits import DroitManquant, ecriture_possible
+from vm_centrale.moduleo.carte import differences_en_noms, element_en_noms, lignes_en_noms
+from vm_centrale.moduleo.client import ErreurModuleo, LecteurModuleo, RequeteInterdite
+from vm_centrale.moduleo.droits import DroitManquant, DroitsModuleo, ecriture_possible
 from vm_centrale.moduleo.ecritures import REFUSEE, carte_de, proposer
+from vm_centrale.moduleo.relecture import RELECTURES, ElementIntrouvable, relire
 from vm_centrale.moduleo.routes import ROUTES_ECRITURE, RouteEcriture
 from vm_centrale.outils.base import ContexteTour, Outil, ResultatOutil
 from vm_centrale.outils.moduleo.commun import INDISPONIBLE, LecteurTrace
@@ -14,16 +15,21 @@ from vm_centrale.statut_tour import consultation_moduleo
 # Écriture Moduléo (spec 1.5.2, #204, ADR-0019) : deux outils génériques.
 # `decrire_ecriture_moduleo` donne les champs d'une route sans appeler
 # Moduléo ; `ecrire_moduleo` propose l'écriture (Carte de confirmation),
-# n'envoie rien. Règles : README.md.
+# n'envoie rien. PUT et DELETE (#205) : l'élément visé est relu avant la
+# carte. Règles : README.md.
 
 _DECRIRE = "decrire_ecriture_moduleo"
 _ECRIRE = "ecrire_moduleo"
 
-# Méthodes ouvertes aux outils : les POST d'abord (#204) ; PUT et DELETE
-# attendent leur carte détaillée (différences, fiche entière, #205).
-_METHODES_OUVERTES = ("POST",)
+SERA_SUPPRIME = "Sera supprimé"
 
 PROPOSEE = "Écriture proposée au collaborateur, en attente de sa confirmation. Rien n'a été écrit."
+_INTROUVABLE = "L'élément visé n'existe pas dans Moduléo : écriture non proposée. Rien n'a été écrit."
+_RELECTURE_REFUSEE = (
+    "Votre compte ne peut pas lire l'élément visé dans Moduléo : écriture non proposée. Rien n'a été écrit. "
+    "Demandez à un compte administrateur si vous en avez besoin."
+)
+_SANS_CHANGEMENT = "Écriture non proposée : le corps ne change aucun champ de l'élément visé. Rien n'a été écrit."
 _ROUTE_INCONNUE = (
     "Route d'écriture Moduléo inconnue ou fermée : « {route} ». Choisis une route listée dans la "
     "description de ecrire_moduleo, sous la forme « MÉTHODE route ». Rien n'a été écrit."
@@ -44,7 +50,7 @@ def _routes_ouvertes(contexte: ContexteTour) -> list[RouteEcriture]:
     return [
         decrite
         for (methode, route), decrite in sorted(ROUTES_ECRITURE.items())
-        if methode in _METHODES_OUVERTES and ecriture_possible(methode, route, contexte.droits_moduleo)
+        if ecriture_possible(methode, route, contexte.droits_moduleo)
     ]
 
 
@@ -53,10 +59,9 @@ def _nom_route(decrite: RouteEcriture) -> str:
 
 
 def _route_connue(nom: Any) -> RouteEcriture | None:
-    # « POST moduleo/telephone » → la route du WADL, d'une méthode ouverte.
+    # « POST moduleo/telephone » → la route du WADL.
     methode, _, route = str(nom or "").strip().partition(" ")
-    cle = (methode.upper(), route.strip())
-    return ROUTES_ECRITURE.get(cle) if cle[0] in _METHODES_OUVERTES else None
+    return ROUTES_ECRITURE.get((methode.upper(), route.strip()))
 
 
 def _route_ouverte(contexte: ContexteTour, nom: Any) -> RouteEcriture | None:
@@ -152,6 +157,53 @@ def _objet(arguments: dict, nom: str, defaut: Any) -> Any:
     return valeur
 
 
+def _carte(
+    lecteur: LecteurModuleo, droits: DroitsModuleo, decrite: RouteEcriture, parametres: dict[str, Any], corps: Any
+) -> dict | None:
+    # POST : paramètres et corps en noms. PUT / DELETE (#205) : l'élément
+    # visé relu d'abord. None : un PUT qui ne change rien.
+    relecture = RELECTURES.get((decrite.methode, decrite.route))
+    if relecture is None:
+        return {"titre": decrite.description, "lignes": lignes_en_noms(lecteur, parametres, corps)}
+    element = relire(lecteur, relecture, parametres, corps)
+    if decrite.methode == "DELETE":
+        fiche, lignes = element_en_noms(lecteur, relecture.route, element, droits, relecture.identites)
+        return {"titre": decrite.description, "lignes": lignes, "rubrique": SERA_SUPPRIME, "fiche": fiche}
+    if not isinstance(corps, dict):
+        # PUT sans corps (émettre un devis…) : ses paramètres, en noms.
+        return {"titre": decrite.description, "lignes": lignes_en_noms(lecteur, parametres, corps)}
+    lignes = differences_en_noms(lecteur, element, corps, relecture.identites)
+    return {"titre": decrite.description, "lignes": lignes} if lignes else None
+
+
+def _refuser(
+    contexte: ContexteTour,
+    methode: str,
+    route: str,
+    parametres: dict[str, Any],
+    corps: Any,
+    phrase: str,
+    refus: str,
+) -> ResultatOutil:
+    # Refus du garde des droits : inscrit au journal, sans carte.
+    logger.info("Garde des droits Moduléo : %s", refus)
+    ecriture = proposer(
+        contexte.db,
+        contexte.identifiant_compte,
+        contexte.conversation_id,
+        methode,
+        route,
+        parametres,
+        corps,
+        None,
+        statut=REFUSEE,
+        erreur=phrase,
+    )
+    return ResultatOutil(
+        phrase, trace={"route": f"{methode} {route}", "ecriture_id": ecriture.id, "garde_des_droits": refus}
+    )
+
+
 def _executer_ecrire(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
     # Une route connue mais fermée au compte va au garde des droits : sa
     # phrase dit quel droit manque.
@@ -174,28 +226,23 @@ def _executer_ecrire(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
     except RequeteInterdite as erreur:
         return ResultatOutil(_NON_PROPOSEE.format(erreur=erreur), trace={"route": f"{methode} {route}"})
     except DroitManquant as refus:
-        logger.info("Garde des droits Moduléo : %s", refus.refus)
-        ecriture = proposer(
-            contexte.db,
-            contexte.identifiant_compte,
-            contexte.conversation_id,
-            methode,
-            route,
-            parametres,
-            corps,
-            None,
-            statut=REFUSEE,
-            erreur=refus.phrase,
-        )
-        return ResultatOutil(
-            refus.phrase,
-            trace={"route": f"{methode} {route}", "ecriture_id": ecriture.id, "garde_des_droits": refus.refus},
-        )
+        return _refuser(contexte, methode, route, parametres, corps, refus.phrase, refus.refus)
     except ErreurModuleo as erreur:
         # La relecture d'un élément `siens` (garde des droits) a échoué.
         logger.warning("Moduléo indisponible : %s", erreur)
         return ResultatOutil(INDISPONIBLE, trace={"route": f"{methode} {route}", "erreur": str(erreur)})
-    carte = {"titre": decrite.description, "lignes": lignes_en_noms(lecteur, parametres, corps)}
+    try:
+        carte = _carte(lecteur, contexte.droits_moduleo, decrite, parametres, corps)
+    except DroitManquant as refus:
+        # Le garde refuse la relecture de l'élément visé (#205).
+        return _refuser(contexte, methode, route, parametres, corps, _RELECTURE_REFUSEE, refus.refus)
+    except ElementIntrouvable:
+        return ResultatOutil(_INTROUVABLE, trace={"route": f"{methode} {route}", "routes": lecteur.routes})
+    except ErreurModuleo as erreur:
+        logger.warning("Moduléo indisponible : %s", erreur)
+        return ResultatOutil(INDISPONIBLE, trace={"route": f"{methode} {route}", "erreur": str(erreur)})
+    if carte is None:
+        return ResultatOutil(_SANS_CHANGEMENT, trace={"route": f"{methode} {route}", "routes": lecteur.routes})
     ecriture = proposer(
         contexte.db,
         contexte.identifiant_compte,
