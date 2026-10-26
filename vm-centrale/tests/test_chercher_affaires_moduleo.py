@@ -119,7 +119,7 @@ def test_par_numero_la_fiche_donne_les_noms_resolus_et_les_intervenants_avec_leu
 
     assert reponse.status_code == 200
     fiche = _contenu_outil(mistral_client_factice)
-    assert "Affaire 2024-123" in fiche
+    assert fiche.startswith("Affaire 2024-123 [id Moduléo 101]\n")
     assert "Objet : Bornage du lot B" in fiche
     assert "État : Acceptée" in fiche
     assert "Date de création : 04/03/2024" in fiche
@@ -131,8 +131,9 @@ def test_par_numero_la_fiche_donne_les_noms_resolus_et_les_intervenants_avec_leu
     assert f"Responsable : Jean Martin (tél. {_TEL_RESPONSABLE}, email j.martin@bbass.fr)" in fiche
     assert "Chargé d'affaire : Sophie Bernard" in fiche
     assert "- Office notarial Rives (Notaire), représenté par Claire Rives (Clerc)" in fiche
-    # Jamais un id Moduléo dans la fiche.
-    assert "IdClient" not in fiche and "101" not in fiche
+    # L'id Moduléo sur la ligne de référence seulement (#203), jamais la
+    # réponse brute.
+    assert "IdClient" not in fiche and fiche.count("[id Moduléo") == 1
 
 
 def test_les_noms_sont_resolus_une_seule_fois_par_appel(client, faux_moduleo, mistral_client_factice, jeton_valide):

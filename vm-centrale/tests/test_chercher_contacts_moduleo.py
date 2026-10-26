@@ -89,7 +89,7 @@ def test_coordonnees_dun_contact_fiche_avec_telephones_emails_adresses_et_affair
 
     assert reponse.status_code == 200
     fiche = _contenu_outil(mistral_client_factice)
-    assert fiche.startswith("Contact Étude Dupont")
+    assert fiche.startswith("Contact Étude Dupont [id Moduléo 40]\n")
     assert "Type : Société" in fiche
     assert f"- {_TEL} (Bureau)" in fiche
     assert "- 06 11 22 33 44 (Portable)" in fiche
@@ -97,8 +97,8 @@ def test_coordonnees_dun_contact_fiche_avec_telephones_emails_adresses_et_affair
     assert "- 3 rue de la Mairie, Castries (34160) (Siège)" in fiche
     assert "Client des affaires : 2024-123" in fiche
     assert "Intervenant dans les affaires : 2023-050" in fiche
-    # Jamais un id Moduléo dans la fiche.
-    assert "40" not in fiche and "101" not in fiche
+    # L'id Moduléo sur la ligne de référence seulement (#203).
+    assert fiche.count("[id Moduléo") == 1 and "101" not in fiche
 
 
 def test_chaque_coordonnee_est_lue_ids_puis_fiche_et_les_affaires_en_une_lecture_multi(
@@ -126,7 +126,7 @@ def test_un_contact_sans_coordonnees_na_que_son_type_et_son_nom(
 
     _chercher(client, mistral_client_factice, jeton_valide, {"texte": "Durand"})
 
-    assert _contenu_outil(mistral_client_factice) == "Contact Paul Durand\nType : Personne"
+    assert _contenu_outil(mistral_client_factice) == "Contact Paul Durand [id Moduléo 41]\nType : Personne"
 
 
 def test_filtre_par_qualification_resolu_en_noms(client, faux_moduleo, mistral_client_factice, jeton_valide):

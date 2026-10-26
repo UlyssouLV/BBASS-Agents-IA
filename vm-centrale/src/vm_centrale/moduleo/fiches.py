@@ -6,12 +6,15 @@ from datetime import date
 from vm_centrale.lectures_outils import Fiche
 from vm_centrale.moduleo import enumerations
 from vm_centrale.moduleo.droits import DroitsModuleo, chemin
+from vm_centrale.moduleo.ids import id_moduleo
 from vm_centrale.moduleo.objet import objet_lisible
 from vm_centrale.moduleo.resolution import Noms, Utilisateur
 
 # Fiche Moduléo (spec 1.5.0) : le texte dense d'un élément lu dans Moduléo,
-# en noms, jamais la réponse brute ni un id. C'est ce que reçoit le modèle et
-# ce qu'enregistre `lectures_outils`. Un champ vide n'a pas de ligne.
+# en noms, jamais la réponse brute. C'est ce que reçoit le modèle et ce
+# qu'enregistre `lectures_outils`. Un champ vide n'a pas de ligne. Seul id :
+# celui de l'élément, sur la ligne de référence (`[id Moduléo <n>]`, #203),
+# retiré de la réponse affichée (moduleo/ids.py).
 #
 # Ses questions couvertes (#177) : écrites ici par gabarit, champ par
 # champ, jamais par un appel Mistral. Un champ vide n'a pas de question.
@@ -69,7 +72,7 @@ def fiche_affaire(
     ]
     lignes_intervenants = [ligne for intervenant in intervenants if (ligne := _intervenant(noms, intervenant))]
 
-    lignes = [f"Affaire {numero}"]
+    lignes = [_reference(f"Affaire {numero}", affaire.get("IdAffaire"))]
     _ajouter(lignes, "Objet", objet)
     _ajouter(lignes, "État", etat)
     for libelle, valeur in dates:
@@ -145,7 +148,7 @@ def fiche_contact(contact: dict, details: DetailsContact, communes: dict[int, st
         ("Intervenant dans les affaires", _numeros(details.affaires_intervenant)),
     ]
 
-    lignes = [f"Contact {nom}"]
+    lignes = [_reference(f"Contact {nom}", contact.get("IdContact"))]
     type_contact = contact.get("TypeContact")
     if type_contact not in _TYPES_SANS_LIGNE:
         _ajouter(lignes, "Type", _texte(enumerations.libelle(enumerations.TYPES_CONTACT, type_contact)))
@@ -189,7 +192,7 @@ def fiche_devis(devis: dict, affaire: dict | None, noms: Noms) -> Fiche:
     ]
     montant_ht, montant_ttc = montant(devis.get("MontantTotalHT")), montant(devis.get("MontantTotalTTC"))
 
-    lignes = [f"Devis {numero}"]
+    lignes = [_reference(f"Devis {numero}", devis.get("IdDevis"))]
     _ajouter(lignes, "Objet", objet)
     _ajouter(lignes, "Affaire", numero_affaire)
     _ajouter(lignes, "Client", client)
@@ -296,7 +299,7 @@ def fiche_facture(
     reglements = [_reglement(r, paiements.echeances) for r in paiements.reglements] if paiements else []
     reste = montant(reste_a_payer(facture, paiements))
 
-    lignes = [f"Facture {numero}"]
+    lignes = [_reference(f"Facture {numero}", facture.get("IdFacture"))]
     _ajouter(lignes, "Objet", objet)
     _ajouter(lignes, "Affaire", numero_affaire)
     _ajouter(lignes, "Client", client)
@@ -396,7 +399,7 @@ def fiche_temps_passe(temps: dict, noms: NomsTempsPasses, droits: DroitsModuleo)
     du_temps = heures(temps.get("NombreHeure"))
     kilometres = temps.get("NombreKilometre")
 
-    lignes = [f"Temps passé du {jour}"]
+    lignes = [_reference(f"Temps passé du {jour}", temps.get("IdTempsPasse"))]
     _ajouter(lignes, "Collaborateur", collaborateur)
     _ajouter(lignes, "Affaire", affaire)
     _ajouter(lignes, "Code activité", code)
@@ -496,7 +499,7 @@ def fiche_tache(tache: dict, noms: NomsPlanning) -> Fiche:
     id_affaire = _id(tache.get("IdAffaire"))
     affaire = noms.affaires.get(id_affaire, "") if noms.affaires is not None else ""
 
-    lignes = [f"Tâche « {libelle} »"]
+    lignes = [_reference(f"Tâche « {libelle} »", tache.get("IdTache"))]
     _ajouter(lignes, "Date", horaire)
     _ajouter(lignes, "Participants", participants)
     _ajouter(lignes, "Activité", activite)
@@ -638,6 +641,11 @@ def _numeros(numeros: list[str]) -> str:
     numeros = [numero for numero in dict.fromkeys(_texte(n) for n in numeros) if numero]
     autres = f" et {len(numeros) - _AFFAIRES_MAX} autres" if len(numeros) > _AFFAIRES_MAX else ""
     return ", ".join(numeros[:_AFFAIRES_MAX]) + autres
+
+
+def _reference(ligne: str, id_element: object) -> str:
+    # « Affaire 2024-123 [id Moduléo 101] » ; sans id lu, la ligne seule.
+    return f"{ligne} {id_moduleo(id_element)}" if (id_element := _id(id_element)) else ligne
 
 
 def _id(valeur: object) -> int:

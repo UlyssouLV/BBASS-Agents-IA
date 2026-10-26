@@ -70,6 +70,7 @@ from vm_centrale.lectures_outils import (
     rattacher_lectures_au_message,
     supprimer_lectures,
 )
+from vm_centrale.moduleo.ids import retirer_ids_moduleo
 from vm_centrale.moduleo.client import ClientModuleo, get_client_moduleo
 from vm_centrale.moduleo.droits import SANS_AUCUN_GROUPE, droits_du_compte
 from vm_centrale.moteur_recherche import MoteurRecherche, get_moteur_recherche
@@ -334,6 +335,28 @@ _MESSAGE_MODULEO_FERME = {
         "recherche web reste ouverte pour le reste."
     ),
 }
+
+
+# Ids des fiches Moduléo (spec 1.5.2, #203) : lus par le modèle pour
+# désigner un élément, jamais cités. Garanti en plus dans le code par
+# moduleo.ids.retirer_ids_moduleo dans _reponse_visible.
+_MESSAGE_IDS_MODULEO = {
+    "role": "system",
+    "content": (
+        "Les fiches Moduléo portent l'id de chaque élément au format [id Moduléo <n>], "
+        "réservé à tes outils. Ne cite jamais un id Moduléo dans ta réponse, sous aucune "
+        "forme : nomme chaque élément par sa référence (numéro d'affaire, de devis ou de "
+        "facture, nom du contact, date du temps passé, libellé et date de la tâche)."
+    ),
+}
+
+
+def _avec_consigne_ids_moduleo(messages: list[dict[str, str]], tools: list[dict] | None) -> list[dict[str, str]]:
+    # Seulement quand un outil Moduléo est proposé au tour, juste après le
+    # style.
+    if any(outil["function"]["name"].endswith("_moduleo") for outil in tools or []):
+        return [messages[0], _MESSAGE_IDS_MODULEO, *messages[1:]]
+    return messages
 
 
 def _prompt_titrage(message_utilisateur: str, reponse_assistant: str) -> str:
@@ -755,7 +778,8 @@ def _reponse_visible(
         db,
         conversation_id,
         nouveau_message,
-        reponse,
+        # Avant les garde-fous, qui ne changent pas (#203).
+        retirer_ids_moduleo(reponse),
         piece_jointe,
         lectures,
         moduleo_appele,
@@ -1175,6 +1199,7 @@ def _tour_creer_conversation(
         droits_moduleo=droits_moduleo,
     )
     tools = outils_du_tour(contexte_outils)
+    message_pour_mistral = _avec_consigne_ids_moduleo(message_pour_mistral, tools)
     attendre_questions = _lancer_questions_piece_jointe(client, piece_jointe, requete.message)
     reponse_chat = _resoudre_reponse_chat(
         lambda: _appeler_reponse_chat(client, message_pour_mistral, tools),
@@ -2000,6 +2025,7 @@ def _tour_envoyer_message(
         droits_moduleo=droits_moduleo,
     )
     tools = outils_du_tour(contexte_outils)
+    messages_pour_mistral = _avec_consigne_ids_moduleo(messages_pour_mistral, tools)
 
     compte = db.query(Compte).filter(Compte.identifiant == identifiant_compte).first()
 
