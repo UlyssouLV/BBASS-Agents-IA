@@ -20,7 +20,7 @@ Paths: **`agents/roles.yml`**.
 
 ## 0. Locate the PR
 
-Current branch must not be `main`. Resolve the open PR for this branch (`gh pr view`). If none, stop.
+Resolve **base** / release **tag** prefix per `agents/docs/integration-channel.md`. Current branch must not be **protected** (`main` / `master` / **base**). Resolve the open PR for this branch (`gh pr view`). If none, stop. PR base must be **base**. Releases via `/crel` use **tag(X.Y.Z)** (e.g. `orchestrator-v0.1.0` on this channel).
 
 Infer **`X.Y.Z`** from the branch `vX.Y.Z-<slug>` or the PR title `VX.Y.Z — …`. If missing: ask and wait.
 
@@ -51,9 +51,10 @@ Read each role below (paths from `agents/roles.yml`), against the parent spec / 
   2. Keep only issues that still have label **`bug`** (`gh issue view <n> --json labels`). Also include any `#n` the parent **spec** / version narrative explicitly says this version closes, if it has label `bug` and is missing from the PR — then **edit the PR body** to add `Fixes #<n>` (same rule as step 1 for the parent).
   3. On role **`roadmap`**: delete each matching `### Bug — … (#n)` block under **Plus tard** (from that heading through the line before the next `###` / `##`). Already absent → OK.
   4. For each such `#n` still **Open**: `gh issue close <n> --comment "Corrigé en VX.Y.Z."` (use this version’s semver). Already Closed → one line, continue.
-- **`suivi-avancement`** — run skill **`mettre-a-jour-suivi-avancement`** as if the user had typed **`/msa`** for this **`X.Y.Z`** (convention: **`docs/suivi-avancement/README.md`**). That skill soft-skips with a **`/os`** reminder when there is no current-week folder (do **not** stop the release). PDF failure after an HTML edit → **stop** the release until fixed. Do not create a week folder here. Do not edit other weeks.
+- **`suivi-avancement`** (opt-in) — if that role is **missing or unresolved** in `agents/roles.yml` → one line soft-skip (suivi not enabled for this repo). Do **not** stop the release. If the role **is** resolved: run skill **`mettre-a-jour-suivi-avancement`** as if the user had typed **`/msa`** for this **`X.Y.Z`** (convention: **`docs/suivi-avancement/README.md`**). That skill soft-skips with a **`/os`** reminder when there is no current-week folder (do **not** stop the release). PDF failure after an HTML edit (when `generer-pdf.mjs` exists) → **stop** the release until fixed. Do not create a week folder here. Do not edit other weeks.
+- **`docs-site`** (opt-in) — if that role is resolved: one line that the Docusaurus site will refresh via GitHub Pages after merge/release (workflow `deploy-docs.yml`). Do **not** run `npm run build` locally here. If the role is missing → soft-skip (no site).
 
-If anything is stale (except soft-skip on missing week HTML): **stop the release**. Update those files on the **feature branch**, then run skill **`commit`** as if the user had typed **`/c -a -p`**. Then re-read this section. Do **not** `/crel` or `/mpr` until this gate is green — the tag must include the docs (HTML + PDF when updated). Bug issue closes (step above) may run in that same docs turn; they do not require a second commit.
+If anything is stale (except soft-skip on missing suivi / docs-site role / missing week HTML / missing PDF script): **stop the release**. Update those files on the **feature branch**, then run skill **`commit`** as if the user had typed **`/c -a -p`**. Then re-read this section. Do **not** `/crel` or `/mpr` until this gate is green — the tag must include the docs (HTML + PDF when updated). Bug issue closes (step above) may run in that same docs turn; they do not require a second commit.
 
 ## 3. Quality gate
 

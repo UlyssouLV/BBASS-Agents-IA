@@ -10,7 +10,7 @@ description: >-
 
 Triggered by **« Ouvre la version »**. The user **must** give a semver **`X.Y.Z`** (e.g. `1.2.0`). If they omit it, ask and **wait** — do not invent a number.
 
-Do **not** `/implement` here. Do **not** merge. Do **not** `git commit` on **`main`**. Git branch / commit / PR go through the skills below, not inline.
+Do **not** `/implement` here. Do **not** merge. Do **not** `git commit` on the integration **base** (`main` by default, or `base_branch` from `agents/integration-channel.yml` — see `agents/docs/integration-channel.md`). Git branch / commit / PR go through the skills below, not inline.
 
 Paths: **`agents/roles.yml`**. Roadmap writing standards: **`docs/dev/feuille-de-route/README.md`** (this skill does **not** edit the roadmap — adding / renumbering versions is **`/afr`**).
 
@@ -26,28 +26,28 @@ If that file already describes version **`X.Y.Z`**:
 
 If **`X.Y.Z` is absent** from that file: tell them to add it with **`/afr`** (standards in the README), **or** ask **what is this version for?** (one job, product language) and **wait** — do not invent a number or rewrite the feuille here.
 
-## 2. `/grill-with-docs` (conversation only if you are on `main`)
+## 2. `/grill-with-docs` (conversation only if you are on the base)
 
 Call **grill-with-docs**. Rounds until the tree is empty. **Wait** for shared-understanding confirmation.
 
-If the current branch is **`main`**: do **not** write roles **`spec`**, **`glossary`**, or **`adr`** to disk yet (that would dirty `main`). Keep decisions in the conversation.
+Resolve **base** per `agents/docs/integration-channel.md`. If the current branch is **base** (including `main` when there is no channel file): do **not** write roles **`spec`**, **`glossary`**, or **`adr`** to disk yet (that would dirty **base**). Keep decisions in the conversation.
 
 ## 3. `/to-spec` (content first)
 
 Matt’s next step is **`/to-spec`**. Synthesize the full spec (problem, solution, user stories, implementation/testing, out of scope), plus **Changements apportés aux versions antérieures** in the format of `agents/issue-tracker.md` (*Changes to earlier versions*): `Aucun.` when this version changes nothing an earlier version shipped. Publish the **parent GitHub issue** (`ready-for-agent`). Do not overwrite a previous version’s spec issue.
 
-Still **do not** commit that spec onto `main`.
+Still **do not** commit that spec onto **base**.
 
 ## 4. Branch, write, init commit
 
-Run skill **`ouvrir-branche`** as if the user had typed **`/ob vX.Y.Z-<slug>`**. Slug = kebab-case of the purpose (ASCII). If that skill stops because the name exists: ask and wait.
+Run skill **`ouvrir-branche`** as if the user had typed **`/ob vX.Y.Z-<slug>`** (from **base**). Slug = kebab-case of the purpose (ASCII). If that skill stops because the name exists: ask and wait.
 
 Then write on **this** branch only:
 
 - role **`spec`** for this version (the `/to-spec` body)
 - roles **`glossary`**, **`agent-adapter`**, **`adr`** only if this version actually changes them (new ADR; never rewrite old ADR history)
 
-Then run skill **`commit`** as if the user had typed **`/c -a -p`**. That commit **is** the initialisation de la version. `main` stays unchanged.
+Then run skill **`commit`** as if the user had typed **`/c -a -p`**. That commit **is** the initialisation de la version. **base** stays unchanged.
 
 ## 5. `/to-tickets` — propose, **then** create
 

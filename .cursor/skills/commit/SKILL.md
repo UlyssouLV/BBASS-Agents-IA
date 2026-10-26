@@ -5,8 +5,9 @@ description: >-
   `/mc -d` block 3. Use when the user types `/c`, or after this skill asked
   « Êtes-vous sûr » for a force-push and they reply oui or non. `-a` stages
   the whole working tree; `-p` pushes; `-p -f` force-with-lease only after
-  oui on the next turn. Not `/mc` (message only). Not on main except
-  `/init` / « Initialise le repo ».
+  oui on the next turn. Not `/mc` (message only). Not on the integration
+  base (`main` by default, or base_branch from
+  agents/integration-channel.yml) except `/init` on `main` only.
 ---
 
 # Commit the current branch
@@ -15,18 +16,20 @@ description: >-
 
 `/` = this skill’s trigger. `-` = options. Treat `/c`, `-a`, `-p`, `-f` as whole tokens. Order of options does not matter.
 
+**Base / protected:** resolve per `agents/docs/integration-channel.md` (*Résolution*).
+
 ## Follow-up (force-push pending)
 
 If the previous turn of **this** skill asked « Êtes-vous sûr » for a force-push:
 
-- The reply contains the whole word **oui** (any case) → `git push --force-with-lease` to the existing upstream (or `origin HEAD` if you must set upstream). Still refuse `main` / `master`. Then stop.
+- The reply contains the whole word **oui** (any case) → `git push --force-with-lease` to the existing upstream (or `origin HEAD` if you must set upstream). Still refuse **protected** branches (`main` / `master` / **base**). Then stop.
 - Anything else → no push. Say the force-push is cancelled. Stop.
 
 Do not commit again on this turn.
 
 ## 1. Guards
 
-1. `git branch --show-current` is `main` or `master` → stop, **except** when the current user message is **`/init`** or **« Initialise le repo »** (that skill is the only allowed commit on `main`). Still refuse force-push to `main` / `master`.
+1. `git branch --show-current` is **protected** → stop, **except** when the branch is `main` / `master` **and** the current user message is **`/init`** or **« Initialise le repo »** (that skill is the only allowed commit on `main`). Never commit on an integration **base** that is not `main`. Still refuse force-push to **protected** branches.
 2. `-f` without `-p` → stop. Say `-f` only exists as `/c -p -f`.
 3. Without `-a`: if the index is empty (`git diff --cached --quiet`) → stop. Say to stage files or pass `-a`.
 4. Always unstage secrets (`.env`, `*.db`, `.venv/`, credential files) before committing, even if the user had staged them.
