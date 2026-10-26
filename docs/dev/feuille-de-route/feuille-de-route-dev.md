@@ -50,7 +50,7 @@ Ce n’est **pas** une spec (ça vient après « Ouvre la version »).
 
 ## Ensuite : 1.6.0 — Déploiement postes (CI/CD, conteneurisation, installateur)
 
-*(Anciennement 1.7.0 — passe en 1.6.0 quand la documentation mémoire / souveraineté sort en Plus tard.)*
+*(Anciennement 1.7.0 — passé en 1.6.0 quand la doc mémoire / souveraineté était sortie en Plus tard ; cette doc revient en **1.7.0** / **1.7.1**.)*
 
 **Contexte.** Les collaborateurs peuvent vouloir **utiliser Moduléo** via le chat (lecture livrée en 1.5.0). Il faut donc pouvoir **déployer / mettre à jour** le logiciel sur les postes du cabinet de façon reproductible — pas seulement via les scripts de dev actuels.
 
@@ -71,9 +71,27 @@ Ce n’est **pas** une spec (ça vient après « Ouvre la version »).
 - Canal de mise à jour (GitHub Releases, partage interne Castries, etc.).
 - Périmètre « pilote » : une machine / quelques postes Admin avant rollout large.
 
+## Ensuite : 1.7.0 — Documentation fonctionnelle : mémoire et souveraineté des données
+
+*(Reprise du bloc Plus tard « Documentation : mémoire conversationnelle et souveraineté des données (ex-1.6.0) », élargi en série 1.7.x de documentation fonctionnelle.)*
+
+**Objectif.** Le cabinet dispose d’un **wiki produit** consultable par des non-techniciens (partie **fonctionnelle** du doc-site) : d’abord une **convention courte** de format (structure type : objectif, schémas, tableaux « où vit / qui voit / ce qui sort », sans dump de code) qui servira de modèle aux documentations suivantes ; puis deux documents dans `docs/features/` **et** sur le site de doc, chacun porté par une issue GitHub labellee **`documentation`** (plan, schémas, captures, exemples). Pas de changement de code produit hors ajustements de doc / schémas / exemples de tests cités.
+
+1. **Persistance de la mémoire** (`docs/features/memoire-conversationnelle.md` ou équivalent). Schéma compréhensible (conversations, messages, résumé glissant, profil de travail, pièces jointes, résultats de recherche web, etc.), flux tour par tour (ce qui entre, ce qui sort de la fenêtre de 3, ce qui est plafonné, ce que le modèle relit via outils), choix déjà pris et **pourquoi** (persistance VM vs API Conversations Mistral, séparation identité / profil, etc.). Exemples concrets (inspecteur, états) et renvois aux tests HTTP-boundary en annexe courte. Inclut la Mémoire de la conversation et les questions couvertes (1.4.1), le cache des pages web (1.4.3).
+
+2. **Souveraineté des données** (`docs/features/souverainete-des-donnees.md` ou équivalent). Cartographie de tous les choix qui font que **seul le cabinet** détient les données persistées : Postgres et fichiers sur la VM Castries, SearXNG auto-hébergé, pas de Files API / Conversations Mistral, ZDR / `chat/completions` sans rétention côté modèle, clé API unique derrière la VM, LAN uniquement, etc. Expliquer **pourquoi** chaque décision rend le cabinet souverain. **Carte globale** « où vit la donnée » et **ce qui quitte le cabinet** (Mistral, Moduléo, SearXNG, rien d’autre) pour les chemins critiques ; liens ADR / specs. Le détail *par outil* de ce qui part / revient est en **1.7.1**.
+
+**Hors périmètre.** Inventaire des outils du modèle et flux par outil (→ **1.7.1**). Doc détaillée du tool calling recherche web (→ **Optimisation de la recherche web**, Plus tard). Doc-site administration des groupes et droits Moduléo (reste **hors version**). Déploiement postes (→ **1.6.0**), n8n (→ **1.8.0**), Agents par pôle, bugs connus. Implémentation de nouvelles capacités mémoire ou cache.
+
+## Ensuite : 1.7.1 — Documentation fonctionnelle : outils du modèle et flux par outil
+
+**Objectif.** Suite du wiki fonctionnel (même convention que la **1.7.0**) : un document (ou un ensemble de pages liées) qui inventorie **tous les outils** exposés au modèle — recherche web, relecture de pièces jointes / pages, Moduléo, etc. Pour chaque outil : à quoi il sert, paramètres utiles en langage produit, **ce qu’il envoie / reçoit / persiste**, ce qui reste sur la VM, lien avec l’inspecteur. Complète la carte souveraineté de la 1.7.0 **sans la réécrire**. Issue(s) GitHub **`documentation`** ; pages sur le doc-site partie fonctionnelle. Pas de changement de code produit hors doc / schémas / exemples.
+
+**Hors périmètre.** Doc ultra-détaillée du tool calling recherche web (paramètres fins, tous les cheminements d’échec) — reste le livrable doc de **Optimisation de la recherche web** (Plus tard). Nouveaux outils, Agents par pôle, n8n (**1.8.0**), écriture Moduléo (**1.5.2**).
+
 ## Ensuite : 1.8.0 — Workflows n8n (socle d’automatisation), branchés sur Moduléo 1.5.0
 
-*(Anciennement 1.6.0, puis 1.7.0 — passe en 1.8.0 pour laisser 1.6.0 à la documentation mémoire / souveraineté.)*
+*(Anciennement 1.6.0 / 1.7.0 — passé en 1.8.0 ; le créneau 1.7.x est repris par la documentation fonctionnelle.)*
 
 S’appuie sur les **outils / client Moduléo lecture** livrés en 1.5.0. n8n devient le **runtime d’automatisation** (scénarios multi-étapes, plus tard d’autres logiciels), pas un miroir 1:1 de chaque route API.
 
@@ -93,7 +111,7 @@ S’appuie sur les **outils / client Moduléo lecture** livrés en 1.5.0. n8n de
 
 ## Ensuite : 1.9.0 — Analyse et traitement des pièces jointes, approfondis
 
-*(Anciennement 1.5.0, puis 1.6.0, puis 1.7.0, puis 1.8.0 — passe en 1.9.0 pour laisser 1.6.0 à la documentation mémoire / souveraineté.)*
+*(Anciennement 1.5.0 → 1.8.0 selon les décalages ; reste en 1.9.0. La documentation fonctionnelle est en **1.7.0** / **1.7.1**.)*
 
 S’appuie sur la [1.1.2](../../specs/v1.1.2-pieces-jointes.md) (pipeline d’extraction, une pièce jointe par message). Le traitement par pôle suppose les **Agents métier par pôle** (Plus tard) : à livrer avant, ou à faire entrer ici. Deux limites actées volontairement en 1.1.2 sont à lever ici, pas avant : **plusieurs pièces jointes par message**, et un **traitement spécifique par pôle** (un agent Foncier ne traite pas un document comme un agent Urbanisme) — demande explicite du cabinet dès le grilling de 1.1.2, remise à plus tard faute d’Agent réel pour la justifier.
 
@@ -107,18 +125,6 @@ S’appuie sur la [1.1.2](../../specs/v1.1.2-pieces-jointes.md) (pipeline d’ex
 - Conservation d’une pièce jointe au-delà de sa conversation d’origine (usage multi-conversationnel, matière pour entraîner les futurs Agents) : piste évoquée dès le grilling 1.1.2, pas tranchée.
 
 ## Plus tard (pas encore numéroté)
-
-### Documentation : mémoire conversationnelle et souveraineté des données (ex-1.6.0)
-
-*(Sortie de la 1.6.0 le 08/10/2026 : plus à l’ordre de la semaine, numéro laissé au déploiement postes.)*
-
-**Objectif.** Deux documents produit / fonctionnels (même format que la doc recherche web prévue ailleurs dans cette feuille), rédigés dans `docs/features/` **et** portés chacun par une issue GitHub labellee **`documentation`** (plan, schémas, captures, exemples). Pas de changement de code produit hors ajustements de doc / schémas / exemples de tests cités.
-
-1. **Persistance de la mémoire** (`docs/features/memoire-conversationnelle.md` ou équivalent). Schéma complet (tables / relations : conversations, messages, résumé glissant, profil de travail, pièces jointes, résultats de recherche web, etc.), flux tour par tour (ce qui entre, ce qui sort de la fenêtre de 3, ce qui est plafonné, ce que le modèle relit via outils), choix et décisions déjà prises et **pourquoi** (persistance VM vs API Conversations Mistral, séparation identité / profil, etc.). Exemples concrets (inspecteur, états en base) et références aux tests HTTP-boundary qui verrouillent ces comportements. Inclut la Mémoire de la conversation et les questions couvertes (1.4.1), le cache des pages web (1.4.3).
-
-2. **Souveraineté des données** (`docs/features/souverainete-des-donnees.md` ou équivalent). Cartographie de tous les choix qui font que **seul le cabinet** détient les données persistées : Postgres et fichiers sur la VM Castries, SearXNG auto-hébergé, pas de Files API / Conversations Mistral, ZDR / `chat/completions` sans rétention côté modèle, clé API unique derrière la VM, LAN uniquement, etc. Expliquer **pourquoi** chaque décision rend le cabinet souverain (Mistral ne stocke pas nos fils ni nos fichiers ; aucun service externe n’héberge notre mémoire métier ; tout ce qui persiste est hébergé par nous). Relier ADR et specs déjà actées ; schémas « où vit la donnée » (poste / VM / Mistral / SearXNG) pour les chemins critiques.
-
-**Hors périmètre.** Implémentation de nouvelles capacités mémoire ou cache (→ **1.4.1**, **1.4.3**). Déploiement postes (→ **1.6.0**), n8n (→ **1.8.0**). Doc tool calling recherche web (déjà prévue dans « Optimisation de la recherche web » / livrable doc associé).
 
 ### Agents métier par pôle (consigne et capacités par pôle)
 

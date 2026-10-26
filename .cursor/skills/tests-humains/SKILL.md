@@ -47,7 +47,17 @@ No images → skip this step. Text-only results are enough to close.
 - Keep `Part of`, What to build, Acceptance criteria (check off what is done), Blocked by
 - **`## Plan de tests`**: same scenarios; checkboxes reflect played / left unchecked or annotated as non-joué
 - **`## Résultats`**: what was played, outcomes, non-joués
-- **`## Ce qu’on peut faire maintenant`**: product bullets; for each screenshot, a Markdown image pointing at the repo path (e.g. `![…](../../img/changelog/vX.Y.Z/….png)` relative to a future `docs/changelog/…` page, or the same style as other `docs/img/` references in this repo)
+- **`## Ce qu’on peut faire maintenant`**: one product bullet per capability, each **immediately followed by its proof screenshot** (a blank line, then the image indented under the bullet). One image per sentence; a bullet without a screenshot stays text-only. Never stack the images after the list. Image URL: `https://github.com/<owner>/<repo>/raw/<sha>/docs/img/changelog/vX.Y.Z/<file>.png` (raw at the commit SHA, so it shows on the ticket):
+
+  ```markdown
+  - Voir d’un coup d’œil le statut d’un dossier ouvert.
+
+    ![Liste des dossiers](https://github.com/<owner>/<repo>/raw/<sha>/docs/img/changelog/vX.Y.Z/scenario-1-liste.png)
+
+  - Relancer une recherche avec les mêmes filtres qu’avant.
+
+    ![Filtres conservés](https://github.com/<owner>/<repo>/raw/<sha>/docs/img/changelog/vX.Y.Z/scenario-2-filtres.png)
+  ```
 
 ## 5. Close
 
