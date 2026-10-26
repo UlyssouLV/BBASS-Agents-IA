@@ -77,6 +77,9 @@ def _cle_mistral_chiffree(monkeypatch, tmp_path_factory):
         "MISTRAL_API_KEY_CHIFFREE", Fernet(cle_maitre).encrypt(CLE_API_MISTRAL_DE_TEST.encode()).decode()
     )
     monkeypatch.delenv("MISTRAL_API_KEY", raising=False)
+    # Écriture Moduléo inactive par défaut (spec 1.5.2, #202), quel que soit
+    # le .env local.
+    monkeypatch.delenv("MODULEO_ECRITURE", raising=False)
 
 
 # Usage/pages_processed factices (spec 1.1.3) : ce double ne sert encore

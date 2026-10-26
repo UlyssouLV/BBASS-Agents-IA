@@ -172,6 +172,14 @@ class ConfigModuleoChiffree:
     fichier_cle_maitre: str | None
 
 
+def get_moduleo_ecriture() -> bool:
+    # Réglage MODULEO_ECRITURE (spec 1.5.2, ADR-0019), lu à l'appel : absent
+    # ou autre que « 1 », « true », « oui » = inactif. Seule une des deux
+    # barrières de l'écriture : MODULEO_URL doit aussi figurer dans la liste
+    # versionnée des serveurs de test (moduleo/serveurs_test.json).
+    return (os.environ.get("MODULEO_ECRITURE") or "").strip().lower() in {"1", "true", "oui"}
+
+
 def get_config_moduleo_chiffree() -> ConfigModuleoChiffree:
     # Lu à l'appel : la clé d'API et le
     # SecurityCode sont chiffrés (Fernet, spec 1.5.0, ADR-0017) avec la clé

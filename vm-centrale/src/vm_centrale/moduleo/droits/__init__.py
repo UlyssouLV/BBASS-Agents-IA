@@ -21,6 +21,7 @@ from vm_centrale.moduleo.droits.garde import (
     DroitManquant,
     autorise,
     verifier,
+    verifier_ecriture,
     verifier_reponse,
 )
 
@@ -41,5 +42,6 @@ __all__ = [
     "droits_du_compte",
     "rattacher",
     "verifier",
+    "verifier_ecriture",
     "verifier_reponse",
 ]

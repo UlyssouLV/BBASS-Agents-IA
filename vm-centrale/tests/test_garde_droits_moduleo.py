@@ -83,8 +83,9 @@ def test_toutes_les_routes_get_sont_classees_et_seulement_elles():
     routes = [
         route
         for genre, valeur in classement.items()
-        # « siens » (#191) ouvre des routes déjà classées sous leur droit.
-        if genre != "siens"
+        # « siens » (#191) ouvre des routes déjà classées sous leur droit ;
+        # « ecriture » classe les routes d'écriture (#202).
+        if genre not in ("siens", "ecriture")
         for route in (valeur if isinstance(valeur, list) else [r for routes in valeur.values() for r in routes])
     ]
 

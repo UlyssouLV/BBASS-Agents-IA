@@ -249,5 +249,153 @@
         "cogeo/tempspasse/multi?ids={ids}": "IdUtilisateur"
       }
     }
+  },
+  "ecriture": {
+    "libre": [],
+    "groupe_cogeo": [
+      "POST cogeo/intervenant",
+      "POST cogeo/localisant?idAffaire={idAffaire}",
+      "PUT cogeo/localisant/{idLocalisant}",
+      "POST cogeo/note",
+      "POST moduleo/tacheafaire"
+    ],
+    "groupe_planning": [],
+    "droits": {
+      "Affaires, groupes et archivage › Créer une affaire et créer un groupe": [
+        "POST cogeo/affaire",
+        "POST cogeo/groupe"
+      ],
+      "Affaires, groupes et archivage › Créer une archive": [
+        "POST cogeo/archive"
+      ],
+      "Affaires, groupes et archivage › Changer l'archive d'une affaire": [
+        "PUT cogeo/archive?idArchive={idArchive}&idAffaire={idAffaire}"
+      ],
+      "Affaires, groupes et archivage › Associer, créer ou renommer un dossier de travail d'une affaire": [
+        "POST fileo/dossierproduction?idAffaire={idAffaire}&idArborescence={idArborescence}"
+      ],
+      "Affaires, groupes et archivage › Gérer l'enveloppe prévisionnelle d'une affaire": [
+        "POST cogeo/enveloppe",
+        "PUT cogeo/enveloppe/{idEnveloppePrevisionnelle}",
+        "DELETE cogeo/enveloppe/{idAffaire}"
+      ],
+      "Affaires, groupes et archivage › Voir l'onglet prix de revient › Créer, modifier, supprimer des frais": [
+        "POST cogeo/frais",
+        "PUT cogeo/frais/{idFrais}",
+        "DELETE cogeo/frais/{IdFrais}"
+      ],
+      "Contacts › Rechercher des contacts": [
+        "POST cogeo/contact/personne",
+        "POST cogeo/contact/societe",
+        "POST cogeo/contact/collectivite",
+        "POST cogeo/contact/groupecontacts",
+        "POST cogeo/contact/contactlie",
+        "PUT cogeo/contact/personne/{idPersonne}",
+        "PUT cogeo/contact/societe/{idSociete}",
+        "PUT cogeo/contact/collectivite/{idCollectivite}",
+        "PUT cogeo/contact/groupecontacts/{idGroupeContacts}",
+        "POST moduleo/adresse",
+        "PUT moduleo/adresse/{idAdresse}",
+        "DELETE moduleo/adresse/{idAdresse}",
+        "POST moduleo/telephone",
+        "PUT moduleo/telephone/{idTelephone}",
+        "DELETE moduleo/telephone/{idTelephone}",
+        "POST cogeo/email",
+        "PUT cogeo/email/{idEmail}",
+        "DELETE cogeo/email/{idEmail}"
+      ],
+      "Devis, factures et avoirs › Consulter les devis › Créer et modifier un devis": [
+        "POST cogeo/devis",
+        "PUT cogeo/devis/{idDevis}"
+      ],
+      "Devis, factures et avoirs › Consulter les devis › Émettre un devis": [
+        "PUT cogeo/devis/{idDevis}/emettre"
+      ],
+      "Devis, factures et avoirs › Consulter les devis › Enregistrer la réponse à un devis": [
+        "PUT cogeo/devis/{idDevis}/accepter",
+        "PUT cogeo/devis/{idDevis}/refuser"
+      ],
+      "G.E.D › Consulter l'onglet G.E.D. et les documents électroniques (courriers, emails, documents, plans, dossiers livrables et états hypothécaires) › Créer et modifier un document électronique": [
+        "POST cogeo/elementged/plan",
+        "POST cogeo/elementged/document",
+        "POST cogeo/elementged/email",
+        "PUT cogeo/elementged/plan",
+        "PUT cogeo/elementged/document",
+        "PUT cogeo/elementged/email"
+      ],
+      "G.E.D › Consulter l'onglet G.E.D. et les documents électroniques (courriers, emails, documents, plans, dossiers livrables et états hypothécaires) › Envoyer un courrier ou un dossier livrable, valider un document, un plan ou un dossier livrable, supprimer un document électronique": [
+        "DELETE cogeo/elementged/plan/{idPlan}",
+        "DELETE cogeo/elementged/document/{idDocument}",
+        "DELETE cogeo/elementged/email/{idEmail}"
+      ],
+      "Notes › Supprimer / Éditer les notes des autres": [
+        "PUT cogeo/note/{idNote}",
+        "DELETE cogeo/note/{idNote}"
+      ],
+      "Tâches à faire › Supprimer / Éditer les tâches à faire dont il n'est pas le créateur": [
+        "PUT moduleo/tacheafaire/{idTacheAFaire}"
+      ],
+      "Temps passés et frais des temps passés › Consulter les temps passés et les frais des temps passés des autres collaborateurs › Créer, modifier et supprimer les temps passés et les frais des temps passés des autres collaborateurs": [
+        "POST cogeo/tempspasse",
+        "PUT cogeo/tempspasse/{idTempsPasse}",
+        "DELETE cogeo/tempspasse/{idTempsPasse}"
+      ],
+      "Temps passés et frais des temps passés › Valider la semaine/jour de temps passés des collaborateurs": [
+        "POST cogeo/tempspasse/valider",
+        "POST cogeo/tempspasse/annulervalidation"
+      ],
+      "Planning › Créer une tâche": [
+        "POST planning/tacheplanning",
+        "POST planning/recurrence",
+        "POST planning/tacheremplacement"
+      ],
+      "Planning › Modifier une tâche": [
+        "PUT planning/tacheplanning/{idTachePlanning}",
+        "PUT planning/recurrence/{idRecurrence}"
+      ],
+      "Planning › Supprimer une tâche": [
+        "DELETE planning/tacheplanning/{idTachePlanning}",
+        "DELETE planning/recurrence/{idRecurrence}"
+      ]
+    },
+    "siens": {
+      "Temps passés et frais des temps passés › Consulter les temps passés et les frais des temps passés des autres collaborateurs › Créer, modifier et supprimer les temps passés et les frais des temps passés des autres collaborateurs": {
+        "champ": "IdUtilisateur",
+        "lecture": "cogeo/tempspasse/multi?ids={ids}",
+        "corps": [
+          "POST cogeo/tempspasse",
+          "PUT cogeo/tempspasse/{idTempsPasse}"
+        ],
+        "existant": {
+          "PUT cogeo/tempspasse/{idTempsPasse}": "idTempsPasse",
+          "DELETE cogeo/tempspasse/{idTempsPasse}": "idTempsPasse"
+        }
+      }
+    },
+    "fermee": {
+      "POST webhook": "configuration de l'intégration",
+      "DELETE webhook": "configuration de l'intégration",
+      "POST fileo/fichier/upload": "fichier binaire, impossible depuis un outil texte",
+      "POST cogeo/procedureapplication": "paramétrage des procédures",
+      "PUT cogeo/affaire/{idAffaire}": "aucun droit de modification générale d'une affaire : une modification peut changer l'état, les dates ou le numéro, chacun sous son propre droit, que BBASS ne vérifie pas champ par champ",
+      "POST cogeo/affaire/polygones": "géométrie d'une affaire : aucun droit Moduléo ne la couvre",
+      "PUT cogeo/affaire/polygones": "géométrie d'une affaire : aucun droit Moduléo ne la couvre",
+      "PUT cogeo/champspecifique/{idChampSpecifique}": "valeur d'un champ spécifique : aucun droit Moduléo ne la couvre",
+      "PUT cogeo/groupe/{idGroupe}": "modification d'un groupe d'affaires : aucun droit Moduléo (seulement sa création)",
+      "POST cogeo/lignearticle/standard": "ligne d'un devis ou d'une facture : le droit dépend de la pièce, que la route ne désigne pas",
+      "POST cogeo/lignearticle/mo": "ligne d'un devis ou d'une facture : le droit dépend de la pièce, que la route ne désigne pas",
+      "PUT fileo/dossierproduction?ids={ids}&status={status}": "statut d'un dossier de production : aucun droit Moduléo ne le couvre",
+      "POST fileo/dossier": "fichiers et dossiers Fileo : aucun droit Moduléo ne les couvre, déjà fermés en lecture",
+      "DELETE fileo/dossier/{idDossier}": "fichiers et dossiers Fileo : aucun droit Moduléo ne les couvre, déjà fermés en lecture",
+      "POST fileo/fichier": "fichiers et dossiers Fileo : aucun droit Moduléo ne les couvre, déjà fermés en lecture",
+      "PUT fileo/fichier/{idFichier}": "fichiers et dossiers Fileo : aucun droit Moduléo ne les couvre, déjà fermés en lecture",
+      "DELETE fileo/fichier/{idFichier}": "fichiers et dossiers Fileo : aucun droit Moduléo ne les couvre, déjà fermés en lecture",
+      "POST cogeo/tempspasse/signer": "le corps ne désigne aucun collaborateur : Moduléo agirait sur la semaine de l'utilisateur de la clé d'API, pas sur celle du collaborateur",
+      "POST cogeo/tempspasse/annulersignature": "le corps ne désigne aucun collaborateur : Moduléo agirait sur la semaine de l'utilisateur de la clé d'API, pas sur celle du collaborateur",
+      "POST cogeo/titre": "titres de propriété : aucun droit Moduléo ne les couvre",
+      "PUT cogeo/titre/{idTitre}": "titres de propriété : aucun droit Moduléo ne les couvre",
+      "PUT cogeo/titre/ajoutparcelle?idTitre={idTitre}&idsParcelle={idsParcelle}": "titres de propriété : aucun droit Moduléo ne les couvre",
+      "PUT cogeo/titre/enleverparcelle?idTitre={idTitre}&idsParcelle={idsParcelle}": "titres de propriété : aucun droit Moduléo ne les couvre"
+    }
   }
 }

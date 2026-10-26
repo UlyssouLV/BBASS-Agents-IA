@@ -2,7 +2,12 @@ from datetime import datetime
 from typing import Any
 
 from vm_centrale.moduleo.client import ModuleoIntrouvable
-from vm_centrale.moduleo.routes import ROUTES_GET
+from vm_centrale.moduleo.routes import ROUTES_ECRITURE, ROUTES_GET
+
+# Le faux se présente comme le serveur Moduléo de test de Kipaware (liste
+# versionnée, moduleo/serveurs_test.json) : une écriture n'y part qu'avec
+# MODULEO_ECRITURE actif (spec 1.5.2, #202).
+URL_SERVEUR_DE_TEST = "https://mwa-kpw-api.kipaware.fr/api"
 
 # Faux Moduléo (spec 1.5.0) : injecté à la place de ClientModuleo
 # (dependency get_client_moduleo), aucun test ne sort sur le réseau. Mêmes
@@ -29,9 +34,14 @@ _FICHES_COORDONNEES = {fiche: (parametre, cle) for fiche, parametre, cle in _COO
 
 
 class FauxModuleo:
-    def __init__(self) -> None:
+    def __init__(self, url: str = URL_SERVEUR_DE_TEST) -> None:
+        self.url = url
         # (route, paramètres) de chaque lecture, dans l'ordre.
         self.appels: list[tuple[str, dict[str, Any]]] = []
+        # (méthode, route, paramètres, corps) de chaque écriture reçue (#202),
+        # et ce que le faux renvoie à chacune.
+        self.ecritures: list[tuple[str, str, dict[str, Any], Any]] = []
+        self.reponse_ecriture: Any = None
         self._affaires: dict[int, dict] = {}
         self._intervenants: dict[int, dict] = {}
         self._utilisateurs: dict[int, dict] = {}
@@ -68,8 +78,17 @@ class FauxModuleo:
         self._exception: Exception | None = None
 
     def echouer(self, exception: Exception) -> None:
-        # Toute lecture suivante lève `exception` (panne, refus).
+        # Toute lecture ou écriture suivante lève `exception` (panne, refus).
         self._exception = exception
+
+    def ecrire(self, methode: str, route: str, parametres: dict[str, Any], corps: Any) -> Any:
+        # Accepte toute écriture d'une route du WADL, sans rien changer aux
+        # données lues.
+        assert (methode, route) in ROUTES_ECRITURE, (methode, route)
+        self.ecritures.append((methode, route, parametres, corps))
+        if self._exception is not None:
+            raise self._exception
+        return self.reponse_ecriture
 
     def ajouter_affaire(self, id_affaire: int, numero: str, objet: str = "", **champs: Any) -> None:
         # `champs` : les autres clés de l'affaire, au nom du JSON Moduléo
