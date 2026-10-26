@@ -6,6 +6,7 @@ from datetime import date
 from vm_centrale.lectures_outils import Fiche
 from vm_centrale.moduleo import enumerations
 from vm_centrale.moduleo.droits import DroitsModuleo, chemin
+from vm_centrale.moduleo.objet import objet_lisible
 from vm_centrale.moduleo.resolution import Noms, Utilisateur
 
 # Fiche Moduléo (spec 1.5.0) : le texte dense d'un élément lu dans Moduléo,
@@ -55,7 +56,7 @@ def fiche_affaire(
     # Référence citée par la ligne « Sources : » : « Moduléo, affaire 2024-123 ».
     # `parcelles` : seulement quand le collaborateur les demande (#193).
     numero = _texte(affaire.get("Numero"))
-    objet = _texte(affaire.get("Objet"))
+    objet = objet_lisible(affaire)
     etat = _texte(enumerations.libelle(enumerations.ETATS_AFFAIRE, affaire.get("Etat")))
     dates = [(libelle, _date(affaire.get(champ))) for champ, libelle in _DATES_AFFAIRE]
     commune = noms.communes.get(_id(affaire.get("IdCommune")), "")
@@ -175,7 +176,7 @@ def fiche_devis(devis: dict, affaire: dict | None, noms: Noms) -> Fiche:
     # dont le client est celui de la fiche (le destinataire du devis exige
     # le droit des factures).
     numero = _texte(devis.get("Numero"))
-    objet = _texte(devis.get("Objet"))
+    objet = objet_lisible(devis)
     affaire = affaire or {}
     numero_affaire = _texte(affaire.get("Numero"))
     client = noms.contacts.get(_id(affaire.get("IdClient")), "")
@@ -280,7 +281,7 @@ def fiche_facture(
     # destinataire de la facture, sinon le client de son affaire.
     # `paiements` : `None` quand ils n'ont pas été lus (facture non émise).
     numero = _texte(facture.get("Numero"))
-    objet = _texte(facture.get("Objet"))
+    objet = objet_lisible(facture)
     affaire = affaire or {}
     numero_affaire = _texte(affaire.get("Numero"))
     client = noms.contacts.get(_id((destinataire or {}).get("IdContact")), "") or noms.contacts.get(
