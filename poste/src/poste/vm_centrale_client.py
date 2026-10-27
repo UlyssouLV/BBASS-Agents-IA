@@ -84,6 +84,21 @@ class DernierAdministrateurError(Exception):
     pass
 
 
+class RefusModuleoError(Exception):
+    # Refus métier de l'administration Moduléo de la VM (groupe introuvable
+    # ou encore rattaché, nom déjà pris, case hors catalogue, utilisateur
+    # Moduléo inconnu, Moduléo injoignable...) : statut et texte relayés tels
+    # quels au Panel.
+    def __init__(self, status_code: int, detail: object) -> None:
+        super().__init__(detail)
+        self.status_code = status_code
+        self.detail = detail
+
+
+# 502/503 : Moduléo (et non la VM) injoignable ou non configuré.
+_REFUS_MODULEO = {404, 409, 422, 502, 503}
+
+
 @dataclass
 class AuthentificationReussie:
     prenom: str
@@ -861,6 +876,22 @@ class VmCentraleClient:
         _lever_si_echange_introuvable(reponse)
         reponse.raise_for_status()
         return _vers_inspecteur_echange_detail(reponse.json())
+
+    def relayer_moduleo(self, jeton: str, methode: str, chemin: str, corps: object = None) -> object:
+        # Administration Moduléo du Panel (spec 1.5.3, #213) : simple relais,
+        # la VM valide tout (droits admin, catalogue, noms Moduléo). Un refus
+        # métier remonte tel quel (RefusModuleoError) ; None pour un 204.
+        reponse = _http_client.request(
+            methode,
+            f"{VM_CENTRALE_BASE_URL}/moduleo/{chemin}",
+            json=corps,
+            headers={"Authorization": f"Bearer {jeton}"},
+        )
+        _lever_si_jeton_ou_droits_refuses(reponse)
+        if reponse.status_code in _REFUS_MODULEO:
+            raise RefusModuleoError(reponse.status_code, reponse.json().get("detail"))
+        reponse.raise_for_status()
+        return None if reponse.status_code == 204 else reponse.json()
 
 
 def get_vm_centrale_client() -> VmCentraleClient:

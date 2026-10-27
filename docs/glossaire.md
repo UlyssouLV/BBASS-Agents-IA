@@ -194,9 +194,15 @@ Ce qu'un Outil a lu dans un logiciel pour une Conversation (en 1.5.0 : une Fiche
 
 ## Groupe Moduléo {#groupe-moduleo}
 
-Un groupe d'utilisateurs de Moduléo (Cogeo ou Planning : Admin, Production, Stagiaire…) recopié dans BBASS avec ses Droits Moduléo. Un Compte est rattaché à au plus un groupe Cogeo et un groupe Planning, et à son utilisateur Moduléo, toujours explicitement : être Compte administrateur n'en donne aucun. Sans groupe, aucun Outil Moduléo ne lui est proposé ([ADR-0018](./adr/0018-droits-moduleo-appliques-par-bbass.md)). En 1.5.1, seul le groupe Admin est recopié ; « Tous droits (dev) » est un groupe local, pour le dev et les tests, jamais dans Moduléo.
+Un groupe d'utilisateurs de Moduléo (Cogeo ou Planning : Admin, Production, Stagiaire…) recopié dans BBASS avec ses Droits Moduléo. Un Compte est rattaché à au plus un groupe Cogeo et un groupe Planning, et à son utilisateur Moduléo, toujours explicitement : être Compte administrateur n'en donne aucun. Sans groupe, aucun Outil Moduléo ne lui est proposé ([ADR-0018](./adr/0018-droits-moduleo-appliques-par-bbass.md)). Depuis la 1.5.3, catalogue des cases et groupes vivent en base ([ADR-0019](./adr/0019-groupes-moduleo-administres-en-base.md)) : un Compte administrateur crée et règle les groupes dans le Panel (Outils → Moduléo) en cochant des cases déjà présentes ; il n'édite pas le catalogue des cases. « Tous droits (dev) » est un groupe local, pour le dev et les tests, jamais dans Moduléo ni créé depuis le Panel.
 
 À éviter : rôle, profil, pôle (le Pôle est un domaine métier du cabinet).
+
+## Journal des droits Moduléo {#journal-des-droits-moduleo}
+
+Liste minimale des changements d'administration Moduléo faits dans le Panel (date, Compte administrateur, action, cible : groupe ou Compte). Consultable sous Outils → Moduléo ; pas d'export en 1.5.3.
+
+À éviter : audit trail, logs VM, Journal des écritures (écritures Moduléo confirmées, autre sujet).
 
 ## Droit Moduléo {#droit-moduleo}
 

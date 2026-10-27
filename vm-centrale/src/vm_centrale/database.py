@@ -35,8 +35,9 @@ def init_db(bind: Engine = engine) -> None:
         for table, colonne, definition in _COLONNES_AJOUTEES:
             if colonne not in {existante["name"] for existante in inspecteur.get_columns(table)}:
                 connexion.execute(text(f"ALTER TABLE {table} ADD COLUMN {colonne} {definition}"))
-    # Catalogue des Droits Moduléo et groupe Admin, rechargés à chaque
-    # démarrage sans doublon (spec 1.5.1). Import ici : models importe Base.
+    # Catalogue des Droits Moduléo et groupe Admin : migration unique depuis
+    # catalogue.json, ensuite plus rien n'est réécrit au démarrage (spec
+    # 1.5.3, ADR-0019). Import ici : models importe Base.
     from vm_centrale.moduleo.droits import charger_catalogue
 
     with Session(bind=bind) as db:

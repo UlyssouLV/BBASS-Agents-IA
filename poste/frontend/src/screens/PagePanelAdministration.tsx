@@ -6,13 +6,14 @@ import { useComptesConsommationQuery, useComptesQuery } from "@/hooks/useComptes
 import { usePerfChargementPage } from "@/lib/instrumentationTemps";
 import { OngletComptes } from "@/onglets/OngletComptes";
 import { OngletConsommations } from "@/onglets/OngletConsommations";
+import { OngletOutils } from "@/onglets/OngletOutils";
 
 interface PagePanelAdministrationProps {
   onRetour: () => void;
 }
 
-// Page Panel d'administration plein écran regroupant Comptes et
-// Consommations (issue #73) : ces deux onglets ne sont plus accessibles
+// Page Panel d'administration plein écran regroupant Comptes,
+// Consommations (issue #73) et Outils (spec 1.5.3, #213) : ces deux onglets ne sont plus accessibles
 // depuis l'écran Compte, dont ils faisaient partie à plat avant le ticket
 // #70. Mêmes fonctionnalités qu'auparavant (création, modification,
 // changement de statut administrateur, révocation, suppression de compte,
@@ -43,12 +44,16 @@ export function PagePanelAdministration({ onRetour }: Readonly<PagePanelAdminist
         <TabsList>
           <TabsTrigger value="comptes">Comptes</TabsTrigger>
           <TabsTrigger value="consommations">Consommations</TabsTrigger>
+          <TabsTrigger value="outils">Outils</TabsTrigger>
         </TabsList>
         <TabsContent value="comptes">
           <OngletComptes />
         </TabsContent>
         <TabsContent value="consommations">
           <OngletConsommations />
+        </TabsContent>
+        <TabsContent value="outils">
+          <OngletOutils />
         </TabsContent>
       </Tabs>
     </main>
