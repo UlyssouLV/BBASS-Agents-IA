@@ -29,3 +29,13 @@ Alternatives écartées :
 ## Guide — ajouter `build-image-vm` au ruleset `main`
 
 Geste **humain** (admin du dépôt), même écran que le guide de l'[ADR-0020](./0020-ci-argos-compartimentee.md) : **Settings** → **Rules** → **Rulesets** → ruleset de `main` → **Require status checks to pass** → ajouter `build-image-vm` (nom tel qu'affiché sur la PR de la 1.6.1) → sauver.
+
+## Guide — rendre les images publiques (une fois par paquet)
+
+Geste **humain** (propriétaire du dépôt), une seule fois, après la première exécution de **Publier les images VM** : un paquet GHCR nouveau naît privé, et la VM tire les images sans token. Le workflow le vérifie et échoue tant que les deux paquets ne sont pas publics.
+
+Pour `bbass-vm-centrale` puis `bbass-vm-searxng` : profil GitHub → **Packages** → le paquet → **Package settings** → **Danger Zone** → **Change visibility** → **Public**. Puis relancer le workflow échoué (**Re-run jobs**) : il reconstruit `vX.Y.Z` et pose `staging`.
+
+## Guide — promouvoir en prod, revenir en arrière
+
+**Actions** → **Promouvoir en prod** → **Run workflow** → version `vX.Y.Z`. Le workflow pose `prod` sur les images `vX.Y.Z` (même digest) et refuse une version qui n'a jamais porté `staging` (trace : tag `staging-vX.Y.Z`, posé par **Publier les images VM**). Revenir en arrière : promouvoir l'ancienne version. Chaque promotion reste dans l'historique **Actions** (titre : version et auteur ; date du run).

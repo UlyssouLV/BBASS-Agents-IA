@@ -1,0 +1,88 @@
+# Publication des images de la VM centrale (spec 1.6.1, ADR-0021) : à chaque
+# GitHub Release vX.Y.Z, build des images vm-centrale et searxng, push public
+# sur GHCR avec le tag de version, puis étiquette staging posée par retag
+# (même digest). La VM de staging la tire au prochain mettre-a-jour.
+#
+# Le tag staging-vX.Y.Z (immuable) garde la trace qu'une version a porté
+# staging : « Promouvoir en prod » refuse une version sans lui.
+name: Publier les images VM
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+# Deux Releases rapprochées : la dernière publiée garde staging.
+concurrency:
+  group: etiquettes-images-vm
+  cancel-in-progress: false
+
+jobs:
+  publier:
+    name: Publier les images VM
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      TAG: ${{ github.event.release.tag_name }}
+      DEPOT_VM: ghcr.io/ulyssoulv/bbass-vm-centrale
+      DEPOT_SEARXNG: ghcr.io/ulyssoulv/bbass-vm-searxng
+    steps:
+      - name: Tag de la Release au format vX.Y.Z
+        run: |
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Tag de Release « $TAG » : attendu vX.Y.Z. Aucune image publiée."
+            exit 1
+          fi
+
+      # Checkout du tag de la Release (défaut de l'événement release).
+      - uses: actions/checkout@v6
+
+      - name: Connexion à GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      # Le label source rattache le paquet GHCR au dépôt (droits du
+      # GITHUB_TOKEN, page du dépôt).
+      - name: Build et push des images vX.Y.Z
+        run: |
+          source="org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}"
+          docker build --build-arg VERSION="${TAG#v}" --label "$source" -t "$DEPOT_VM:$TAG" vm-centrale
+          docker build --label "$source" -t "$DEPOT_SEARXNG:$TAG" searxng
+          docker push "$DEPOT_VM:$TAG"
+          docker push "$DEPOT_SEARXNG:$TAG"
+
+      # La VM tire sans token : un paquet privé ne serait jamais mis à jour.
+      # Un paquet GHCR nouveau naît privé ; le passer public est un geste
+      # humain unique (guide dans l'ADR-0021).
+      - name: Images téléchargeables sans authentification
+        run: |
+          accept="application/vnd.oci.image.index.v1+json,application/vnd.oci.image.manifest.v1+json,application/vnd.docker.distribution.manifest.list.v2+json,application/vnd.docker.distribution.manifest.v2+json"
+          for paquet in bbass-vm-centrale bbass-vm-searxng; do
+            if ! jeton=$(curl -fsS "https://ghcr.io/token?scope=repository:ulyssoulv/$paquet:pull" | jq -r .token) \
+                || ! curl -fsS -o /dev/null -H "Authorization: Bearer $jeton" -H "Accept: $accept" \
+                  "https://ghcr.io/v2/ulyssoulv/$paquet/manifests/$TAG"; then
+              echo "::error::ghcr.io/ulyssoulv/$paquet:$TAG n'est pas téléchargeable sans authentification. Passer le paquet en Public (guide dans l'ADR-0021), puis relancer ce workflow."
+              exit 1
+            fi
+          done
+
+      - name: Étiquette staging
+        run: |
+          for depot in "$DEPOT_VM" "$DEPOT_SEARXNG"; do
+            docker buildx imagetools create -t "$depot:staging" -t "$depot:staging-$TAG" "$depot:$TAG"
+          done
+
+      - name: Résumé
+        run: |
+          {
+            echo "### $TAG en staging"
+            echo
+            echo "| Image | Digest |"
+            echo "| --- | --- |"
+            for depot in "$DEPOT_VM" "$DEPOT_SEARXNG"; do
+              echo "| \`$depot:$TAG\` | \`$(docker buildx imagetools inspect "$depot:$TAG" --format '{{json .Manifest}}' | jq -r .digest)\` |"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"

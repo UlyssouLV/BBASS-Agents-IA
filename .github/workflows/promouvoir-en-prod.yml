@@ -1,0 +1,87 @@
+# Promotion en prod (spec 1.6.1, ADR-0021) : pose l'étiquette prod sur les
+# images vX.Y.Z déjà publiées, par retag (même digest, aucun rebuild).
+# Refuse une version qui n'a jamais porté staging (tag staging-vX.Y.Z posé
+# par « Publier les images VM »). Retour arrière = promouvoir une version
+# plus ancienne. La VM de prod la tire au prochain mettre-a-jour.
+#
+# Trace : chaque exécution reste dans l'historique Actions (qui : acteur,
+# quand : date du run, quelle version : titre du run).
+name: Promouvoir en prod
+run-name: Promouvoir ${{ inputs.version }} en prod (${{ github.actor }})
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version à promouvoir (vX.Y.Z, déjà passée par staging)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# Même groupe que la publication : une étiquette bouge à la fois.
+concurrency:
+  group: etiquettes-images-vm
+  cancel-in-progress: false
+
+jobs:
+  promouvoir:
+    name: Promouvoir en prod
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      VERSION: ${{ inputs.version }}
+      DEPOTS: ghcr.io/ulyssoulv/bbass-vm-centrale ghcr.io/ulyssoulv/bbass-vm-searxng
+    steps:
+      - name: Version au format vX.Y.Z
+        run: |
+          if ! [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Version « $VERSION » : attendu vX.Y.Z (ex. v1.6.1)."
+            exit 1
+          fi
+
+      - name: Connexion à GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      # Tout vérifier avant de bouger une étiquette : jamais une image en
+      # prod et l'autre non.
+      - name: La version est passée par staging
+        run: |
+          for depot in $DEPOTS; do
+            if ! digest_version=$(docker buildx imagetools inspect "$depot:$VERSION" --format '{{json .Manifest}}' | jq -r .digest); then
+              echo "::error::$depot:$VERSION n'existe pas : aucune Release $VERSION publiée. Promotion refusée."
+              exit 1
+            fi
+            if ! staging=$(docker buildx imagetools inspect "$depot:staging-$VERSION" --format '{{json .Manifest}}' | jq -r .digest) \
+                || [ "$staging" != "$digest_version" ]; then
+              echo "::error::$VERSION n'a jamais porté l'étiquette staging ($depot). Promotion refusée : publier d'abord la Release pour l'essayer en staging."
+              exit 1
+            fi
+          done
+
+      - name: Étiquette prod
+        run: |
+          for depot in $DEPOTS; do
+            docker buildx imagetools create -t "$depot:prod" "$depot:$VERSION"
+          done
+
+      - name: prod sur le même digest que la version
+        run: |
+          {
+            echo "### $VERSION promue en prod par @${{ github.actor }}"
+            echo
+            echo "| Image | Digest |"
+            echo "| --- | --- |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          for depot in $DEPOTS; do
+            digest_version=$(docker buildx imagetools inspect "$depot:$VERSION" --format '{{json .Manifest}}' | jq -r .digest)
+            prod=$(docker buildx imagetools inspect "$depot:prod" --format '{{json .Manifest}}' | jq -r .digest)
+            if [ "$prod" != "$digest_version" ]; then
+              echo "::error::$depot:prod ($prod) ≠ $depot:$VERSION ($digest_version)."
+              exit 1
+            fi
+            echo "| \`$depot:prod\` | \`$prod\` |" >> "$GITHUB_STEP_SUMMARY"
+          done
