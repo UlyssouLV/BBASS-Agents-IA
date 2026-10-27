@@ -26,4 +26,4 @@ Ce n’est ni une spec produit, ni un tutoriel. C’est le journal des choix str
 | [0016](./0016-envoi-de-message-en-flux-sse.md) | Envoi de message en flux SSE |
 | [0017](./0017-lecture-moduleo-par-outil.md) | Lecture de Moduléo par outil |
 | [0018](./0018-droits-moduleo-appliques-par-bbass.md) | Droits Moduléo appliqués par BBASS |
-| [0019](./0019-groupes-moduleo-administres-en-base.md) | Groupes Moduléo administrés en base |
+| [0019](./0019-groupes-moduleo-administres-en-base.md) | Catalogue et groupes Moduléo en base |
