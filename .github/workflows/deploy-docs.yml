@@ -4,12 +4,12 @@ name: Deploy docs
 # compteurs de commits lus par les badges du README (static/stats/).
 # Aperçus README : produits sur la branche de version (skill finaliser-la-version),
 # jamais par un commit/push bot ici (ADR-0020 / V1.6.0).
+# Pas de déclencheur release : Finalise crée la release avant le squash-merge,
+# donc le push du merge redéploie déjà avec le changelog à jour.
 on:
   push:
     branches:
       - main
-  release:
-    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -20,22 +20,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # L'environnement github-pages n'accepte que main : un run déclenché par le tag
-  # d'une release ne peut pas déployer. On relance donc le même workflow sur main,
-  # pour que le changelog du site affiche la nouvelle release.
-  relancer-sur-main:
-    if: github.event_name == 'release'
-    runs-on: ubuntu-latest
-    permissions:
-      actions: write
-    steps:
-      - name: Relancer Deploy docs sur main
-        run: gh workflow run deploy-docs.yml --ref main --repo "$GITHUB_REPOSITORY"
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
   build:
-    if: github.event_name != 'release'
     uses: ./.github/workflows/build-docs.yml
     permissions:
       contents: read
