@@ -417,7 +417,7 @@
               <li><a href="#version-1-5-1">V1.5.1 — Lire plus de données Moduléo depuis le chat</a></li>
               <li><a href="#version-1-5-2">V1.5.2 — Écrire dans Moduléo depuis le chat</a></li>
               <li><a href="#version-1-5-3">V1.5.3 — Administration des groupes et droits Moduléo</a></li>
-              <li><a href="#version-1-6-0">V1.6.0 — Déploiement postes</a></li>
+              <li><a href="#version-1-6-0">V1.6.0 — Versions vérifiées et prêtes à livrer</a></li>
               <li><a href="#version-1-8-0">V1.8.0 — Workflows n8n</a></li>
               <li><a href="#version-1-9-0">V1.9.0 — Analyse approfondie des pièces jointes</a></li>
             </ol>
@@ -446,6 +446,8 @@
       <h3>Mardi 27 octobre</h3>
       <ul>
         <li>V1.5.3 livrée : le compte administrateur gère les droits Moduléo depuis le Panel d’administration (onglet Outils → Moduléo) — groupes Cogeo et Planning, droits cochés comme dans Moduléo, rattachement de chaque compte et journal des changements ; plus de fichier ni de script à manipuler ; tests humains validés.</li>
+        <li>V1.6.0 livrée : chaque nouvelle version est désormais vérifiée automatiquement avant d’être acceptée (tests du serveur central et des postes, contrôle qualité du code, construction de l’interface et de la documentation) ; la version publiée n’est plus modifiée après coup ; tests humains validés.</li>
+        <li>V1.5.2 toujours en attente : les identifiants du serveur de test Moduléo (accès à l’API) ne sont pas encore reçus, et aucune écriture n’est essayée sur le serveur Moduléo réel du cabinet ; finalisation visée mercredi 28 octobre — c’est pourquoi la 1.5.3 et la 1.6.0 ont été livrées avant elle.</li>
       </ul>
     </div>
     <div class="jour">
@@ -471,8 +473,8 @@
     <section class="bloc" id="reste-a-implementer">
     <h2>Reste à implémenter</h2>
     <ul>
-      <li><strong>V1.5.2</strong> — écrire dans Moduléo depuis le chat, essayé sur le serveur de test fourni par Kipaware.</li>
-      <li><strong>V1.6.0</strong> — déployer et mettre à jour le logiciel sur les postes du cabinet.</li>
+      <li><strong>V1.5.2</strong> — écrire dans Moduléo depuis le chat, essayé sur le serveur de test fourni par Kipaware. Bloquée tant que les identifiants de ce serveur de test (accès à l’API) ne sont pas reçus : aucune écriture n’est essayée sur le serveur réel du cabinet. Finalisation visée mercredi 28 octobre.</li>
+      <li><strong>V1.6.1 / V1.6.2</strong> — installer et mettre à jour le logiciel sur le serveur central de Castries puis sur les postes du cabinet, sans intervention de l’alternant.</li>
       <li><strong>V1.8.0</strong> — automatisations n8n branchées sur Moduléo.</li>
       <li><strong>V1.9.0</strong> — analyse et traitement approfondis des pièces jointes.</li>
       <li>Suite « Plus tard » de la feuille de route (documentation mémoire / souveraineté, agents par pôle, bugs connus, etc.).</li>
@@ -482,7 +484,8 @@
     <section class="bloc" id="livre-pour">
     <h2>Livré pour le 29/10/2026</h2>
     <div class="recap">
-      <p><strong>Point jeudi 29 octobre — visé : V1.5.1 · livré : V1.5.1 (lundi 26 octobre), V1.5.3 (mardi 27 octobre)</strong></p>
+      <p><strong>Point jeudi 29 octobre — visé : V1.5.1 · livré : V1.5.1 (lundi 26 octobre), V1.5.3 et V1.6.0 (mardi 27 octobre)</strong></p>
+      <p>V1.5.2 reportée : identifiants du serveur de test Moduléo non reçus, pas d’essai d’écriture sur le serveur réel ; finalisation visée mercredi 28 octobre, d’où la livraison de la 1.5.3 et de la 1.6.0 avant elle.</p>
     </div>
     </section>
 
@@ -512,10 +515,11 @@
       <div class="version" id="version-1-5-2">
         <div class="version-head">
           <h3>V1.5.2 — Écrire dans Moduléo depuis le chat</h3>
-          <span class="prevu">Livraison prévue (sous réserve serveur de test)</span>
+          <span class="prevu">En attente des identifiants du serveur de test — finalisation visée le 28/10/2026</span>
         </div>
         <div class="version-body">
           <p>Premiers outils d’écriture Moduléo depuis le chat, essayés uniquement sur un serveur de test. Chaque écriture est confirmée explicitement par le collaborateur avant d’être envoyée.</p>
+          <p>Pas encore finalisable : les identifiants du serveur de test pour l’accès à l’API Moduléo n’ont pas encore été reçus, et aucune écriture n’est essayée sur le serveur Moduléo réel du cabinet. Finalisation visée mercredi 28 octobre ; c’est pourquoi les versions 1.5.3 et 1.6.0 ont été livrées avant elle.</p>
         </div>
       </div>
 
@@ -538,11 +542,18 @@
 
       <div class="version" id="version-1-6-0">
         <div class="version-head">
-          <h3>V1.6.0 — Déploiement postes</h3>
-          <span class="prevu">Livraison prévue (feuille de route)</span>
+          <h3>V1.6.0 — Versions vérifiées et prêtes à livrer</h3>
+          <span class="deploye">Déployé le 27/10/2026 à 14:23</span>
         </div>
         <div class="version-body">
-          <p>Une chaîne de déploiement pour installer et mettre à jour le logiciel sur les postes du cabinet de façon reproductible, afin que les collaborateurs puissent utiliser le chat (dont Moduléo) sans dépendre d’une installation manuelle fragile.</p>
+          <p>Chaque version du logiciel est vérifiée automatiquement avant d’être acceptée, sans dépendre d’une validation faite à la main sur le poste de l’alternant. C’est la référence sur laquelle s’appuieront l’installation du serveur central et des postes (1.6.1 / 1.6.2).</p>
+          <ul>
+            <li><strong>Vérifications séparées</strong> : serveur central, postes, interface, documentation et qualité du code sont contrôlés chacun de leur côté ; on voit tout de suite ce qui casse.</li>
+            <li><strong>Signal rapide</strong> : le contrôle qualité démarre en premier, sans attendre la fin des tests.</li>
+            <li><strong>Seulement ce qui change</strong> : une partie non touchée par la version n’est pas revérifiée, sans bloquer l’acceptation.</li>
+            <li><strong>Interface à jour</strong> : la vérification échoue si l’interface livrée ne correspond pas à son code source.</li>
+            <li><strong>Version figée</strong> : une version n’entre dans le logiciel que si toutes les vérifications sont vertes, et plus rien ne la modifie après sa publication.</li>
+          </ul>
         </div>
       </div>
 
