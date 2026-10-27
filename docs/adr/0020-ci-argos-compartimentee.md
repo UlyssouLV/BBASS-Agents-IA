@@ -30,16 +30,17 @@ Geste **humain** (admin du dépôt). Pas d'issue dédiée.
 2. **Enforcement status** : Active. **Target branches** : `main` (ou « Default » / include `refs/heads/main`).
 3. **Restrict deletions** / **Block force pushes** : activés (recommandé).
 4. **Require a pull request before merging** : activé ; autoriser seulement **Squash** comme méthode de merge (désactiver merge commit et rebase si l'UI le permet, ou n'autoriser que squash).
-5. **Require status checks to pass** : activé. Ajouter les checks dont les noms correspondent aux **jobs** des workflows 1.6.0, typiquement :
-   - le job Sonar (ex. `SonarQube Cloud` / nom exact affiché sur une PR) ;
-   - `tests-vm-centrale` (ou le nom du job dans `tests-vm-centrale.yml`) ;
+5. **Require status checks to pass** : activé. Ajouter **exactement** ces checks (noms tels qu'affichés sur la PR [#223](https://github.com/UlyssouLV/BBASS-Agents-IA/pull/223), branche `v1.6.0-ci-versions-verifiees`) :
+   - `SonarQube Cloud` — job du workflow `sonar.yml` (app GitHub Actions) ;
+   - `tests-vm-centrale` ;
    - `tests-poste` ;
    - `build-front` ;
    - `build-docs`.
+   Ne **pas** exiger `Detect changes` (job path-filter, plusieurs instances homonymes) ni `SonarCloud Code Analysis` (check de l'app SonarCloud, distinct du job Actions).
 6. Vérifier sur une PR dont certains paths ne matchent pas : les jobs skippés doivent apparaître **verts** (pattern skip→vert), sinon le merge reste bloqué.
 7. Sauver le ruleset. Tester en ouvrant une PR draft : sans checks verts (ou skip verts), le squash doit être refusé.
 
-Les noms exacts des checks se lisent dans l'onglet **Checks** d'une PR après le premier push des workflows 1.6.0.
+Cohérence **Finalise** (déjà dans le skill `finaliser-la-version`) : si la version touche des chemins d'aperçus README, les captures se font **sur la branche de version** et entrent dans le squash ; `deploy-docs.yml` ne fait que build + Pages (`contents: read`, aucun `git commit` / `git push`).
 
 ## Guide — SonarCloud CI-only (pas Automatic Analysis)
 
