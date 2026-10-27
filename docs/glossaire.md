@@ -16,7 +16,7 @@ Le système IA destiné à traiter les demandes d'un pôle donné. Non construit
 
 ## Compte {#compte}
 
-L'identité de connexion d'un collaborateur : un login, un prénom et un nom (obligatoires, affichés dans l'interface), rattaché à exactement une agence et à un ou plusieurs pôles ([ADR-0006](./adr/0006-compte-rattache-plusieurs-poles.md)). Un email est optionnel. Créé et modifié par un compte administrateur ; le tout premier compte administrateur reste créé manuellement en base, comme tous les comptes en V1. Jamais par auto-inscription.
+L'identité de connexion d'un collaborateur : un login, un prénom et un nom (obligatoires, affichés dans l'interface), rattaché à exactement une agence et à un ou plusieurs pôles ([ADR-0006](./adr/0006-compte-rattache-plusieurs-poles.md)). Un email est optionnel. Créé et modifié par un compte administrateur ; en production, le tout premier compte administrateur est créé à l'installation de la VM (`creer-admin`, [ADR-0021](./adr/0021-cd-vm-centrale-staging-prod.md)). Jamais par auto-inscription.
 
 À éviter : utilisateur, profil.
 
@@ -215,3 +215,15 @@ Une case du catalogue des droits de Moduléo (« Consulter les devis », « Voir
 Le contrôle que la VM centrale fait avant tout appel à l'API Moduléo : la route doit être classée, et le Compte doit avoir le Droit Moduléo qu'elle exige. Fermé par défaut ; un refus est dit au modèle par une phrase fixe qui nomme le droit manquant, distincte du refus de Moduléo.
 
 À éviter : garde-fou (les Garde-fous contrôlent la réponse du modèle, après coup), filtre, middleware.
+
+## Environnement {#environnement}
+
+Une installation complète de la VM centrale sur la machine de Castries : sa base, ses fichiers, sa clé maître, son port ([ADR-0021](./adr/0021-cd-vm-centrale-staging-prod.md)). Deux Environnements : **staging** (essais, serveur de test Moduléo, port 8001) et **prod** (les collaborateurs, port 8000). Chacun suit son étiquette d'images et se met à jour seul.
+
+À éviter : instance, serveur (la machine porte les deux Environnements), recette.
+
+## Promotion {#promotion}
+
+Le geste qui fait passer en prod une version déjà essayée en staging : l'étiquette `prod` est posée sur les mêmes images, sans reconstruction, par un workflow GitHub manuel et tracé ([ADR-0021](./adr/0021-cd-vm-centrale-staging-prod.md)). Refusée pour une version jamais passée par le staging. Revenir en arrière, c'est promouvoir l'ancienne version.
+
+À éviter : déploiement (la prod se met à jour ensuite, à la commande ou au redémarrage), release (la Release crée la version et l'envoie au staging).

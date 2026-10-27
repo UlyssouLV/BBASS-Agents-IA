@@ -28,3 +28,4 @@ Ce n’est ni une spec produit, ni un tutoriel. C’est le journal des choix str
 | [0018](./0018-droits-moduleo-appliques-par-bbass.md) | Droits Moduléo appliqués par BBASS |
 | [0019](./0019-groupes-moduleo-administres-en-base.md) | Catalogue et groupes Moduléo en base |
 | [0020](./0020-ci-argos-compartimentee.md) | CI ArgOS compartimentée |
+| [0021](./0021-cd-vm-centrale-staging-prod.md) | CD de la VM centrale (staging, prod) |

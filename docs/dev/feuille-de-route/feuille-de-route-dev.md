@@ -46,11 +46,11 @@ Ce n’est **pas** une spec (ça vient après « Ouvre la version »).
 
 ## Ensuite : 1.6.1 — CD : packaging, conteneurs et mise à jour de la VM Castries sans l’alternant
 
-**Objectif.** **Packager et conteneuriser** la **VM centrale**, puis la **déployer / mettre à jour** en continu (CD) à Castries, de façon **reproductible**, à partir de la référence CI de la **1.6.0** (tag / Release vérifiée). Inclut : images ou paquets déployables (ex. Docker / Compose — forme exacte au grilling), services qui tournent en continu, maintenance type purge du cache des pages web (préparée en 1.4.3), secrets Moduléo en production **hors** du dépôt. Un admin cabinet peut déployer ou mettre à jour **sans cloner le dépôt** ni connaître la plomberie de développement.
+**Objectif.** **Packager et conteneuriser** la **VM centrale**, puis la **déployer / mettre à jour** à Castries, de façon **reproductible**, à partir de la référence CI de la **1.6.0** (tag / Release vérifiée). Un admin cabinet installe en une commande et met à jour par une commande ou un redémarrage, **sans cloner le dépôt** ni connaître la plomberie de développement. Ouverte avant la 1.5.2 ([#229](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/229), [spec](../../specs/v1.6.1-cd-vm-castries.md), [ADR-0021](../../adr/0021-cd-vm-centrale-staging-prod.md)).
 
-**À trancher au grilling.** Outil exact de packaging VM (Docker seul, Compose, autre), registre d’images le cas échéant, chemins secrets, procédure de première install vs mise à jour.
+**Tranché au grilling.** Ubuntu Server 26.04 LTS + Docker Compose ; images publiques sur GHCR construites à chaque Release ; deux Environnements (staging, prod) sur la même VM, Promotion staging → prod par étiquette ; mise à jour en pull avec sauvegarde avant changement de version et retour automatique ; clés API saisies en clair et chiffrées par l’installateur ; purge du cache des pages web (préparée en 1.4.3) par timer, sous une convention unique de tâches planifiées.
 
-**Hors périmètre.** Chaîne CI (→ **1.6.0**). Packaging / conteneurs / installateur des **postes** (→ **1.6.2**). Écriture Moduléo (→ **1.5.2**).
+**Hors périmètre.** Chaîne CI (→ **1.6.0**). Packaging / conteneurs / installateur des **postes** (→ **1.6.2**). Écriture Moduléo (→ **1.5.2**). Alembic, HTTPS sur le LAN, sauvegarde nocturne hors VM, déploiement automatique, mise en production définitive (→ Plus tard).
 
 ## Ensuite : 1.6.2 — Packaging, conteneurs et installateur des postes (fenêtre, accès web)
 
@@ -77,6 +77,18 @@ Ce n’est **pas** une spec (ça vient après « Ouvre la version »).
 **Objectif.** Suite du wiki fonctionnel (même convention que la **1.7.0**) : un document (ou un ensemble de pages liées) qui inventorie **tous les outils** exposés au modèle — recherche web, relecture de pièces jointes / pages, Moduléo, etc. Pour chaque outil : à quoi il sert, paramètres utiles en langage produit, **ce qu’il envoie / reçoit / persiste**, ce qui reste sur la VM, lien avec l’inspecteur. Complète la carte souveraineté de la 1.7.0 **sans la réécrire**. Issue(s) GitHub **`documentation`** ; pages sur le doc-site partie fonctionnelle. Pas de changement de code produit hors doc / schémas / exemples.
 
 **Hors périmètre.** Doc ultra-détaillée du tool calling recherche web (paramètres fins, tous les cheminements d’échec) — reste le livrable doc de **Optimisation de la recherche web** (Plus tard). Nouveaux outils, Agents par pôle, n8n (**1.8.0**), écriture Moduléo (**1.5.2**).
+
+## Ensuite : 1.7.2 — Documentation de la base de données
+
+**Objectif.** Toute la base de la VM centrale est **documentée et visualisée** sur le doc-site : un schéma lisible (diagramme des tables et de leurs relations), puis chaque table, chaque colonne, son rôle en langage clair, qui l’écrit, qui la lit, combien de temps les lignes vivent. Une personne qui découvre le projet comprend où vit chaque donnée sans lire le code. Issue(s) GitHub **`documentation`**. Pas de changement de code produit hors doc / schémas.
+
+**Hors périmètre.** Relations entre les services (→ **1.7.3**). Système de migration de schéma (→ **Alembic**, Plus tard). Carte de souveraineté (→ **1.7.0**, non réécrite).
+
+## Ensuite : 1.7.3 — Documentation des relations entre les services
+
+**Objectif.** Une carte claire de **qui parle à qui** : poste, VM centrale, Postgres, SearXNG, Mistral, Moduléo, et les deux Environnements staging / prod mis en place en **1.6.1** — ports, sens des appels, ce qui reste sur le LAN et ce qui sort, ce qui se passe quand un service manque. Schémas sur le doc-site, même convention que la **1.7.0**. Issue(s) GitHub **`documentation`**. Pas de changement de code produit hors doc / schémas.
+
+**Hors périmètre.** Détail par outil du modèle (→ **1.7.1**). Tables et colonnes (→ **1.7.2**). Procédure d’installation (guide admin livré en **1.6.1**).
 
 ## Ensuite : 1.8.0 — Workflows n8n (socle d’automatisation), branchés sur Moduléo 1.5.0
 
@@ -274,3 +286,27 @@ Constat (ouverture 1.4.0) : plusieurs façons d’utiliser les outils sont possi
 Constat (validation manuelle de la coloration syntaxique, #95/#97) : au-delà de l'afficher correctement, le cabinet a comparé au comportement de ChatGPT qui permet d'exécuter directement une cellule de code Python dans la conversation et d'en voir le résultat.
 
 Pas de travail avant que le besoin se confirme — portée très différente d'un ajustement de rendu : il faudrait un bac à sable d'exécution (isolation, limites CPU/mémoire/temps, pas d'accès réseau/fichiers du poste), une décision sur où il tourne (poste local vs VM centrale vs service tiers) et une revue sécurité dédiée avant d'exposer quoi que ce soit d'exécutable à une réponse de modèle. Distinct de #97 (habillage visuel des blocs de code), qui n'en dépend pas.
+
+### Migrations de schéma (Alembic)
+
+Constat (grilling 1.6.1) : la base de la VM se crée au démarrage et ne sait qu’**ajouter** tables et colonnes ([ADR-0008](../../adr/0008-postgresql-vm-centrale.md)). Alembic transformerait chaque changement de schéma en script numéroté, appliqué dans l’ordre au démarrage. **Déclencheur** : la première version qui renomme ou supprime une colonne, ou déplace des données.
+
+### HTTPS sur le LAN
+
+Constat (grilling 1.6.1) : la VM n’est servie qu’en HTTP, acceptable tant qu’elle reste sur le LAN de Castries ([ADR-0003](../../adr/0003-v1-scope-castries-seule.md)). À reprendre avec l’ouverture aux satellites ou à Internet, ou si le cabinet l’exige pour le LAN.
+
+### Sauvegarde nocturne et copie hors de la VM
+
+Constat (grilling 1.6.1) : la 1.6.1 ne sauvegarde la base qu’avant un changement de version, sur le même disque. Une sauvegarde nocturne de la base **et** des fichiers de pièces jointes, copiée hors de la VM (NAS du cabinet), protégerait contre la perte de la machine. Se branche sur la convention des tâches planifiées de la 1.6.1 (`taches-planifiees.conf`).
+
+### Déploiement automatique (pull périodique ou runner à Castries)
+
+Constat (grilling 1.6.1) : la mise à jour reste déclenchée par l’admin (commande ou redémarrage). Un timer qui applique seul la dernière Promotion, ou un runner GitHub auto-hébergé dans le LAN, rendrait le CD réellement continu. **Déclencheur** : la cadence des versions rend le geste manuel pénible.
+
+### Mise en production définitive (checklist de livraison)
+
+À faire quand la solution est remise au cabinet pour de bon, pour qu’il en reste une trace :
+
+- Activer **Ubuntu Pro** (gratuit jusqu’à 5 machines ; correctifs jusqu’en 2036) avec un compte **Ubuntu One au nom du cabinet** (adresse générique, double authentification). Ce compte ne donne aucun accès à la machine ; une fuite permettrait au pire de détacher la VM des correctifs étendus. Revérifier à ce moment que l’offre gratuite couvre toujours l’usage commercial.
+- Ranger dans le **gestionnaire de mots de passe du cabinet** : identifiants Ubuntu One, valeurs générées par l’installateur (mots de passe Postgres, `VM_ADMIN_KEY` de chaque Environnement), emplacement des clés maîtres.
+- Vérifier que l’admin du cabinet a joué seul, avec le guide, une mise à jour et une Promotion.
