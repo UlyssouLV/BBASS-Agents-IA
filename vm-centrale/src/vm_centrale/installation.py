@@ -52,24 +52,27 @@ def _racine_hote() -> Path:
     return Path(os.environ.get("BBASS_RACINE_HOTE", "/hote"))
 
 
-def _dossier_deploiement() -> Path:
+def dossier_deploiement() -> Path:
     # Posé par le Dockerfile dans l'image ; hors image, celui du dépôt.
     return Path(os.environ.get("VM_CENTRALE_DEPLOIEMENT_DIR") or Path(__file__).resolve().parents[2] / "deploiement")
 
 
+# Dans les espaces de noms du PID 1 de l'hôte (--pid=host, --privileged) :
+# le docker et le systemctl de l'hôte, chemins de l'hôte.
+NSENTER_HOTE = ["nsenter", "--target", "1", "--mount", "--uts", "--ipc", "--net", "--pid", "--"]
+
+
 def executer_sur_hote(commande: list[str]) -> None:
-    # Dans les espaces de noms du PID 1 de l'hôte (--pid=host, --privileged) :
-    # le docker et le systemctl de l'hôte, chemins de l'hôte. Entrée et
-    # sortie restent celles du terminal (creer-admin est interactif).
+    # Entrée et sortie restent celles du terminal (creer-admin est
+    # interactif).
     try:
-        subprocess.run(["nsenter", "--target", "1", "--mount", "--uts", "--ipc", "--net", "--pid", "--", *commande],
-                       check=True)
+        subprocess.run([*NSENTER_HOTE, *commande], check=True)
     except subprocess.CalledProcessError:
-        _refuser(f"Échec sur l'hôte : {' '.join(commande)}")
+        refuser(f"Échec sur l'hôte : {' '.join(commande)}")
 
 
 @dataclass(frozen=True)
-class _Chemins:
+class Chemins:
     # `hote` : chemin vu par l'hôte (écrit dans .env et l'unité systemd) ;
     # `ici` : le même vu depuis ce conteneur (sous la racine montée).
     environnement: str
@@ -85,6 +88,10 @@ class _Chemins:
     @property
     def service(self) -> str:
         return f"bbass-vm-{self.environnement}.service"
+
+    @property
+    def unite_hote(self) -> str:
+        return f"/etc/systemd/system/{self.service}"
 
     def ici(self, chemin_hote: str) -> Path:
         return _racine_hote() / chemin_hote.lstrip("/")
@@ -102,7 +109,7 @@ class _Chemins:
         return self.ici(self.cle_maitre_hote)
 
 
-def _refuser(message: str) -> NoReturn:
+def refuser(message: str) -> NoReturn:
     print(message, file=sys.stderr)
     sys.exit(1)
 
@@ -135,10 +142,10 @@ def _ecrire_prive(chemin: Path, contenu: str, mode: int) -> None:
 
 
 def installer(environnement: str) -> None:
-    chemins = _Chemins(environnement)
+    chemins = Chemins(environnement)
     config = ENVIRONNEMENTS[environnement]
     if chemins.dossier.exists() or chemins.cle_maitre.parent.exists():
-        _refuser(
+        refuser(
             f"L'Environnement {environnement} est déjà installé ({chemins.dossier_hote}, "
             f"{chemins.cle_maitre_hote.rsplit('/', 1)[0]}) : rien n'est modifié. Après une installation "
             "interrompue, supprimer ces deux dossiers puis relancer."
@@ -166,10 +173,10 @@ def installer(environnement: str) -> None:
         **{variable: _chiffrer(valeur, cle_maitre) for variable, valeur in saisis.items()},
     }
     _ecrire_prive(chemins.env, "".join(f"{nom}={valeur}\n" for nom, valeur in lignes.items()), 0o600)
-    deploiement = _dossier_deploiement()
+    deploiement = dossier_deploiement()
     shutil.copyfile(deploiement / "compose.yml", chemins.dossier / "compose.yml")
     unite = (deploiement / "bbass-vm.service").read_text(encoding="utf-8")
-    unite_ici = chemins.ici(f"/etc/systemd/system/{chemins.service}")
+    unite_ici = chemins.ici(chemins.unite_hote)
     unite_ici.parent.mkdir(parents=True, exist_ok=True)
     unite_ici.write_text(unite.replace("{environnement}", environnement), encoding="utf-8")
 
@@ -189,9 +196,9 @@ def installer(environnement: str) -> None:
 
 
 def configurer_secret(environnement: str, variable: str) -> None:
-    chemins = _Chemins(environnement)
+    chemins = Chemins(environnement)
     if not chemins.env.is_file():
-        _refuser(f"L'Environnement {environnement} n'est pas installé ({chemins.dossier_hote}/.env absent).")
+        refuser(f"L'Environnement {environnement} n'est pas installé ({chemins.dossier_hote}/.env absent).")
     valeur = _chiffrer(_demander_secret(variable), lire_cle_maitre(str(chemins.cle_maitre)))
     lignes = chemins.env.read_text(encoding="utf-8").splitlines()
     autres = [ligne for ligne in lignes if not ligne.startswith(f"{variable}=")]
@@ -206,7 +213,7 @@ def creer_admin(db: Session) -> None:
     # seed_compte_test.py, réservé au dev). Mot de passe généré et affiché
     # une fois, comme à la création d'un compte par l'API (spec V1.1).
     if db.query(Compte).filter(Compte.est_admin.is_(True)).first() is not None:
-        _refuser("Un compte administrateur existe déjà : rien n'est créé.")
+        refuser("Un compte administrateur existe déjà : rien n'est créé.")
     identifiant = _demander("Identifiant de l'administrateur : ")
     prenom = _demander("Prénom : ")
     nom = _demander("Nom : ")
