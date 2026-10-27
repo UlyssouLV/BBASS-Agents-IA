@@ -146,6 +146,9 @@ class VmCentraleClientFactice:
         self._jetons_inspecteur_echange_detail: list[str] = []
         self._ids_inspecteur_echange_detail: list[int] = []
         self._cles_admin_inspecteur_echange_detail: list[str] = []
+        self.appels_moduleo: list[tuple[str, str, str, object]] = []
+        self._corps_moduleo: object = None
+        self._exception_moduleo: Exception | None = None
 
     def accepter(
         self,
@@ -614,6 +617,19 @@ class VmCentraleClientFactice:
             raise self._exception_inspecteur_echange_detail
         assert self._inspecteur_echange_detail is not None
         return self._inspecteur_echange_detail
+
+    def moduleo_repond(self, corps: object) -> None:
+        self._corps_moduleo = corps
+        self._exception_moduleo = None
+
+    def moduleo_echoue(self, exception: Exception) -> None:
+        self._exception_moduleo = exception
+
+    def relayer_moduleo(self, jeton: str, methode: str, chemin: str, corps: object = None) -> object:
+        self.appels_moduleo.append((jeton, methode, chemin, corps))
+        if self._exception_moduleo is not None:
+            raise self._exception_moduleo
+        return self._corps_moduleo
 
     def consommation_retournee(self, consommation: Consommation) -> None:
         self._consommation = consommation
