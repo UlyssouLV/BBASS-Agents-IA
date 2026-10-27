@@ -1,5 +1,7 @@
-# Scan SonarCloud CI-only : démarre dès le push/PR, sans needs sur les jobs
-# de tests et sans coverage-*.xml (ADR-0020 — désactiver Automatic Analysis).
+# Scan SonarCloud CI-only (ADR-0020 — désactiver Automatic Analysis). Le job
+# relance lui-même pytest avec couverture, sans needs sur les workflows de tests :
+# sans coverage-*.xml, la condition « couverture du nouveau code ≥ 80 % » du
+# quality gate tombe à 0 % dès qu'une version ajoute du code.
 name: SonarQube Cloud
 
 on:
@@ -17,6 +19,44 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            requirements-ci.txt
+            vm-centrale/pyproject.toml
+            poste/pyproject.toml
+
+      - name: Install
+        run: |
+          python -m pip install --only-binary :all: --require-hashes -r requirements-ci.txt
+          python -m pip install --only-binary :all: --no-binary vm-centrale --no-deps -e "./vm-centrale"
+          python -m pip install --only-binary :all: --no-binary poste --no-deps -e "./poste"
+
+      - name: Tests vm-centrale
+        run: |
+          python -m pytest vm-centrale/tests \
+            --rootdir=vm-centrale \
+            -c vm-centrale/pyproject.toml \
+            --cov=vm-centrale/src/vm_centrale \
+            --cov-report=xml:coverage-vm.xml \
+            --cov-branch \
+            --cov-config=.coveragerc
+
+      - name: Tests poste
+        env:
+          PYTHON_KEYRING_BACKEND: keyring.backends.fail.Keyring
+        run: |
+          python -m pytest poste/tests \
+            --rootdir=poste \
+            -c poste/pyproject.toml \
+            --cov=poste/src/poste \
+            --cov-report=xml:coverage-poste.xml \
+            --cov-branch \
+            --cov-config=.coveragerc
 
       # Nouveau code de main = depuis la dernière version livrée : le tag vX.Y.Z
       # est créé sur la branche avant le squash, donc déjà là au push sur main.
