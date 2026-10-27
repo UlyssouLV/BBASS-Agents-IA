@@ -183,7 +183,8 @@ def get_config_moduleo_chiffree() -> ConfigModuleoChiffree:
     # SecurityCode sont chiffrés (Fernet, spec 1.5.0, ADR-0017) avec la clé
     # maître du fichier VM_CLE_MAITRE_FICHIER, hors du dépôt. Le
     # déchiffrement est dans vm_centrale/moduleo/configuration.py ;
-    # scripts/chiffrer_secret.py produit les valeurs chiffrées.
+    # scripts/chiffrer_secret.py (dev), `installer` et `configurer-secret`
+    # (image, spec 1.6.1) produisent les valeurs chiffrées.
     return ConfigModuleoChiffree(
         url=os.environ.get("MODULEO_URL", MODULEO_URL) or None,
         api_key_chiffree=os.environ.get("MODULEO_API_KEY_CHIFFREE") or None,

@@ -1,0 +1,20 @@
+# Service systemd d'un Environnement (spec 1.6.1, ADR-0021), posé par
+# `installer <env>` sous /etc/systemd/system/bbass-vm-<env>.service ;
+# {environnement} y est remplacé par staging ou prod. Démarre la stack de
+# production au démarrage de la VM.
+[Unit]
+Description=BBASS - VM centrale ({environnement})
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/bbass/{environnement}
+ExecStart=/usr/bin/docker compose up -d --wait --wait-timeout 180
+ExecStop=/usr/bin/docker compose down
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target

@@ -1,5 +1,5 @@
-# Le Dockerfile ne copie que pyproject.toml, uv.lock, .python-version et
-# src/ ; cette liste garde le reste hors du contexte de build (secrets,
+# Le Dockerfile ne copie que pyproject.toml, uv.lock, .python-version,
+# src/ et deploiement/ ; cette liste garde le reste hors du contexte de build (secrets,
 # scripts de dev, données locales).
 .env
 .env.*
