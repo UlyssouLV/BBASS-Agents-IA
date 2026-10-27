@@ -1,3 +1,5 @@
+# Scan SonarCloud CI-only : démarre dès le push/PR, sans needs sur les jobs
+# de tests et sans coverage-*.xml (ADR-0020 — désactiver Automatic Analysis).
 name: SonarQube Cloud
 
 on:
