@@ -169,13 +169,13 @@ class node_database,node_collaborator,node_mistral,node_searxng toneIndigo
 
 ## Semaine du 26 au 30 octobre 2026
 
-**V1.5.1 livrée** (lire plus de données Moduléo depuis le chat — devis, factures, temps passés, planning, parcelles ; droits par groupe Cogeo / Planning ; clé Mistral chiffrée). Suite sur la feuille de route : **V1.5.2** (écriture Moduléo sur le serveur de test Kipaware), **V1.5.3** (admin des groupes et droits Moduléo), **V1.6.x** (versions vérifiées, mise à jour de la VM, installation des postes), **V1.8.0** (workflows n8n), **V1.9.0** (pièces jointes approfondies).
+**V1.5.3 livrée** (administration des groupes et droits Moduléo depuis le Panel, onglet Outils → Moduléo : groupes Cogeo / Planning, rattachement des comptes, journal des droits ; groupes et cases en base). Avant elle, **V1.5.1** (lire plus de données Moduléo depuis le chat — devis, factures, temps passés, planning, parcelles ; droits par groupe Cogeo / Planning ; clé Mistral chiffrée). Suite sur la feuille de route : **V1.5.2** (écriture Moduléo sur le serveur de test Kipaware), **V1.6.x** (versions vérifiées, mise à jour de la VM, installation des postes), **V1.8.0** (workflows n8n), **V1.9.0** (pièces jointes approfondies).
 
 ```mermaid
 flowchart LR
-  V151["V1.5.1<br/>plus de lectures Moduléo<br/>livrée"] --> V152["V1.5.2<br/>écriture Moduléo<br/>serveur de test"]
-  V152 --> V153["V1.5.3<br/>admin groupes / droits"]
-  V153 --> V16x["V1.6.x<br/>livraison VM et postes"]
+  V151["V1.5.1<br/>plus de lectures Moduléo<br/>livrée"] --> V153["V1.5.3<br/>admin groupes / droits<br/>livrée"]
+  V153 --> V152["V1.5.2<br/>écriture Moduléo<br/>serveur de test"]
+  V152 --> V16x["V1.6.x<br/>livraison VM et postes"]
   V16x --> V180["V1.8.0<br/>workflows n8n"]
   V180 --> V190["V1.9.0<br/>pièces jointes approfondies"]
 ```

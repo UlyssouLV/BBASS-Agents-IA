@@ -397,7 +397,7 @@
             <div class="toc-row">
               <a href="#reste-a-implementer">Reste à implémenter</a>
               <span class="toc-dots" aria-hidden="true"></span>
-              <span class="toc-ref">V1.5.1 → …</span>
+              <span class="toc-ref">V1.5.2 → …</span>
             </div>
           </li>
           <li>
@@ -445,7 +445,7 @@
     <div class="jour">
       <h3>Mardi 27 octobre</h3>
       <ul>
-        <li>À compléter.</li>
+        <li>V1.5.3 livrée : le compte administrateur gère les droits Moduléo depuis le Panel d’administration (onglet Outils → Moduléo) — groupes Cogeo et Planning, droits cochés comme dans Moduléo, rattachement de chaque compte et journal des changements ; plus de fichier ni de script à manipuler ; tests humains validés.</li>
       </ul>
     </div>
     <div class="jour">
@@ -472,7 +472,6 @@
     <h2>Reste à implémenter</h2>
     <ul>
       <li><strong>V1.5.2</strong> — écrire dans Moduléo depuis le chat, essayé sur le serveur de test fourni par Kipaware.</li>
-      <li><strong>V1.5.3</strong> — administrer groupes et droits Moduléo depuis le Panel d’administration.</li>
       <li><strong>V1.6.0</strong> — déployer et mettre à jour le logiciel sur les postes du cabinet.</li>
       <li><strong>V1.8.0</strong> — automatisations n8n branchées sur Moduléo.</li>
       <li><strong>V1.9.0</strong> — analyse et traitement approfondis des pièces jointes.</li>
@@ -483,7 +482,7 @@
     <section class="bloc" id="livre-pour">
     <h2>Livré pour le 29/10/2026</h2>
     <div class="recap">
-      <p><strong>Point jeudi 29 octobre — visé : V1.5.1 · livré : V1.5.1 (lundi 26 octobre)</strong></p>
+      <p><strong>Point jeudi 29 octobre — visé : V1.5.1 · livré : V1.5.1 (lundi 26 octobre), V1.5.3 (mardi 27 octobre)</strong></p>
     </div>
     </section>
 
@@ -523,10 +522,17 @@
       <div class="version" id="version-1-5-3">
         <div class="version-head">
           <h3>V1.5.3 — Administration des groupes et droits Moduléo</h3>
-          <span class="prevu">Livraison prévue (feuille de route)</span>
+          <span class="deploye">Déployé le 27/10/2026 à 09:56</span>
         </div>
         <div class="version-body">
-          <p>Le compte administrateur gère depuis le Panel d’administration les groupes Cogeo et Planning, leurs droits, et le rattachement de chaque compte à son groupe et à son utilisateur Moduléo.</p>
+          <p>Le compte administrateur gère les droits Moduléo depuis le Panel d’administration, dans un nouvel onglet Outils → Moduléo, sans intervention technique. Les droits restent ceux recopiés en 1.5.1 et s’appliquent dès la question suivante dans le chat.</p>
+          <ul>
+            <li><strong>Groupes</strong> : créer un groupe Cogeo ou Planning, le renommer, cocher ses droits dans une arborescence comme dans Moduléo (avec les conditions du Planning : participation, activité, créateur) ; un groupe encore utilisé par un compte ne peut pas être supprimé.</li>
+            <li><strong>Rattachements</strong> : pour chaque compte, son groupe Cogeo, son groupe Planning et son utilisateur Moduléo, retrouvé par son nom.</li>
+            <li><strong>Journal</strong> : qui a changé quoi et quand, consultable dans le même onglet.</li>
+            <li><strong>Conservation</strong> : groupes et droits sont gardés tels quels au redémarrage ; la liste des droits disponibles reste celle de Moduléo, en lecture seule.</li>
+            <li><strong>Accès</strong> : seuls les comptes administrateurs peuvent modifier ces réglages.</li>
+          </ul>
         </div>
       </div>
 
@@ -563,12 +569,7 @@
 
     <section class="bloc agenda" id="agenda-quotidien">
       <h2>Emploi du temps quotidien</h2>
-      <div class="agenda-placeholder">
-        <strong>Emploi du temps quotidien</strong>
-        Synchronisé depuis le dossier Suivi (Excel) via
-        <code>node docs/suivi-avancement/sync-agenda.mjs</code>
-        (aussi lancé par <code>generer-pdf.mjs</code>).
-      </div>
+      <img src="agenda-quotidien-tableau.png" alt="Emploi du temps quotidien — semaine du 26 au 30 octobre 2026" />
     </section>
   </div>
 </body>
