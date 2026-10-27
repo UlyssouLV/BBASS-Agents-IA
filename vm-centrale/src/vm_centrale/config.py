@@ -155,6 +155,12 @@ def _dechiffrer_cle_mistral(valeur_chiffree: str, fichier_cle_maitre: str) -> st
         ) from None
 
 
+def get_version() -> str:
+    # Posée par l'image (ARG VERSION du Dockerfile, spec 1.6.1) ; « dev »
+    # hors image (lancer-vm.*).
+    return os.environ.get("VM_CENTRALE_VERSION") or "dev"
+
+
 def get_vm_admin_key() -> str | None:
     # None (jamais une levée d'exception) quand la clé n'est pas configurée :
     # l'endpoint de révocation forcée doit alors refuser toute requête (401),

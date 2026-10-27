@@ -1,0 +1,120 @@
+# Images de la VM centrale (spec 1.6.1, ADR-0021) : build des images
+# vm-centrale et searxng, démarrage de la stack de production
+# (vm-centrale/deploiement/compose.yml), GET /sante → 200. Faux secret Mistral
+# chiffré généré à la volée, Moduléo vide.
+name: Build image VM
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  # Path filter en job (pas au niveau workflow) : un skip par `if` compte
+  # Success pour le ruleset (skip→vert). Un `paths:` sur `on:` laisserait le
+  # check required en Pending.
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      vm: ${{ steps.filter.outputs.vm }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad # v3.0.4
+        id: filter
+        with:
+          filters: |
+            vm:
+              - 'vm-centrale/**'
+              - 'searxng/**'
+              - '.github/workflows/build-image-vm.yml'
+
+  build-image-vm:
+    name: build-image-vm
+    needs: changes
+    if: needs.changes.outputs.vm == 'true'
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_VM: ghcr.io/ulyssoulv/bbass-vm-centrale:ci
+      IMAGE_SEARXNG: ghcr.io/ulyssoulv/bbass-vm-searxng:ci
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build des images
+        run: |
+          docker build --build-arg VERSION="ci-${GITHUB_SHA::7}" -t "$IMAGE_VM" vm-centrale
+          docker build -t "$IMAGE_SEARXNG" searxng
+
+      - name: Aucun secret ni script de dev dans l'image
+        run: |
+          trouves=$(docker run --rm --entrypoint sh "$IMAGE_VM" -c \
+            'find / -xdev \( -name ".env" -o -name "*.key" -o -name "seed_compte_test.py" -o -name "chiffrer_secret.py" \) 2>/dev/null')
+          if [ -n "$trouves" ]; then
+            echo "::error::Fichiers interdits dans l'image : $trouves"
+            exit 1
+          fi
+
+      # Ce que fera l'installation sur la VM : dossier de l'Environnement,
+      # clé maître et pièces jointes lisibles par l'UID de l'image (10001).
+      - name: Environnement de CI
+        run: |
+          mkdir -p "$RUNNER_TEMP/stack/donnees/pieces_jointes"
+          cp vm-centrale/deploiement/compose.yml "$RUNNER_TEMP/stack/"
+          docker run --rm --entrypoint python "$IMAGE_VM" -c "
+          from cryptography.fernet import Fernet
+          cle = Fernet.generate_key()
+          print(cle.decode())
+          print(Fernet(cle).encrypt(b'fausse-cle-mistral-ci').decode())" > "$RUNNER_TEMP/secrets.txt"
+          sed -n 1p "$RUNNER_TEMP/secrets.txt" > "$RUNNER_TEMP/stack/cle-maitre"
+          sudo chown 10001 "$RUNNER_TEMP/stack/cle-maitre" "$RUNNER_TEMP/stack/donnees/pieces_jointes"
+          sudo chmod 400 "$RUNNER_TEMP/stack/cle-maitre"
+          cat > "$RUNNER_TEMP/stack/.env" <<EOF
+          BBASS_ENVIRONNEMENT=ci
+          BBASS_ETIQUETTE=ci
+          VM_PORT_HOTE=8000
+          VM_CLE_MAITRE_FICHIER=$RUNNER_TEMP/stack/cle-maitre
+          POSTGRES_USER=vm_centrale
+          POSTGRES_PASSWORD=$(openssl rand -hex 16)
+          POSTGRES_DB=vm_centrale
+          MISTRAL_API_KEY_CHIFFREE=$(sed -n 2p "$RUNNER_TEMP/secrets.txt")
+          MODULEO_API_KEY_CHIFFREE=
+          MODULEO_SECURITY_CODE_CHIFFRE=
+          EOF
+          rm "$RUNNER_TEMP/secrets.txt"
+
+      - name: Démarrage de la stack de production
+        working-directory: ${{ runner.temp }}/stack
+        run: docker compose up -d --wait --wait-timeout 180
+
+      - name: GET /sante → 200
+        run: |
+          reponse=$(curl -sS --fail-with-body http://localhost:8000/sante)
+          echo "$reponse"
+          [ "$(echo "$reponse" | jq -r .statut)" = "ok" ]
+
+      - name: Seul le port de la VM est publié
+        run: |
+          for port in 5432 8080; do
+            if timeout 2 bash -c "</dev/tcp/127.0.0.1/$port" 2>/dev/null; then
+              echo "::error::Port $port joignable depuis l'hôte."
+              exit 1
+            fi
+          done
+
+      - name: Journaux de la stack
+        if: failure()
+        working-directory: ${{ runner.temp }}/stack
+        run: docker compose logs
+
+      - name: Arrêt de la stack
+        if: always()
+        working-directory: ${{ runner.temp }}/stack
+        run: docker compose down

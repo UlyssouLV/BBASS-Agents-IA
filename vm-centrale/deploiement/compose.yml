@@ -1,0 +1,65 @@
+# Stack de production d'un Environnement (spec 1.6.1, ADR-0021), distincte
+# du docker-compose.yml de dev. Lancée depuis /opt/bbass/<env>/ : le .env de
+# ce dossier fournit les variables ci-dessous et la configuration de la VM ;
+# les chemins relatifs (donnees/) s'y résolvent.
+#
+# Variables du .env lues ici :
+# - BBASS_ENVIRONNEMENT : staging ou prod (nom du projet Compose) ;
+# - BBASS_ETIQUETTE : tag des images (staging, prod ou vX.Y.Z) ;
+# - VM_PORT_HOTE : port publié sur le LAN (prod 8000, staging 8001) ;
+# - VM_CLE_MAITRE_FICHIER : clé maître de l'hôte, montée au même chemin ;
+# - POSTGRES_USER / POSTGRES_PASSWORD / POSTGRES_DB : sans caractère à
+#   encoder dans une URL (VM_CENTRALE_DATABASE_URL est composée ici).
+name: bbass-${BBASS_ENVIRONNEMENT:?BBASS_ENVIRONNEMENT manquant dans .env}
+
+services:
+  vm-centrale:
+    image: ghcr.io/ulyssoulv/bbass-vm-centrale:${BBASS_ETIQUETTE:?BBASS_ETIQUETTE manquant dans .env}
+    restart: unless-stopped
+    env_file: .env
+    # Prime sur env_file : ce qui dépend de la stack, pas de l'Environnement.
+    environment:
+      VM_CENTRALE_HOST: 0.0.0.0
+      VM_CENTRALE_PORT: "8000"
+      VM_CENTRALE_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      VM_CENTRALE_SEARXNG_URL: http://searxng:8080
+      VM_CENTRALE_PIECES_JOINTES_DIR: /donnees/pieces_jointes
+    # Seul port publié de la stack.
+    ports:
+      - "${VM_PORT_HOTE:?VM_PORT_HOTE manquant dans .env}:8000"
+    # Propriétaire côté hôte : UID 10001 (utilisateur de l'image).
+    volumes:
+      - ./donnees/pieces_jointes:/donnees/pieces_jointes
+      - ${VM_CLE_MAITRE_FICHIER:?VM_CLE_MAITRE_FICHIER manquant dans .env}:${VM_CLE_MAITRE_FICHIER}:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      searxng:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/sante', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # Réseau Docker du projet seulement : aucun port publié.
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER manquant dans .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD manquant dans .env}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB manquant dans .env}
+    volumes:
+      - ./donnees/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Réseau Docker du projet seulement : aucun port publié.
+  searxng:
+    image: ghcr.io/ulyssoulv/bbass-vm-searxng:${BBASS_ETIQUETTE}
+    restart: unless-stopped
