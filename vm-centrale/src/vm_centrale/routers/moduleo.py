@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import or_
@@ -5,16 +7,28 @@ from sqlalchemy.orm import Session
 
 from vm_centrale.autorisation import get_compte_admin
 from vm_centrale.database import get_db
-from vm_centrale.models import Compte, DroitModuleo, GroupeModuleo, GroupeModuleoDroit, RattachementModuleo
-from vm_centrale.moduleo.droits import APPLICATIONS
+from vm_centrale.models import (
+    Compte,
+    DroitModuleo,
+    EvenementJournalModuleo,
+    GroupeModuleo,
+    GroupeModuleoDroit,
+    RattachementModuleo,
+)
+from vm_centrale.moduleo.client import ClientModuleo, ErreurModuleo, get_client_moduleo
+from vm_centrale.moduleo.droits import APPLICATIONS, AUCUN_DROIT, COGEO, PLANNING
+from vm_centrale.moduleo.resolution import NomNonResolu, chercher_utilisateur
 from vm_centrale.schemas import (
     CatalogueModuleoResponse,
     CategorieDroitsModuleoResponse,
     DroitAccordeModuleo,
     DroitModuleoResponse,
+    EvenementJournalModuleoResponse,
     GroupeModuleoRenommeRequest,
     GroupeModuleoRequest,
     GroupeModuleoResponse,
+    RattachementModuleoRequest,
+    RattachementModuleoResponse,
 )
 
 # Administration Moduléo du Panel (spec 1.5.3, ADR-0019) : jeton d'un
@@ -27,6 +41,13 @@ _NOM_DEJA_UTILISE = "Un groupe de cette application porte déjà ce nom"
 _GROUPE_RATTACHE = "Ce groupe est encore rattaché à des comptes"
 _DROIT_HORS_CATALOGUE = "Droit absent du catalogue Moduléo de cette application"
 _CONDITION_HORS_CATALOGUE = "Condition que Moduléo ne propose pas sur ce droit"
+_COMPTE_INTROUVABLE = "Compte introuvable"
+_GROUPE_HORS_APPLICATION = "Aucun groupe Moduléo de cette application ne porte cet id"
+_MODULEO_NON_CONFIGURE = "Moduléo n'est pas configuré : utilisateur non résolu"
+_MODULEO_EN_ECHEC = "Moduléo n'a pas répondu : utilisateur non résolu"
+# Le journal se consulte sans export (spec 1.5.3) : les plus récents.
+_JOURNAL_RECENT = 200
+_AUCUN = "aucun"
 
 
 @router.get("/catalogue")
@@ -59,6 +80,19 @@ def lire_catalogue(
             for application, categories in arbres.items()
         }
     )
+
+
+def _journaliser(db: Session, admin: Compte, action: str, cible: str) -> None:
+    # Avant le commit de l'action : une action refusée n'est pas journalisée.
+    db.add(
+        EvenementJournalModuleo(
+            date=datetime.now(timezone.utc), identifiant_admin=admin.identifiant, action=action, cible=cible
+        )
+    )
+
+
+def _decrire(groupe: GroupeModuleo) -> str:
+    return f"{groupe.application} « {groupe.nom} »"
 
 
 def _vers_reponse(groupe: GroupeModuleo) -> GroupeModuleoResponse:
@@ -105,10 +139,11 @@ def lister_groupes(
 def creer_groupe(
     requete: GroupeModuleoRequest,
     db: Session = Depends(get_db),
-    _admin: Compte = Depends(get_compte_admin),
+    admin: Compte = Depends(get_compte_admin),
 ) -> GroupeModuleoResponse:
     groupe = GroupeModuleo(application=requete.application, nom=requete.nom)
     db.add(groupe)
+    _journaliser(db, admin, "Groupe créé", _decrire(groupe))
     _valider_nom(db)
     db.refresh(groupe)
     return _vers_reponse(groupe)
@@ -122,9 +157,10 @@ def renommer_groupe(
     groupe_id: int,
     requete: GroupeModuleoRenommeRequest,
     db: Session = Depends(get_db),
-    _admin: Compte = Depends(get_compte_admin),
+    admin: Compte = Depends(get_compte_admin),
 ) -> GroupeModuleoResponse:
     groupe = _groupe(db, groupe_id)
+    _journaliser(db, admin, "Groupe renommé", f"{_decrire(groupe)} → « {requete.nom} »")
     groupe.nom = requete.nom
     _valider_nom(db)
     db.refresh(groupe)
@@ -139,7 +175,7 @@ def renommer_groupe(
 def supprimer_groupe(
     groupe_id: int,
     db: Session = Depends(get_db),
-    _admin: Compte = Depends(get_compte_admin),
+    admin: Compte = Depends(get_compte_admin),
 ) -> None:
     groupe = _groupe(db, groupe_id)
     # Jamais un compte orphelin en silence : l'admin le rattache d'abord
@@ -160,6 +196,7 @@ def supprimer_groupe(
 
     db.query(GroupeModuleoDroit).filter_by(groupe_id=groupe.id).delete()
     db.delete(groupe)
+    _journaliser(db, admin, "Groupe supprimé", _decrire(groupe))
     db.commit()
 
 
@@ -192,7 +229,7 @@ def remplacer_droits_du_groupe(
     groupe_id: int,
     droits: list[DroitAccordeModuleo],
     db: Session = Depends(get_db),
-    _admin: Compte = Depends(get_compte_admin),
+    admin: Compte = Depends(get_compte_admin),
 ) -> list[DroitAccordeModuleo]:
     # Remplace tout : une case absente de la liste n'est plus accordée.
     # Seules les cases déjà en base, de l'application du groupe (ADR-0019).
@@ -208,10 +245,121 @@ def remplacer_droits_du_groupe(
         if not _conditions_du_catalogue(droit, accorde.conditions):
             raise HTTPException(status_code=422, detail=f"{_CONDITION_HORS_CATALOGUE} : {accorde.chemin}")
 
+    accordes = {d.chemin: d for d in droits}.values()
+    pluriel = "s" if len(accordes) > 1 else ""
+    _journaliser(db, admin, "Droits remplacés", f"{_decrire(groupe)} : {len(accordes)} droit{pluriel}")
     db.query(GroupeModuleoDroit).filter_by(groupe_id=groupe.id).delete()
-    for accorde in {d.chemin: d for d in droits}.values():
+    for accorde in accordes:
         db.add(
             GroupeModuleoDroit(groupe_id=groupe.id, droit_id=catalogue[accorde.chemin].id, conditions=accorde.conditions)
         )
     db.commit()
     return _droits_accordes(db, groupe)
+
+
+def _rattachement(compte: Compte, rattachement: RattachementModuleo | None) -> RattachementModuleoResponse:
+    return RattachementModuleoResponse(
+        identifiant=compte.identifiant,
+        groupe_cogeo_id=rattachement.groupe_cogeo_id if rattachement else None,
+        groupe_planning_id=rattachement.groupe_planning_id if rattachement else None,
+        id_utilisateur_moduleo=rattachement.id_utilisateur_moduleo if rattachement else None,
+    )
+
+
+@router.get("/rattachements")
+def lister_rattachements(
+    db: Session = Depends(get_db),
+    _admin: Compte = Depends(get_compte_admin),
+) -> list[RattachementModuleoResponse]:
+    # Chaque compte, rattaché ou non (spec 1.5.3, #212).
+    lignes = (
+        db.query(Compte, RattachementModuleo)
+        .outerjoin(RattachementModuleo, RattachementModuleo.identifiant_compte == Compte.identifiant)
+        .order_by(Compte.identifiant)
+    )
+    return [_rattachement(compte, rattachement) for compte, rattachement in lignes]
+
+
+def _groupe_de(db: Session, application: str, groupe_id: int | None) -> GroupeModuleo | None:
+    if groupe_id is None:
+        return None
+    groupe = db.get(GroupeModuleo, groupe_id)
+    if groupe is None or groupe.application != application:
+        raise HTTPException(status_code=422, detail=f"{_GROUPE_HORS_APPLICATION} : {application} {groupe_id}")
+    return groupe
+
+
+@router.patch(
+    "/rattachements/{identifiant}",
+    responses={
+        404: {"description": _COMPTE_INTROUVABLE},
+        422: {"description": f"{_GROUPE_HORS_APPLICATION}, ou nom d'utilisateur Moduléo inconnu ou ambigu"},
+        502: {"description": _MODULEO_EN_ECHEC},
+        503: {"description": _MODULEO_NON_CONFIGURE},
+    },
+)
+def modifier_rattachement(
+    identifiant: str,
+    requete: RattachementModuleoRequest,
+    db: Session = Depends(get_db),
+    client_moduleo: ClientModuleo | None = Depends(get_client_moduleo),
+    admin: Compte = Depends(get_compte_admin),
+) -> RattachementModuleoResponse:
+    # Tout est validé avant d'écrire : une erreur ne change rien. Effet au
+    # tour suivant (droits_du_compte relu à chaque tour).
+    compte = db.query(Compte).filter(Compte.identifiant == identifiant).one_or_none()
+    if compte is None:
+        raise HTTPException(status_code=404, detail=_COMPTE_INTROUVABLE)
+    # Champ absent : inchangé. Seuls les champs changés vont au journal
+    # (« n.durand : groupe Cogeo Admin, utilisateur Moduléo 31 »).
+    champs = requete.model_fields_set
+    valeurs: dict[str, int | None] = {}
+    changes: list[str] = []
+    for champ, application, libelle in (
+        ("groupe_cogeo_id", COGEO, "groupe Cogeo"),
+        ("groupe_planning_id", PLANNING, "groupe Planning"),
+    ):
+        if champ in champs:
+            groupe = _groupe_de(db, application, getattr(requete, champ))
+            valeurs[champ] = groupe.id if groupe else None
+            changes.append(f"{libelle} {groupe.nom if groupe else _AUCUN}")
+    if "utilisateur_moduleo" in champs:
+        id_utilisateur = _id_utilisateur(client_moduleo, requete.utilisateur_moduleo)
+        valeurs["id_utilisateur_moduleo"] = id_utilisateur
+        changes.append(f"utilisateur Moduléo {id_utilisateur or _AUCUN}")
+
+    rattachement = db.get(RattachementModuleo, identifiant) or RattachementModuleo(identifiant_compte=identifiant)
+    for champ, valeur in valeurs.items():
+        setattr(rattachement, champ, valeur)
+    db.add(rattachement)
+    _journaliser(db, admin, "Rattachement modifié", f"{identifiant} : {', '.join(changes)}" if changes else identifiant)
+    db.commit()
+    return _rattachement(compte, rattachement)
+
+
+def _id_utilisateur(client_moduleo: ClientModuleo | None, nom: str | None) -> int | None:
+    if nom is None:
+        return None
+    if client_moduleo is None:
+        raise HTTPException(status_code=503, detail=_MODULEO_NON_CONFIGURE)
+    # moduleo/utilisateur est une route libre du garde des droits (#188).
+    try:
+        return chercher_utilisateur(client_moduleo.pour(AUCUN_DROIT), nom)
+    except NomNonResolu as erreur:
+        raise HTTPException(status_code=422, detail=str(erreur)) from None
+    except ErreurModuleo as erreur:
+        raise HTTPException(status_code=502, detail=f"{_MODULEO_EN_ECHEC} : {erreur}") from None
+
+
+@router.get("/journal")
+def lire_journal(
+    db: Session = Depends(get_db),
+    _admin: Compte = Depends(get_compte_admin),
+) -> list[EvenementJournalModuleoResponse]:
+    evenements = db.query(EvenementJournalModuleo).order_by(EvenementJournalModuleo.id.desc()).limit(_JOURNAL_RECENT)
+    return [
+        EvenementJournalModuleoResponse(
+            date=evenement.date, admin=evenement.identifiant_admin, action=evenement.action, cible=evenement.cible
+        )
+        for evenement in evenements
+    ]

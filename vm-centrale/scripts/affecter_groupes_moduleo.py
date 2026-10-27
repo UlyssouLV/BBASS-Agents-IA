@@ -1,5 +1,10 @@
 """Rattache un compte a son groupe Moduleo Cogeo, son groupe Planning et son utilisateur Moduleo.
 
+Outil de dev seulement depuis la 1.5.3 (#212) : au cabinet, un compte
+administrateur rattache les comptes dans le Panel (Outils -> Moduleo, API
+`/moduleo/rattachements`), qui tient le journal des droits Moduleo ; ce
+script n'y ecrit pas. Il reste pour `--groupe-dev` sur un poste de dev.
+
 Spec 1.5.1, ADR-0018 : sans groupe, aucun outil Moduleo n'est propose au
 compte ; etre compte administrateur BBASS n'en donne aucun. Les groupes sont
 ceux de `vm_centrale/moduleo/droits/catalogue.json` (en 1.5.1 : Admin),

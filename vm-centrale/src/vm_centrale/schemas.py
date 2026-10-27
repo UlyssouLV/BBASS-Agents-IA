@@ -308,3 +308,29 @@ class DroitAccordeModuleo(BaseModel):
     # conditions Planning que le groupe pose sur l'action.
     chemin: str
     conditions: dict | None = None
+
+
+class RattachementModuleoResponse(BaseModel):
+    # Un compte et ses groupes Moduléo (ids de GET /moduleo/groupes) et son
+    # utilisateur Moduléo, chacun facultatif (spec 1.5.3, #212).
+    identifiant: str
+    groupe_cogeo_id: int | None
+    groupe_planning_id: int | None
+    id_utilisateur_moduleo: int | None
+
+
+class RattachementModuleoRequest(BaseModel):
+    # Un champ absent garde sa valeur, null la retire (comme l'ancien script
+    # affecter_groupes_moduleo.py, « aucun »).
+    groupe_cogeo_id: int | None = None
+    groupe_planning_id: int | None = None
+    # Nom de l'utilisateur Moduléo (« Durand », « Nadia Durand »), résolu
+    # en id par une lecture Moduléo.
+    utilisateur_moduleo: str | None = None
+
+
+class EvenementJournalModuleoResponse(BaseModel):
+    date: datetime
+    admin: str
+    action: str
+    cible: str
