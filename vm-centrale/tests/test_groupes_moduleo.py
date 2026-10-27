@@ -106,6 +106,64 @@ def test_au_demarrage_le_catalogue_et_le_groupe_admin_sont_charges_sans_doublon(
     ]
 
 
+def test_apres_la_migration_le_demarrage_ne_relit_plus_le_catalogue(demarrage_reel, db_session):
+    # Spec 1.5.3 (#210, ADR-0019) : les cases vivent en base ; un
+    # démarrage ne les resynchronise plus depuis catalogue.json.
+    demarrage_reel()
+    retiree = chemin("Affaires, groupes et archivage", "Changer la date libre d'une affaire")
+    db_session.query(DroitModuleo).filter_by(chemin=retiree).delete()
+    renommee = db_session.query(DroitModuleo).filter_by(chemin=chemin("Analyse", "Consulter le bilan d'une affaire")).one()
+    renommee.libelle = "Libellé changé en base"
+    db_session.commit()
+    nombre = db_session.query(DroitModuleo).count()
+
+    demarrage_reel()
+
+    assert db_session.query(DroitModuleo).count() == nombre
+    assert db_session.query(DroitModuleo).filter_by(chemin=retiree).count() == 0
+    assert db_session.get(DroitModuleo, renommee.id).libelle == "Libellé changé en base"
+
+
+def test_les_groupes_modifies_en_base_survivent_au_demarrage(demarrage_reel, db_session):
+    demarrage_reel()
+    admin = db_session.query(GroupeModuleo).filter_by(application="cogeo", nom="Admin").one()
+    retire = chemin("Devis, factures et avoirs", "Consulter les factures et les avoirs")
+    accorde = chemin("Affaires, groupes et archivage", "Changer la date libre d'une affaire")
+    droits = {d.chemin: d for d in db_session.query(DroitModuleo).filter(DroitModuleo.chemin.in_([retire, accorde]))}
+    db_session.query(GroupeModuleoDroit).filter_by(groupe_id=admin.id, droit_id=droits[retire].id).delete()
+    db_session.add(GroupeModuleoDroit(groupe_id=admin.id, droit_id=droits[accorde].id))
+    production = GroupeModuleo(application="cogeo", nom="Production")
+    db_session.add(production)
+    db_session.flush()
+    db_session.add(GroupeModuleoDroit(groupe_id=production.id, droit_id=droits[retire].id))
+    db_session.commit()
+
+    demarrage_reel()
+
+    cogeo = _droits_du_groupe(db_session, "cogeo", "Admin")
+    assert retire not in cogeo
+    assert accorde in cogeo
+    assert len(cogeo) == 153
+    assert set(_droits_du_groupe(db_session, "cogeo", "Production")) == {retire}
+
+
+def test_sans_aucun_groupe_le_demarrage_seme_admin_une_fois(demarrage_reel, db_session):
+    demarrage_reel()
+    db_session.query(GroupeModuleoDroit).delete()
+    db_session.query(GroupeModuleo).delete()
+    db_session.commit()
+    nombre = db_session.query(DroitModuleo).count()
+
+    demarrage_reel()
+
+    assert db_session.query(DroitModuleo).count() == nombre
+    assert sorted((g.application, g.nom) for g in db_session.query(GroupeModuleo)) == [
+        ("cogeo", "Admin"),
+        ("planning", "Admin"),
+    ]
+    assert len(_droits_du_groupe(db_session, "cogeo", "Admin")) == 153
+
+
 def test_le_catalogue_cogeo_reprend_toutes_les_cases_des_captures(demarrage_reel, db_session):
     demarrage_reel()
 

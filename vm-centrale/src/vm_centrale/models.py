@@ -308,8 +308,8 @@ class ProfilTravail(Base):
 
 class DroitModuleo(Base):
     # Une case du catalogue des droits de Moduléo, Cogeo ou Planning (spec
-    # 1.5.1, ADR-0018), recopiée de moduleo/droits/catalogue.json au
-    # démarrage. `chemin` : catégorie puis libellés des droits parents, un
+    # 1.5.1, ADR-0018), importée une fois de moduleo/droits/catalogue.json
+    # puis tenue en base (spec 1.5.3, ADR-0019). `chemin` : catégorie puis libellés des droits parents, un
     # même libellé pouvant revenir sous deux parents (« Émettre à la fin du
     # mois précédent » des devis et des factures).
     __tablename__ = "droits_moduleo"
