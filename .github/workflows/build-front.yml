@@ -1,0 +1,63 @@
+name: Build front
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  # Path filter en job (pas au niveau workflow) : un skip par `if` compte
+  # Success pour le ruleset (skip→vert). Un `paths:` sur `on:` laisserait le
+  # check required en Pending.
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      front: ${{ steps.filter.outputs.front }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            front:
+              - 'poste/frontend/**'
+              - 'poste/src/poste/static/**'
+              - '.github/workflows/build-front.yml'
+
+  build-front:
+    name: build-front
+    needs: changes
+    if: needs.changes.outputs.front == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: poste/frontend/package-lock.json
+
+      - name: Install
+        working-directory: poste/frontend
+        run: npm ci --ignore-scripts
+
+      - name: Build Vite
+        working-directory: poste/frontend
+        run: npm run build
+
+      # ADR-0010 : le dist reste committé sous poste/src/poste/static/.
+      # emptyOutDir réécrit ce dossier ; toute différence vs HEAD = dérive.
+      - name: Contrôle de dérive du dist
+        run: |
+          if [ -n "$(git status --porcelain -- poste/src/poste/static/)" ]; then
+            echo "::error::poste/src/poste/static/ dérive du résultat de npm run build (rebuild et commit du dist requis, ADR-0010)."
+            git status -- poste/src/poste/static/
+            git diff --stat -- poste/src/poste/static/ || true
+            exit 1
+          fi
+          echo "static/ aligné avec npm run build."
