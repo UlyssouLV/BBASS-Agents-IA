@@ -268,10 +268,11 @@ function FormulaireDroitsGroupe({ groupe, onFermer }: Readonly<{ groupe: GroupeM
           Cochez les cases comme dans Moduléo. Une case manquante relève d'une évolution du catalogue (intervention dév).
         </DialogDescription>
       </DialogHeader>
-      {(catalogueQuery.isLoading || droitsQuery.isLoading) && <output>Chargement…</output>}
+      {(catalogueQuery.isLoading || (!droitsQuery.isFetchedAfterMount && !droitsQuery.error)) && <output>Chargement…</output>}
       <Erreur erreur={catalogueQuery.error} parDefaut="Le chargement du catalogue a échoué." />
       <Erreur erreur={droitsQuery.error} parDefaut="Le chargement des droits du groupe a échoué." />
-      {catalogueQuery.data && droitsQuery.data && (
+      {/* Droits relus à l'ouverture : l'éditeur ne part pas d'une copie en cache périmée. */}
+      {catalogueQuery.data && droitsQuery.data && droitsQuery.isFetchedAfterMount && (
         <EditeurDroits
           groupe={groupe}
           categories={catalogueQuery.data[groupe.application]}

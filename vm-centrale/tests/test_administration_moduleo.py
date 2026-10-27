@@ -1,6 +1,7 @@
 import pytest
 
-from vm_centrale.moduleo.droits import charger_catalogue, chemin, rattacher
+from vm_centrale.models import GroupeModuleo
+from vm_centrale.moduleo.droits import GROUPE_DEV, charger_catalogue, chemin, creer_groupes_dev, rattacher
 
 # API d'administration des groupes Moduléo (spec 1.5.3, #211, ADR-0019) :
 # catalogue des cases en lecture seule, groupes et droits accordés, pour le
@@ -120,6 +121,26 @@ def test_le_nom_du_groupe_de_dev_est_reserve(client, admin):
 
     assert _creer(client, admin, "cogeo", "Tous droits (dev)").status_code == 422
     assert client.patch(f"/moduleo/groupes/{groupe_id}", json={"nom": "Tous droits (dev)"}, headers=admin).status_code == 422
+    assert _creer(client, admin, "cogeo", " Tous droits (dev) ").status_code == 422
+
+
+def test_le_groupe_de_dev_reste_hors_panel(client, admin, db_session):
+    creer_groupes_dev(db_session)
+    db_session.commit()
+    groupe_id = db_session.query(GroupeModuleo).filter_by(application="cogeo", nom=GROUPE_DEV).one().id
+
+    assert ("cogeo", GROUPE_DEV) not in _groupes(client, admin)
+    assert client.get(f"/moduleo/groupes/{groupe_id}/droits", headers=admin).status_code == 404
+    assert client.patch(f"/moduleo/groupes/{groupe_id}", json={"nom": "X"}, headers=admin).status_code == 404
+    assert client.put(f"/moduleo/groupes/{groupe_id}/droits", json=[], headers=admin).status_code == 404
+    assert client.delete(f"/moduleo/groupes/{groupe_id}", headers=admin).status_code == 404
+    assert db_session.get(GroupeModuleo, groupe_id).nom == GROUPE_DEV
+
+
+def test_le_nom_dun_groupe_perd_ses_espaces_autour(client, admin):
+    assert _creer(client, admin, "cogeo", " Prod ").json()["nom"] == "Prod"
+    assert _creer(client, admin, "cogeo", "Admin ").status_code == 409
+    assert _creer(client, admin, "cogeo", "   ").status_code == 422
 
 
 _CONSULTER_DEVIS = chemin("Devis, factures et avoirs", "Consulter les devis")
@@ -171,6 +192,46 @@ def test_un_groupe_planning_recoit_ses_conditions(client, admin):
         # Une condition que Moduléo ne propose pas sur cette action.
         ("planning", {"chemin": _CREER_TACHE, "conditions": {"Avec conditions sur le créateur": {}}}),
         ("planning", {"chemin": _CREER_TACHE, "conditions": {"Avec conditions sur l'activité": {"Champ inventé": True}}}),
+        # Une condition ou une valeur de champ mal formée.
+        ("planning", {"chemin": _CREER_TACHE, "conditions": {"Avec conditions sur l'activité": ["x"]}}),
+        ("planning", {"chemin": _CREER_TACHE, "conditions": {"Avec conditions sur l'activité": "x"}}),
+        (
+            "planning",
+            {"chemin": _CREER_TACHE, "conditions": {"Avec conditions sur l'activité": {"L'activité doit toujours être indiquée": "oui"}}},
+        ),
+        (
+            "planning",
+            {
+                "chemin": _CREER_TACHE,
+                "conditions": {
+                    "Avec conditions sur l'activité": {
+                        "L'activité … des activités suivantes": {"operateur": "Peut-être", "activites": ["CHANTIER"]}
+                    }
+                },
+            },
+        ),
+        (
+            "planning",
+            {
+                "chemin": _CREER_TACHE,
+                "conditions": {
+                    "Avec conditions sur l'activité": {
+                        "L'activité … des activités suivantes": {"operateur": "Fait partie", "activites": "CHANTIER"}
+                    }
+                },
+            },
+        ),
+        # Un sous-droit sans son droit parent.
+        (
+            "cogeo",
+            {
+                "chemin": chemin(
+                    "Affaires, groupes et archivage",
+                    "Voir l'onglet prix de revient",
+                    "Voir le prix de vente des temps passés",
+                )
+            },
+        ),
         # Des conditions sur une case Cogeo.
         ("cogeo", {"chemin": _CONSULTER_DEVIS, "conditions": _CONDITIONS_ACTIVITE}),
     ],

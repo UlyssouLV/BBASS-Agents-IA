@@ -16,7 +16,7 @@ from vm_centrale.models import (
     RattachementModuleo,
 )
 from vm_centrale.moduleo.client import ClientModuleo, ErreurModuleo, get_client_moduleo
-from vm_centrale.moduleo.droits import APPLICATIONS, AUCUN_DROIT, COGEO, PLANNING
+from vm_centrale.moduleo.droits import APPLICATIONS, AUCUN_DROIT, COGEO, GROUPE_DEV, PLANNING
 from vm_centrale.moduleo.resolution import NomNonResolu, chercher_utilisateur
 from vm_centrale.schemas import (
     CatalogueModuleoResponse,
@@ -41,6 +41,7 @@ _NOM_DEJA_UTILISE = "Un groupe de cette application porte déjà ce nom"
 _GROUPE_RATTACHE = "Ce groupe est encore rattaché à des comptes"
 _DROIT_HORS_CATALOGUE = "Droit absent du catalogue Moduléo de cette application"
 _CONDITION_HORS_CATALOGUE = "Condition que Moduléo ne propose pas sur ce droit"
+_SOUS_DROIT_SANS_PARENT = "Sous-droit accordé sans son droit parent"
 _COMPTE_INTROUVABLE = "Compte introuvable"
 _GROUPE_HORS_APPLICATION = "Aucun groupe Moduléo de cette application ne porte cet id"
 _MODULEO_NON_CONFIGURE = "Moduléo n'est pas configuré : utilisateur non résolu"
@@ -48,6 +49,9 @@ _MODULEO_EN_ECHEC = "Moduléo n'a pas répondu : utilisateur non résolu"
 # Le journal se consulte sans export (spec 1.5.3) : les plus récents.
 _JOURNAL_RECENT = 200
 _AUCUN = "aucun"
+# Champ de condition « L'activité … des activités suivantes » : un opérateur
+# et une liste, comme dans Moduléo ; les autres champs sont des cases.
+_OPERATEURS = ("Fait partie", "Ne fait pas partie")
 
 
 @router.get("/catalogue")
@@ -100,8 +104,9 @@ def _vers_reponse(groupe: GroupeModuleo) -> GroupeModuleoResponse:
 
 
 def _groupe(db: Session, groupe_id: int) -> GroupeModuleo:
+    # « Tous droits (dev) » reste hors Panel (ADR-0019) : ni lu ni modifié.
     groupe = db.get(GroupeModuleo, groupe_id)
-    if groupe is None:
+    if groupe is None or groupe.nom == GROUPE_DEV:
         raise HTTPException(status_code=404, detail=_GROUPE_INTROUVABLE)
     return groupe
 
@@ -131,7 +136,12 @@ def lister_groupes(
     db: Session = Depends(get_db),
     _admin: Compte = Depends(get_compte_admin),
 ) -> list[GroupeModuleoResponse]:
-    groupes = db.query(GroupeModuleo).order_by(GroupeModuleo.application, GroupeModuleo.nom).all()
+    groupes = (
+        db.query(GroupeModuleo)
+        .filter(GroupeModuleo.nom != GROUPE_DEV)
+        .order_by(GroupeModuleo.application, GroupeModuleo.nom)
+        .all()
+    )
     return [_vers_reponse(groupe) for groupe in groupes]
 
 
@@ -209,6 +219,15 @@ def lire_droits_du_groupe(
     return _droits_accordes(db, _groupe(db, groupe_id))
 
 
+def _valeur_de_champ(champ: str, valeur: object) -> bool:
+    if "…" not in champ:
+        return isinstance(valeur, bool)
+    if not isinstance(valeur, dict) or valeur.get("operateur") not in _OPERATEURS or len(valeur) != 2:
+        return False
+    (liste,) = (v for cle, v in valeur.items() if cle != "operateur")
+    return isinstance(liste, list) and all(isinstance(element, str) for element in liste)
+
+
 def _conditions_du_catalogue(droit: DroitModuleo, conditions: dict | None) -> bool:
     # Le catalogue liste, par condition proposée sur l'action, ses champs ;
     # le groupe pose une valeur par champ.
@@ -216,14 +235,19 @@ def _conditions_du_catalogue(droit: DroitModuleo, conditions: dict | None) -> bo
         return True
     possibles = droit.conditions or {}
     return all(
-        condition in possibles and (not isinstance(champs, dict) or set(champs) <= set(possibles[condition]))
+        condition in possibles
+        and isinstance(champs, dict)
+        and all(champ in possibles[condition] and _valeur_de_champ(champ, valeur) for champ, valeur in champs.items())
         for condition, champs in conditions.items()
     )
 
 
 @router.put(
     "/groupes/{groupe_id}/droits",
-    responses={404: {"description": _GROUPE_INTROUVABLE}, 422: {"description": _DROIT_HORS_CATALOGUE}},
+    responses={
+        404: {"description": _GROUPE_INTROUVABLE},
+        422: {"description": f"{_DROIT_HORS_CATALOGUE}, {_CONDITION_HORS_CATALOGUE} ou {_SOUS_DROIT_SANS_PARENT}"},
+    },
 )
 def remplacer_droits_du_groupe(
     groupe_id: int,
@@ -244,6 +268,11 @@ def remplacer_droits_du_groupe(
             raise HTTPException(status_code=422, detail=f"{_DROIT_HORS_CATALOGUE} : {accorde.chemin}")
         if not _conditions_du_catalogue(droit, accorde.conditions):
             raise HTTPException(status_code=422, detail=f"{_CONDITION_HORS_CATALOGUE} : {accorde.chemin}")
+    # Comme dans Moduléo, un sous-droit ne se coche que sous son parent.
+    accordes_ids = {droit.id for droit in catalogue.values()}
+    for droit in catalogue.values():
+        if droit.parent_id is not None and droit.parent_id not in accordes_ids:
+            raise HTTPException(status_code=422, detail=f"{_SOUS_DROIT_SANS_PARENT} : {droit.chemin}")
 
     accordes = {d.chemin: d for d in droits}.values()
     pluriel = "s" if len(accordes) > 1 else ""
@@ -284,7 +313,7 @@ def _groupe_de(db: Session, application: str, groupe_id: int | None) -> GroupeMo
     if groupe_id is None:
         return None
     groupe = db.get(GroupeModuleo, groupe_id)
-    if groupe is None or groupe.application != application:
+    if groupe is None or groupe.application != application or groupe.nom == GROUPE_DEV:
         raise HTTPException(status_code=422, detail=f"{_GROUPE_HORS_APPLICATION} : {application} {groupe_id}")
     return groupe
 
@@ -313,6 +342,9 @@ def modifier_rattachement(
     # Champ absent : inchangé. Seuls les champs changés vont au journal
     # (« n.durand : groupe Cogeo Admin, utilisateur Moduléo 31 »).
     champs = requete.model_fields_set
+    rattachement = db.get(RattachementModuleo, identifiant)
+    if not champs:
+        return _rattachement(compte, rattachement)
     valeurs: dict[str, int | None] = {}
     changes: list[str] = []
     for champ, application, libelle in (
@@ -326,13 +358,13 @@ def modifier_rattachement(
     if "utilisateur_moduleo" in champs:
         id_utilisateur = _id_utilisateur(client_moduleo, requete.utilisateur_moduleo)
         valeurs["id_utilisateur_moduleo"] = id_utilisateur
-        changes.append(f"utilisateur Moduléo {id_utilisateur or _AUCUN}")
+        changes.append(f"utilisateur Moduléo {_AUCUN if id_utilisateur is None else id_utilisateur}")
 
-    rattachement = db.get(RattachementModuleo, identifiant) or RattachementModuleo(identifiant_compte=identifiant)
+    rattachement = rattachement or RattachementModuleo(identifiant_compte=identifiant)
     for champ, valeur in valeurs.items():
         setattr(rattachement, champ, valeur)
     db.add(rattachement)
-    _journaliser(db, admin, "Rattachement modifié", f"{identifiant} : {', '.join(changes)}" if changes else identifiant)
+    _journaliser(db, admin, "Rattachement modifié", f"{identifiant} : {', '.join(changes)}")
     db.commit()
     return _rattachement(compte, rattachement)
 
@@ -359,7 +391,8 @@ def lire_journal(
     evenements = db.query(EvenementJournalModuleo).order_by(EvenementJournalModuleo.id.desc()).limit(_JOURNAL_RECENT)
     return [
         EvenementJournalModuleoResponse(
-            date=evenement.date, admin=evenement.identifiant_admin, action=evenement.action, cible=evenement.cible
+            # SQLite rend la date sans fuseau, enregistrée en UTC.
+            date=evenement.date.replace(tzinfo=timezone.utc), admin=evenement.identifiant_admin, action=evenement.action, cible=evenement.cible
         )
         for evenement in evenements
     ]

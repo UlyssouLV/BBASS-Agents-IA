@@ -134,17 +134,31 @@ function EditeurConditions({
   );
 }
 
+function decocher(droit: DroitCatalogueModuleo, coches: DroitsCoches) {
+  coches.delete(droit.chemin);
+  for (const sousDroit of droit.sous_droits) {
+    decocher(sousDroit, coches);
+  }
+}
+
 function NoeudDroit({
   droit,
   coches,
   onChange,
-}: Readonly<{ droit: DroitCatalogueModuleo; coches: DroitsCoches; onChange: (coches: DroitsCoches) => void }>) {
+  desactive = false,
+}: Readonly<{
+  droit: DroitCatalogueModuleo;
+  coches: DroitsCoches;
+  onChange: (coches: DroitsCoches) => void;
+  desactive?: boolean;
+}>) {
   const coche = coches.has(droit.chemin);
 
   function poser(conditions: ConditionsModuleo | null | undefined) {
     const suivantes = new Map(coches);
     if (conditions === undefined) {
-      suivantes.delete(droit.chemin);
+      // Comme dans Moduléo : décocher un droit décoche ses sous-droits.
+      decocher(droit, suivantes);
     } else {
       suivantes.set(droit.chemin, conditions);
     }
@@ -154,7 +168,11 @@ function NoeudDroit({
   return (
     <li className="space-y-1">
       <label className="flex items-center gap-2 text-sm">
-        <Checkbox checked={coche} onCheckedChange={(etat) => poser(etat === true ? null : undefined)} />
+        <Checkbox
+          checked={coche}
+          disabled={desactive}
+          onCheckedChange={(etat) => poser(etat === true ? null : undefined)}
+        />
         {droit.libelle}
       </label>
       {coche && droit.conditions && Object.keys(droit.conditions).length > 0 && (
@@ -167,7 +185,7 @@ function NoeudDroit({
       {droit.sous_droits.length > 0 && (
         <ul className="ml-6 space-y-1">
           {droit.sous_droits.map((sousDroit) => (
-            <NoeudDroit key={sousDroit.chemin} droit={sousDroit} coches={coches} onChange={onChange} />
+            <NoeudDroit key={sousDroit.chemin} droit={sousDroit} coches={coches} onChange={onChange} desactive={!coche} />
           ))}
         </ul>
       )}

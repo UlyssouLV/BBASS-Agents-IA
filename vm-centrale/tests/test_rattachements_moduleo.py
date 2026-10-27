@@ -1,6 +1,9 @@
+from datetime import datetime, timedelta
+
 import pytest
 
-from vm_centrale.moduleo.droits import charger_catalogue
+from vm_centrale.models import GroupeModuleo
+from vm_centrale.moduleo.droits import GROUPE_DEV, charger_catalogue, creer_groupes_dev
 
 # Rattachements des comptes et journal des droits Moduléo administrés par
 # API (spec 1.5.3, #212) : pour le seul Compte administrateur.
@@ -100,6 +103,16 @@ def test_un_groupe_inconnu_est_refuse(client, admin, durand):
     assert _modifier(client, admin, "n.durand", groupe_cogeo_id=999).status_code == 422
 
 
+def test_le_groupe_de_dev_ne_se_rattache_pas_depuis_le_panel(client, admin, durand, db_session):
+    # « Tous droits (dev) » reste hors Panel (ADR-0019).
+    creer_groupes_dev(db_session)
+    db_session.commit()
+    groupe_id = db_session.query(GroupeModuleo).filter_by(application="cogeo", nom=GROUPE_DEV).one().id
+
+    assert _modifier(client, admin, "n.durand", groupe_cogeo_id=groupe_id).status_code == 422
+    assert _rattachement(client, admin, "n.durand")["groupe_cogeo_id"] is None
+
+
 def test_un_compte_inconnu_est_refuse(client, admin):
     assert _modifier(client, admin, "x.inconnu", groupe_cogeo_id=None).status_code == 404
 
@@ -165,12 +178,15 @@ def test_le_journal_liste_les_actions_admin_les_plus_recentes_dabord(client, fau
         ("a.martin", "Groupe créé", "cogeo « Prod »"),
     ]
     entree = client.get("/moduleo/journal", headers=admin).json()[0]
-    assert entree["date"]
+    # En UTC explicite : le Panel l'affiche à l'heure locale.
+    assert datetime.fromisoformat(entree["date"]).utcoffset() == timedelta(0)
 
 
 def test_une_action_refusee_nest_pas_journalisee(client, admin, durand):
     client.post("/moduleo/groupes", json={"application": "cogeo", "nom": "Admin"}, headers=admin)
     _modifier(client, admin, "n.durand", groupe_cogeo_id=999)
+    # Rien à changer : rien à journaliser.
+    _modifier(client, admin, "n.durand")
 
     assert _journal(client, admin) == []
 

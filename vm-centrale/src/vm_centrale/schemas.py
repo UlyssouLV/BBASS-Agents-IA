@@ -287,7 +287,12 @@ class GroupeModuleoRenommeRequest(BaseModel):
     @field_validator("nom")
     @classmethod
     def _nom_hors_groupe_de_dev(cls, nom: str) -> str:
-        # « Tous droits (dev) » reste hors Panel (ADR-0019).
+        # Sans espaces autour, comme le Panel : « Admin » et « Admin » suivi
+        # d'un espace sont un seul nom. « Tous droits (dev) » reste hors Panel
+        # (ADR-0019).
+        nom = nom.strip()
+        if not nom:
+            raise ValueError("Le nom du groupe est vide")
         if nom == GROUPE_DEV:
             raise ValueError(f"« {GROUPE_DEV} » est réservé au groupe de dev")
         return nom
