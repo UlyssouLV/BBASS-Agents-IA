@@ -43,25 +43,29 @@ Ce n’est **pas** une spec (ça vient après « Ouvre la version »).
 
 ## Ensuite : 1.6.0 — CI : versions vérifiées et prêtes à livrer
 
-*(Anciennement un seul bloc « déploiement postes » 1.6.0 — découpé en **1.6.0** (CI) / **1.6.1** (CD VM) / **1.6.2** (postes). La doc mémoire / souveraineté reste en **1.7.0** / **1.7.1**.)*
+*(Anciennement un seul bloc « déploiement » — découpé en **1.6.0** (CI) / **1.6.1** (packaging + conteneurs + CD **VM**) / **1.6.2** (packaging + conteneurs + installateur **postes**). La doc mémoire / souveraineté reste en **1.7.0** / **1.7.1**.)*
 
 **Contexte.** Avant de pouvoir déployer la VM ou installer les postes sans l’alternant, chaque version doit passer par une **intégration continue (CI)** : une **même référence** claire, vérifiée, prête à être reprise par le déploiement.
 
 **Objectif.** Mettre en place la **CI** du projet : chaque version produit un livrable **testé et versionné** (build, contrôles, artefacts), sans dépendre d’un build ou d’une validation faits à la main sur le poste de l’alternant. Le cabinet (ou le prochain déploiement / la CD) part toujours de cette référence. Modèle **ArgOS** : les workflows CI entrent dans le dépôt **dans le squash de la version** (un seul commit de merge qui les porte) ; **plus de commit de bot** après « Finalise la version » (aujourd’hui `github-actions[bot]` pousse encore les aperçus README via `deploy-docs.yml` — aligner ce workflow sur ArgOS : build + Pages seulement, pas de push sur `main`).
 
-**Hors périmètre.** Déploiement / mise à jour de la VM Castries (→ **1.6.1**, CD). Installation et mise à jour des postes collab (→ **1.6.2**). Choix d’outillage CI (pipeline, artefacts, hébergeur, etc.) — **à trancher au grilling**.
+**Hors périmètre.** Packaging / conteneurisation / CD de la **VM** (→ **1.6.1**) et packaging / conteneurisation / installateur des **postes** (→ **1.6.2**). Choix d’outillage CI déjà tranchés à l’ouverture de cette version.
 
-## Ensuite : 1.6.1 — CD : mise à jour de la VM Castries sans l’alternant
+## Ensuite : 1.6.1 — CD : packaging, conteneurs et mise à jour de la VM Castries sans l’alternant
 
-**Objectif.** Mettre en place la **livraison / déploiement continu (CD)** de la machine centrale : elle se **déploie et se met à jour** de façon **reproductible** à partir des livrables de la **1.6.0**, y compris ce qui doit tourner en continu (services, maintenance type purge du cache des pages web préparée en 1.4.3, secrets Moduléo en production hors du dépôt). Un admin cabinet peut le faire **sans cloner le dépôt** ni connaître la plomberie de développement.
+**Objectif.** **Packager et conteneuriser** la **VM centrale**, puis la **déployer / mettre à jour** en continu (CD) à Castries, de façon **reproductible**, à partir de la référence CI de la **1.6.0** (tag / Release vérifiée). Inclut : images ou paquets déployables (ex. Docker / Compose — forme exacte au grilling), services qui tournent en continu, maintenance type purge du cache des pages web (préparée en 1.4.3), secrets Moduléo en production **hors** du dépôt. Un admin cabinet peut déployer ou mettre à jour **sans cloner le dépôt** ni connaître la plomberie de développement.
 
-**Hors périmètre.** Chaîne CI de vérification des livrables (→ **1.6.0**, déjà faite). Installation / mise à jour des postes (→ **1.6.2**). Détail technique CD (conteneurs, chemins secrets, etc.) — **à trancher au grilling**.
+**À trancher au grilling.** Outil exact de packaging VM (Docker seul, Compose, autre), registre d’images le cas échéant, chemins secrets, procédure de première install vs mise à jour.
 
-## Ensuite : 1.6.2 — Installer et mettre à jour le poste (installateur, fenêtre, accès web)
+**Hors périmètre.** Chaîne CI (→ **1.6.0**). Packaging / conteneurs / installateur des **postes** (→ **1.6.2**). Écriture Moduléo (→ **1.5.2**).
 
-**Objectif.** Un collaborateur (ou un admin) **installe ou met à jour** le logiciel poste **sans git**, via un **installateur propre**. Une fois lancé : une **fenêtre propre** pour travailler ; le logiciel **reste disponible en fond** si on ferme la fenêtre (comme Docker Desktop qui continue après fermeture de sa fenêtre) ; on peut aussi l’**ouvrir depuis le navigateur** (raccourci possible). Le backend local obligatoire démarre, le lien vers la VM Castries est configuré, le chat est utilisable. Doc courte collab / admin.
+## Ensuite : 1.6.2 — Packaging, conteneurs et installateur des postes (fenêtre, accès web)
 
-**Hors périmètre.** CD de la VM (→ **1.6.1**). CI / production des livrables (→ **1.6.0**). Choix techniques d’embarquer la fenêtre ou le raccourci — **à trancher au grilling**.
+**Objectif.** **Packager et conteneuriser** le logiciel **poste** (backend local obligatoire inclus), puis permettre à un collaborateur (ou un admin) de l’**installer ou le mettre à jour sans git**, via un **installateur propre**. Une fois lancé : une **fenêtre propre** pour travailler ; le logiciel **reste disponible en fond** si on ferme la fenêtre (comme Docker Desktop qui continue après fermeture de sa fenêtre) ; on peut aussi l’**ouvrir depuis le navigateur** (raccourci possible). Le lien vers la VM Castries est configuré, le chat est utilisable. Doc courte collab / admin.
+
+**À trancher au grilling.** Forme du packaging poste (conteneur local, runtime embarqué, etc.), outil d’installateur, choix pour fenêtre / raccourci navigateur.
+
+**Hors périmètre.** Packaging / conteneurs / CD de la **VM** (→ **1.6.1**). CI / preuve des livrables (→ **1.6.0**).
 
 ## Ensuite : 1.7.0 — Documentation fonctionnelle : mémoire et souveraineté des données
 
