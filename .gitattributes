@@ -1,2 +1,8 @@
-*.sh text eol=lf
+﻿*.sh text eol=lf
 *.command text eol=lf
+poste/src/poste/static/**/*.html text eol=lf
+poste/src/poste/static/**/*.js text eol=lf
+poste/src/poste/static/**/*.css text eol=lf
+poste/src/poste/static/**/*.svg text eol=lf
+poste/src/poste/static/**/*.json text eol=lf
+poste/src/poste/static/**/*.map text eol=lf
