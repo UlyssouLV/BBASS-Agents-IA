@@ -19,8 +19,14 @@ Alternatives écartées :
 
 - Les workflows CI de la 1.6.0 entrent dans le **squash** de la version (pas de commit bot après Finalise).
 - Un **ruleset** GitHub doit exiger le squash-merge et les checks des compartiments (voir guide ci-dessous).
-- `sonar-project.properties` ne doit plus exiger des `coverage-*.xml` absents au moment du scan.
+- ~~`sonar-project.properties` ne doit plus exiger des `coverage-*.xml` absents au moment du scan.~~ Voir *Révision — couverture dans Sonar*.
 - `/qg` continue de lire le quality gate Sonar via l'API ; inchangé.
+
+## Révision — couverture dans Sonar (après la V1.6.0)
+
+Sans rapport de couverture, Sonar compte tout nouveau code comme non couvert : la condition « couverture du nouveau code ≥ 80 % » du quality gate tombait à 0 % sur `main` (1 487 lignes à couvrir à la première analyse acceptée), et ferait échouer toute PR de version qui ajoute du code — donc l'étape `/qg` de Finalise. La PR de la 1.6.0 n'est passée que parce qu'elle n'ajoutait aucune ligne à couvrir.
+
+Décision : le job `sonar.yml` relance **lui-même** pytest vm-centrale et poste avec `--cov` avant le scan, et `sonar-project.properties` relit `coverage-vm.xml` / `coverage-poste.xml`. Le découpage des workflows ne change pas (pas de `needs` ni de `workflow_run` vers `tests-*`) ; le prix est un check Sonar plus long et des tests exécutés deux fois.
 
 ## Guide — ruleset GitHub (squash-merge + checks)
 
