@@ -48,3 +48,4 @@ Cohérence **Finalise** (déjà dans le skill `finaliser-la-version`) : si la ve
 2. **Administration** (ou **Project Settings**) → **Analysis Method** / **Automatic Analysis**.
 3. Si **Automatic Analysis** est activée : **désactive-la**. L'analyse doit venir uniquement du workflow GitHub Actions (`SONAR_TOKEN`).
 4. Confirme qu'une PR déclenche bien un scan via Actions et que `/qg` retrouve l'analyse du SHA.
+
