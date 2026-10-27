@@ -7,6 +7,9 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
+permissions:
+  contents: read
+
 jobs:
   # Path filter en job (pas au niveau workflow) : un skip par `if` compte
   # Success pour le ruleset (skip→vert). Un `paths:` sur `on:` laisserait le
@@ -14,6 +17,9 @@ jobs:
   changes:
     name: Detect changes
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
     outputs:
       front: ${{ steps.filter.outputs.front }}
     steps:

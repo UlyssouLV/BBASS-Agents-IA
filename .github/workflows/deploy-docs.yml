@@ -36,47 +36,12 @@ jobs:
 
   build:
     if: github.event_name != 'release'
-    runs-on: ubuntu-latest
+    uses: ./.github/workflows/build-docs.yml
     permissions:
       contents: read
-      pages: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: docs-site/package-lock.json
-
-      - name: Install dependencies
-        working-directory: docs-site
-        run: npm ci --ignore-scripts
-
-      - name: Install poste frontend
-        working-directory: poste/frontend
-        run: npm ci --ignore-scripts
-
-      - name: Compteurs de commits
-        working-directory: docs-site
-        run: node scripts/generer-stats-commits.mjs
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-
-      - name: Build
-        working-directory: docs-site
-        run: npm run build
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: docs-site/build
+      pull-requests: read
+    with:
+      upload-pages: true
 
   deploy:
     if: github.event_name != 'release'

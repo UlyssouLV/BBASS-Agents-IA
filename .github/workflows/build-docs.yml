@@ -1,11 +1,19 @@
 name: Build docs
 
+# Check de PR, et build réutilisé par deploy-docs.yml sur main (workflow_call) :
+# une seule définition du build Docusaurus.
 on:
-  push:
-    branches:
-      - main
   pull_request:
     types: [opened, synchronize, reopened]
+  workflow_call:
+    inputs:
+      upload-pages:
+        description: Publie docs-site/build comme artefact Pages
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
 
 jobs:
   # Path filter en job (pas au niveau workflow) : un skip par `if` compte
@@ -13,7 +21,11 @@ jobs:
   # check required en Pending.
   changes:
     name: Detect changes
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
     outputs:
       docs: ${{ steps.filter.outputs.docs }}
     steps:
@@ -32,7 +44,10 @@ jobs:
   build-docs:
     name: build-docs
     needs: changes
-    if: needs.changes.outputs.docs == 'true'
+    # Appelé par deploy-docs : changes est skipped, on build toujours.
+    if: >-
+      !failure() && !cancelled() &&
+      (github.event_name != 'pull_request' || needs.changes.outputs.docs == 'true')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -66,3 +81,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
+
+      - name: Upload Pages artifact
+        if: inputs.upload-pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs-site/build
