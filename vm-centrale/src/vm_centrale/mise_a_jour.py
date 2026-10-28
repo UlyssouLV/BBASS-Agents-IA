@@ -34,6 +34,9 @@ _TENTATIVES_SANTE = 90
 SAUVEGARDES_GARDEES = 5
 # Identifiant d'image tel que `docker image inspect` le donne.
 _ID_IMAGE = re.compile(r"sha256:([0-9a-f]{64})")
+# Réponses de GHCR à `docker pull` quand le paquet est privé ou l'étiquette
+# absente : le réseau marche, c'est la publication qu'il faut regarder.
+_REFUS_GHCR = re.compile(r"\b(denied|unauthorized|manifest unknown)\b")
 
 
 def interroger_hote(
@@ -106,9 +109,14 @@ class _MiseAJour:
             if telechargement.returncode != 0:
                 # Au démarrage de la VM, le réseau peut manquer : la VM
                 # tourne quand même, sur ce qu'elle a.
+                erreur = telechargement.stderr.strip()
+                cause = (
+                    "refusé par GHCR (paquet privé ou étiquette absente)"
+                    if _REFUS_GHCR.search(erreur)
+                    else "impossible (pas d'Internet ?)"
+                )
                 self.dire(
-                    f"Téléchargement de {reference} impossible (pas d'Internet ?) : démarrage avec les images "
-                    f"présentes. {telechargement.stderr.strip()}".strip()
+                    f"Téléchargement de {reference} {cause} : démarrage avec les images présentes. {erreur}".strip()
                 )
         identifiants = {nom: self._id_image(reference) for nom, reference in self.references.items()}
         presentes = {nom: image for nom, image in identifiants.items() if image is not None}

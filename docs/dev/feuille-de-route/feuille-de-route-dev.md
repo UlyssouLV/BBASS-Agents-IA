@@ -299,6 +299,14 @@ Constat (grilling 1.6.1) : la VM n’est servie qu’en HTTP, acceptable tant qu
 
 Constat (grilling 1.6.1) : la 1.6.1 ne sauvegarde la base qu’avant un changement de version, sur le même disque. Une sauvegarde nocturne de la base **et** des fichiers de pièces jointes, copiée hors de la VM (NAS du cabinet), protégerait contre la perte de la machine. Se branche sur la convention des tâches planifiées de la 1.6.1 (`taches-planifiees.conf`).
 
+### Chiffrer `VM_ADMIN_KEY` dans le `.env` de la VM
+
+Constat (tests humains 1.6.1, #236, scénario 10) : dans `/opt/bbass/<env>/.env`, les clés Mistral et Moduléo sont chiffrées avec la clé maître, mais `VM_ADMIN_KEY` y est écrite en clair (fichier lisible par root seul). La chiffrer comme les autres clés éviterait qu’une copie du `.env` seule (sauvegarde, instantané, envoi pour dépannage) suffise à administrer la VM. Hors périmètre : le mot de passe Postgres, qui ne sert que sur le réseau interne de la stack.
+
+### Migrer le compte Ubuntu One propriétaire d’Ubuntu Pro
+
+Constat (tests humains 1.6.1, #236) : Ubuntu Pro de la VM est rattaché au compte Ubuntu One `j.rasolofono@bbass.fr` (gérant du cabinet), pas à une adresse générique du cabinet. Passer l’abonnement sur un compte au nom du cabinet pour qu’il ne dépende pas d’une personne ; modalités à transmettre par le cabinet. Mettre à jour le guide [Installer et mettre à jour la VM centrale](../../exploitation/vm-centrale.md) en même temps.
+
 ### Déploiement automatique (pull périodique ou runner à Castries)
 
 Constat (grilling 1.6.1) : la mise à jour reste déclenchée par l’admin (commande ou redémarrage). Un timer qui applique seul la dernière Promotion, ou un runner GitHub auto-hébergé dans le LAN, rendrait le CD réellement continu. **Déclencheur** : la cadence des versions rend le geste manuel pénible.

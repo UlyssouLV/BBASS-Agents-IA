@@ -34,6 +34,8 @@ class FauxHote:
         self.versions: dict[str, str] = {}
         self.saines: set[str] = set()
         self.internet = True
+        # Paquet GHCR privé ou absent : GHCR répond `denied`.
+        self.ghcr_refuse = False
         self.en_service: str | None = None
         self.base = "base initiale"
         self.commandes: list[list[str]] = []
@@ -65,13 +67,18 @@ class FauxHote:
 
     def __call__(self, commande: list[str], *, entree=None, sortie=None) -> subprocess.CompletedProcess:
         self.commandes.append(commande)
-        code, texte = 0, ""
+        code, texte, erreur = 0, "", ""
         match commande:
             case ["docker", "pull", reference]:
-                if self.internet and reference in self.registre:
+                # Messages d'erreur tels que `docker pull` les donne.
+                if not self.internet:
+                    code, erreur = 1, "dial tcp: lookup ghcr.io: network is unreachable"
+                elif self.ghcr_refuse:
+                    code, erreur = 1, "Error response from daemon: error from registry: denied\ndenied"
+                elif reference in self.registre:
                     self.locales[reference] = self.registre[reference]
                 else:
-                    code = 1
+                    code, erreur = 1, f"Error response from daemon: manifest for {reference} not found: manifest unknown"
             case ["docker", "image", "inspect", "--format", "{{.Id}}", reference]:
                 if reference in self.locales:
                     texte = self.locales[reference] + "\n"
@@ -92,7 +99,7 @@ class FauxHote:
                     self.base = entree.read().decode()
             case ["logger", "-t", _, message]:
                 self.journal.append(message)
-        return subprocess.CompletedProcess(commande, code, texte, "")
+        return subprocess.CompletedProcess(commande, code, texte, erreur)
 
     def a_lance(self, *debut: str) -> bool:
         return any(commande[: len(debut)] == list(debut) for commande in self.commandes)
@@ -201,6 +208,21 @@ def test_sans_internet_demarre_les_images_presentes_et_le_journalise(racine, sta
     assert staging.en_service == _id("vm", "1.6.1")
     assert _sauvegardes(racine) == []
     assert any("Internet" in message for message in staging.journal)
+    assert not any("GHCR" in message for message in staging.journal)
+
+
+def test_ghcr_refuse_le_dit_sans_parler_d_internet(racine, staging):
+    # Paquet resté privé : l'admin doit chercher du côté de GHCR, pas du
+    # réseau.
+    staging.publier("1.6.2")
+    staging.ghcr_refuse = True
+
+    main(["mettre-a-jour", "staging"])
+
+    assert staging.en_service == _id("vm", "1.6.1")
+    refus = [message for message in staging.journal if "GHCR" in message]
+    assert len(refus) == 2
+    assert all("privé" in message and "Internet" not in message for message in refus)
 
 
 @pytest.mark.parametrize("saine", [True, False])
