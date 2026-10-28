@@ -132,7 +132,7 @@ fn main() {
         .manage(Backend(Mutex::new(None)))
         .manage(journal())
         .setup(move |app| {
-            journaliser(app.handle(), &format!("BBASS {} démarre ({lancement:?})", env!("CARGO_PKG_VERSION")));
+            journaliser(app.handle(), &format!("BBASS {} démarre ({lancement:?})", app.package_info().version));
             installer_la_zone_de_notification(app.handle())?;
             let fenetre = app
                 .get_webview_window("principale")

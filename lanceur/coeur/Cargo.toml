@@ -6,3 +6,9 @@ publish = false
 description = "Logique du Lanceur BBASS sans fenêtre ni réseau distant, testée par cargo test."
 
 [dependencies]
+# Clés et signatures du Paquet poste en texte (secret GitHub, fichier committé, .sig).
+base64 = "0.22"
+# Signature du Paquet poste (ADR-0022).
+ed25519-dalek = "2"
+# Graine de la paire de clés générée par `cle-poste generer`.
+getrandom = "0.2"

@@ -23,7 +23,19 @@ powershell -ExecutionPolicy Bypass -File lanceur\scripts\construire-paquet.ps1
 powershell -ExecutionPolicy Bypass -File lanceur\scripts\test-fumee.ps1
 ```
 
-Le paquet est dans `lanceur\target\paquet\BBASS\` ; il tourne sans Python ni git.
+Le paquet est dans `lanceur\target\paquet\BBASS\` ; il tourne sans Python ni git. `-Version X.Y.Z` fixe la version annoncée par `BBASS.exe` (sinon celle de `Cargo.toml`).
+
+## Paquet poste signé
+
+À chaque GitHub Release `vX.Y.Z`, le workflow `publier-paquet-poste.yml` joint à la Release `bbass-poste-vX.Y.Z-windows-x64.zip`, sa signature ed25519 (`.zip.sig`) et `SHA256SUMS`. Il signe avec le secret `POSTE_CLE_SIGNATURE` ; le Lanceur vérifie avec `cle-publique-poste.txt`, compilée dedans. Depuis `lanceur\` :
+
+```powershell
+cargo run -p bbass-lanceur-coeur --bin cle-poste -- generer <fichier-cle-secrete>   # nouvelle paire ; réécrit cle-publique-poste.txt
+cargo run -p bbass-lanceur-coeur --bin cle-poste -- signer <paquet>                 # avec $env:POSTE_CLE_SIGNATURE
+cargo run -p bbass-lanceur-coeur --bin cle-poste -- verifier <paquet> <signature>   # avec la clé publique compilée
+```
+
+Créer ou remplacer la clé : guide dans l'ADR-0022.
 
 ## Configuration
 

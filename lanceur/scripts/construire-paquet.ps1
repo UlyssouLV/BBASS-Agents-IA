@@ -4,10 +4,12 @@
 #
 # Prérequis : Node 20+, Python 3.11, Rust (MSVC) et WebView2 (présent dans Windows 10/11).
 # Usage, depuis la racine du dépôt :
-#   powershell -ExecutionPolicy Bypass -File lanceur\scripts\construire-paquet.ps1
+#   powershell -ExecutionPolicy Bypass -File lanceur\scripts\construire-paquet.ps1 [-Version X.Y.Z]
 param(
     # Interpréteur Python 3.11 qui crée l'environnement de construction du sidecar.
-    [string]$Python = "python"
+    [string]$Python = "python",
+    # Version annoncée par BBASS.exe (Release vX.Y.Z) ; sans elle, celle de lanceur\Cargo.toml.
+    [string]$Version = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -15,6 +17,8 @@ $racine = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 $lanceur = Join-Path $racine "lanceur"
 $cible = Join-Path $lanceur "target"
 $paquet = Join-Path $cible "paquet\BBASS"
+
+if ($Version -and $Version -notmatch '^\d+\.\d+\.\d+$') { throw "Version « $Version » : attendu X.Y.Z." }
 
 function Executer([string]$Etape, [scriptblock]$Commande) {
     Write-Host "==> $Etape"
@@ -52,7 +56,15 @@ Executer "Sidecar PyInstaller (onedir)" {
 
 Executer "Lanceur (cargo build --release)" {
     Push-Location $lanceur
-    try { cargo build --release --locked -p bbass-lanceur } finally { Pop-Location }
+    # Lu par tauri-build (ressource de version de l'exe) et generate_context! (build.rs).
+    if ($Version) { $env:TAURI_CONFIG = (@{ version = $Version } | ConvertTo-Json -Compress) }
+    try { cargo build --release --locked -p bbass-lanceur } finally { Remove-Item Env:TAURI_CONFIG -ErrorAction SilentlyContinue; Pop-Location }
+}
+
+if ($Version) {
+    $annoncee = (Get-Item (Join-Path $cible "release\BBASS.exe")).VersionInfo.ProductVersion
+    if ($annoncee -ne $Version) { throw "BBASS.exe annonce la version « $annoncee », attendu « $Version »." }
+    Write-Host "BBASS.exe annonce la version $Version"
 }
 
 Write-Host "==> Assemblage dans $paquet"
