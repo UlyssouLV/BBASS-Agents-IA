@@ -38,3 +38,4 @@ roles:
     paths:
       - vm-centrale
       - poste
+      - lanceur

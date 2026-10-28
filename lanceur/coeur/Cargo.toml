@@ -1,0 +1,8 @@
+[package]
+name = "bbass-lanceur-coeur"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Logique du Lanceur BBASS sans fenêtre ni réseau distant, testée par cargo test."
+
+[dependencies]

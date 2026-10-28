@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>BBASS</title>
+    <style>
+      html, body { height: 100%; margin: 0; }
+      body {
+        display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px;
+        background: oklch(1 0 0); color: oklch(0.18 0.012 315);
+        font-family: "Segoe UI", system-ui, sans-serif;
+      }
+      img { width: 160px; }
+      #etat { font-size: 15px; color: oklch(0.27 0.02 315); }
+      #etat.erreur { color: oklch(0.55 0.18 26); max-width: 480px; text-align: center; }
+    </style>
+  </head>
+  <body>
+    <img src="logo-bbass.png" alt="BBASS" />
+    <p id="etat">Démarrage…</p>
+    <script>
+      // Appelée par le Lanceur quand le backend ne démarre pas.
+      window.afficherErreur = (message) => {
+        const etat = document.getElementById("etat");
+        etat.textContent = message;
+        etat.className = "erreur";
+      };
+    </script>
+  </body>
+</html>

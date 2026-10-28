@@ -3,7 +3,7 @@ name: lancer-tests
 description: >-
   Run the test suites under role test-roots (agents/roles.yml), scoped to
   changed files when possible. Detect the runner in each root (pytest+venv,
-  else npm test). Use when the user types `/t` or `/t -a`, or says « lance
+  else npm test, else cargo test). Use when the user types `/t` or `/t -a`, or says « lance
   les tests », or when another skill tells you to run lancer-tests.
   `-a` forces every test-root full suite. Do not commit. Do not close issues.
 ---
@@ -18,7 +18,7 @@ Paths: **`agents/roles.yml`**. Role **`test-roots`** must resolve; else **stop**
 
 ## 0. Option `-a`
 
-If **`-a`** is present: skip scoping. Run **every** test-root with its **full** suite (step 3 with no path args for pytest; `npm test` as usual). Go to step 2.
+If **`-a`** is present: skip scoping. Run **every** test-root with its **full** suite (step 3 with no path args for pytest; `npm test` and `cargo test --workspace` as usual). Go to step 2.
 
 ## 1. Which files, then which packages
 
@@ -41,10 +41,13 @@ In **each** selected root, inspect only files in that root. First match wins:
 
 1. **pytest-venv** — `pytest` appears in `pyproject.toml`, `pytest.ini`, or `setup.cfg`, **and** `.venv/bin/python` or `.venv/Scripts/python.exe` exists.
 2. **npm-test** — `package.json` has `scripts.test`.
+3. **cargo-test** — `Cargo.toml` exists at the root and `cargo` is on `PATH` (or `~/.cargo/bin/cargo`).
 
 `pytest` declared but the venv interpreter is missing → **stop**. Do not invent another interpreter.
 
-Neither match → **stop**. Report the root and that the test model is unknown. Do not invent a runner.
+`Cargo.toml` present but no `cargo` → **stop**. Tell the user to install Rust (rustup).
+
+No match → **stop**. Report the root and that the test model is unknown. Do not invent a runner.
 
 ## 3. Scope pytest paths (skipped when `-a`)
 
@@ -64,12 +67,15 @@ For each **pytest-venv** root, build the pytest argument list from changed files
 
 For **npm-test** roots: always `npm test` (no path filter).
 
+For **cargo-test** roots: always `cargo test --workspace` (no path filter).
+
 ## 4. Run
 
 From that root:
 
 - pytest-venv: `.venv/bin/python -m pytest` … (Windows: `.venv/Scripts/python.exe -m pytest`) with the args from step 3 (or none if `-a` / fallback).
 - npm-test: `npm test`
+- cargo-test: `cargo test --workspace`
 
 Any non-zero exit → **fail**. Report the failures. Do not continue a caller’s later steps.
 

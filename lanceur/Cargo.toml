@@ -1,0 +1,34 @@
+[workspace]
+members = [".", "coeur"]
+
+[package]
+name = "bbass-lanceur"
+version = "1.6.2"
+edition = "2021"
+publish = false
+description = "Lanceur BBASS : démarre le backend poste (sidecar) et l'affiche dans sa fenêtre (ADR-0022)."
+
+[[bin]]
+name = "BBASS"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+bbass-lanceur-coeur = { path = "coeur" }
+# custom-protocol : sert `ecran/` embarqué (sans lui, cargo build vise un serveur de dev).
+tauri = { version = "2", features = ["custom-protocol"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = [
+  "Win32_Foundation",
+  "Win32_Security",
+  "Win32_System_JobObjects",
+] }
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
