@@ -100,6 +100,7 @@ def enregistrer_la_configuration(requete: ServeurBbassRequest) -> ConfigurationR
         provisoire = fichier.with_suffix(".json.tmp")
         provisoire.write_text(json.dumps(contenu, ensure_ascii=False, indent=2), encoding="utf-8")
         provisoire.replace(fichier)
+        config.oublier_la_configuration_lue()
     except OSError as erreur:
         journal.warning("Configuration non enregistrée : %s", erreur)
         raise HTTPException(status_code=500, detail="La configuration n'a pas pu être enregistrée.") from erreur

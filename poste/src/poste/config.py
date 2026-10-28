@@ -31,19 +31,40 @@ ADRESSE_PROD = ""
 PORT_PAR_DEFAUT = 8000
 
 
+# Dernière lecture du fichier de configuration, gardée tant que le fichier ne
+# change pas (chemin, date, taille) : l'adresse sert à chaque appel au Serveur BBASS.
+_derniere_lecture: tuple[tuple[Path, int, int], tuple[str, int] | None] | None = None
+
+
 def lire_serveur_bbass() -> tuple[str, int] | None:
     """Hôte et port du fichier de configuration, `None` s'il est absent, illisible ou sans hôte."""
+    global _derniere_lecture
+    try:
+        etat = FICHIER_CONFIGURATION.stat()
+    except OSError:
+        return None
+    cle = (FICHIER_CONFIGURATION, etat.st_mtime_ns, etat.st_size)
+    if _derniere_lecture is not None and _derniere_lecture[0] == cle:
+        return _derniere_lecture[1]
     try:
         serveur = json.loads(FICHIER_CONFIGURATION.read_text(encoding="utf-8"))["serveur_bbass"]
         hote, port = str(serveur["hote"]).strip(), int(serveur["port"])
+        lu = (hote, port) if hote else None
     except (OSError, ValueError, KeyError, TypeError):
-        return None
-    return (hote, port) if hote else None
+        lu = None
+    _derniere_lecture = (cle, lu)
+    return lu
+
+
+def oublier_la_configuration_lue() -> None:
+    """Après une écriture du fichier : la prochaine lecture le relit, même à date et taille égales."""
+    global _derniere_lecture
+    _derniere_lecture = None
 
 
 def adresse_serveur_bbass() -> str:
-    """Adresse du Serveur BBASS, relue à chaque appel en mode paquet : la
-    Configuration (menu « … ») vaut sans redémarrer ni réinstaller."""
+    """Adresse du Serveur BBASS, relue dès que le fichier change en mode paquet :
+    la Configuration (menu « … ») vaut sans redémarrer ni réinstaller."""
     if not EN_MODE_PAQUET:
         return VM_CENTRALE_BASE_URL
     serveur = lire_serveur_bbass()

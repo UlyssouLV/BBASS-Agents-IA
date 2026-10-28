@@ -21,7 +21,9 @@ export interface ServeurBbass {
   port: number;
 }
 
-const _MSG_ERREUR_RESEAU = "Impossible de joindre le poste BBASS. Relancez BBASS.";
+// Menu « … » (Configuration, À propos) : c'est le backend local qui ne répond pas.
+export const MSG_POSTE_INJOIGNABLE = "Impossible de joindre le poste BBASS. Relancez BBASS.";
+const _MSG_ERREUR_RESEAU = MSG_POSTE_INJOIGNABLE;
 // Pastille : nouvel essai rapide tant que le Serveur BBASS est injoignable.
 const _INTERVALLE_INJOIGNABLE = 5_000;
 const _INTERVALLE_JOIGNABLE = 30_000;

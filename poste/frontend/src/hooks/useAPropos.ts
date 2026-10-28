@@ -1,6 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 
 import { appelApi } from "@/lib/api";
+import { MSG_POSTE_INJOIGNABLE as _MSG_ERREUR_RESEAU } from "@/hooks/useConfiguration";
 import type { DerniereVerification } from "@/hooks/useMiseAJour";
 
 // Même forme que poste.schemas.AProposResponse (spec 1.6.2, point 9).
@@ -12,8 +13,6 @@ export interface APropos {
   derniere_verification: DerniereVerification | null;
   verification_possible: boolean;
 }
-
-const _MSG_ERREUR_RESEAU = "Impossible de joindre le poste BBASS. Relancez BBASS.";
 
 // Lu à chaque ouverture : la version de la VM peut avoir changé depuis.
 export function useAPropos(actif: boolean) {

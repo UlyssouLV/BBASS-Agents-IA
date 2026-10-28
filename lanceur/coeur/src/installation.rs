@@ -126,14 +126,34 @@ impl Installation {
             if !partiel.join(EXE).is_file() || !backend.is_file() {
                 return Err("le paquet ne contient pas BBASS.exe et poste-backend\\poste-backend.exe".to_string());
             }
-            let dossier = self.dossier(version);
-            let _ = fs::remove_dir_all(&dossier);
-            fs::rename(&partiel, &dossier).map_err(|e| format!("impossible de poser {} ({e})", dossier.display()))
+            self.poser(version, &partiel)
         });
         if resultat.is_err() {
             let _ = fs::remove_dir_all(&partiel);
         }
         resultat
+    }
+
+    /// Met `partiel` à la place de `versions\vX.Y.Z\`. Une version déjà posée est d'abord mise
+    /// de côté d'un seul renommage, refusé par Windows si l'un de ses fichiers est ouvert :
+    /// elle reste alors intacte. Le dossier mis de côté part au prochain [`Self::nettoyer`].
+    fn poser(&self, version: Version, partiel: &Path) -> Result<(), String> {
+        let dossier = self.dossier(version);
+        let impossible = |e: io::Error| format!("impossible de poser {} ({e})", dossier.display());
+        let ancien = self.versions().join(format!(".v{version}.ancien"));
+        let _ = fs::remove_dir_all(&ancien);
+        let mis_de_cote = dossier.exists();
+        if mis_de_cote {
+            fs::rename(&dossier, &ancien).map_err(impossible)?;
+        }
+        if let Err(erreur) = fs::rename(partiel, &dossier) {
+            if mis_de_cote {
+                let _ = fs::rename(&ancien, &dossier);
+            }
+            return Err(impossible(erreur));
+        }
+        let _ = fs::remove_dir_all(&ancien);
+        Ok(())
     }
 
     /// Setup : copie le Lanceur de `version` en `BBASS.exe` ; rend son chemin.
@@ -176,7 +196,7 @@ impl Installation {
 }
 
 /// Un chemin déjà absent est déjà retiré.
-fn retirer(chemin: &Path) -> io::Result<()> {
+pub(crate) fn retirer(chemin: &Path) -> io::Result<()> {
     let resultat = if chemin.is_dir() { fs::remove_dir_all(chemin) } else { fs::remove_file(chemin) };
     match resultat {
         Err(erreur) if erreur.kind() != io::ErrorKind::NotFound => Err(erreur),

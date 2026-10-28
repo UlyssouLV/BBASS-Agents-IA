@@ -9,7 +9,7 @@ mod sidecar;
 mod systeme;
 
 use std::fs;
-use std::net::{Ipv4Addr, SocketAddr};
+use std::net::{Ipv4Addr, SocketAddr, TcpListener};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::thread;
@@ -41,6 +41,47 @@ const TAILLE_MAX_JOURNAL: u64 = 1_000_000;
 const ARCHIVES_JOURNAL: u32 = 2;
 
 struct Backend(Mutex<Option<Sidecar>>);
+
+/// Quitter (zone de notification, désinstallation) attend la fin de la mise à jour au lancement :
+/// la bascule et le retour arrière renomment `BBASS.exe`, un arrêt entre deux le laisserait absent.
+#[derive(Default)]
+struct Arret {
+    mise_a_jour: bool,
+    demande: bool,
+}
+
+struct EtatArret(Mutex<Arret>);
+
+fn demander_a_quitter(app: &AppHandle, raison: &str) {
+    let etat = app.state::<EtatArret>();
+    let mut arret = etat.0.lock().unwrap();
+    if arret.mise_a_jour {
+        arret.demande = true;
+        journaliser(app, &format!("{raison} : BBASS quittera à la fin de la mise à jour"));
+        if let Some(fenetre) = app.get_webview_window("principale") {
+            let _ = fenetre.hide();
+        }
+        return;
+    }
+    drop(arret);
+    journaliser(app, raison);
+    app.exit(0);
+}
+
+/// Fin de la mise à jour : quitte si Quitter a été demandé pendant ; `true` dans ce cas.
+fn quitter_apres_la_mise_a_jour(fenetre: &WebviewWindow) -> bool {
+    let demande = {
+        let etat = fenetre.state::<EtatArret>();
+        let mut arret = etat.0.lock().unwrap();
+        arret.mise_a_jour = false;
+        arret.demande
+    };
+    if demande {
+        journaliser(fenetre, "Mise à jour terminée : BBASS quitte comme demandé");
+        fenetre.app_handle().exit(0);
+    }
+    demande
+}
 
 /// `%LOCALAPPDATA%\BBASS` : configuration, fichier d'état de la mise à jour et journaux, partagés avec le backend.
 fn dossier_bbass() -> PathBuf {
@@ -106,10 +147,7 @@ fn installer_la_zone_de_notification(app: &AppHandle) -> tauri::Result<()> {
             "navigateur" => {
                 let _ = app.opener().open_url(URL_POSTE, None::<&str>);
             }
-            "quitter" => {
-                journaliser(app, "Quitter demandé depuis la zone de notification");
-                app.exit(0);
-            }
+            "quitter" => demander_a_quitter(app,"Quitter demandé depuis la zone de notification"),
             _ => {}
         })
         .on_tray_icon_event(|icone, evenement| {
@@ -151,6 +189,13 @@ impl Ecran<'_> {
 
 /// `Err` : message pour l'utilisateur, la cause est au journal.
 fn demarrer_le_backend(fenetre: &WebviewWindow, exe: &Path, lanceur: &Path) -> Result<(), &'static str> {
+    let adresse = SocketAddr::from((Ipv4Addr::LOCALHOST, PORT_POSTE));
+    // Port déjà pris : la réponse viendrait d'un autre programme, pas de notre backend
+    // (et confirmerait à tort l'essai d'une nouvelle version).
+    if TcpListener::bind(adresse).is_err() {
+        journaliser(fenetre, &format!("Port {PORT_POSTE} déjà utilisé par un autre programme"));
+        return Err("BBASS n'a pas pu démarrer : un autre programme utilise son port (8100). Redémarrez Windows.");
+    }
     let version = fenetre.package_info().version.to_string();
     let sidecar = Sidecar::demarrer(exe, &version, lanceur).map_err(|erreur| {
         journaliser(fenetre, &format!("Backend {} introuvable ou impossible à démarrer : {erreur}", exe.display()));
@@ -159,9 +204,10 @@ fn demarrer_le_backend(fenetre: &WebviewWindow, exe: &Path, lanceur: &Path) -> R
     *fenetre.state::<Backend>().0.lock().unwrap() = Some(sidecar);
     journaliser(fenetre, "Backend démarré");
 
-    let adresse = SocketAddr::from((Ipv4Addr::LOCALHOST, PORT_POSTE));
-    if !attendre_reponse(adresse, DELAI_DEMARRAGE) {
-        journaliser(fenetre, &format!("Backend muet après {} s", DELAI_DEMARRAGE.as_secs()));
+    let pret = attendre_reponse(adresse, DELAI_DEMARRAGE);
+    let en_cours = fenetre.state::<Backend>().0.lock().unwrap().as_mut().is_some_and(Sidecar::en_cours);
+    if !pret || !en_cours {
+        journaliser(fenetre, &format!("Backend muet ou arrêté après {} s", DELAI_DEMARRAGE.as_secs()));
         return Err("BBASS ne répond pas. Quittez BBASS depuis la zone de notification puis relancez-le.");
     }
     journaliser(fenetre, &format!("Backend prêt sur {URL_POSTE}"));
@@ -201,21 +247,41 @@ fn demarrer_le_poste(fenetre: WebviewWindow, lancement: Lancement) {
     let reseau = ReseauHttp::new(url_de_la_sante(configuration.as_deref()));
 
     let mut ecran = Ecran { fenetre: &fenetre, pourcent: None };
+    // Quitter attend jusqu'au redémarrage ou, pour un essai, jusqu'à sa confirmation ou son retour arrière.
     let essai = match mise_a_jour.au_lancement(&reseau, &mut |etape| ecran.afficher(etape)) {
-        Suite::Redemarrer => return redemarrer(&fenetre, &racine.join("BBASS.exe"), lancement),
+        Suite::Redemarrer => {
+            if !quitter_apres_la_mise_a_jour(&fenetre) {
+                redemarrer(&fenetre, &racine.join("BBASS.exe"), lancement);
+            }
+            return;
+        }
         Suite::Demarrer { essai } => essai,
     };
+    if !essai && quitter_apres_la_mise_a_jour(&fenetre) {
+        return;
+    }
     match demarrer_le_backend(&fenetre, &mise_a_jour.backend(), &racine.join("BBASS.exe")) {
         Ok(()) => {
             if essai {
                 mise_a_jour.confirmer();
+                let version = fenetre.package_info().version.to_string();
+                if let Err(erreur) = systeme::noter_la_version(&version) {
+                    journaliser(&fenetre, &format!("Version v{version} non notée dans « Applications installées » : {erreur}"));
+                }
+                if quitter_apres_la_mise_a_jour(&fenetre) {
+                    return;
+                }
             }
             let url = if lancement == Lancement::Verification { URL_A_PROPOS } else { URL_POSTE };
             let _ = fenetre.navigate(Url::parse(url).expect("URL locale valide"));
         }
         Err(_) if essai => {
             arreter_le_backend(&fenetre);
-            match mise_a_jour.revenir() {
+            let retour = mise_a_jour.revenir();
+            if quitter_apres_la_mise_a_jour(&fenetre) {
+                return;
+            }
+            match retour {
                 Ok(()) => redemarrer(&fenetre, &racine.join("BBASS.exe"), lancement),
                 Err(_) => afficher_erreur(&fenetre, "BBASS n'a pas pu démarrer sa nouvelle version. Réinstallez BBASS."),
             }
@@ -231,7 +297,8 @@ fn main() {
         redemarrage::attendre_la_fin(pid);
     }
     if lancement == Lancement::Desinstallation {
-        return desinstallation::executer(&dossier_bbass(), &journal());
+        let depuis_la_copie = processus_a_attendre(std::env::args()).is_some();
+        return desinstallation::executer(&dossier_bbass(), &journal(), depuis_la_copie);
     }
     let contexte = tauri::generate_context!();
     // Setup (paquet embarqué derrière l'exe) : l'assistant si rien n'est installé, sinon le BBASS installé.
@@ -251,8 +318,7 @@ fn main() {
         // sans démarrer de second backend ; lancé par le backend, il demande une vérification.
         .plugin(tauri_plugin_single_instance::init(|app, arguments, _dossier| {
             if demande_d_arret(arguments.clone()) {
-                journaliser(app, "Arrêt demandé par la désinstallation");
-                app.exit(0);
+                demander_a_quitter(app, "Arrêt demandé par la désinstallation");
             } else if demande_de_verification(arguments) {
                 verifier_maintenant(app);
             } else {
@@ -261,6 +327,8 @@ fn main() {
         }))
         .plugin(tauri_plugin_opener::init())
         .manage(Backend(Mutex::new(None)))
+        // La mise à jour commence dès `setup`, avant que la zone de notification ne propose Quitter.
+        .manage(EtatArret(Mutex::new(Arret { mise_a_jour: true, ..Arret::default() })))
         .manage(journal())
         .setup(move |app| {
             if lancement == Lancement::Arret {

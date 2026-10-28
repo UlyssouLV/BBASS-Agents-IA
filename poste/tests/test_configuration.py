@@ -222,3 +222,19 @@ def test_la_configuration_est_accessible_sans_session(client, fichier_configurat
     for methode, chemin in [("get", "/configuration"), ("get", "/serveur-bbass/etat")]:
         assert getattr(client, methode)(chemin).status_code == 200
     assert client.put("/configuration", json={"hote": "10.0.0.6", "port": 8000}).status_code == 200
+
+
+def test_l_adresse_n_est_relue_que_quand_le_fichier_change(fichier_configuration, monkeypatch):
+    # Lue à chaque appel au Serveur BBASS : sans changement du fichier, pas de nouvelle lecture.
+    _ecrire(fichier_configuration, {"serveur_bbass": {"hote": "10.0.0.5", "port": 8000}})
+    lectures = []
+    lire = type(fichier_configuration).read_text
+    monkeypatch.setattr(type(fichier_configuration), "read_text", lambda self, *a, **k: lectures.append(self) or lire(self, *a, **k))
+
+    assert config.adresse_serveur_bbass() == "http://10.0.0.5:8000"
+    assert config.adresse_serveur_bbass() == "http://10.0.0.5:8000"
+    assert len(lectures) == 1
+
+    # Changé par un autre programme (le Setup, à la main) : relu.
+    _ecrire(fichier_configuration, {"serveur_bbass": {"hote": "10.0.0.66", "port": 9000}})
+    assert config.adresse_serveur_bbass() == "http://10.0.0.66:9000"

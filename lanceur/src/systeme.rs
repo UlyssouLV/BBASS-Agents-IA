@@ -13,6 +13,9 @@ const CLE_DESINSTALLATION: &str = r"Software\Microsoft\Windows\CurrentVersion\Un
 /// Session du backend (`poste/session.py`, keyring) : keyring écrit sous le nom du service
 /// et, quand un autre utilisateur l'occupait, sous `utilisateur@service`.
 const SESSIONS: [&str; 2] = ["bbass-agents-ia-poste", "session@bbass-agents-ia-poste"];
+/// Processus console (backend, `cmd`) lancé sans fenêtre de terminal.
+#[cfg(windows)]
+pub const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 /// Ce que l'assistant a coché à l'étape Options.
 pub struct Options {
@@ -86,6 +89,20 @@ pub fn inscrire(exe: &Path, version: &str, options: &Options) -> io::Result<()> 
     Ok(())
 }
 
+/// Après une mise à jour confirmée : « Applications installées » affiche la version qui tourne.
+/// Sans entrée (poste non installé par le Setup), rien n'est créé.
+#[cfg(windows)]
+pub fn noter_la_version(version: &str) -> io::Result<()> {
+    use winreg::enums::{HKEY_CURRENT_USER, KEY_SET_VALUE};
+    use winreg::RegKey;
+
+    let entree = match RegKey::predef(HKEY_CURRENT_USER).open_subkey_with_flags(CLE_DESINSTALLATION, KEY_SET_VALUE) {
+        Err(erreur) if erreur.kind() == io::ErrorKind::NotFound => return Ok(()),
+        entree => entree?,
+    };
+    entree.set_value("DisplayVersion", &version)
+}
+
 /// Désinstallation : retire raccourcis, démarrage avec Windows, entrée de désinstallation et Session.
 /// Au mieux : ce qui est déjà absent est déjà retiré.
 #[cfg(windows)]
@@ -136,6 +153,11 @@ pub fn informer(message: &str, erreur: bool) {
 #[cfg(not(windows))]
 pub fn inscrire(_exe: &Path, _version: &str, _options: &Options) -> io::Result<()> {
     Err(io::Error::new(io::ErrorKind::Unsupported, "installation prévue pour Windows"))
+}
+
+#[cfg(not(windows))]
+pub fn noter_la_version(_version: &str) -> io::Result<()> {
+    Ok(())
 }
 
 #[cfg(not(windows))]

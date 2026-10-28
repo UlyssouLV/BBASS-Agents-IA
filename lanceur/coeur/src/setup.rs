@@ -12,7 +12,7 @@ use std::io::{self, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 
 use crate::configuration;
-use crate::installation::Installation;
+use crate::installation::{self, Installation};
 use crate::signature::ClePublique;
 use crate::version::Version;
 
@@ -113,8 +113,5 @@ fn ecrire_la_configuration(racine: &Path, choix: &Choix) -> io::Result<()> {
 /// un fichier encore ouvert rend `Err`, à réessayer.
 pub fn desinstaller(racine: &Path) -> io::Result<()> {
     Installation::new(racine.to_path_buf()).retirer()?;
-    match fs::remove_file(racine.join(ETAT_MISE_A_JOUR)) {
-        Err(erreur) if erreur.kind() != io::ErrorKind::NotFound => Err(erreur),
-        _ => Ok(()),
-    }
+    installation::retirer(&racine.join(ETAT_MISE_A_JOUR))
 }

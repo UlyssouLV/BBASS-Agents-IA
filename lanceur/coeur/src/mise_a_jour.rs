@@ -196,14 +196,21 @@ impl<'a> MiseAJour<'a> {
     }
 
     /// Le backend de l'essai a répondu : la version devient courante, la précédente est gardée.
+    /// Si la bascule ne peut pas être notée confirmée, le prochain lancement refait l'essai.
     pub fn confirmer(&self) {
+        let version = self.version_poste;
         if let Some(bascule) = self.installation.bascule() {
             if let Err(erreur) = self.installation.confirmer(bascule) {
                 (self.journal)(&format!("Confirmation de la bascule impossible ({erreur})"));
+                let detail = format!(
+                    "La version v{version} démarre, mais sa mise à jour n'a pas pu être enregistrée : \
+                     nouvel essai au prochain lancement."
+                );
+                self.ecrire(Some(version.to_string()), Resultat::Echec, detail, None);
+                return;
             }
             (self.journal)(&format!("Mise à jour vers v{} réussie", bascule.vers));
         }
-        let version = self.version_poste;
         self.ecrire(Some(version.to_string()), Resultat::MiseAJour, format!("Mise à jour vers v{version} réussie."), None);
     }
 

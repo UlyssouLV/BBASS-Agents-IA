@@ -121,6 +121,33 @@ def test_verifier_maintenant_demande_au_lanceur_de_redemarrer_en_mode_verificati
     assert demandes == [True]
 
 
+@pytest.mark.parametrize(
+    "entetes",
+    [
+        {"Sec-Fetch-Site": "cross-site", "Origin": "https://exemple.com"},
+        {"Sec-Fetch-Site": "same-site", "Origin": "http://127.0.0.1:9999"},
+        {"Origin": "https://exemple.com"},
+    ],
+)
+def test_une_page_d_un_autre_site_ne_peut_pas_lancer_la_verification(client, poste_installe, demandes, entetes):
+    # fetch(…, {method: "POST", mode: "no-cors"}) depuis n'importe quelle page ouverte dans le navigateur.
+    reponse = client.post("/mise-a-jour/verifier", headers=entetes)
+
+    assert reponse.status_code == 403
+    assert demandes == []
+
+
+@pytest.mark.parametrize(
+    "entetes",
+    [{"Sec-Fetch-Site": "same-origin", "Origin": "http://127.0.0.1:8100"}, {"Origin": "http://localhost:5173"}],
+)
+def test_la_page_de_bbass_peut_lancer_la_verification(client, poste_installe, demandes, entetes):
+    reponse = client.post("/mise-a-jour/verifier", headers=entetes)
+
+    assert reponse.status_code == 202
+    assert demandes == [True]
+
+
 def test_en_dev_verifier_maintenant_est_refuse_avec_un_message_clair(client, poste_installe, demandes, monkeypatch):
     monkeypatch.setattr(config, "EN_MODE_PAQUET", False)
 

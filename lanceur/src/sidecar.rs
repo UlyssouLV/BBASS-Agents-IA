@@ -27,8 +27,7 @@ impl Sidecar {
         {
             use std::os::windows::process::CommandExt;
             // Backend en mode console : pas de fenêtre de terminal sous la fenêtre BBASS.
-            const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-            commande.creation_flags(CREATE_NO_WINDOW);
+            commande.creation_flags(crate::systeme::CREATE_NO_WINDOW);
         }
         let mut processus = commande.spawn()?;
         #[cfg(windows)]
@@ -45,6 +44,11 @@ impl Sidecar {
             #[cfg(windows)]
             _travail: travail,
         })
+    }
+
+    /// Faux si le backend s'est déjà arrêté (port pris, plantage au démarrage).
+    pub fn en_cours(&mut self) -> bool {
+        matches!(self.processus.try_wait(), Ok(None))
     }
 
     pub fn arreter(&mut self) {

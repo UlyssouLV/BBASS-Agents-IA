@@ -188,6 +188,29 @@ fn le_nouveau_lanceur_essaie_sa_version_sans_reverifier_puis_la_confirme() {
 }
 
 #[test]
+fn une_confirmation_impossible_a_noter_n_annonce_pas_la_reussite_et_refait_l_essai() {
+    let poste = Poste::installe_en("confirmation-impossible", "1.6.2");
+    let (zip, signature) = poste.paquet_signe("1.6.3");
+    lancer(&poste.lanceur("1.6.2"), &ReseauFactice::annoncant("1.6.3").avec_paquet("1.6.3", zip, signature));
+    let fichier = poste.racine.join("versions").join("installation.json");
+    let mut permissions = fs::metadata(&fichier).unwrap().permissions();
+    permissions.set_readonly(true);
+    fs::set_permissions(&fichier, permissions.clone()).unwrap();
+    let nouveau = poste.lanceur("1.6.3");
+    lancer(&nouveau, &ReseauFactice::injoignable());
+
+    nouveau.confirmer();
+    let (suite, _) = lancer(&nouveau, &ReseauFactice::injoignable());
+
+    #[allow(clippy::permissions_set_readonly_false)]
+    permissions.set_readonly(false);
+    fs::set_permissions(&fichier, permissions).unwrap();
+    assert_eq!(poste.etat()["resultat"], "echec");
+    assert!(poste.etat()["bandeau"].is_null());
+    assert_eq!(suite, Suite::Demarrer { essai: true });
+}
+
+#[test]
 fn le_lancement_suivant_nettoie_le_lanceur_precedent_et_ne_garde_qu_une_version_precedente() {
     let poste = Poste::installe_en("nettoyage", "1.6.2");
     for (de, vers) in [("1.6.2", "1.6.3"), ("1.6.3", "1.6.4")] {

@@ -76,6 +76,41 @@ fn l_installation_pose_le_lanceur_la_version_embarquee_et_la_configuration() {
 }
 
 #[test]
+fn reinstaller_remplace_la_version_deja_posee() {
+    let racine = dossier("remplacement");
+    let cle = CleSecrete::generer();
+    let ancien = racine.join("versions/v1.6.2/reste-d-une-ancienne-installation");
+    fs::create_dir_all(ancien.parent().unwrap()).unwrap();
+    fs::write(&ancien, b"ancien").unwrap();
+
+    installer(&racine, "1.6.2".parse().unwrap(), &paquet_signe(&cle, "1.6.2"), &cle.cle_publique(), &choix()).unwrap();
+
+    assert!(racine.join("versions/v1.6.2/poste-backend/poste-backend.exe").is_file());
+    assert!(!ancien.exists());
+    assert!(!racine.join("versions/.v1.6.2.ancien").exists());
+}
+
+/// Comme un `poste-backend.exe` qui tourne encore : la version en place reste entière.
+#[cfg(windows)]
+#[test]
+fn reinstaller_sur_une_version_en_cours_d_utilisation_la_laisse_intacte() {
+    use std::os::windows::fs::OpenOptionsExt;
+
+    let racine = dossier("version-ouverte");
+    let cle = CleSecrete::generer();
+    let backend = racine.join("versions/v1.6.2/poste-backend/poste-backend.exe");
+    fs::create_dir_all(backend.parent().unwrap()).unwrap();
+    fs::write(&backend, b"backend en cours").unwrap();
+    let ouvert = fs::OpenOptions::new().read(true).share_mode(0).open(&backend).unwrap();
+
+    let resultat = installer(&racine, "1.6.2".parse().unwrap(), &paquet_signe(&cle, "1.6.2"), &cle.cle_publique(), &choix());
+
+    drop(ouvert);
+    assert!(resultat.is_err());
+    assert_eq!(fs::read(&backend).unwrap(), b"backend en cours");
+}
+
+#[test]
 fn reinstaller_garde_les_autres_reglages_de_la_configuration() {
     let racine = dossier("reinstallation");
     fs::write(

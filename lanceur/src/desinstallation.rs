@@ -24,12 +24,13 @@ const CONFIRMATION: &str = "Désinstaller BBASS ?\n\n\
     Le programme, ses versions, le démarrage avec Windows et votre Session sont retirés. \
     La configuration (adresse du Serveur BBASS) est gardée ; vos conversations restent sur le Serveur BBASS.";
 
-/// `racine` : `%LOCALAPPDATA%\BBASS`.
-pub fn executer(racine: &Path, journal: &Journal) {
+/// `racine` : `%LOCALAPPDATA%\BBASS`. `depuis_la_copie` : lancé par [`relancer_depuis_une_copie`]
+/// (`--attendre-fin`), après la confirmation ; sinon on demande d'abord, quel que soit le dossier de l'exe.
+pub fn executer(racine: &Path, journal: &Journal, depuis_la_copie: bool) {
     let Ok(exe) = std::env::current_exe() else {
         return systeme::informer("BBASS n'a pas pu être désinstallé : programme introuvable.", true);
     };
-    if exe.parent() == Some(racine) {
+    if !depuis_la_copie {
         if systeme::confirmer(CONFIRMATION) {
             relancer_depuis_une_copie(&exe, journal);
         }
@@ -100,11 +101,10 @@ fn retirer(racine: &Path, journal: &Journal) {
 #[cfg(windows)]
 fn effacer_plus_tard(exe: &Path) {
     use std::os::windows::process::CommandExt;
-    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
     // Ligne passée telle quelle : `cmd /C` retirerait les guillemets d'un argument cité par Rust.
     let _ = Command::new("cmd")
         .raw_arg(format!("/C ping -n 3 127.0.0.1 >NUL & del /F /Q \"{}\"", exe.display()))
-        .creation_flags(CREATE_NO_WINDOW)
+        .creation_flags(systeme::CREATE_NO_WINDOW)
         .spawn();
 }
 
