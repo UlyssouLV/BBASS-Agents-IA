@@ -11,6 +11,7 @@ import httpx
 from dotenv import dotenv_values
 
 from vm_centrale.installation import ENVIRONNEMENTS, NSENTER_HOTE, Chemins, refuser
+from vm_centrale.taches_planifiees import FICHIERS, ConfInvalide, lire_conf, planifier_taches
 
 # Mise à jour d'un Environnement (spec 1.6.1, ADR-0021, #233), appelée par
 # la sous-commande `mettre-a-jour <env>` de vm_centrale.exploitation et par
@@ -192,21 +193,34 @@ class _MiseAJour:
 
     def _rafraichir_fichiers(self, image: str) -> bool:
         environnement = self.chemins.environnement
+        lus = {source: self._lire_dans_image(image, source) for source in ("compose.yml", "bbass-vm.service", *FICHIERS)}
+        if None in lus.values():
+            return False
+        # Le .conf d'abord : invalide, rien n'est écrit (retour arrière).
+        try:
+            lire_conf(lus["taches-planifiees.conf"])
+        except ConfInvalide as erreur:
+            self.dire(f"{erreur} (image {image})")
+            return False
         for source, destination in (
             ("compose.yml", f"{self.chemins.dossier_hote}/compose.yml"),
             ("bbass-vm.service", self.chemins.unite_hote),
         ):
-            lu = interroger_hote(["docker", "run", "--rm", "--entrypoint", "cat", image, f"/app/deploiement/{source}"])
-            if lu.returncode != 0:
-                self.dire(f"{source} illisible dans l'image {image} : {lu.stderr.strip()}")
-                return False
             fichier = self.chemins.ici(destination)
-            contenu = lu.stdout.replace("{environnement}", environnement)
+            contenu = lus[source].replace("{environnement}", environnement)
             if not fichier.is_file() or fichier.read_text(encoding="utf-8") != contenu:
                 fichier.write_text(contenu, encoding="utf-8")
                 if destination == self.chemins.unite_hote:
                     interroger_hote(["systemctl", "daemon-reload"])
+        planifier_taches(self.chemins, lus.__getitem__, interroger_hote)
         return True
+
+    def _lire_dans_image(self, image: str, source: str) -> str | None:
+        lu = interroger_hote(["docker", "run", "--rm", "--entrypoint", "cat", image, f"/app/deploiement/{source}"])
+        if lu.returncode != 0:
+            self.dire(f"{source} illisible dans l'image {image} : {lu.stderr.strip()}")
+            return None
+        return lu.stdout
 
     def _attendre_sante(self) -> str | None:
         for _ in range(_TENTATIVES_SANTE):

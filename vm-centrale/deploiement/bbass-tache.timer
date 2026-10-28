@@ -1,0 +1,12 @@
+# Planification d'une tâche (spec 1.6.1, ADR-0021), générée depuis
+# taches-planifiees.conf sous /etc/systemd/system/bbass-{environnement}-{nom}.timer.
+# Persistent : une exécution manquée (VM éteinte) est rattrapée au démarrage.
+[Unit]
+Description=BBASS - planification de {nom} ({environnement})
+
+[Timer]
+OnCalendar={calendrier}
+Persistent=true
+
+[Install]
+WantedBy=timers.target

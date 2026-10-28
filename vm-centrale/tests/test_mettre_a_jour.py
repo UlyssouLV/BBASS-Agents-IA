@@ -39,15 +39,21 @@ class FauxHote:
         self.commandes: list[list[str]] = []
         self.journal: list[str] = []
 
-    def publier(self, version: str, *, saine: bool = True) -> None:
-        # Release vX.Y.Z, étiquette de l'Environnement posée dessus.
+    def publier(self, version: str, *, saine: bool = True, taches: str | None = None) -> None:
+        # Release vX.Y.Z, étiquette de l'Environnement posée dessus ; `taches`
+        # remplace le taches-planifiees.conf livré dans l'image.
         vm, searxng = _id("vm", version), _id("searxng", version)
         self.registre[f"{DEPOT_VM}:{self.etiquette}"] = vm
         self.registre[f"{DEPOT_SEARXNG}:{self.etiquette}"] = searxng
         self.fichiers[vm] = {
             "/app/deploiement/compose.yml": f"# compose.yml de {version}\n",
-            "/app/deploiement/bbass-vm.service": (DEPLOIEMENT / "bbass-vm.service").read_text(encoding="utf-8"),
+            **{
+                f"/app/deploiement/{nom}": (DEPLOIEMENT / nom).read_text(encoding="utf-8")
+                for nom in ("bbass-vm.service", "taches-planifiees.conf", "bbass-tache.service", "bbass-tache.timer")
+            },
         }
+        if taches is not None:
+            self.fichiers[vm]["/app/deploiement/taches-planifiees.conf"] = taches
         self.versions[vm] = version
         if saine:
             self.saines.add(vm)
@@ -267,3 +273,52 @@ def test_le_service_de_l_environnement_lance_la_mise_a_jour_au_demarrage(racine,
     (execution,) = [ligne for ligne in unite.splitlines() if ligne.startswith("ExecStart=")]
     assert "ghcr.io/ulyssoulv/bbass-vm-centrale:staging mettre-a-jour staging" in execution
     assert "--network host" in execution and "-v /:/hote" in execution
+
+
+def _timers(racine: Path) -> list[str]:
+    return sorted(fichier.name for fichier in (racine / "etc" / "systemd" / "system").glob("bbass-staging-*.timer"))
+
+
+def test_une_ligne_ajoutee_au_conf_cree_son_timer_a_la_mise_a_jour(racine, staging):
+    staging.publier("1.6.2", taches="purger-cache-pages hourly\nrelancer-quelque-chose *-*-* 03:00:00\n")
+
+    main(["mettre-a-jour", "staging"])
+
+    assert _timers(racine) == ["bbass-staging-purger-cache-pages.timer", "bbass-staging-relancer-quelque-chose.timer"]
+    systemd = racine / "etc" / "systemd" / "system"
+    assert "OnCalendar=*-*-* 03:00:00" in (systemd / "bbass-staging-relancer-quelque-chose.timer").read_text()
+    assert "tache relancer-quelque-chose" in (systemd / "bbass-staging-relancer-quelque-chose.service").read_text()
+    assert staging.a_lance("systemctl", "daemon-reload")
+    assert staging.a_lance("systemctl", "enable", "--now", "bbass-staging-relancer-quelque-chose.timer")
+
+
+def test_une_ligne_retiree_du_conf_retire_son_timer_a_la_mise_a_jour(racine, staging):
+    assert _timers(racine) == ["bbass-staging-purger-cache-pages.timer"]
+    staging.publier("1.6.2", taches="# plus aucune tâche\n")
+
+    main(["mettre-a-jour", "staging"])
+
+    systemd = racine / "etc" / "systemd" / "system"
+    assert _timers(racine) == []
+    assert not (systemd / "bbass-staging-purger-cache-pages.service").exists()
+    assert staging.a_lance("systemctl", "disable", "--now", "bbass-staging-purger-cache-pages.timer")
+    assert (systemd / "bbass-vm-staging.service").is_file()
+
+
+def test_un_conf_invalide_dans_la_nouvelle_image_remet_la_version_precedente(racine, staging, capsys):
+    staging.publier("1.6.2", taches="purger-cache-pages hourly\nExecStart=/bin/sh\n")
+
+    with pytest.raises(SystemExit):
+        main(["mettre-a-jour", "staging"])
+
+    assert staging.en_service == _id("vm", "1.6.1")
+    assert _timers(racine) == ["bbass-staging-purger-cache-pages.timer"]
+    assert "taches-planifiees.conf" in capsys.readouterr().out
+
+
+def test_chaque_tache_du_conf_livre_est_une_sous_commande_de_l_image():
+    for ligne in (DEPLOIEMENT / "taches-planifiees.conf").read_text(encoding="utf-8").splitlines():
+        if ligne.strip() and not ligne.startswith("#"):
+            with pytest.raises(SystemExit) as aide:
+                main(["tache", ligne.split()[0], "--help"])
+            assert aide.value.code == 0

@@ -194,6 +194,12 @@ def installer(environnement: str) -> None:
     )
     executer_sur_hote(["systemctl", "daemon-reload"])
     executer_sur_hote(["systemctl", "enable", "--now", chemins.service])
+    # Import à l'appel : taches_planifiees importe ce module.
+    from vm_centrale.taches_planifiees import planifier_taches
+
+    planifier_taches(
+        chemins, lambda fichier: (deploiement / fichier).read_text(encoding="utf-8"), executer_sur_hote
+    )
 
     print()
     print(f"Environnement {environnement} installé et démarré (port {config.port_hote}).")

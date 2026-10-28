@@ -1,0 +1,13 @@
+# Exécution d'une tâche planifiée (spec 1.6.1, ADR-0021), générée par
+# `installer` / `mettre-a-jour` depuis taches-planifiees.conf sous
+# /etc/systemd/system/bbass-{environnement}-{nom}.service et lancée par le
+# timer du même nom. Conteneur jetable de l'image de l'Environnement, sur la
+# stack en service (Postgres du projet Compose) ; sa sortie va au journal.
+[Unit]
+Description=BBASS - tâche {nom} ({environnement})
+After=bbass-vm-{environnement}.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/bbass/{environnement}
+ExecStart=/usr/bin/docker compose run --rm -T vm-centrale tache {nom}

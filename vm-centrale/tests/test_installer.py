@@ -194,3 +194,17 @@ def test_configurer_secret_refuse_un_environnement_non_installe(racine, hote, sa
 
     assert sortie.value.code != 0
     assert _fichiers(racine) == []
+
+
+def test_installer_pose_un_timer_par_tache_planifiee(racine, hote, saisies_masquees):
+    _installer("staging", saisies_masquees)
+
+    systemd = racine / "etc" / "systemd" / "system"
+    timer = (systemd / "bbass-staging-purger-cache-pages.timer").read_text()
+    service = (systemd / "bbass-staging-purger-cache-pages.service").read_text()
+    assert "OnCalendar=hourly" in timer
+    (execution,) = [ligne for ligne in service.splitlines() if ligne.startswith("ExecStart=")]
+    assert execution.endswith("vm-centrale tache purger-cache-pages")
+    assert "WorkingDirectory=/opt/bbass/staging" in service
+    assert ["systemctl", "enable", "--now", "bbass-staging-purger-cache-pages.timer"] in hote
+    assert not (systemd / "bbass-prod-purger-cache-pages.timer").exists()

@@ -27,8 +27,9 @@ FROM python:3.11.18-slim-trixie
 RUN useradd --uid 10001 --no-create-home --shell /usr/sbin/nologin vm-centrale
 # Le .venv seul : les sources sont dans son site-packages (non éditable).
 COPY --from=build /app/.venv /app/.venv
-# Fichiers de déploiement (compose.yml, unité systemd) : `installer` les
-# dépose sur l'hôte (#232).
+# Fichiers de déploiement (compose.yml, unités systemd, tâches planifiées) :
+# `installer` les dépose sur l'hôte, `mettre-a-jour` les rafraîchit (#232,
+# #233, #234).
 COPY deploiement /app/deploiement
 ARG VERSION=dev
 ENV PATH="/app/.venv/bin:$PATH" \
