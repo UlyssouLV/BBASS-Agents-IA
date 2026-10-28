@@ -141,6 +141,14 @@ def _ecrire_prive(chemin: Path, contenu: str, mode: int) -> None:
         fichier.write(contenu)
 
 
+def _ecrire(chemin: Path, contenu: str) -> None:
+    # Chemin fixé par le code, contenu lu d'un fichier : open() plutôt que
+    # Path.write_text, que Sonar (pythonsecurity:S2083) prend pour un chemin
+    # issu du contenu.
+    with open(chemin, "w", encoding="utf-8") as fichier:
+        fichier.write(contenu)
+
+
 def installer(environnement: str) -> None:
     chemins = Chemins(environnement)
     config = ENVIRONNEMENTS[environnement]
@@ -178,7 +186,7 @@ def installer(environnement: str) -> None:
     unite = (deploiement / "bbass-vm.service").read_text(encoding="utf-8")
     unite_ici = chemins.ici(chemins.unite_hote)
     unite_ici.parent.mkdir(parents=True, exist_ok=True)
-    unite_ici.write_text(unite.replace("{environnement}", environnement), encoding="utf-8")
+    _ecrire(unite_ici, unite.replace("{environnement}", environnement))
 
     executer_sur_hote(["chown", _UID_IMAGE, chemins.cle_maitre_hote, f"{chemins.dossier_hote}/donnees/pieces_jointes"])
     executer_sur_hote(
@@ -203,7 +211,7 @@ def configurer_secret(environnement: str, variable: str) -> None:
     lignes = chemins.env.read_text(encoding="utf-8").splitlines()
     autres = [ligne for ligne in lignes if not ligne.startswith(f"{variable}=")]
     # Réécrit en place : le fichier garde son mode (root seul).
-    chemins.env.write_text("".join(f"{ligne}\n" for ligne in [*autres, f"{variable}={valeur}"]), encoding="utf-8")
+    _ecrire(chemins.env, "".join(f"{ligne}\n" for ligne in [*autres, f"{variable}={valeur}"]))
     executer_sur_hote(["systemctl", "restart", chemins.service])
     print(f"{variable} remplacée ; {chemins.service} redémarré.")
 

@@ -14,11 +14,12 @@ ENV UV_COMPILE_BYTECODE=1 \
 WORKDIR /app
 # Dépendances verrouillées par uv.lock (ADR-0011) : --locked échoue si le
 # verrou ne suit plus pyproject.toml. Paquet installé non éditable, sans
-# l'extra test.
+# l'extra test. --no-build : dépendances en wheels seulement, aucun setup.py
+# exécuté (Sonar docker:S8541) ; le paquet vm-centrale reste construit.
 COPY pyproject.toml uv.lock .python-version ./
-RUN uv sync --locked --no-install-project --no-editable
+RUN uv sync --locked --no-install-project --no-editable --no-build
 COPY src ./src
-RUN uv sync --locked --no-editable
+RUN uv sync --locked --no-editable --no-build
 
 FROM python:3.11.18-slim-trixie
 # UID fixe (pas root, Sonar docker:S6471) : l'installation donne à cet UID

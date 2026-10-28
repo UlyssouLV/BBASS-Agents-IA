@@ -1,3 +1,4 @@
+import hashlib
 import subprocess
 from pathlib import Path
 
@@ -14,6 +15,11 @@ from vm_centrale.exploitation import main
 DEPOT_VM = "ghcr.io/ulyssoulv/bbass-vm-centrale"
 DEPOT_SEARXNG = "ghcr.io/ulyssoulv/bbass-vm-searxng"
 DEPLOIEMENT = Path(__file__).resolve().parents[1] / "deploiement"
+
+
+def _id(image: str, version: str) -> str:
+    # Au format de `docker image inspect` (sha256:<64 hex>).
+    return "sha256:" + hashlib.sha256(f"{image}-{version}".encode()).hexdigest()
 
 
 class FauxHote:
@@ -35,7 +41,7 @@ class FauxHote:
 
     def publier(self, version: str, *, saine: bool = True) -> None:
         # Release vX.Y.Z, étiquette de l'Environnement posée dessus.
-        vm, searxng = f"sha256:vm-{version}", f"sha256:searxng-{version}"
+        vm, searxng = _id("vm", version), _id("searxng", version)
         self.registre[f"{DEPOT_VM}:{self.etiquette}"] = vm
         self.registre[f"{DEPOT_SEARXNG}:{self.etiquette}"] = searxng
         self.fichiers[vm] = {
@@ -123,7 +129,7 @@ def test_version_inchangee_redemarre_sans_sauvegarde(racine, staging, capsys):
 
     assert _sauvegardes(racine) == []
     assert not staging.a_lance("docker", "compose", "--project-directory", "/opt/bbass/staging", "exec")
-    assert staging.en_service == "sha256:vm-1.6.1"
+    assert staging.en_service == _id("vm", "1.6.1")
     assert "1.6.1" in capsys.readouterr().out
 
 
@@ -134,7 +140,7 @@ def test_version_changee_sauvegarde_la_base_puis_demarre_la_nouvelle(racine, sta
 
     (sauvegarde,) = _sauvegardes(racine)
     assert (_dossier(racine) / "sauvegardes" / sauvegarde).read_text() == "base initiale"
-    assert staging.en_service == "sha256:vm-1.6.2"
+    assert staging.en_service == _id("vm", "1.6.2")
     assert (_dossier(racine) / "compose.yml").read_text() == "# compose.yml de 1.6.2\n"
 
 
@@ -159,9 +165,9 @@ def test_sante_ko_apres_mise_a_jour_remet_les_images_precedentes_et_le_dit(racin
         main(["mettre-a-jour", "staging"])
 
     assert sortie.value.code != 0
-    assert staging.en_service == "sha256:vm-1.6.1"
-    assert staging.locales[f"{DEPOT_VM}:staging"] == "sha256:vm-1.6.1"
-    assert staging.locales[f"{DEPOT_SEARXNG}:staging"] == "sha256:searxng-1.6.1"
+    assert staging.en_service == _id("vm", "1.6.1")
+    assert staging.locales[f"{DEPOT_VM}:staging"] == _id("vm", "1.6.1")
+    assert staging.locales[f"{DEPOT_SEARXNG}:staging"] == _id("searxng", "1.6.1")
     assert (_dossier(racine) / "compose.yml").read_text() == "# compose.yml de 1.6.1\n"
     message = capsys.readouterr().err
     assert "1.6.1" in message and "précédente" in message
@@ -176,7 +182,7 @@ def test_apres_un_retour_arriere_la_version_remise_reste_en_service(racine, stag
 
     main(["mettre-a-jour", "staging"])
 
-    assert staging.en_service == "sha256:vm-1.6.3"
+    assert staging.en_service == _id("vm", "1.6.3")
     assert len(_sauvegardes(racine)) == 2
 
 
@@ -186,7 +192,7 @@ def test_sans_internet_demarre_les_images_presentes_et_le_journalise(racine, sta
 
     main(["mettre-a-jour", "staging"])
 
-    assert staging.en_service == "sha256:vm-1.6.1"
+    assert staging.en_service == _id("vm", "1.6.1")
     assert _sauvegardes(racine) == []
     assert any("Internet" in message for message in staging.journal)
 
@@ -205,6 +211,19 @@ def test_le_env_est_identique_avant_et_apres_une_mise_a_jour(racine, staging, sa
     assert env.read_bytes() == avant
 
 
+def test_images_en_service_illisibles_refuse_sans_rien_toucher(racine, staging, capsys):
+    (_dossier(racine) / "images-en-service.json").write_text('{"vm-centrale": "--help", "searxng": "x"}')
+    staging.publier("1.6.2")
+
+    with pytest.raises(SystemExit) as sortie:
+        main(["mettre-a-jour", "staging"])
+
+    assert sortie.value.code != 0
+    assert "images-en-service.json" in capsys.readouterr().err
+    assert not staging.a_lance("docker", "tag")
+    assert _sauvegardes(racine) == []
+
+
 def _restaurer(monkeypatch, sauvegarde: str, confirmation: str = "restaurer") -> None:
     monkeypatch.setattr("builtins.input", lambda _invite="": confirmation)
     main(["restaurer", "staging", sauvegarde])
@@ -218,7 +237,7 @@ def test_restaurer_remet_la_base_dans_l_etat_de_la_sauvegarde(racine, staging, m
     _restaurer(monkeypatch, _sauvegardes(racine)[0])
 
     assert staging.base == "base initiale"
-    assert staging.en_service == "sha256:vm-1.6.2"
+    assert staging.en_service == _id("vm", "1.6.2")
 
 
 def test_restaurer_sans_confirmation_ne_touche_pas_a_la_base(racine, staging, monkeypatch):
@@ -231,7 +250,7 @@ def test_restaurer_sans_confirmation_ne_touche_pas_a_la_base(racine, staging, mo
 
     assert sortie.value.code != 0
     assert staging.base == "messages écrits après la mise à jour"
-    assert staging.en_service == "sha256:vm-1.6.2"
+    assert staging.en_service == _id("vm", "1.6.2")
 
 
 def test_restaurer_refuse_une_sauvegarde_absente(racine, staging, monkeypatch):

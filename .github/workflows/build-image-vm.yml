@@ -53,9 +53,11 @@ jobs:
           docker build --build-arg VERSION="ci-${GITHUB_SHA::7}" -t "$IMAGE_VM" vm-centrale
           docker build -t "$IMAGE_SEARXNG" searxng
 
+      # En root : l'UID de l'image ne lit pas tout le disque, find sortirait
+      # en erreur sans rien avoir trouvé.
       - name: Aucun secret ni script de dev dans l'image
         run: |
-          trouves=$(docker run --rm --entrypoint sh "$IMAGE_VM" -c \
+          trouves=$(docker run --rm --user root --entrypoint sh "$IMAGE_VM" -c \
             'find / -xdev \( -name ".env" -o -name "*.key" -o -name "seed_compte_test.py" -o -name "chiffrer_secret.py" \) 2>/dev/null')
           if [ -n "$trouves" ]; then
             echo "::error::Fichiers interdits dans l'image : $trouves"

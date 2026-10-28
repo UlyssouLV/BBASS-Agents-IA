@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import subprocess
 import time
 from datetime import UTC, datetime
@@ -9,7 +10,7 @@ from typing import IO, NoReturn
 import httpx
 from dotenv import dotenv_values
 
-from vm_centrale.installation import NSENTER_HOTE, Chemins, refuser
+from vm_centrale.installation import ENVIRONNEMENTS, NSENTER_HOTE, Chemins, refuser
 
 # Mise à jour d'un Environnement (spec 1.6.1, ADR-0021, #233), appelée par
 # la sous-commande `mettre-a-jour <env>` de vm_centrale.exploitation et par
@@ -30,6 +31,8 @@ _TENTATIVES_SANTE = 90
 # Par Environnement, sous /opt/bbass/<env>/sauvegardes/ : une par
 # changement de version.
 SAUVEGARDES_GARDEES = 5
+# Identifiant d'image tel que `docker image inspect` le donne.
+_ID_IMAGE = re.compile(r"sha256:([0-9a-f]{64})")
 
 
 def interroger_hote(
@@ -56,15 +59,27 @@ def lire_sante(url: str) -> str | None:
         return None
 
 
+def _id_image_valide(valeur: object) -> str | None:
+    # Reconstruit depuis l'entier lu : rien du fichier ne passe tel quel en
+    # argument d'une commande de l'hôte (Sonar pythonsecurity:S6350).
+    trouve = _ID_IMAGE.fullmatch(valeur) if isinstance(valeur, str) else None
+    return f"sha256:{int(trouve[1], 16):064x}" if trouve else None
+
+
 class _MiseAJour:
     def __init__(self, environnement: str) -> None:
-        self.chemins = Chemins(environnement)
+        # Nom repris d'ENVIRONNEMENTS, jamais de l'argument : seul un nom
+        # connu entre dans les chemins et les commandes de l'hôte.
+        connu = next((nom for nom in ENVIRONNEMENTS if nom == environnement), None)
+        if connu is None:
+            refuser(f"Environnement inconnu : {environnement}.")
+        self.chemins = Chemins(connu)
         if not self.chemins.env.is_file():
             refuser(f"L'Environnement {environnement} n'est pas installé ({self.chemins.dossier_hote}/.env absent).")
         # Lu, jamais réécrit : le .env reste celui de l'installation.
         env = dotenv_values(self.chemins.env)
         self.references = {nom: f"{depot}:{env['BBASS_ETIQUETTE']}" for nom, depot in IMAGES.items()}
-        self.url_sante = f"http://localhost:{env['VM_PORT_HOTE']}/sante"
+        self.url_sante = f"http://localhost:{int(env['VM_PORT_HOTE'])}/sante"
         self.compose = ["docker", "compose", "--project-directory", self.chemins.dossier_hote]
 
     @property
@@ -132,7 +147,11 @@ class _MiseAJour:
     def _lire_en_service(self) -> dict[str, str] | None:
         if not self._fichier_en_service.is_file():
             return None
-        return json.loads(self._fichier_en_service.read_text(encoding="utf-8"))
+        lues = json.loads(self._fichier_en_service.read_text(encoding="utf-8"))
+        images = {nom: _id_image_valide(lues.get(nom)) for nom in IMAGES}
+        if None in images.values():
+            self.echouer(f"{self.chemins.dossier_hote}/images-en-service.json illisible : rien n'est modifié.")
+        return images
 
     def _noter_en_service(self, images: dict[str, str]) -> None:
         self._fichier_en_service.write_text(json.dumps(images), encoding="utf-8")
