@@ -114,6 +114,12 @@ const config: Config = {
         },
         {
           type: 'docSidebar',
+          sidebarId: 'exploitationSidebar',
+          position: 'left',
+          label: 'Exploitation',
+        },
+        {
+          type: 'docSidebar',
           sidebarId: 'changelogSidebar',
           position: 'left',
           label: 'Changelog',
