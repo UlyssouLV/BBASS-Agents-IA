@@ -1,0 +1,29 @@
+# Service systemd d'un Environnement (spec 1.6.1, ADR-0021), posé par
+# `installer <env>` sous /etc/systemd/system/bbass-vm-<env>.service et
+# rafraîchi par `mettre-a-jour` ; {environnement} y est remplacé par staging
+# ou prod. Au démarrage de la VM : `mettre-a-jour <env>` (téléchargement,
+# sauvegarde si la version change, /sante, retour arrière), puis la stack
+# reste démarrée. L'image de la mise à jour est celle de l'étiquette de
+# l'Environnement déjà présente (pas de téléchargement : sans Internet, elle
+# tourne quand même).
+[Unit]
+Description=BBASS - VM centrale ({environnement})
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/bbass/{environnement}
+ExecStart=/usr/bin/docker run --rm --user root --privileged --pid=host --network host -v /:/hote ghcr.io/ulyssoulv/bbass-vm-centrale:{environnement} mettre-a-jour {environnement}
+ExecStop=/usr/bin/docker compose down
+# Pire cas de `mettre-a-jour`, chaque étape bornée par le code : 2 × 10 min
+# de téléchargement (DELAI_TELECHARGEMENT_SECONDES), sauvegarde, 2 × 7 min 30
+# de /sante (90 essais : 3 s de réponse + 2 s d'attente), pour la nouvelle
+# version puis le retour arrière. Coupé avant, le retour arrière resterait
+# à moitié fait.
+TimeoutStartSec=3600
+
+[Install]
+WantedBy=multi-user.target

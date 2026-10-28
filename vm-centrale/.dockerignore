@@ -1,0 +1,13 @@
+# Le Dockerfile ne copie que pyproject.toml, uv.lock, .python-version,
+# src/ et deploiement/ ; cette liste garde le reste hors du contexte de build (secrets,
+# scripts de dev, données locales).
+.env
+.env.*
+*.key
+*.db
+.venv/
+scripts/
+tests/
+pieces_jointes/
+**/__pycache__/
+.pytest_cache/

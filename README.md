@@ -169,14 +169,14 @@ class node_database,node_collaborator,node_mistral,node_searxng toneIndigo
 
 ## Semaine du 26 au 30 octobre 2026
 
-**V1.6.0 livrée** (CI : chaque version vérifiée automatiquement avant d’entrer sur `main` — tests VM centrale et poste, Sonar, build du front avec contrôle de dérive, build du site de doc ; plus aucun commit de bot après la finalisation, [ADR-0020](docs/adr/0020-ci-argos-compartimentee.md)). Avant elle, **V1.5.3** (administration des groupes et droits Moduléo depuis le Panel) et **V1.5.1** (lire plus de données Moduléo depuis le chat). **V1.5.2** (écriture Moduléo sur le serveur de test Kipaware) n’est pas encore finalisable : les identifiants du serveur de test pour l’API Moduléo ne sont pas reçus, et on ne teste pas d’écriture sur le serveur de production ; finalisation visée le mercredi 28/10, d’où la 1.5.3 et la 1.6.0 livrées avant elle. Suite sur la feuille de route : **V1.6.1** / **V1.6.2** (mise à jour de la VM, installation des postes), **V1.8.0** (workflows n8n), **V1.9.0** (pièces jointes approfondies).
+**V1.6.1 livrée** (CD : la VM centrale livrée en images Docker publiques sur GHCR, installée en une commande et mise à jour par une commande ou un redémarrage sur une VM Ubuntu Server 26.04 LTS, sans cloner le dépôt ; deux Environnements sur la même VM, staging et prod, Promotion de l’un à l’autre, sauvegarde avant changement de version et retour automatique si `/sante` échoue, [ADR-0021](docs/adr/0021-cd-vm-centrale-staging-prod.md)). Avant elle, **V1.6.0** (CI : chaque version vérifiée automatiquement avant d’entrer sur `main`, [ADR-0020](docs/adr/0020-ci-argos-compartimentee.md)) et **V1.5.3** (administration des groupes et droits Moduléo depuis le Panel). **V1.5.2** (écriture Moduléo sur le serveur de test Kipaware) n’est pas encore finalisable : les identifiants du serveur de test pour l’API Moduléo ne sont pas reçus, et on ne teste pas d’écriture sur le serveur de production ; d’où la 1.5.3, la 1.6.0 et la 1.6.1 livrées avant elle. Suite sur la feuille de route : **V1.5.2** (écriture Moduléo), **V1.6.2** (installation des postes), **V1.8.0** (workflows n8n), **V1.9.0** (pièces jointes approfondies).
 
 ```mermaid
 flowchart LR
-  V153["V1.5.3<br/>admin groupes / droits<br/>livrée"] --> V160["V1.6.0<br/>CI versions vérifiées<br/>livrée"]
-  V160 --> V152["V1.5.2<br/>écriture Moduléo<br/>attend le serveur de test"]
-  V152 --> V16x["V1.6.1 / V1.6.2<br/>livraison VM et postes"]
-  V16x --> V180["V1.8.0<br/>workflows n8n"]
+  V160["V1.6.0<br/>CI versions vérifiées<br/>livrée"] --> V161["V1.6.1<br/>CD de la VM centrale<br/>livrée"]
+  V161 --> V152["V1.5.2<br/>écriture Moduléo<br/>attend le serveur de test"]
+  V152 --> V162["V1.6.2<br/>installation des postes"]
+  V162 --> V180["V1.8.0<br/>workflows n8n"]
   V180 --> V190["V1.9.0<br/>pièces jointes approfondies"]
 ```
 
@@ -193,6 +193,8 @@ flowchart LR
 - Une clé API Mistral (console [La Plateforme](https://console.mistral.ai)) pour un vrai chat
 
 ## Démarrer
+
+Ce parcours est celui du **développement**. La VM centrale du cabinet ne s’installe plus depuis un clone : depuis la 1.6.1, elle s’installe et se met à jour à partir des images publiées à chaque Release — voir le guide admin [Installer et mettre à jour la VM centrale](docs/exploitation/vm-centrale.md).
 
 Après avoir installé les prérequis ci-dessus (Python 3.11, Docker Desktop installé ; Docker Desktop est lancé par le lanceur s’il est arrêté), le parcours officiel est : cloner le dépôt, puis double-cliquer sur l'un des deux scripts à la racine correspondant à ton OS — aucune autre commande à taper.
 

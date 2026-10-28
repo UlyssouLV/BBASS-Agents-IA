@@ -1,29 +1,37 @@
-import importlib.util
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 
+import pytest
+
+from vm_centrale.exploitation import main
 from vm_centrale.models import PageWebEnCache, ResultatRechercheWeb
 
 # Purge du cache commun des pages web (spec 1.4.3, #155) : les copies de
-# plus de 24 h sont supprimées, jamais les copies des conversations.
+# plus de 24 h sont supprimées, jamais les copies des conversations. Tâche
+# planifiée `tache purger-cache-pages` de l'image (spec 1.6.1, #234), lancée
+# toutes les heures par le timer bbass-<env>-purger-cache-pages.
 
-_SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "purger_cache_pages.py"
 _URL = "https://www.legifrance.gouv.fr/loi-climat-resilience"
 _MAINTENANT = datetime(2026, 10, 7, 12, 0, tzinfo=timezone.utc)
 
 
-def _charger_script():
-    spec = importlib.util.spec_from_file_location("purger_cache_pages", _SCRIPT)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+@pytest.fixture
+def tache(db_session, monkeypatch):
+    # La sous-commande ouvre sa session sur la base des tests, à l'heure dite.
+    monkeypatch.setattr("vm_centrale.database.init_db", lambda: None)
+    monkeypatch.setattr("vm_centrale.database.SessionLocal", lambda: db_session)
+
+    def _lancer(maintenant: datetime = _MAINTENANT) -> None:
+        monkeypatch.setattr("vm_centrale.taches.maintenant", lambda: maintenant)
+        main(["tache", "purger-cache-pages"])
+
+    return _lancer
 
 
 def _copie(url: str, age: timedelta) -> PageWebEnCache:
     return PageWebEnCache(url=url, texte_nettoye="Texte", titre="Titre", date_telechargement=_MAINTENANT - age)
 
 
-def test_le_script_supprime_les_copies_expirees_et_garde_les_fraiches(db_session):
+def test_la_tache_supprime_les_copies_expirees_et_garde_les_fraiches(db_session, tache, capsys):
     db_session.add_all(
         [
             _copie("https://exemple.fr/ancienne", timedelta(hours=30)),
@@ -33,26 +41,23 @@ def test_le_script_supprime_les_copies_expirees_et_garde_les_fraiches(db_session
     )
     db_session.commit()
 
-    nombre = _charger_script().purger(db_session, _MAINTENANT)
+    tache()
 
-    assert nombre == 2
+    assert capsys.readouterr().out.strip() == "Copies du cache des pages web supprimées : 2"
     assert [copie.url for copie in db_session.query(PageWebEnCache).all()] == ["https://exemple.fr/fraiche"]
 
 
-def test_le_script_affiche_le_nombre_supprime(db_session, monkeypatch, capsys):
-    db_session.add(_copie("https://exemple.fr/ancienne", timedelta(days=3)))
-    db_session.commit()
-    module = _charger_script()
-    monkeypatch.setattr(module, "init_db", lambda: None)
-    monkeypatch.setattr(module, "SessionLocal", lambda: db_session)
+def test_une_tache_inconnue_est_refusee(capsys):
+    with pytest.raises(SystemExit) as sortie:
+        main(["tache", "tache-inconnue"])
 
-    module.main()
-
-    assert capsys.readouterr().out.strip() == "Copies du cache des pages web supprimées : 1"
+    assert sortie.value.code != 0
+    assert "tache-inconnue" in capsys.readouterr().err
 
 
-def test_le_script_ne_touche_pas_aux_copies_des_conversations(
-    client, jeton_valide, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, db_session
+def test_la_tache_ne_touche_pas_aux_copies_des_conversations(
+    client, jeton_valide, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, db_session,
+    tache,
 ):
     telechargeur_pages_factice.servir(
         _URL,
@@ -74,7 +79,7 @@ def test_le_script_ne_touche_pas_aux_copies_des_conversations(
     assert texte_conversation
     assert db_session.query(PageWebEnCache).count() == 1
 
-    _charger_script().purger(db_session, datetime.now(timezone.utc) + timedelta(days=2))
+    tache(datetime.now(timezone.utc) + timedelta(days=2))
 
     db_session.expire_all()
     assert db_session.query(PageWebEnCache).count() == 0
