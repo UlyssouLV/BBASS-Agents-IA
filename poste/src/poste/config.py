@@ -13,6 +13,9 @@ EN_MODE_PAQUET = bool(getattr(sys, "frozen", False))
 # Format du fichier de configuration (lu aussi par le Lanceur) :
 # {"serveur_bbass": {"hote": "10.0.0.5", "port": 8000}}
 FICHIER_CONFIGURATION = Path(os.environ.get("LOCALAPPDATA", "")) / "BBASS" / "configuration.json"
+# Résultat de la dernière vérification de mise à jour, écrit par le Lanceur à
+# chaque lancement (ADR-0022) : bandeau de l'application, « À propos ».
+FICHIER_ETAT_MISE_A_JOUR = FICHIER_CONFIGURATION.parent / "mise-a-jour.json"
 # Journaux du Lanceur et du backend, en mode paquet seulement.
 DOSSIER_JOURNAUX = FICHIER_CONFIGURATION.parent / "journaux"
 

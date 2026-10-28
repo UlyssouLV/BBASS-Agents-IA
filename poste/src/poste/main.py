@@ -11,6 +11,7 @@ from poste.routers.comptes import router as comptes_router
 from poste.routers.consommation import router as consommation_router
 from poste.routers.conversations import router as conversations_router
 from poste.routers.inspecteur import router as inspecteur_router
+from poste.routers.mise_a_jour import router as mise_a_jour_router
 from poste.routers.moduleo import router as moduleo_router
 from poste.routers.profil_travail import router as profil_travail_router
 from poste.routers.session import router as session_router
@@ -39,6 +40,7 @@ app.include_router(consommation_router)
 app.include_router(comptes_router)
 app.include_router(inspecteur_router)
 app.include_router(moduleo_router)
+app.include_router(mise_a_jour_router)
 app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
 
 

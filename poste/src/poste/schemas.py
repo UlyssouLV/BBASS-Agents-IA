@@ -209,3 +209,13 @@ class InspecteurEchangeDetailResponse(BaseModel):
     statut: str
     erreur: str | None
     date_creation: datetime
+
+
+class DerniereVerificationResponse(BaseModel):
+    # Fichier d'état du Lanceur (lanceur/coeur/src/mise_a_jour.rs, DerniereVerification).
+    date: str
+    version_poste: str
+    version_serveur: str | None
+    resultat: str
+    detail: str
+    bandeau: str | None

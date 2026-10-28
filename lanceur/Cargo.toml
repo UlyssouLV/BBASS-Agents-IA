@@ -6,7 +6,7 @@ name = "bbass-lanceur"
 version = "1.6.2"
 edition = "2021"
 publish = false
-description = "Lanceur BBASS : démarre le backend poste (sidecar) et l'affiche dans sa fenêtre (ADR-0022)."
+description = "Lanceur BBASS : dÃ©marre le backend poste (sidecar) et l'affiche dans sa fenÃªtre (ADR-0022)."
 
 [[bin]]
 name = "BBASS"
@@ -19,10 +19,12 @@ tauri-build = { version = "2", features = [] }
 bbass-lanceur-coeur = { path = "coeur" }
 # Horodatage local des lignes du journal.
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
-# custom-protocol : sert `ecran/` embarqué (sans lui, cargo build vise un serveur de dev).
+# custom-protocol : sert `ecran/` embarquÃ© (sans lui, cargo build vise un serveur de dev).
 tauri = { version = "2", features = ["custom-protocol", "tray-icon"] }
 tauri-plugin-opener = "2"
 tauri-plugin-single-instance = "2"
+# /sante du Serveur BBASS et Paquet poste de la GitHub Release (HTTPS, rustls).
+ureq = { version = "2", default-features = false, features = ["tls"] }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = [

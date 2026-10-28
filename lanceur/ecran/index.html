@@ -4,26 +4,54 @@
     <meta charset="utf-8" />
     <title>BBASS</title>
     <style>
+      /* Jetons de poste/frontend/src/index.css (identité 1.2.1). */
+      :root {
+        --background: oklch(1 0 0);
+        --foreground: oklch(0.18 0.012 315);
+        --primary: oklch(0.27 0.02 315);
+        --muted: oklch(0.96 0.006 315);
+        --accent: oklch(0.55 0.18 26);
+      }
       html, body { height: 100%; margin: 0; }
       body {
         display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px;
-        background: oklch(1 0 0); color: oklch(0.18 0.012 315);
+        background: var(--background); color: var(--foreground);
         font-family: "Segoe UI", system-ui, sans-serif;
       }
       img { width: 160px; }
-      #etat { font-size: 15px; color: oklch(0.27 0.02 315); }
-      #etat.erreur { color: oklch(0.55 0.18 26); max-width: 480px; text-align: center; }
+      #etat { margin: 0; font-size: 15px; color: var(--primary); }
+      #etat.erreur { color: var(--accent); max-width: 480px; text-align: center; }
+      #barre { width: 280px; height: 6px; border-radius: 3px; background: var(--muted); overflow: hidden; }
+      #barre[hidden] { display: none; }
+      #avancement { height: 100%; width: 0; border-radius: 3px; background: var(--accent); transition: width 0.2s ease-out; }
+      #barre.indeterminee #avancement { width: 30%; animation: aller-retour 1.2s ease-in-out infinite alternate; }
+      @keyframes aller-retour { from { margin-left: 0; } to { margin-left: 70%; } }
     </style>
   </head>
   <body>
     <img src="logo-bbass.png" alt="BBASS" />
-    <p id="etat">Démarrage…</p>
+    <p id="etat">Vérification…</p>
+    <div id="barre" role="progressbar" aria-label="Mise à jour" hidden><div id="avancement"></div></div>
     <script>
+      const etat = document.getElementById("etat");
+      const barre = document.getElementById("barre");
+      const avancement = document.getElementById("avancement");
+
+      // Appelée par le Lanceur à chaque étape. progression : undefined sans barre,
+      // null pour une barre sans total connu, sinon la fraction faite (0 à 1).
+      window.afficherEtape = (texte, progression) => {
+        etat.textContent = texte;
+        etat.className = "";
+        barre.hidden = progression === undefined;
+        barre.classList.toggle("indeterminee", progression === null);
+        avancement.style.width = typeof progression === "number" ? `${Math.round(progression * 100)}%` : "";
+      };
+
       // Appelée par le Lanceur quand le backend ne démarre pas.
       window.afficherErreur = (message) => {
-        const etat = document.getElementById("etat");
         etat.textContent = message;
         etat.className = "erreur";
+        barre.hidden = true;
       };
     </script>
   </body>

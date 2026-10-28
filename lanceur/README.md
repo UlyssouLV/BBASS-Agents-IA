@@ -25,6 +25,16 @@ powershell -ExecutionPolicy Bypass -File lanceur\scripts\test-fumee.ps1
 
 Le paquet est dans `lanceur\target\paquet\BBASS\` ; il tourne sans Python ni git. `-Version X.Y.Z` fixe la version annoncée par `BBASS.exe` (sinon celle de `Cargo.toml`).
 
+## Mise à jour au lancement
+
+À chaque lancement (fenêtre ou `--demarrage-windows`, jamais pendant que BBASS tourne en fond), le Lanceur lit la version sur `GET /sante` du Serveur BBASS. Si elle diffère de la sienne, il télécharge `bbass-poste-vX.Y.Z-windows-x64.zip` et sa signature depuis la GitHub Release, vérifie la signature, décompresse dans `versions\vX.Y.Z\`, renomme `BBASS.exe` en `BBASS.old.exe`, pose le nouveau `BBASS.exe` et redémarre dessus (`--attendre-fin <pid>`). Le nouveau Lanceur démarre son backend : réponse locale, la version est confirmée ; sinon il remet `BBASS.old.exe` et redémarre sur l'ancienne version. Séquence de l'ADR-0022 ; logique dans `coeur/src/mise_a_jour.rs`.
+
+- Écran de démarrage : « Vérification… », « Mise à jour vers vX.Y.Z… » (barre de progression), « Démarrage… ».
+- VM ou Internet injoignable, téléchargement ou signature en échec : démarrage sur la version installée, bandeau dans l'application, nouvel essai au lancement suivant. Une VM en version `dev` ne déclenche rien.
+- `versions\installation.json` : version précédente gardée (une seule) et bascule en cours. Les autres versions, `BBASS.old.exe` et `BBASS.echec.exe` sont supprimés au lancement suivant.
+- `%LOCALAPPDATA%\BBASS\mise-a-jour.json` : résultat de la dernière vérification (date, versions, résultat, détail, bandeau), servi par le backend sur `GET /mise-a-jour`.
+- Le paquet construit en local (`target\paquet\BBASS\`) se met à jour lui aussi s'il trouve un Serveur BBASS d'une autre version publiée.
+
 ## Paquet poste signé
 
 À chaque GitHub Release `vX.Y.Z`, le workflow `publier-paquet-poste.yml` joint à la Release `bbass-poste-vX.Y.Z-windows-x64.zip`, sa signature ed25519 (`.zip.sig`) et `SHA256SUMS`. Il signe avec le secret `POSTE_CLE_SIGNATURE` ; le Lanceur vérifie avec `cle-publique-poste.txt`, compilée dedans. Depuis `lanceur\` :

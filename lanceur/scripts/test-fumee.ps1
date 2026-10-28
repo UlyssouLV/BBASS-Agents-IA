@@ -45,6 +45,12 @@ try {
         if (-not (Test-Path (Join-Path $journaux $journal))) { throw "Journal absent : $journaux\$journal" }
     }
     Write-Host "OK : journaux du Lanceur et du backend dans $journaux"
+
+    # Sans Serveur BBASS joignable ici : vérification en échec, démarrage sur la version du paquet.
+    $etat = Join-Path $env:LOCALAPPDATA "BBASS\mise-a-jour.json"
+    if (-not (Test-Path $etat)) { throw "Fichier d'état de la mise à jour absent : $etat" }
+    $verification = Get-Content $etat -Raw -Encoding UTF8 | ConvertFrom-Json
+    Write-Host "OK : fichier d'état écrit ($($verification.resultat))"
 } finally {
     # Arrêt brutal : seul le Job Object du Lanceur peut alors emporter le backend.
     if (-not $lanceur.HasExited) { Stop-Process -Id $lanceur.Id -Force }

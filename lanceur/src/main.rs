@@ -1,17 +1,24 @@
 // Pas de console sous la fenêtre BBASS en release.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod redemarrage;
+mod reseau;
 mod sidecar;
 
+use std::fs;
 use std::net::{Ipv4Addr, SocketAddr};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
 
 use bbass_lanceur_coeur::attente::attendre_reponse;
+use bbass_lanceur_coeur::configuration::url_de_la_sante;
 use bbass_lanceur_coeur::journal::Journal;
-use bbass_lanceur_coeur::lancement::Lancement;
+use bbass_lanceur_coeur::lancement::{processus_a_attendre, Lancement};
+use bbass_lanceur_coeur::mise_a_jour::{Etape, MiseAJour, Suite};
+use bbass_lanceur_coeur::signature::ClePublique;
+use reseau::ReseauHttp;
 use sidecar::Sidecar;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
@@ -29,17 +36,14 @@ const ARCHIVES_JOURNAL: u32 = 2;
 
 struct Backend(Mutex<Option<Sidecar>>);
 
-/// `poste-backend\poste-backend.exe` à côté de `BBASS.exe` (forme du Paquet poste).
-fn chemin_du_backend() -> std::io::Result<PathBuf> {
-    let exe = std::env::current_exe()?;
-    let dossier = exe.parent().map(PathBuf::from).unwrap_or_default();
-    Ok(dossier.join("poste-backend").join("poste-backend.exe"))
+/// `%LOCALAPPDATA%\BBASS` : configuration, fichier d'état de la mise à jour et journaux, partagés avec le backend.
+fn dossier_bbass() -> PathBuf {
+    std::env::var_os("LOCALAPPDATA").map(PathBuf::from).unwrap_or_default().join("BBASS")
 }
 
 /// `%LOCALAPPDATA%\BBASS\journaux\lanceur.log`, à côté de celui du backend.
 fn journal() -> Journal {
-    let local_app_data = std::env::var_os("LOCALAPPDATA").map(PathBuf::from).unwrap_or_default();
-    let chemin = local_app_data.join("BBASS").join("journaux").join("lanceur.log");
+    let chemin = dossier_bbass().join("journaux").join("lanceur.log");
     Journal::new(chemin, TAILLE_MAX_JOURNAL, ARCHIVES_JOURNAL)
 }
 
@@ -96,34 +100,110 @@ fn installer_la_zone_de_notification(app: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
-fn demarrer_le_poste(fenetre: WebviewWindow) {
-    let sidecar = match chemin_du_backend().and_then(|exe| Sidecar::demarrer(&exe)) {
-        Ok(sidecar) => sidecar,
-        Err(erreur) => {
-            journaliser(&fenetre, &format!("Backend introuvable ou impossible à démarrer : {erreur}"));
-            afficher_erreur(
-                &fenetre,
-                "BBASS n'a pas pu démarrer : l'installation semble incomplète. Réinstallez BBASS.",
-            );
-            return;
-        }
-    };
+/// Écran de démarrage (`ecran/index.html`) ; la barre ne bouge qu'au pour cent près.
+struct Ecran<'a> {
+    fenetre: &'a WebviewWindow,
+    pourcent: Option<u64>,
+}
+
+impl Ecran<'_> {
+    fn afficher(&mut self, etape: Etape) {
+        let (texte, progression) = match etape {
+            Etape::Verification => ("Vérification…".to_string(), "undefined".to_string()),
+            Etape::Demarrage => ("Démarrage…".to_string(), "undefined".to_string()),
+            Etape::MiseAJour { version, recus, total } => {
+                let pourcent = total.filter(|t| *t > 0).map(|t| (recus * 100 / t).min(100));
+                if pourcent.is_some() && pourcent == self.pourcent {
+                    return;
+                }
+                self.pourcent = pourcent;
+                let progression = pourcent.map(|p| format!("{}", p as f64 / 100.0)).unwrap_or("null".into());
+                (format!("Mise à jour vers v{version}…"), progression)
+            }
+        };
+        let _ = self.fenetre.eval(format!("window.afficherEtape(\"{texte}\", {progression})"));
+    }
+}
+
+/// `Err` : message pour l'utilisateur, la cause est au journal.
+fn demarrer_le_backend(fenetre: &WebviewWindow, exe: &Path) -> Result<(), &'static str> {
+    let sidecar = Sidecar::demarrer(exe).map_err(|erreur| {
+        journaliser(fenetre, &format!("Backend {} introuvable ou impossible à démarrer : {erreur}", exe.display()));
+        "BBASS n'a pas pu démarrer : l'installation semble incomplète. Réinstallez BBASS."
+    })?;
     *fenetre.state::<Backend>().0.lock().unwrap() = Some(sidecar);
-    journaliser(&fenetre, "Backend démarré");
+    journaliser(fenetre, "Backend démarré");
 
     let adresse = SocketAddr::from((Ipv4Addr::LOCALHOST, PORT_POSTE));
-    if attendre_reponse(adresse, DELAI_DEMARRAGE) {
-        journaliser(&fenetre, &format!("Backend prêt sur {URL_POSTE}"));
-        let url = Url::parse(URL_POSTE).expect("URL locale valide");
-        let _ = fenetre.navigate(url);
-    } else {
-        journaliser(&fenetre, &format!("Backend muet après {} s", DELAI_DEMARRAGE.as_secs()));
-        afficher_erreur(&fenetre, "BBASS ne répond pas. Quittez BBASS depuis la zone de notification puis relancez-le.");
+    if !attendre_reponse(adresse, DELAI_DEMARRAGE) {
+        journaliser(fenetre, &format!("Backend muet après {} s", DELAI_DEMARRAGE.as_secs()));
+        return Err("BBASS ne répond pas. Quittez BBASS depuis la zone de notification puis relancez-le.");
+    }
+    journaliser(fenetre, &format!("Backend prêt sur {URL_POSTE}"));
+    Ok(())
+}
+
+fn arreter_le_backend(fenetre: &WebviewWindow) {
+    if let Some(mut sidecar) = fenetre.state::<Backend>().0.lock().unwrap().take() {
+        sidecar.arreter();
+    }
+}
+
+/// Redémarre sur `BBASS.exe` du dossier d'installation, posé par la bascule ou le retour arrière.
+fn redemarrer(fenetre: &WebviewWindow, exe: &Path, lancement: Lancement) {
+    match redemarrage::lancer(exe, lancement) {
+        Ok(()) => {
+            journaliser(fenetre, &format!("Redémarrage sur {}", exe.display()));
+            fenetre.app_handle().exit(0);
+        }
+        Err(erreur) => {
+            journaliser(fenetre, &format!("Redémarrage sur {} impossible : {erreur}", exe.display()));
+            afficher_erreur(fenetre, "BBASS n'a pas pu redémarrer après sa mise à jour. Relancez BBASS.");
+        }
+    }
+}
+
+/// Séquence de l'ADR-0022 : se mettre à la version du Serveur BBASS, puis démarrer le backend.
+fn demarrer_le_poste(fenetre: WebviewWindow, lancement: Lancement) {
+    let racine = std::env::current_exe().ok().and_then(|exe| exe.parent().map(PathBuf::from)).unwrap_or_default();
+    let version_poste = fenetre.package_info().version.to_string().parse().expect("version X.Y.Z du Lanceur");
+    let cle = ClePublique::du_paquet_poste().expect("clé publique du Paquet poste compilée");
+    let ecrire = |ligne: &str| journaliser(&fenetre, ligne);
+    let horodatage = chrono::Local::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, false);
+    let mise_a_jour =
+        MiseAJour::new(racine.clone(), version_poste, dossier_bbass().join("mise-a-jour.json"), cle, horodatage, &ecrire);
+    let configuration = fs::read_to_string(dossier_bbass().join("configuration.json")).ok();
+    let reseau = ReseauHttp::new(url_de_la_sante(configuration.as_deref()));
+
+    let mut ecran = Ecran { fenetre: &fenetre, pourcent: None };
+    let essai = match mise_a_jour.au_lancement(&reseau, &mut |etape| ecran.afficher(etape)) {
+        Suite::Redemarrer => return redemarrer(&fenetre, &racine.join("BBASS.exe"), lancement),
+        Suite::Demarrer { essai } => essai,
+    };
+    match demarrer_le_backend(&fenetre, &mise_a_jour.backend()) {
+        Ok(()) => {
+            if essai {
+                mise_a_jour.confirmer();
+            }
+            let _ = fenetre.navigate(Url::parse(URL_POSTE).expect("URL locale valide"));
+        }
+        Err(_) if essai => {
+            arreter_le_backend(&fenetre);
+            match mise_a_jour.revenir() {
+                Ok(()) => redemarrer(&fenetre, &racine.join("BBASS.exe"), lancement),
+                Err(_) => afficher_erreur(&fenetre, "BBASS n'a pas pu démarrer sa nouvelle version. Réinstallez BBASS."),
+            }
+        }
+        Err(message) => afficher_erreur(&fenetre, message),
     }
 }
 
 fn main() {
     let lancement = Lancement::depuis_arguments(std::env::args());
+    // Avant l'instance unique : le Lanceur qui a redémarré sur nous doit avoir quitté.
+    if let Some(pid) = processus_a_attendre(std::env::args()) {
+        redemarrage::attendre_la_fin(pid);
+    }
     let app = tauri::Builder::default()
         // En premier : un second BBASS.exe rouvre la fenêtre du premier puis s'arrête,
         // sans démarrer de second backend.
@@ -140,7 +220,8 @@ fn main() {
             if lancement == Lancement::AvecFenetre {
                 fenetre.show()?;
             }
-            thread::spawn(move || demarrer_le_poste(fenetre));
+            // Seul moment de mise à jour : jamais pendant que BBASS tourne en fond.
+            thread::spawn(move || demarrer_le_poste(fenetre, lancement));
             Ok(())
         })
         .on_window_event(|fenetre, evenement| {

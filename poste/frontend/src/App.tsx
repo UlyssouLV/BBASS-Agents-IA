@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 
+import { BandeauMiseAJour } from "@/components/BandeauMiseAJour";
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
 import { useSession } from "@/hooks/useSession";
@@ -30,6 +31,7 @@ export function App() {
 
   return (
     <>
+      <BandeauMiseAJour />
       {_ecran()}
       <Toaster />
     </>
