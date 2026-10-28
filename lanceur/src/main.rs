@@ -1,9 +1,12 @@
 // Pas de console sous la fenêtre BBASS en release.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod desinstallation;
+mod installateur;
 mod redemarrage;
 mod reseau;
 mod sidecar;
+mod systeme;
 
 use std::fs;
 use std::net::{Ipv4Addr, SocketAddr};
@@ -15,8 +18,9 @@ use std::time::Duration;
 use bbass_lanceur_coeur::attente::attendre_reponse;
 use bbass_lanceur_coeur::configuration::url_de_la_sante;
 use bbass_lanceur_coeur::journal::Journal;
-use bbass_lanceur_coeur::lancement::{demande_de_verification, processus_a_attendre, Lancement};
+use bbass_lanceur_coeur::lancement::{demande_d_arret, demande_de_verification, processus_a_attendre, Lancement};
 use bbass_lanceur_coeur::mise_a_jour::{Etape, MiseAJour, Suite};
+use bbass_lanceur_coeur::setup::lire_paquet_embarque;
 use bbass_lanceur_coeur::signature::ClePublique;
 use reseau::ReseauHttp;
 use sidecar::Sidecar;
@@ -50,9 +54,13 @@ fn journal() -> Journal {
 }
 
 /// Jamais de secret ni de jeton ici : le journal peut être envoyé à l'admin.
-fn journaliser<R: Runtime>(app: &impl Manager<R>, message: &str) {
+fn ecrire_au_journal(journal: &Journal, message: &str) {
     let horodatage = chrono::Local::now().format("%Y-%m-%d %H:%M:%S");
-    app.state::<Journal>().ecrire(&format!("{horodatage} {message}"));
+    journal.ecrire(&format!("{horodatage} {message}"));
+}
+
+fn journaliser<R: Runtime>(app: &impl Manager<R>, message: &str) {
+    ecrire_au_journal(&app.state::<Journal>(), message);
 }
 
 fn afficher_erreur(fenetre: &WebviewWindow, message: &str) {
@@ -222,11 +230,30 @@ fn main() {
     if let Some(pid) = processus_a_attendre(std::env::args()) {
         redemarrage::attendre_la_fin(pid);
     }
+    if lancement == Lancement::Desinstallation {
+        return desinstallation::executer(&dossier_bbass(), &journal());
+    }
+    let contexte = tauri::generate_context!();
+    // Setup (paquet embarqué derrière l'exe) : l'assistant si rien n'est installé, sinon le BBASS installé.
+    let setup = std::env::current_exe().ok().and_then(|exe| lire_paquet_embarque(&exe).ok().flatten());
+    if let Some(paquet) = setup {
+        let installe = dossier_bbass().join("BBASS.exe");
+        if !installe.is_file() {
+            return installateur::executer(contexte, paquet);
+        }
+        if let Err(erreur) = redemarrage::lancer(&installe, Lancement::AvecFenetre) {
+            ecrire_au_journal(&journal(), &format!("Setup : BBASS installé impossible à lancer : {erreur}"));
+        }
+        return;
+    }
     let app = tauri::Builder::default()
         // En premier : un second BBASS.exe rouvre la fenêtre du premier puis s'arrête,
         // sans démarrer de second backend ; lancé par le backend, il demande une vérification.
         .plugin(tauri_plugin_single_instance::init(|app, arguments, _dossier| {
-            if demande_de_verification(arguments) {
+            if demande_d_arret(arguments.clone()) {
+                journaliser(app, "Arrêt demandé par la désinstallation");
+                app.exit(0);
+            } else if demande_de_verification(arguments) {
                 verifier_maintenant(app);
             } else {
                 montrer_la_fenetre(app);
@@ -236,6 +263,11 @@ fn main() {
         .manage(Backend(Mutex::new(None)))
         .manage(journal())
         .setup(move |app| {
+            if lancement == Lancement::Arret {
+                // Désinstallation sans BBASS en cours : rien à arrêter.
+                app.handle().exit(0);
+                return Ok(());
+            }
             journaliser(app.handle(), &format!("BBASS {} démarre ({lancement:?})", app.package_info().version));
             installer_la_zone_de_notification(app.handle())?;
             let fenetre = app
@@ -255,7 +287,7 @@ fn main() {
                 let _ = fenetre.hide();
             }
         })
-        .build(tauri::generate_context!())
+        .build(contexte)
         .expect("construction de l'application Tauri");
 
     app.run(|handle, evenement| {

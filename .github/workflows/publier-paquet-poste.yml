@@ -1,8 +1,10 @@
 # Publication du Paquet poste (spec 1.6.2, ADR-0022) : à chaque GitHub Release
 # vX.Y.Z, construit bbass-poste-vX.Y.Z-windows-x64.zip (Lanceur, sidecar et
 # front de ce tag, Lanceur à la version X.Y.Z), le signe en ed25519 avec le
-# secret POSTE_CLE_SIGNATURE et joint à la Release le zip, sa signature et
-# SHA256SUMS. Le Lanceur des postes télécharge ce zip quand la VM passe à X.Y.Z.
+# secret POSTE_CLE_SIGNATURE et joint à la Release le zip, sa signature,
+# BBASS-Setup-vX.Y.Z.exe (le Lanceur suivi du zip signé : installation hors
+# ligne) et SHA256SUMS. Le Lanceur des postes télécharge ce zip quand la VM
+# passe à X.Y.Z.
 name: Publier le paquet poste
 
 on:
@@ -95,6 +97,15 @@ jobs:
             Write-Output "::error::La signature ne se vérifie pas avec lanceur/cle-publique-poste.txt : POSTE_CLE_SIGNATURE n'est pas la clé secrète de cette clé publique."
             exit 1
           }
+
+      # Le Setup embarque le zip signé ; setup-poste revérifie la signature avant d'assembler.
+      - name: Setup
+        shell: pwsh
+        working-directory: lanceur
+        run: |
+          $zip = "../publication/bbass-poste-$env:TAG-windows-x64.zip"
+          cargo run --release --locked -q -p bbass-lanceur-coeur --bin setup-poste -- target/release/BBASS.exe $zip "$zip.sig" "../publication/BBASS-Setup-$env:TAG.exe"
+          if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: SHA256SUMS
         shell: pwsh

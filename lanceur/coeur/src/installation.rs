@@ -108,6 +108,15 @@ impl Installation {
         }
     }
 
+    /// Désinstallation : retire les Lanceurs et les versions ; le reste du dossier
+    /// (configuration, journaux) est à l'appelant.
+    pub fn retirer(&self) -> io::Result<()> {
+        for exe in [EXE, EXE_PRECEDENT, EXE_EN_ECHEC] {
+            retirer(&self.racine.join(exe))?;
+        }
+        retirer(&self.versions())
+    }
+
     /// Décompresse le Paquet poste `zip` (signature déjà vérifiée) dans `versions\vX.Y.Z\`.
     pub fn installer(&self, version: Version, zip: &[u8]) -> Result<(), String> {
         let partiel = self.versions().join(format!(".v{version}.partiel"));
@@ -125,6 +134,12 @@ impl Installation {
             let _ = fs::remove_dir_all(&partiel);
         }
         resultat
+    }
+
+    /// Setup : copie le Lanceur de `version` en `BBASS.exe` ; rend son chemin.
+    pub fn poser_le_lanceur(&self, version: Version) -> io::Result<PathBuf> {
+        fs::copy(self.dossier(version).join(EXE), self.exe())?;
+        Ok(self.exe())
     }
 
     /// Met le Lanceur de `vers` à la place de celui de `de`, gardé en `BBASS.old.exe`.
@@ -157,6 +172,15 @@ impl Installation {
             return Err(erreur);
         }
         Ok(())
+    }
+}
+
+/// Un chemin déjà absent est déjà retiré.
+fn retirer(chemin: &Path) -> io::Result<()> {
+    let resultat = if chemin.is_dir() { fs::remove_dir_all(chemin) } else { fs::remove_file(chemin) };
+    match resultat {
+        Err(erreur) if erreur.kind() != io::ErrorKind::NotFound => Err(erreur),
+        _ => Ok(()),
     }
 }
 

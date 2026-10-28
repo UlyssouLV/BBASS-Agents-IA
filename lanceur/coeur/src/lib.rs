@@ -6,5 +6,6 @@ mod installation;
 pub mod journal;
 pub mod lancement;
 pub mod mise_a_jour;
+pub mod setup;
 pub mod signature;
 pub mod version;

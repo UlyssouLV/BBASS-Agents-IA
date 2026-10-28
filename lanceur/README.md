@@ -11,7 +11,7 @@ Application Windows du poste (ADR-0022) : `BBASS.exe` (Rust / Tauri v2) démarre
 
 - `coeur/` : logique pure, testée par `cargo test` (test-root `lanceur`).
 - `src/` : application Tauri (fenêtre, sidecar).
-- `ecran/` : écran « Démarrage… » affiché avant le poste.
+- `ecran/` : écran « Démarrage… » affiché avant le poste ; `ecran/installateur/` : assistant du Setup (build committé).
 - `sidecar/poste-backend.py` : point d'entrée PyInstaller du backend.
 
 ## Construire et essayer le paquet
@@ -36,9 +36,22 @@ Le paquet est dans `lanceur\target\paquet\BBASS\` ; il tourne sans Python ni git
 - Le paquet construit en local (`target\paquet\BBASS\`) se met à jour lui aussi s'il trouve un Serveur BBASS d'une autre version publiée.
 - « Vérifier les mises à jour maintenant » (menu « … », À propos, `GET /a-propos`) : le backend lance `BBASS.exe --verifier-mise-a-jour` (`BBASS_LANCEUR`, donné au sidecar avec `BBASS_VERSION`) ; l'instance unique le transmet au Lanceur en cours, qui redémarre avec cet argument : même parcours qu'au lancement, puis la fenêtre s'ouvre sur À propos avec le résultat (`/?a-propos`).
 
+## Setup et désinstallation
+
+`BBASS-Setup-vX.Y.Z.exe` est le Lanceur suivi du Paquet poste signé de sa version (`coeur/src/setup.rs`) : l'installation marche hors ligne. Lancé alors que `%LOCALAPPDATA%\BBASS\BBASS.exe` n'existe pas, il ouvre l'assistant (Bienvenue, Serveur BBASS avec test en direct sur `/sante`, Options, Installation) ; sinon il lance le BBASS installé.
+
+- Par utilisateur, sans droits administrateur : décompresse dans `versions\vX.Y.Z\`, pose `BBASS.exe`, écrit `configuration.json` (adresse, `demarrage_windows` ; les autres réglages sont gardés), raccourci Menu Démarrer (et Bureau), `HKCU\…\Run\BBASS` (`--demarrage-windows`) et `HKCU\…\Uninstall\BBASS`. La signature est vérifiée avant de poser quoi que ce soit.
+- Assistant : React, construit depuis `poste/frontend` (`npm run build:installateur`) dans `ecran/installateur/`, committé comme `poste/src/poste/static` (ADR-0010) ; `build-front` contrôle sa dérive. Commandes Tauri dans `src/installateur.rs`.
+- Désinstallation (« Applications installées » → `BBASS.exe --desinstaller`) : confirmation, copie temporaire du Lanceur, arrêt du BBASS en cours (`--quitter`, transmis par l'instance unique), retrait des raccourcis, du démarrage avec Windows, de l'entrée de désinstallation, de la Session (gestionnaire d'identifiants) et de `BBASS.exe`, `versions\`, `mise-a-jour.json`. `configuration.json` et `journaux\` restent.
+- Le workflow `publier-paquet-poste.yml` assemble le Setup après la signature (`setup-poste`, qui revérifie la signature) et le joint à la Release. À la main, depuis `lanceur\` :
+
+```powershell
+cargo run -p bbass-lanceur-coeur --bin setup-poste -- target\release\BBASS.exe <paquet.zip> <paquet.zip.sig> BBASS-Setup-vX.Y.Z.exe
+```
+
 ## Paquet poste signé
 
-À chaque GitHub Release `vX.Y.Z`, le workflow `publier-paquet-poste.yml` joint à la Release `bbass-poste-vX.Y.Z-windows-x64.zip`, sa signature ed25519 (`.zip.sig`) et `SHA256SUMS`. Il signe avec le secret `POSTE_CLE_SIGNATURE` ; le Lanceur vérifie avec `cle-publique-poste.txt`, compilée dedans. Depuis `lanceur\` :
+À chaque GitHub Release `vX.Y.Z`, le workflow `publier-paquet-poste.yml` joint à la Release `bbass-poste-vX.Y.Z-windows-x64.zip`, sa signature ed25519 (`.zip.sig`), `BBASS-Setup-vX.Y.Z.exe` et `SHA256SUMS`. Il signe avec le secret `POSTE_CLE_SIGNATURE` ; le Lanceur vérifie avec `cle-publique-poste.txt`, compilée dedans. Depuis `lanceur\` :
 
 ```powershell
 cargo run -p bbass-lanceur-coeur --bin cle-poste -- generer <fichier-cle-secrete>   # nouvelle paire ; réécrit cle-publique-poste.txt

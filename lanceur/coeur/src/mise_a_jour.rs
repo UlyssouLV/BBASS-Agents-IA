@@ -77,7 +77,8 @@ pub fn url_du_paquet(version: Version) -> String {
     format!("{RELEASES}/v{version}/bbass-poste-v{version}-windows-x64.zip")
 }
 
-fn version_annoncee(sante: &str) -> Option<String> {
+/// Version annoncée par le corps de `GET /sante`.
+pub fn version_annoncee(sante: &str) -> Option<String> {
     let corps: serde_json::Value = serde_json::from_str(sante).ok()?;
     corps.get("version")?.as_str().map(str::to_string)
 }

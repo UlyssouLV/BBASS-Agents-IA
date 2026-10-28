@@ -19,6 +19,8 @@ tauri-build = { version = "2", features = [] }
 bbass-lanceur-coeur = { path = "coeur" }
 # Horodatage local des lignes du journal.
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
+# Échanges avec l'assistant d'installation (commandes Tauri).
+serde = { version = "1", features = ["derive"] }
 # custom-protocol : sert `ecran/` embarquÃ© (sans lui, cargo build vise un serveur de dev).
 tauri = { version = "2", features = ["custom-protocol", "tray-icon"] }
 tauri-plugin-opener = "2"
@@ -27,12 +29,20 @@ tauri-plugin-single-instance = "2"
 ureq = { version = "2", default-features = false, features = ["tls"] }
 
 [target.'cfg(windows)'.dependencies]
+# Dossiers Bureau et Menu Démarrer de l'utilisateur (raccourcis du Setup).
+dirs = "7"
+# Raccourcis .lnk du Setup, sans COM ni PowerShell.
+mslnk = "0.1"
 windows-sys = { version = "0.59", features = [
   "Win32_Foundation",
   "Win32_Security",
+  "Win32_Security_Credentials",
   "Win32_System_JobObjects",
   "Win32_System_Threading",
+  "Win32_UI_WindowsAndMessaging",
 ] }
+# Démarrage avec Windows et entrée de désinstallation (HKCU, sans droits administrateur).
+winreg = "0.56"
 
 [profile.release]
 codegen-units = 1

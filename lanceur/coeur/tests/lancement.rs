@@ -1,6 +1,6 @@
 use bbass_lanceur_coeur::lancement::{
-    demande_de_verification, processus_a_attendre, Lancement, ARGUMENT_ATTENDRE_FIN, ARGUMENT_DEMARRAGE_WINDOWS,
-    ARGUMENT_VERIFICATION,
+    demande_d_arret, demande_de_verification, processus_a_attendre, Lancement, ARGUMENT_ARRET, ARGUMENT_ATTENDRE_FIN,
+    ARGUMENT_DEMARRAGE_WINDOWS, ARGUMENT_DESINSTALLATION, ARGUMENT_VERIFICATION,
 };
 
 fn lancement(arguments: &[&str]) -> Lancement {
@@ -61,4 +61,20 @@ fn le_backend_demande_une_verification_par_l_instance_unique() {
     assert!(demande_de_verification(arguments(&[r"C:\BBASS\BBASS.exe", ARGUMENT_VERIFICATION])));
     assert!(!demande_de_verification(arguments(&[r"C:\BBASS\BBASS.exe"])));
     assert!(!demande_de_verification(arguments(&[ARGUMENT_VERIFICATION])));
+}
+
+#[test]
+fn l_entree_de_desinstallation_de_windows_lance_la_desinstallation() {
+    assert_eq!(lancement(&["BBASS.exe", ARGUMENT_DESINSTALLATION]), Lancement::Desinstallation);
+    assert_eq!(
+        lancement(&["BBASS-desinstallation.exe", ARGUMENT_DESINSTALLATION, ARGUMENT_ATTENDRE_FIN, "42"]),
+        Lancement::Desinstallation
+    );
+}
+
+#[test]
+fn la_desinstallation_demande_au_bbass_en_cours_de_s_arreter() {
+    assert_eq!(lancement(&["BBASS.exe", ARGUMENT_ARRET]), Lancement::Arret);
+    assert!(demande_d_arret(["BBASS.exe", ARGUMENT_ARRET].map(String::from)));
+    assert!(!demande_d_arret(["BBASS.exe"].map(String::from)));
 }

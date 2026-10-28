@@ -21,7 +21,7 @@ pub fn lancer(exe: &Path, lancement: Lancement) -> io::Result<()> {
         Lancement::Verification => {
             commande.arg(ARGUMENT_VERIFICATION);
         }
-        Lancement::AvecFenetre => {}
+        Lancement::AvecFenetre | Lancement::Desinstallation | Lancement::Arret => {}
     }
     commande.arg(ARGUMENT_ATTENDRE_FIN).arg(std::process::id().to_string());
     commande.spawn().map(|_| ())

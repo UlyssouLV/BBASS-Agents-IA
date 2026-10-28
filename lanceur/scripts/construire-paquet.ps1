@@ -26,9 +26,13 @@ function Executer([string]$Etape, [scriptblock]$Commande) {
     if ($LASTEXITCODE -ne 0) { throw "$Etape : échec (code $LASTEXITCODE)" }
 }
 
-Executer "Front du poste (npm run build)" {
+Executer "Front du poste et assistant d'installation (npm run build, build:installateur)" {
     Push-Location (Join-Path $racine "poste\frontend")
-    try { npm ci --ignore-scripts; if ($LASTEXITCODE -eq 0) { npm run build } } finally { Pop-Location }
+    try {
+        npm ci --ignore-scripts
+        if ($LASTEXITCODE -eq 0) { npm run build }
+        if ($LASTEXITCODE -eq 0) { npm run build:installateur }
+    } finally { Pop-Location }
 }
 
 $venv = Join-Path $cible "venv-sidecar"
