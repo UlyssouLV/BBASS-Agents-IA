@@ -1,11 +1,12 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from poste.config import POSTE_HOST, POSTE_PORT
+from poste.config import DOSSIER_JOURNAUX, EN_MODE_PAQUET, POSTE_HOST, POSTE_PORT
+from poste.journaux import configurer_journaux, journal_des_requetes
 from poste.routers.comptes import router as comptes_router
 from poste.routers.consommation import router as consommation_router
 from poste.routers.conversations import router as conversations_router
@@ -41,6 +42,15 @@ app.include_router(moduleo_router)
 app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
 
 
+@app.middleware("http")
+async def journaliser_la_requete(request: Request, call_next):
+    # Méthode, chemin et statut seulement : ni chaîne de requête, ni en-tête,
+    # ni corps (mot de passe, jeton).
+    reponse = await call_next(request)
+    journal_des_requetes.info("%s %s %d", request.method, request.url.path, reponse.status_code)
+    return reponse
+
+
 @app.get("/")
 def index() -> FileResponse:
     return FileResponse(_STATIC_DIR / "index.html")
@@ -58,7 +68,13 @@ def inspecteur() -> FileResponse:
 def run() -> None:
     import uvicorn
 
-    uvicorn.run(app, host=POSTE_HOST, port=POSTE_PORT)
+    if EN_MODE_PAQUET:
+        # Sortie standard nulle sous le Lanceur : uvicorn passe par nos
+        # journaux rotatifs ; son access log doublerait journaliser_la_requete.
+        configurer_journaux(DOSSIER_JOURNAUX)
+        uvicorn.run(app, host=POSTE_HOST, port=POSTE_PORT, log_config=None, access_log=False)
+    else:
+        uvicorn.run(app, host=POSTE_HOST, port=POSTE_PORT)
 
 
 if __name__ == "__main__":

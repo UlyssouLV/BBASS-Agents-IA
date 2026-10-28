@@ -17,8 +17,12 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 bbass-lanceur-coeur = { path = "coeur" }
+# Horodatage local des lignes du journal.
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
 # custom-protocol : sert `ecran/` embarqué (sans lui, cargo build vise un serveur de dev).
-tauri = { version = "2", features = ["custom-protocol"] }
+tauri = { version = "2", features = ["custom-protocol", "tray-icon"] }
+tauri-plugin-opener = "2"
+tauri-plugin-single-instance = "2"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = [

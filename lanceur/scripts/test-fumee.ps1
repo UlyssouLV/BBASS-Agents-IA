@@ -29,6 +29,22 @@ try {
     if (-not $repond) { throw "Le backend n'a pas répondu sur $url en $DelaiSecondes s." }
     Write-Host "OK : le paquet démarre et répond sur $url"
     if ((Backends).Count -eq 0) { throw "Aucun processus poste-backend : qui a répondu sur $url ?" }
+
+    # Instance unique : un second BBASS.exe rouvre la fenêtre du premier et s'arrête.
+    $second = Start-Process -FilePath (Join-Path $Paquet "BBASS.exe") -PassThru
+    if (-not $second.WaitForExit(15000)) {
+        Stop-Process -Id $second.Id -Force
+        throw "Un second BBASS.exe est resté lancé (instance unique)."
+    }
+    if ($lanceur.HasExited) { throw "Le premier BBASS.exe s'est arrêté au second lancement." }
+    if ((Backends).Count -ne 1) { throw "Un second lancement a démarré un autre poste-backend." }
+    Write-Host "OK : un second lancement ne démarre ni second Lanceur ni second backend"
+
+    $journaux = Join-Path $env:LOCALAPPDATA "BBASS\journaux"
+    foreach ($journal in "lanceur.log", "poste-backend.log") {
+        if (-not (Test-Path (Join-Path $journaux $journal))) { throw "Journal absent : $journaux\$journal" }
+    }
+    Write-Host "OK : journaux du Lanceur et du backend dans $journaux"
 } finally {
     # Arrêt brutal : seul le Job Object du Lanceur peut alors emporter le backend.
     if (-not $lanceur.HasExited) { Stop-Process -Id $lanceur.Id -Force }

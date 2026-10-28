@@ -1,6 +1,13 @@
 # Lanceur BBASS
 
-Application Windows du poste (ADR-0022) : `BBASS.exe` (Rust / Tauri v2) démarre le backend poste figé par PyInstaller (`poste-backend\`, mode dossier), attend sa réponse sur `127.0.0.1:8100`, puis l'affiche dans sa fenêtre WebView2. Fermer le Lanceur arrête le backend (Job Object Windows).
+Application Windows du poste (ADR-0022) : `BBASS.exe` (Rust / Tauri v2) démarre le backend poste figé par PyInstaller (`poste-backend\`, mode dossier), attend sa réponse sur `127.0.0.1:8100`, puis l'affiche dans sa fenêtre WebView2. Quitter le Lanceur arrête le backend (Job Object Windows).
+
+## Fenêtre et fond
+
+- Fermer la fenêtre la cache : BBASS reste dans la zone de notification (« Ouvrir BBASS », « Ouvrir dans le navigateur », « Quitter ») et le chat reste ouvert sur `http://127.0.0.1:8100`. Seul « Quitter » arrête le Lanceur et le backend.
+- Instance unique : relancer `BBASS.exe` rouvre la fenêtre existante.
+- `BBASS.exe --demarrage-windows` (lancement avec Windows) démarre en fond, sans fenêtre.
+- Journaux dans `%LOCALAPPDATA%\BBASS\journaux\` : `lanceur.log` et `poste-backend.log`, 3 fichiers de 1 Mo au plus chacun, sans secret ni jeton.
 
 - `coeur/` : logique pure, testée par `cargo test` (test-root `lanceur`).
 - `src/` : application Tauri (fenêtre, sidecar).
