@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from poste.config import DOSSIER_JOURNAUX, EN_MODE_PAQUET, POSTE_HOST, POSTE_PORT
 from poste.journaux import configurer_journaux, journal_des_requetes
 from poste.routers.comptes import router as comptes_router
+from poste.routers.configuration import router as configuration_router
 from poste.routers.consommation import router as consommation_router
 from poste.routers.conversations import router as conversations_router
 from poste.routers.inspecteur import router as inspecteur_router
@@ -41,6 +42,7 @@ app.include_router(comptes_router)
 app.include_router(inspecteur_router)
 app.include_router(moduleo_router)
 app.include_router(mise_a_jour_router)
+app.include_router(configuration_router)
 app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
 
 

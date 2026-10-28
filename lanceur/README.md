@@ -49,10 +49,12 @@ Créer ou remplacer la clé : guide dans l'ADR-0022.
 
 ## Configuration
 
-Le backend packagé lit l'adresse du Serveur BBASS dans `%LOCALAPPDATA%\BBASS\configuration.json` (sans fichier : `http://localhost:8000`) :
+Le Lanceur et le backend packagé lisent l'adresse du Serveur BBASS dans `%LOCALAPPDATA%\BBASS\configuration.json`, relue par le backend à chaque appel :
 
 ```json
 { "serveur_bbass": { "hote": "10.0.0.5", "port": 8000 } }
 ```
+
+Sans fichier, l'adresse prod du dépôt s'applique (`ADRESSE_PROD`, `poste/src/poste/config.py` et `coeur/src/configuration.rs`) ; vide en 1.6.2, donc l'écran de connexion ouvre la Configuration. Le menu « … » (écran de connexion, page Profil) l'écrit via `PUT /configuration` sans réinstaller ; il ouvre aussi `%LOCALAPPDATA%\BBASS` (configuration et journaux).
 
 En dev (`lancer-logiciel.*`), le backend lit toujours `VM_CENTRALE_BASE_URL` dans le `.env`.

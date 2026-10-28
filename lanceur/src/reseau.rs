@@ -11,13 +11,14 @@ const TAILLE_MAX: u64 = 1_000_000_000;
 const MORCEAU: usize = 64 * 1024;
 
 pub struct ReseauHttp {
-    url_sante: String,
+    /// `None` sans adresse connue : le Serveur BBASS est injoignable.
+    url_sante: Option<String>,
     serveur_bbass: ureq::Agent,
     releases: ureq::Agent,
 }
 
 impl ReseauHttp {
-    pub fn new(url_sante: String) -> Self {
+    pub fn new(url_sante: Option<String>) -> Self {
         // VM injoignable : démarrer vite sur la version installée.
         let serveur_bbass = ureq::AgentBuilder::new()
             .timeout_connect(Duration::from_secs(3))
@@ -35,7 +36,7 @@ impl ReseauHttp {
 impl Reseau for ReseauHttp {
     fn sante(&self) -> Option<String> {
         // 503 « base injoignable » annonce aussi la version.
-        match self.serveur_bbass.get(&self.url_sante).call() {
+        match self.serveur_bbass.get(self.url_sante.as_deref()?).call() {
             Ok(reponse) | Err(ureq::Error::Status(_, reponse)) => reponse.into_string().ok(),
             Err(_) => None,
         }

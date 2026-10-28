@@ -1,11 +1,14 @@
 //! Adresse du Serveur BBASS dans `%LOCALAPPDATA%\BBASS\configuration.json`, partagé
-//! avec le backend (`poste/config.py`) : même format, même adresse par défaut.
+//! avec le backend (`poste/config.py`) : même format, même adresse prod par défaut.
 //!
 //! ```json
 //! { "serveur_bbass": { "hote": "10.0.0.5", "port": 8000 } }
 //! ```
 
-const ADRESSE_PAR_DEFAUT: &str = "http://localhost:8000";
+/// Adresse prod par défaut (spec 1.6.2, point 10), comme `ADRESSE_PROD` du backend.
+/// Vide tant qu'elle n'est pas connue : sans fichier de configuration, le Serveur BBASS
+/// est injoignable et le poste ouvre la Configuration.
+const ADRESSE_PROD: &str = "";
 
 fn adresse(contenu: &str) -> Option<String> {
     let configuration: serde_json::Value = serde_json::from_str(contenu).ok()?;
@@ -19,7 +22,8 @@ fn adresse(contenu: &str) -> Option<String> {
 }
 
 /// `contenu` : texte du fichier de configuration, `None` s'il n'existe pas.
-pub fn url_de_la_sante(contenu: Option<&str>) -> String {
-    let adresse = contenu.and_then(adresse).unwrap_or_else(|| ADRESSE_PAR_DEFAUT.to_string());
-    format!("{adresse}/sante")
+/// `None` sans adresse connue (ni fichier ni adresse prod).
+pub fn url_de_la_sante(contenu: Option<&str>) -> Option<String> {
+    let adresse = contenu.and_then(adresse).or_else(|| (!ADRESSE_PROD.is_empty()).then(|| ADRESSE_PROD.to_string()))?;
+    Some(format!("{adresse}/sante"))
 }

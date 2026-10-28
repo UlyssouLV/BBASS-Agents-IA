@@ -219,3 +219,22 @@ class DerniereVerificationResponse(BaseModel):
     resultat: str
     detail: str
     bandeau: str | None
+
+
+class ServeurBbassRequest(BaseModel):
+    # Hôte (nom ou IPv4, sans schéma ni port) et port du Serveur BBASS.
+    hote: str = Field(min_length=1, max_length=253, pattern=r"^\s*[A-Za-z0-9.\-]+\s*$")
+    port: int = Field(ge=1, le=65535)
+
+
+class ConfigurationResponse(BaseModel):
+    # hote vide : adresse inconnue, le front ouvre la Configuration.
+    # modifiable faux en dev : l'adresse vient du `.env` du clone.
+    hote: str
+    port: int
+    modifiable: bool
+
+
+class EtatServeurBbassResponse(BaseModel):
+    joignable: bool
+    version: str | None

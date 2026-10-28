@@ -43,16 +43,17 @@ def test_en_mode_paquet_l_adresse_du_serveur_bbass_vient_du_fichier_de_configura
 
     _recharger_en_mode_paquet(monkeypatch, tmp_path)
     try:
-        assert config.VM_CENTRALE_BASE_URL == "http://10.0.0.5:8000"
+        assert config.adresse_serveur_bbass() == "http://10.0.0.5:8000"
     finally:
         monkeypatch.undo()
         importlib.reload(config)
 
 
-def test_en_mode_paquet_sans_fichier_de_configuration_l_adresse_par_defaut_s_applique(monkeypatch, tmp_path):
+def test_en_mode_paquet_sans_fichier_de_configuration_l_adresse_prod_s_applique(monkeypatch, tmp_path):
+    # Vide en 1.6.2 (ADRESSE_PROD) : le premier lancement ouvre la Configuration.
     _recharger_en_mode_paquet(monkeypatch, tmp_path)
     try:
-        assert config.VM_CENTRALE_BASE_URL == "http://localhost:8000"
+        assert config.adresse_serveur_bbass() == config.ADRESSE_PROD == ""
     finally:
         monkeypatch.undo()
         importlib.reload(config)
