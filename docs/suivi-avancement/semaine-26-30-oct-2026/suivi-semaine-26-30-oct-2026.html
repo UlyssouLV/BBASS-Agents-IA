@@ -418,6 +418,7 @@
               <li><a href="#version-1-5-2">V1.5.2 — Écrire dans Moduléo depuis le chat</a></li>
               <li><a href="#version-1-5-3">V1.5.3 — Administration des groupes et droits Moduléo</a></li>
               <li><a href="#version-1-6-0">V1.6.0 — Versions vérifiées et prêtes à livrer</a></li>
+              <li><a href="#version-1-6-1">V1.6.1 — Installer et mettre à jour le serveur central sans l’alternant</a></li>
               <li><a href="#version-1-8-0">V1.8.0 — Workflows n8n</a></li>
               <li><a href="#version-1-9-0">V1.9.0 — Analyse approfondie des pièces jointes</a></li>
             </ol>
@@ -453,7 +454,8 @@
     <div class="jour">
       <h3>Mercredi 28 octobre</h3>
       <ul>
-        <li>À compléter.</li>
+        <li>V1.6.1 livrée : le serveur central de Castries s’installe en une commande et se met à jour par une commande ou un simple redémarrage, sans le code source ni l’alternant ; une version est d’abord essayée sur un environnement de test, puis passée en production quand elle est validée ; sauvegarde avant chaque changement de version et retour automatique à l’ancienne version en cas de problème ; tests humains validés.</li>
+        <li>V1.5.2 toujours en attente des identifiants du serveur de test Moduléo — c’est pourquoi la 1.6.1 a été livrée avant elle.</li>
       </ul>
     </div>
     <div class="jour">
@@ -474,7 +476,7 @@
     <h2>Reste à implémenter</h2>
     <ul>
       <li><strong>V1.5.2</strong> — écrire dans Moduléo depuis le chat, essayé sur le serveur de test fourni par Kipaware. Bloquée tant que les identifiants de ce serveur de test (accès à l’API) ne sont pas reçus : aucune écriture n’est essayée sur le serveur réel du cabinet. Finalisation visée mercredi 28 octobre.</li>
-      <li><strong>V1.6.1 / V1.6.2</strong> — installer et mettre à jour le logiciel sur le serveur central de Castries puis sur les postes du cabinet, sans intervention de l’alternant.</li>
+      <li><strong>V1.6.2</strong> — installer et mettre à jour le logiciel sur les postes du cabinet, sans intervention de l’alternant.</li>
       <li><strong>V1.8.0</strong> — automatisations n8n branchées sur Moduléo.</li>
       <li><strong>V1.9.0</strong> — analyse et traitement approfondis des pièces jointes.</li>
       <li>Suite « Plus tard » de la feuille de route (documentation mémoire / souveraineté, agents par pôle, bugs connus, etc.).</li>
@@ -484,8 +486,8 @@
     <section class="bloc" id="livre-pour">
     <h2>Livré pour le 29/10/2026</h2>
     <div class="recap">
-      <p><strong>Point jeudi 29 octobre — visé : V1.5.1 · livré : V1.5.1 (lundi 26 octobre), V1.5.3 et V1.6.0 (mardi 27 octobre)</strong></p>
-      <p>V1.5.2 reportée : identifiants du serveur de test Moduléo non reçus, pas d’essai d’écriture sur le serveur réel ; finalisation visée mercredi 28 octobre, d’où la livraison de la 1.5.3 et de la 1.6.0 avant elle.</p>
+      <p><strong>Point jeudi 29 octobre — visé : V1.5.1 · livré : V1.5.1 (lundi 26 octobre), V1.5.3 et V1.6.0 (mardi 27 octobre), V1.6.1 (mercredi 28 octobre)</strong></p>
+      <p>V1.5.2 reportée : identifiants du serveur de test Moduléo non reçus, pas d’essai d’écriture sur le serveur réel ; d’où la livraison de la 1.5.3, de la 1.6.0 et de la 1.6.1 avant elle.</p>
     </div>
     </section>
 
@@ -519,7 +521,7 @@
         </div>
         <div class="version-body">
           <p>Premiers outils d’écriture Moduléo depuis le chat, essayés uniquement sur un serveur de test. Chaque écriture est confirmée explicitement par le collaborateur avant d’être envoyée.</p>
-          <p>Pas encore finalisable : les identifiants du serveur de test pour l’accès à l’API Moduléo n’ont pas encore été reçus, et aucune écriture n’est essayée sur le serveur Moduléo réel du cabinet. Finalisation visée mercredi 28 octobre ; c’est pourquoi les versions 1.5.3 et 1.6.0 ont été livrées avant elle.</p>
+          <p>Pas encore finalisable : les identifiants du serveur de test pour l’accès à l’API Moduléo n’ont pas encore été reçus, et aucune écriture n’est essayée sur le serveur Moduléo réel du cabinet. Finalisation visée mercredi 28 octobre ; c’est pourquoi les versions 1.5.3, 1.6.0 et 1.6.1 ont été livrées avant elle.</p>
         </div>
       </div>
 
@@ -553,6 +555,23 @@
             <li><strong>Seulement ce qui change</strong> : une partie non touchée par la version n’est pas revérifiée, sans bloquer l’acceptation.</li>
             <li><strong>Interface à jour</strong> : la vérification échoue si l’interface livrée ne correspond pas à son code source.</li>
             <li><strong>Version figée</strong> : une version n’entre dans le logiciel que si toutes les vérifications sont vertes, et plus rien ne la modifie après sa publication.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="version" id="version-1-6-1">
+        <div class="version-head">
+          <h3>V1.6.1 — Installer et mettre à jour le serveur central sans l’alternant</h3>
+          <span class="deploye">Déployé le 28/10/2026 à 12:55</span>
+        </div>
+        <div class="version-body">
+          <p>Le serveur central de Castries ne dépend plus du poste de l’alternant : l’administrateur du cabinet l’installe et le met à jour lui-même, à partir des versions vérifiées automatiquement depuis la 1.6.0. Rien ne change pour le collaborateur dans le chat.</p>
+          <ul>
+            <li><strong>Installation en une commande</strong> : les mots de passe techniques sont générés et affichés une seule fois, à ranger dans le coffre du cabinet ; les clés de l’IA et de Moduléo sont saisies puis chiffrées aussitôt ; le premier compte administrateur est créé à l’installation.</li>
+            <li><strong>Test puis production</strong> : deux environnements séparés sur le même serveur ; une nouvelle version arrive d’abord sur l’environnement de test (branché sur le serveur de test Moduléo), puis passe en production d’un clic, exactement la même ; revenir en arrière, c’est repasser l’ancienne version.</li>
+            <li><strong>Mise à jour sans risque</strong> : une commande ou un redémarrage du serveur ; sauvegarde des données avant chaque changement de version ; si le logiciel ne répond pas correctement après la mise à jour, l’ancienne version est remise automatiquement et le problème est signalé ; sans Internet, le serveur redémarre sur la version déjà installée.</li>
+            <li><strong>Entretien automatique</strong> : les tâches régulières du serveur sont planifiées au même endroit ; le cache des pages web est purgé toutes les heures.</li>
+            <li><strong>Guide administrateur</strong> : installation et mise à jour décrites pas à pas sur le site de documentation.</li>
           </ul>
         </div>
       </div>
