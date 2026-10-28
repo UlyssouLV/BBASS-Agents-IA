@@ -13,10 +13,13 @@ pub struct Sidecar {
 }
 
 impl Sidecar {
-    pub fn demarrer(exe: &Path) -> io::Result<Self> {
+    /// `version` et `lanceur` : pour « À propos » (`poste/src/poste/config.py`).
+    pub fn demarrer(exe: &Path, version: &str, lanceur: &Path) -> io::Result<Self> {
         let mut commande = Command::new(exe);
         commande
             .current_dir(exe.parent().unwrap_or(Path::new(".")))
+            .env("BBASS_VERSION", version)
+            .env("BBASS_LANCEUR", lanceur)
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null());

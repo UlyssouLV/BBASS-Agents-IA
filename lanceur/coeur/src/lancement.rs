@@ -5,6 +5,10 @@ pub const ARGUMENT_DEMARRAGE_WINDOWS: &str = "--demarrage-windows";
 /// `--attendre-fin <pid>` : posé par le Lanceur qui redémarre sur un autre `BBASS.exe`
 /// (bascule, retour arrière). Sans attente, l'instance unique rendrait la main au partant.
 pub const ARGUMENT_ATTENDRE_FIN: &str = "--attendre-fin";
+/// « Vérifier les mises à jour maintenant » (menu « … », À propos) : le backend lance
+/// `BBASS.exe --verifier-mise-a-jour`, que l'instance unique transmet au Lanceur en cours ;
+/// celui-ci redémarre avec cet argument (même parcours qu'au lancement, puis À propos).
+pub const ARGUMENT_VERIFICATION: &str = "--verifier-mise-a-jour";
 
 /// Processus dont attendre la fin avant de démarrer, d'après `std::env::args()`.
 pub fn processus_a_attendre(arguments: impl IntoIterator<Item = String>) -> Option<u32> {
@@ -19,12 +23,22 @@ pub enum Lancement {
     AvecFenetre,
     /// Lancé avec Windows : BBASS tourne en fond, sans fenêtre, dans la zone de notification.
     EnFond,
+    /// Relancé pour vérifier les mises à jour : la fenêtre s'ouvre ensuite sur À propos.
+    Verification,
+}
+
+/// Arguments reçus par l'instance unique (le premier est l'exe) : le backend demande une vérification.
+pub fn demande_de_verification(arguments: impl IntoIterator<Item = String>) -> bool {
+    arguments.into_iter().skip(1).any(|a| a == ARGUMENT_VERIFICATION)
 }
 
 impl Lancement {
     /// `arguments` comme `std::env::args()` : le premier est l'exe.
     pub fn depuis_arguments(arguments: impl IntoIterator<Item = String>) -> Self {
-        if arguments.into_iter().skip(1).any(|a| a == ARGUMENT_DEMARRAGE_WINDOWS) {
+        let arguments: Vec<String> = arguments.into_iter().skip(1).collect();
+        if arguments.iter().any(|a| a == ARGUMENT_VERIFICATION) {
+            Self::Verification
+        } else if arguments.iter().any(|a| a == ARGUMENT_DEMARRAGE_WINDOWS) {
             Self::EnFond
         } else {
             Self::AvecFenetre

@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Ellipsis } from "lucide-react";
 import { toast } from "sonner";
 
+import { DialogueAPropos } from "@/components/DialogueAPropos";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -37,6 +38,7 @@ export function MenuConfiguration({ ouvrirSiAdresseInconnue = false, className }
   const configuration = useConfiguration();
   const ouvrirDossier = useOuvrirDossierConfiguration();
   const [configurationOuverte, setConfigurationOuverte] = useState(false);
+  const [aProposOuvert, setAProposOuvert] = useState(false);
   const [ouvertureAutomatiqueFaite, setOuvertureAutomatiqueFaite] = useState(false);
 
   const adresseInconnue = configuration.data?.modifiable === true && configuration.data.hote === "";
@@ -64,6 +66,7 @@ export function MenuConfiguration({ ouvrirSiAdresseInconnue = false, className }
         <DropdownMenuContent align="end">
           <DropdownMenuItem onSelect={() => setConfigurationOuverte(true)}>Configuration</DropdownMenuItem>
           <DropdownMenuItem onSelect={ouvrirLeDossier}>Ouvrir le dossier de configuration</DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => setAProposOuvert(true)}>À propos</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
       <Dialog open={configurationOuverte} onOpenChange={setConfigurationOuverte}>
@@ -80,6 +83,7 @@ export function MenuConfiguration({ ouvrirSiAdresseInconnue = false, className }
           )}
         </DialogContent>
       </Dialog>
+      <DialogueAPropos ouvert={aProposOuvert} onOuvertChange={setAProposOuvert} />
     </>
   );
 }

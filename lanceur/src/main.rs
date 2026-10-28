@@ -15,7 +15,7 @@ use std::time::Duration;
 use bbass_lanceur_coeur::attente::attendre_reponse;
 use bbass_lanceur_coeur::configuration::url_de_la_sante;
 use bbass_lanceur_coeur::journal::Journal;
-use bbass_lanceur_coeur::lancement::{processus_a_attendre, Lancement};
+use bbass_lanceur_coeur::lancement::{demande_de_verification, processus_a_attendre, Lancement};
 use bbass_lanceur_coeur::mise_a_jour::{Etape, MiseAJour, Suite};
 use bbass_lanceur_coeur::signature::ClePublique;
 use reseau::ReseauHttp;
@@ -28,6 +28,8 @@ use tauri_plugin_opener::OpenerExt;
 /// Port local du backend poste, inchangé depuis la V1 (`POSTE_PORT`).
 const PORT_POSTE: u16 = 8100;
 const URL_POSTE: &str = "http://127.0.0.1:8100/";
+/// Après « Vérifier les mises à jour maintenant » : le front ouvre À propos sur le résultat.
+const URL_A_PROPOS: &str = "http://127.0.0.1:8100/?a-propos";
 /// Premier démarrage d'un backend PyInstaller : antivirus et disque froid compris.
 const DELAI_DEMARRAGE: Duration = Duration::from_secs(90);
 /// 3 fichiers de 1 Mo au plus, comme le journal du backend.
@@ -63,6 +65,20 @@ fn montrer_la_fenetre(app: &AppHandle) {
         let _ = fenetre.show();
         let _ = fenetre.unminimize();
         let _ = fenetre.set_focus();
+    }
+}
+
+/// « Vérifier les mises à jour maintenant » (À propos) : redémarrer sur ce `BBASS.exe` en mode
+/// vérification, même parcours qu'au lancement (écran de démarrage, mise à jour, retour arrière).
+fn verifier_maintenant(app: &AppHandle) {
+    journaliser(app, "Vérification des mises à jour demandée depuis À propos");
+    let relance = std::env::current_exe().and_then(|exe| redemarrage::lancer(&exe, Lancement::Verification));
+    match relance {
+        Ok(()) => app.exit(0),
+        Err(erreur) => {
+            journaliser(app, &format!("Redémarrage pour vérifier les mises à jour impossible : {erreur}"));
+            montrer_la_fenetre(app);
+        }
     }
 }
 
@@ -126,8 +142,9 @@ impl Ecran<'_> {
 }
 
 /// `Err` : message pour l'utilisateur, la cause est au journal.
-fn demarrer_le_backend(fenetre: &WebviewWindow, exe: &Path) -> Result<(), &'static str> {
-    let sidecar = Sidecar::demarrer(exe).map_err(|erreur| {
+fn demarrer_le_backend(fenetre: &WebviewWindow, exe: &Path, lanceur: &Path) -> Result<(), &'static str> {
+    let version = fenetre.package_info().version.to_string();
+    let sidecar = Sidecar::demarrer(exe, &version, lanceur).map_err(|erreur| {
         journaliser(fenetre, &format!("Backend {} introuvable ou impossible à démarrer : {erreur}", exe.display()));
         "BBASS n'a pas pu démarrer : l'installation semble incomplète. Réinstallez BBASS."
     })?;
@@ -180,12 +197,13 @@ fn demarrer_le_poste(fenetre: WebviewWindow, lancement: Lancement) {
         Suite::Redemarrer => return redemarrer(&fenetre, &racine.join("BBASS.exe"), lancement),
         Suite::Demarrer { essai } => essai,
     };
-    match demarrer_le_backend(&fenetre, &mise_a_jour.backend()) {
+    match demarrer_le_backend(&fenetre, &mise_a_jour.backend(), &racine.join("BBASS.exe")) {
         Ok(()) => {
             if essai {
                 mise_a_jour.confirmer();
             }
-            let _ = fenetre.navigate(Url::parse(URL_POSTE).expect("URL locale valide"));
+            let url = if lancement == Lancement::Verification { URL_A_PROPOS } else { URL_POSTE };
+            let _ = fenetre.navigate(Url::parse(url).expect("URL locale valide"));
         }
         Err(_) if essai => {
             arreter_le_backend(&fenetre);
@@ -206,8 +224,14 @@ fn main() {
     }
     let app = tauri::Builder::default()
         // En premier : un second BBASS.exe rouvre la fenêtre du premier puis s'arrête,
-        // sans démarrer de second backend.
-        .plugin(tauri_plugin_single_instance::init(|app, _arguments, _dossier| montrer_la_fenetre(app)))
+        // sans démarrer de second backend ; lancé par le backend, il demande une vérification.
+        .plugin(tauri_plugin_single_instance::init(|app, arguments, _dossier| {
+            if demande_de_verification(arguments) {
+                verifier_maintenant(app);
+            } else {
+                montrer_la_fenetre(app);
+            }
+        }))
         .plugin(tauri_plugin_opener::init())
         .manage(Backend(Mutex::new(None)))
         .manage(journal())
@@ -217,7 +241,7 @@ fn main() {
             let fenetre = app
                 .get_webview_window("principale")
                 .expect("fenêtre déclarée dans tauri.conf.json");
-            if lancement == Lancement::AvecFenetre {
+            if lancement != Lancement::EnFond {
                 fenetre.show()?;
             }
             // Seul moment de mise à jour : jamais pendant que BBASS tourne en fond.

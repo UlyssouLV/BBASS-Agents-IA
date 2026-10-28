@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 
 import { BandeauMiseAJour } from "@/components/BandeauMiseAJour";
+import { AProposApresVerification } from "@/components/DialogueAPropos";
 import { MenuConfiguration } from "@/components/MenuConfiguration";
 import { PastilleServeurBbass } from "@/components/PastilleServeurBbass";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,7 @@ export function App() {
   return (
     <>
       <BandeauMiseAJour />
+      <AProposApresVerification />
       {_ecran()}
       <Toaster />
     </>

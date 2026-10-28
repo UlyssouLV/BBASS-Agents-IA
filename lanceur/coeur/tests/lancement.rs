@@ -1,4 +1,7 @@
-use bbass_lanceur_coeur::lancement::{processus_a_attendre, Lancement, ARGUMENT_ATTENDRE_FIN, ARGUMENT_DEMARRAGE_WINDOWS};
+use bbass_lanceur_coeur::lancement::{
+    demande_de_verification, processus_a_attendre, Lancement, ARGUMENT_ATTENDRE_FIN, ARGUMENT_DEMARRAGE_WINDOWS,
+    ARGUMENT_VERIFICATION,
+};
 
 fn lancement(arguments: &[&str]) -> Lancement {
     Lancement::depuis_arguments(arguments.iter().map(|a| a.to_string()))
@@ -38,4 +41,24 @@ fn un_lancement_ordinaire_n_attend_aucun_processus() {
 #[test]
 fn le_redemarrage_en_fond_reste_en_fond() {
     assert_eq!(lancement(&["BBASS.exe", ARGUMENT_DEMARRAGE_WINDOWS, ARGUMENT_ATTENDRE_FIN, "7"]), Lancement::EnFond);
+}
+
+#[test]
+fn verifier_les_mises_a_jour_maintenant_relance_avec_la_fenetre_sur_a_propos() {
+    assert_eq!(lancement(&["BBASS.exe", ARGUMENT_VERIFICATION, ARGUMENT_ATTENDRE_FIN, "7"]), Lancement::Verification);
+}
+
+#[test]
+fn la_verification_l_emporte_sur_le_demarrage_en_fond() {
+    // Demandée depuis le navigateur pendant que BBASS tourne en fond : la fenêtre rouvre quand même.
+    assert_eq!(lancement(&["BBASS.exe", ARGUMENT_DEMARRAGE_WINDOWS, ARGUMENT_VERIFICATION]), Lancement::Verification);
+}
+
+#[test]
+fn le_backend_demande_une_verification_par_l_instance_unique() {
+    // Arguments transmis au Lanceur en cours par le second BBASS.exe que lance le backend.
+    let arguments = |a: &[&str]| a.iter().map(|a| a.to_string()).collect::<Vec<_>>();
+    assert!(demande_de_verification(arguments(&[r"C:\BBASS\BBASS.exe", ARGUMENT_VERIFICATION])));
+    assert!(!demande_de_verification(arguments(&[r"C:\BBASS\BBASS.exe"])));
+    assert!(!demande_de_verification(arguments(&[ARGUMENT_VERIFICATION])));
 }

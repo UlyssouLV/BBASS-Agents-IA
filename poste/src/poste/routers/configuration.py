@@ -34,7 +34,7 @@ def get_ouvreur_de_dossier() -> Callable[[Path], None]:
     return _ouvrir_dans_l_explorateur
 
 
-def _etat(client: httpx.Client, adresse: str) -> EtatServeurBbassResponse:
+def etat_a_l_adresse(client: httpx.Client, adresse: str) -> EtatServeurBbassResponse:
     # Vert seulement sur 200 : un 503 « base injoignable » ne permet pas de chatter.
     try:
         reponse = client.get(f"{adresse}/sante")
@@ -64,7 +64,7 @@ def etat_du_serveur_bbass(client: httpx.Client = Depends(get_client_sante)) -> E
     adresse = config.adresse_serveur_bbass()
     if not adresse:
         return EtatServeurBbassResponse(joignable=False, version=None)
-    return _etat(client, adresse)
+    return etat_a_l_adresse(client, adresse)
 
 
 @router.get("/configuration")
@@ -76,7 +76,7 @@ def lire_configuration() -> ConfigurationResponse:
 def tester_la_connexion(
     requete: ServeurBbassRequest, client: httpx.Client = Depends(get_client_sante)
 ) -> EtatServeurBbassResponse:
-    return _etat(client, f"http://{requete.hote.strip()}:{requete.port}")
+    return etat_a_l_adresse(client, f"http://{requete.hote.strip()}:{requete.port}")
 
 
 @router.put("/configuration")

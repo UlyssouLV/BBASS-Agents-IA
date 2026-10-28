@@ -18,6 +18,10 @@ FICHIER_CONFIGURATION = Path(os.environ.get("LOCALAPPDATA", "")) / "BBASS" / "co
 FICHIER_ETAT_MISE_A_JOUR = FICHIER_CONFIGURATION.parent / "mise-a-jour.json"
 # Journaux du Lanceur et du backend, en mode paquet seulement.
 DOSSIER_JOURNAUX = FICHIER_CONFIGURATION.parent / "journaux"
+# Donnés par le Lanceur à son backend (lanceur/src/sidecar.rs) : version du
+# poste et exe à relancer pour « Vérifier les mises à jour maintenant ».
+VERSION_POSTE = os.environ.get("BBASS_VERSION") or None
+LANCEUR = os.environ.get("BBASS_LANCEUR") or None
 
 
 # Adresse prod par défaut du Serveur BBASS (spec 1.6.2, point 10), même

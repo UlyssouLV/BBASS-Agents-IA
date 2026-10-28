@@ -1,11 +1,12 @@
-//! Redémarrage sur un autre `BBASS.exe` après une bascule ou un retour arrière (ADR-0022).
+//! Redémarrage sur un autre `BBASS.exe` après une bascule ou un retour arrière (ADR-0022),
+//! ou sur le même pour « Vérifier les mises à jour maintenant ».
 
 use std::io;
 use std::path::Path;
 use std::process::Command;
 use std::time::Duration;
 
-use bbass_lanceur_coeur::lancement::{Lancement, ARGUMENT_ATTENDRE_FIN, ARGUMENT_DEMARRAGE_WINDOWS};
+use bbass_lanceur_coeur::lancement::{Lancement, ARGUMENT_ATTENDRE_FIN, ARGUMENT_DEMARRAGE_WINDOWS, ARGUMENT_VERIFICATION};
 
 /// Au-delà, le Lanceur partant est bloqué : l'instance unique dira s'il tourne encore.
 const ATTENTE_MAX: Duration = Duration::from_secs(30);
@@ -13,8 +14,14 @@ const ATTENTE_MAX: Duration = Duration::from_secs(30);
 /// Lance `exe`, qui attendra la fin de ce processus (instance unique) ; à l'appelant de quitter ensuite.
 pub fn lancer(exe: &Path, lancement: Lancement) -> io::Result<()> {
     let mut commande = Command::new(exe);
-    if lancement == Lancement::EnFond {
-        commande.arg(ARGUMENT_DEMARRAGE_WINDOWS);
+    match lancement {
+        Lancement::EnFond => {
+            commande.arg(ARGUMENT_DEMARRAGE_WINDOWS);
+        }
+        Lancement::Verification => {
+            commande.arg(ARGUMENT_VERIFICATION);
+        }
+        Lancement::AvecFenetre => {}
     }
     commande.arg(ARGUMENT_ATTENDRE_FIN).arg(std::process::id().to_string());
     commande.spawn().map(|_| ())

@@ -221,6 +221,15 @@ class DerniereVerificationResponse(BaseModel):
     bandeau: str | None
 
 
+class AProposResponse(BaseModel):
+    # version_poste nulle en dev (pas de Lanceur) ; version_serveur nulle si
+    # le Serveur BBASS est injoignable.
+    version_poste: str | None
+    version_serveur: str | None
+    derniere_verification: DerniereVerificationResponse | None
+    verification_possible: bool
+
+
 class ServeurBbassRequest(BaseModel):
     # Hôte (nom ou IPv4, sans schéma ni port) et port du Serveur BBASS.
     hote: str = Field(min_length=1, max_length=253, pattern=r"^\s*[A-Za-z0-9.\-]+\s*$")
