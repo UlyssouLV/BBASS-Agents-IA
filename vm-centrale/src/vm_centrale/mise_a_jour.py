@@ -11,7 +11,7 @@ import httpx
 from dotenv import dotenv_values
 
 from vm_centrale.installation import ENVIRONNEMENTS, NSENTER_HOTE, Chemins, refuser
-from vm_centrale.taches_planifiees import FICHIERS, ConfInvalide, lire_conf, planifier_taches
+from vm_centrale.taches_planifiees import FICHIERS, ConfInvalide, lire_conf, planifier_taches, timers_installes
 
 # Mise à jour d'un Environnement (spec 1.6.1, ADR-0021, #233), appelée par
 # la sous-commande `mettre-a-jour <env>` de vm_centrale.exploitation et par
@@ -29,6 +29,9 @@ IMAGES = {
 # création des tables compris).
 INTERVALLE_SANTE_SECONDES = 2.0
 _TENTATIVES_SANTE = 90
+# Par image : au-delà, le lien du cabinet est tenu pour coupé (la VM démarre
+# sur ce qu'elle a) et TimeoutStartSec de bbass-vm.service reste tenable.
+DELAI_TELECHARGEMENT_SECONDES = 600
 # Par Environnement, sous /opt/bbass/<env>/sauvegardes/ : une par
 # changement de version.
 SAUVEGARDES_GARDEES = 5
@@ -37,28 +40,47 @@ _ID_IMAGE = re.compile(r"sha256:([0-9a-f]{64})")
 # Réponses de GHCR à `docker pull` quand le paquet est privé ou l'étiquette
 # absente : le réseau marche, c'est la publication qu'il faut regarder.
 _REFUS_GHCR = re.compile(r"\b(denied|unauthorized|manifest unknown)\b")
+# Fichiers de deploiement/ lus d'une image en un seul conteneur, rendus en
+# JSON. python -c plutôt qu'une sous-commande : une image plus ancienne
+# (retour arrière) se lit pareil.
+_LIRE_FICHIERS = (
+    "import json, pathlib, sys; "
+    "print(json.dumps({f: pathlib.Path('/app/deploiement', f).read_text(encoding='utf-8') for f in sys.argv[1:]}))"
+)
 
 
 def interroger_hote(
-    commande: list[str], *, entree: IO[bytes] | None = None, sortie: IO[bytes] | None = None
+    commande: list[str],
+    *,
+    entree: IO[bytes] | None = None,
+    sortie: IO[bytes] | None = None,
+    delai: float | None = None,
 ) -> subprocess.CompletedProcess:
     # Contrairement à executer_sur_hote, un échec est une réponse : la mise
-    # à jour en décide (pas d'Internet, retour arrière…).
-    return subprocess.run(
-        [*NSENTER_HOTE, *commande],
-        stdin=entree,
-        stdout=sortie or subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        check=False,
-    )
+    # à jour en décide (pas d'Internet, retour arrière…). Délai dépassé : un
+    # échec comme un autre.
+    try:
+        return subprocess.run(
+            [*NSENTER_HOTE, *commande],
+            stdin=entree,
+            stdout=sortie or subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False,
+            timeout=delai,
+        )
+    except subprocess.TimeoutExpired:
+        return subprocess.CompletedProcess(commande, 124, "", f"interrompu après {delai:.0f} s")
 
 
 def lire_sante(url: str) -> str | None:
-    # Version servie si GET /sante répond 200, sinon None.
+    # Version servie si GET /sante répond 200 avec un objet, sinon None.
     try:
         reponse = httpx.get(url, timeout=3)
-        return reponse.json().get("version") if reponse.status_code == 200 else None
+        if reponse.status_code != 200:
+            return None
+        corps = reponse.json()
+        return corps.get("version") if isinstance(corps, dict) else None
     except (httpx.HTTPError, ValueError):
         return None
 
@@ -104,25 +126,18 @@ class _MiseAJour:
         interroger_hote(["logger", "-t", f"bbass-vm-{self.chemins.environnement}", message])
 
     def executer(self) -> None:
-        for reference in self.references.values():
-            telechargement = interroger_hote(["docker", "pull", reference])
-            if telechargement.returncode != 0:
-                # Au démarrage de la VM, le réseau peut manquer : la VM
-                # tourne quand même, sur ce qu'elle a.
-                erreur = telechargement.stderr.strip()
-                cause = (
-                    "refusé par GHCR (paquet privé ou étiquette absente)"
-                    if _REFUS_GHCR.search(erreur)
-                    else "impossible (pas d'Internet ?)"
-                )
-                self.dire(
-                    f"Téléchargement de {reference} {cause} : démarrage avec les images présentes. {erreur}".strip()
-                )
+        en_service = self._lire_en_service()
+        # Liste, pas générateur : chaque image est tentée.
+        complet = all([self._telecharger(reference) for reference in self.references.values()])
+        # Jamais une image neuve avec l'autre ancienne : ce couple n'a été ni
+        # publié ni essayé ensemble. Les étiquettes locales reviennent aux
+        # images en service.
+        if not complet and en_service is not None and not self._etiqueter(en_service):
+            self.echouer("Téléchargement incomplet et images en service absentes de l'hôte : rien n'est démarré.")
         identifiants = {nom: self._id_image(reference) for nom, reference in self.references.items()}
         presentes = {nom: image for nom, image in identifiants.items() if image is not None}
         if len(presentes) != len(IMAGES):
             self.echouer("Images absentes de l'hôte et téléchargement impossible : rien à démarrer.")
-        en_service = self._lire_en_service()
         # Premier démarrage après `installer` : rien à protéger ni à remettre.
         if en_service is None or presentes == en_service:
             version = self._deployer(presentes)
@@ -137,13 +152,33 @@ class _MiseAJour:
         self._noter_en_service(presentes)
         self.dire(f"{self.chemins.environnement} : version {version} en service.")
 
+    def _telecharger(self, reference: str) -> bool:
+        telechargement = interroger_hote(["docker", "pull", reference], delai=DELAI_TELECHARGEMENT_SECONDES)
+        if telechargement.returncode == 0:
+            return True
+        # Au démarrage de la VM, le réseau peut manquer : la VM tourne quand
+        # même, sur ce qu'elle a.
+        erreur = telechargement.stderr.strip()
+        cause = (
+            "refusé par GHCR (paquet privé ou étiquette absente)"
+            if _REFUS_GHCR.search(erreur)
+            else "impossible (pas d'Internet ?)"
+        )
+        self.dire(f"Téléchargement de {reference} {cause} : démarrage avec les images en service. {erreur}".strip())
+        return False
+
+    def _etiqueter(self, images: dict[str, str]) -> bool:
+        # Les étiquettes locales repointent sur ces images : le compose.yml
+        # (BBASS_ETIQUETTE) les démarre sans toucher au .env.
+        return all(
+            interroger_hote(["docker", "tag", image, self.references[nom]]).returncode == 0
+            for nom, image in images.items()
+        )
+
     def _revenir(self, precedentes: dict[str, str], raison: str) -> NoReturn:
-        # Les étiquettes locales repointent sur les images d'avant : le
-        # compose.yml (BBASS_ETIQUETTE) les redémarre sans toucher au .env.
         # La base n'est jamais restaurée ici (`restaurer`, à la main).
-        for nom, image in precedentes.items():
-            if interroger_hote(["docker", "tag", image, self.references[nom]]).returncode != 0:
-                self.echouer(f"{raison} Images précédentes absentes de l'hôte : aucun retour arrière possible.")
+        if not self._etiqueter(precedentes):
+            self.echouer(f"{raison} Images précédentes absentes de l'hôte : aucun retour arrière possible.")
         version = self._deployer(precedentes)
         if version is None:
             self.echouer(f"{raison} La version précédente ne répond pas non plus sur {self.url_sante}.")
@@ -156,14 +191,26 @@ class _MiseAJour:
     def _lire_en_service(self) -> dict[str, str] | None:
         if not self._fichier_en_service.is_file():
             return None
-        lues = json.loads(self._fichier_en_service.read_text(encoding="utf-8"))
+        try:
+            lues = json.loads(self._fichier_en_service.read_text(encoding="utf-8"))
+        except ValueError:
+            lues = None
+        if not isinstance(lues, dict):
+            lues = {}
         images = {nom: _id_image_valide(lues.get(nom)) for nom in IMAGES}
         if None in images.values():
             self.echouer(f"{self.chemins.dossier_hote}/images-en-service.json illisible : rien n'est modifié.")
         return images
 
     def _noter_en_service(self, images: dict[str, str]) -> None:
-        self._fichier_en_service.write_text(json.dumps(images), encoding="utf-8")
+        # Écrit à côté puis renommé : une coupure de courant laisse l'ancien
+        # fichier ou le nouveau, jamais un fichier tronqué.
+        provisoire = self._fichier_en_service.with_suffix(".tmp")
+        with open(provisoire, "w", encoding="utf-8") as fichier:
+            fichier.write(json.dumps(images))
+            fichier.flush()
+            os.fsync(fichier.fileno())
+        os.replace(provisoire, self._fichier_en_service)
 
     def _sauvegarder(self) -> bool:
         # Base de la version en service, avant que la nouvelle n'y touche.
@@ -201,8 +248,8 @@ class _MiseAJour:
 
     def _rafraichir_fichiers(self, image: str) -> bool:
         environnement = self.chemins.environnement
-        lus = {source: self._lire_dans_image(image, source) for source in ("compose.yml", "bbass-vm.service", *FICHIERS)}
-        if None in lus.values():
+        lus = self._lire_dans_image(image, ["compose.yml", "bbass-vm.service", *FICHIERS])
+        if lus is None:
             return False
         # Le .conf d'abord : invalide, rien n'est écrit (retour arrière).
         try:
@@ -223,12 +270,16 @@ class _MiseAJour:
         planifier_taches(self.chemins, lus.__getitem__, interroger_hote)
         return True
 
-    def _lire_dans_image(self, image: str, source: str) -> str | None:
-        lu = interroger_hote(["docker", "run", "--rm", "--entrypoint", "cat", image, f"/app/deploiement/{source}"])
-        if lu.returncode != 0:
-            self.dire(f"{source} illisible dans l'image {image} : {lu.stderr.strip()}")
+    def _lire_dans_image(self, image: str, sources: list[str]) -> dict[str, str] | None:
+        lu = interroger_hote(["docker", "run", "--rm", "--entrypoint", "python", image, "-c", _LIRE_FICHIERS, *sources])
+        try:
+            fichiers = json.loads(lu.stdout) if lu.returncode == 0 else None
+        except ValueError:
+            fichiers = None
+        if not isinstance(fichiers, dict) or not all(isinstance(fichiers.get(source), str) for source in sources):
+            self.dire(f"Fichiers de déploiement illisibles dans l'image {image} : {lu.stderr.strip()}")
             return None
-        return lu.stdout
+        return fichiers
 
     def _attendre_sante(self) -> str | None:
         for _ in range(_TENTATIVES_SANTE):
@@ -248,7 +299,19 @@ class _MiseAJour:
         )
         if confirmation.strip() != "restaurer":
             refuser("Restauration annulée : la base n'a pas été modifiée.")
-        # VM arrêtée : personne n'écrit pendant que la sauvegarde est rejouée.
+        # VM et tâches planifiées arrêtées : personne n'écrit pendant que la
+        # sauvegarde est rejouée. Les timers repartent quoi qu'il arrive.
+        timers = timers_installes(self.chemins)
+        if timers:
+            taches = [timer.removesuffix(".timer") + ".service" for timer in timers]
+            interroger_hote(["systemctl", "stop", *timers, *taches])
+        try:
+            self._rejouer(sauvegarde)
+        finally:
+            if timers:
+                interroger_hote(["systemctl", "start", *timers])
+
+    def _rejouer(self, sauvegarde: Path) -> None:
         interroger_hote([*self.compose, "stop", "vm-centrale"])
         if interroger_hote([*self.compose, "up", "-d", "--wait", "postgres"]).returncode != 0:
             self.echouer("Postgres ne démarre pas : la base n'a pas été modifiée.")

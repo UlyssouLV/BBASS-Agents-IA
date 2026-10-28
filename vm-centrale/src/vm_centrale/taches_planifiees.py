@@ -35,6 +35,12 @@ def lire_conf(contenu: str) -> dict[str, str]:
     return taches
 
 
+def timers_installes(chemins: Chemins) -> list[str]:
+    # Noms des timers de l'Environnement posés sur l'hôte.
+    dossier = chemins.ici(_DOSSIER_UNITES)
+    return sorted(timer.name for timer in dossier.glob(f"bbass-{chemins.environnement}-*.timer"))
+
+
 def planifier_taches(chemins: Chemins, lire: Callable[[str], str], executer: Callable[[list[str]], object]) -> None:
     # `lire` donne un fichier de FICHIERS (deploiement/ de l'image),
     # `executer` passe une commande à l'hôte.
@@ -54,9 +60,10 @@ def planifier_taches(chemins: Chemins, lire: Callable[[str], str], executer: Cal
             if not fichier.is_file() or fichier.read_text(encoding="utf-8") != contenu:
                 fichier.write_text(contenu, encoding="utf-8")
                 modifie = True
-    for timer in sorted(dossier.glob(f"{prefixe}*.timer")):
+    for nom_timer in timers_installes(chemins):
+        timer = dossier / nom_timer
         if timer.stem.removeprefix(prefixe) not in taches:
-            executer(["systemctl", "disable", "--now", timer.name])
+            executer(["systemctl", "disable", "--now", nom_timer])
             timer.unlink()
             timer.with_suffix(".service").unlink(missing_ok=True)
             modifie = True

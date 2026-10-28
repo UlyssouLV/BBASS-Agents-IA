@@ -35,6 +35,11 @@ jobs:
     env:
       VERSION: ${{ inputs.version }}
       DEPOTS: ghcr.io/ulyssoulv/bbass-vm-centrale ghcr.io/ulyssoulv/bbass-vm-searxng
+    # shell: bash explicite = bash -eo pipefail : l'échec d'un
+    # `imagetools inspect` n'est pas masqué par le jq qui le suit.
+    defaults:
+      run:
+        shell: bash
     steps:
       - name: Version au format vX.Y.Z
         run: |
@@ -50,13 +55,17 @@ jobs:
       # prod et l'autre non.
       - name: La version est passée par staging
         run: |
+          # Digest d'une étiquette ; échoue si elle est absente ou sans digest
+          # (jq -e : null refusé), jamais une chaîne vide.
+          digest() {
+            docker buildx imagetools inspect "$1" --format '{{json .Manifest}}' | jq -er '.digest | select(. != "")'
+          }
           for depot in $DEPOTS; do
-            if ! digest_version=$(docker buildx imagetools inspect "$depot:$VERSION" --format '{{json .Manifest}}' | jq -r .digest); then
+            if ! digest_version=$(digest "$depot:$VERSION"); then
               echo "::error::$depot:$VERSION n'existe pas : aucune Release $VERSION publiée. Promotion refusée."
               exit 1
             fi
-            if ! staging=$(docker buildx imagetools inspect "$depot:staging-$VERSION" --format '{{json .Manifest}}' | jq -r .digest) \
-                || [ "$staging" != "$digest_version" ]; then
+            if ! staging=$(digest "$depot:staging-$VERSION") || [ "$staging" != "$digest_version" ]; then
               echo "::error::$VERSION n'a jamais porté l'étiquette staging ($depot). Promotion refusée : publier d'abord la Release pour l'essayer en staging."
               exit 1
             fi
@@ -77,8 +86,8 @@ jobs:
             echo "| --- | --- |"
           } >> "$GITHUB_STEP_SUMMARY"
           for depot in $DEPOTS; do
-            digest_version=$(docker buildx imagetools inspect "$depot:$VERSION" --format '{{json .Manifest}}' | jq -r .digest)
-            prod=$(docker buildx imagetools inspect "$depot:prod" --format '{{json .Manifest}}' | jq -r .digest)
+            digest_version=$(docker buildx imagetools inspect "$depot:$VERSION" --format '{{json .Manifest}}' | jq -er .digest)
+            prod=$(docker buildx imagetools inspect "$depot:prod" --format '{{json .Manifest}}' | jq -er .digest)
             if [ "$prod" != "$digest_version" ]; then
               echo "::error::$depot:prod ($prod) ≠ $depot:$VERSION ($digest_version)."
               exit 1

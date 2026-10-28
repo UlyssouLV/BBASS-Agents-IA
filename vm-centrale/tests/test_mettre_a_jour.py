@@ -1,7 +1,9 @@
 import hashlib
+import json
 import subprocess
 from pathlib import Path
 
+import httpx
 import pytest
 
 from vm_centrale.exploitation import main
@@ -36,6 +38,8 @@ class FauxHote:
         self.internet = True
         # Paquet GHCR privé ou absent : GHCR répond `denied`.
         self.ghcr_refuse = False
+        # Références dont le téléchargement est coupé (les autres passent).
+        self.coupees: set[str] = set()
         self.en_service: str | None = None
         self.base = "base initiale"
         self.commandes: list[list[str]] = []
@@ -65,13 +69,14 @@ class FauxHote:
             return self.versions[self.en_service]
         return None
 
-    def __call__(self, commande: list[str], *, entree=None, sortie=None) -> subprocess.CompletedProcess:
+    def __call__(self, commande: list[str], *, entree=None, sortie=None, delai=None) -> subprocess.CompletedProcess:
         self.commandes.append(commande)
         code, texte, erreur = 0, "", ""
         match commande:
             case ["docker", "pull", reference]:
+                assert delai is not None, "docker pull sans délai"
                 # Messages d'erreur tels que `docker pull` les donne.
-                if not self.internet:
+                if not self.internet or reference in self.coupees:
                     code, erreur = 1, "dial tcp: lookup ghcr.io: network is unreachable"
                 elif self.ghcr_refuse:
                     code, erreur = 1, "Error response from daemon: error from registry: denied\ndenied"
@@ -86,8 +91,8 @@ class FauxHote:
                     code = 1
             case ["docker", "tag", image, reference]:
                 self.locales[reference] = image
-            case ["docker", "run", "--rm", "--entrypoint", "cat", image, chemin]:
-                texte = self.fichiers[image][chemin]
+            case ["docker", "run", "--rm", "--entrypoint", "python", image, "-c", _, *sources]:
+                texte = json.dumps({source: self.fichiers[image][f"/app/deploiement/{source}"] for source in sources})
             case ["docker", "compose", "--project-directory", _, *reste]:
                 if reste == ["up", "-d"]:
                     self.en_service = self.locales[f"{DEPOT_VM}:{self.etiquette}"]
@@ -225,6 +230,50 @@ def test_ghcr_refuse_le_dit_sans_parler_d_internet(racine, staging):
     assert all("privé" in message and "Internet" not in message for message in refus)
 
 
+def test_une_seule_image_telechargee_garde_le_couple_en_service(racine, staging):
+    # vm-centrale 1.6.2 et searxng 1.6.1 n'ont jamais été publiées ensemble.
+    staging.publier("1.6.2")
+    staging.coupees.add(f"{DEPOT_SEARXNG}:staging")
+
+    main(["mettre-a-jour", "staging"])
+
+    assert staging.en_service == _id("vm", "1.6.1")
+    assert staging.locales[f"{DEPOT_VM}:staging"] == _id("vm", "1.6.1")
+    assert staging.locales[f"{DEPOT_SEARXNG}:staging"] == _id("searxng", "1.6.1")
+    assert _sauvegardes(racine) == []
+    en_service = json.loads((_dossier(racine) / "images-en-service.json").read_text())
+    assert en_service == {"vm-centrale": _id("vm", "1.6.1"), "searxng": _id("searxng", "1.6.1")}
+
+
+def test_un_telechargement_trop_long_est_un_echec_comme_un_autre(monkeypatch):
+    from vm_centrale import mise_a_jour
+
+    def trop_long(commande, **options):
+        raise subprocess.TimeoutExpired(commande, options["timeout"])
+
+    monkeypatch.setattr(mise_a_jour.subprocess, "run", trop_long)
+
+    resultat = mise_a_jour.interroger_hote(["docker", "pull", "x"], delai=600)
+
+    assert resultat.returncode != 0
+    assert "600" in resultat.stderr
+
+
+def test_les_fichiers_de_deploiement_sont_lus_en_un_seul_conteneur(racine, staging):
+    main(["mettre-a-jour", "staging"])
+
+    assert len([commande for commande in staging.commandes if commande[:2] == ["docker", "run"]]) == 1
+
+
+@pytest.mark.parametrize("corps", [[], "ok", 42])
+def test_une_sante_qui_n_est_pas_un_objet_est_une_vm_qui_ne_repond_pas(monkeypatch, corps):
+    from vm_centrale import mise_a_jour
+
+    monkeypatch.setattr(mise_a_jour.httpx, "get", lambda _url, timeout: httpx.Response(200, json=corps))
+
+    assert mise_a_jour.lire_sante("http://localhost:8001/sante") is None
+
+
 @pytest.mark.parametrize("saine", [True, False])
 def test_le_env_est_identique_avant_et_apres_une_mise_a_jour(racine, staging, saine):
     env = _dossier(racine) / ".env"
@@ -252,6 +301,26 @@ def test_images_en_service_illisibles_refuse_sans_rien_toucher(racine, staging, 
     assert _sauvegardes(racine) == []
 
 
+@pytest.mark.parametrize("contenu", ["", '{"vm-centrale": "sha256:', "[]"])
+def test_images_en_service_tronquees_refuse_sans_trace_python(racine, staging, capsys, contenu):
+    (_dossier(racine) / "images-en-service.json").write_text(contenu)
+
+    with pytest.raises(SystemExit) as sortie:
+        main(["mettre-a-jour", "staging"])
+
+    assert sortie.value.code != 0
+    assert any("images-en-service.json" in message for message in staging.journal)
+    assert "images-en-service.json" in capsys.readouterr().err
+
+
+def test_images_en_service_est_remplace_d_un_coup(racine, staging):
+    staging.publier("1.6.2")
+
+    main(["mettre-a-jour", "staging"])
+
+    assert [fichier.name for fichier in _dossier(racine).glob("images-en-service*")] == ["images-en-service.json"]
+
+
 def _restaurer(monkeypatch, sauvegarde: str, confirmation: str = "restaurer") -> None:
     monkeypatch.setattr("builtins.input", lambda _invite="": confirmation)
     main(["restaurer", "staging", sauvegarde])
@@ -266,6 +335,31 @@ def test_restaurer_remet_la_base_dans_l_etat_de_la_sauvegarde(racine, staging, m
 
     assert staging.base == "base initiale"
     assert staging.en_service == _id("vm", "1.6.2")
+
+
+def test_restaurer_arrete_les_taches_planifiees_le_temps_de_la_remise(racine, staging, monkeypatch):
+    staging.publier("1.6.2")
+    main(["mettre-a-jour", "staging"])
+    staging.commandes.clear()
+
+    _restaurer(monkeypatch, _sauvegardes(racine)[0])
+
+    timer = "bbass-staging-purger-cache-pages.timer"
+    arret = staging.commandes.index(["systemctl", "stop", timer, "bbass-staging-purger-cache-pages.service"])
+    remise = next(i for i, commande in enumerate(staging.commandes) if "psql" in commande[-1])
+    reprise = staging.commandes.index(["systemctl", "start", timer])
+    assert arret < remise < reprise
+
+
+def test_restaurer_echoue_relance_quand_meme_les_taches_planifiees(racine, staging, monkeypatch):
+    staging.publier("1.6.2")
+    main(["mettre-a-jour", "staging"])
+    staging.saines.clear()
+
+    with pytest.raises(SystemExit):
+        _restaurer(monkeypatch, _sauvegardes(racine)[0])
+
+    assert staging.commandes[-1] == ["systemctl", "start", "bbass-staging-purger-cache-pages.timer"]
 
 
 def test_restaurer_sans_confirmation_ne_touche_pas_a_la_base(racine, staging, monkeypatch):
@@ -299,6 +393,17 @@ def test_le_service_de_l_environnement_lance_la_mise_a_jour_au_demarrage(racine,
 
 def _timers(racine: Path) -> list[str]:
     return sorted(fichier.name for fichier in (racine / "etc" / "systemd" / "system").glob("bbass-staging-*.timer"))
+
+
+def test_le_premier_demarrage_pose_un_timer_par_tache_planifiee(racine, staging):
+    systemd = racine / "etc" / "systemd" / "system"
+    timer = (systemd / "bbass-staging-purger-cache-pages.timer").read_text()
+    service = (systemd / "bbass-staging-purger-cache-pages.service").read_text()
+    assert "OnCalendar=hourly" in timer
+    (execution,) = [ligne for ligne in service.splitlines() if ligne.startswith("ExecStart=")]
+    assert execution.endswith("vm-centrale tache purger-cache-pages")
+    assert "WorkingDirectory=/opt/bbass/staging" in service
+    assert not (systemd / "bbass-prod-purger-cache-pages.timer").exists()
 
 
 def test_une_ligne_ajoutee_au_conf_cree_son_timer_a_la_mise_a_jour(racine, staging):

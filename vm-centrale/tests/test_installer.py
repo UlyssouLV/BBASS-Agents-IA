@@ -137,8 +137,17 @@ def test_installer_cree_l_admin_puis_pose_et_demarre_le_service(racine, hote, sa
     assert hote.index(creer_admin) < hote.index(demarrage)
 
 
-def test_les_valeurs_generees_sont_affichees_a_la_fin(racine, hote, saisies_masquees, monkeypatch, capsys):
-    _installer("staging", saisies_masquees)
+def test_les_valeurs_generees_sont_affichees_meme_si_le_premier_demarrage_echoue(
+    racine, saisies_masquees, monkeypatch, capsys
+):
+    def hote(commande: list[str]) -> None:
+        if commande[:3] == ["systemctl", "enable", "--now"]:
+            raise SystemExit(1)
+
+    monkeypatch.setattr("vm_centrale.installation.executer_sur_hote", hote)
+
+    with pytest.raises(SystemExit):
+        _installer("staging", saisies_masquees)
 
     sortie = capsys.readouterr().out
     env = _env(racine, "staging")
@@ -171,7 +180,9 @@ def test_configurer_secret_remplace_une_cle_relue_par_la_vm(racine, hote, saisie
     assert b"nouvelle-cle-mistral-42" not in (racine / "opt" / "bbass" / "staging" / ".env").read_bytes()
     _charger_env(monkeypatch, racine, "staging")
     assert get_mistral_api_key() == "nouvelle-cle-mistral-42"
-    assert ["systemctl", "restart", "bbass-vm-staging.service"] in hote
+    # La VM seule, sur ses images en service : jamais `mettre-a-jour`.
+    assert ["docker", "compose", "--project-directory", "/opt/bbass/staging", "up", "-d", "vm-centrale"] in hote
+    assert not any("restart" in commande for commande in hote)
 
 
 def test_configurer_secret_garde_les_autres_valeurs(racine, hote, saisies_masquees):
@@ -196,15 +207,10 @@ def test_configurer_secret_refuse_un_environnement_non_installe(racine, hote, sa
     assert _fichiers(racine) == []
 
 
-def test_installer_pose_un_timer_par_tache_planifiee(racine, hote, saisies_masquees):
+def test_installer_laisse_les_taches_planifiees_au_premier_demarrage(racine, hote, saisies_masquees):
+    # Posées par le `mettre-a-jour` du service, depuis l'image déployée
+    # (test_mettre_a_jour) : jamais deux fois, ni depuis une autre image.
     _installer("staging", saisies_masquees)
 
-    systemd = racine / "etc" / "systemd" / "system"
-    timer = (systemd / "bbass-staging-purger-cache-pages.timer").read_text()
-    service = (systemd / "bbass-staging-purger-cache-pages.service").read_text()
-    assert "OnCalendar=hourly" in timer
-    (execution,) = [ligne for ligne in service.splitlines() if ligne.startswith("ExecStart=")]
-    assert execution.endswith("vm-centrale tache purger-cache-pages")
-    assert "WorkingDirectory=/opt/bbass/staging" in service
-    assert ["systemctl", "enable", "--now", "bbass-staging-purger-cache-pages.timer"] in hote
-    assert not (systemd / "bbass-prod-purger-cache-pages.timer").exists()
+    assert not list((racine / "etc" / "systemd" / "system").glob("bbass-staging-*"))
+    assert not any(commande[-1].endswith(".timer") for commande in hote)

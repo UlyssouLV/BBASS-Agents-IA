@@ -18,9 +18,12 @@ RemainAfterExit=yes
 WorkingDirectory=/opt/bbass/{environnement}
 ExecStart=/usr/bin/docker run --rm --user root --privileged --pid=host --network host -v /:/hote ghcr.io/ulyssoulv/bbass-vm-centrale:{environnement} mettre-a-jour {environnement}
 ExecStop=/usr/bin/docker compose down
-# Téléchargement, sauvegarde, 3 min de /sante, et autant pour un retour
-# arrière.
-TimeoutStartSec=900
+# Pire cas de `mettre-a-jour`, chaque étape bornée par le code : 2 × 10 min
+# de téléchargement (DELAI_TELECHARGEMENT_SECONDES), sauvegarde, 2 × 7 min 30
+# de /sante (90 essais : 3 s de réponse + 2 s d'attente), pour la nouvelle
+# version puis le retour arrière. Coupé avant, le retour arrière resterait
+# à moitié fait.
+TimeoutStartSec=3600
 
 [Install]
 WantedBy=multi-user.target

@@ -181,6 +181,14 @@ def installer(environnement: str) -> None:
         **{variable: _chiffrer(valeur, cle_maitre) for variable, valeur in saisis.items()},
     }
     _ecrire_prive(chemins.env, "".join(f"{nom}={valeur}\n" for nom, valeur in lignes.items()), 0o600)
+    # Affichées dès qu'elles sont écrites : un échec plus loin (premier
+    # démarrage…) ne les fait pas perdre.
+    print()
+    print("Valeurs générées, affichées une seule fois : à ranger dans le gestionnaire de mots de passe du cabinet.")
+    print(f"  Mot de passe Postgres : {mot_de_passe_postgres}")
+    print(f"  Clé maître ({chemins.cle_maitre_hote}) : {cle_maitre.decode()}")
+    print(f"  VM_ADMIN_KEY : {vm_admin_key}")
+    print()
     deploiement = dossier_deploiement()
     shutil.copyfile(deploiement / "compose.yml", chemins.dossier / "compose.yml")
     unite = (deploiement / "bbass-vm.service").read_text(encoding="utf-8")
@@ -193,20 +201,12 @@ def installer(environnement: str) -> None:
         ["docker", "compose", "--project-directory", chemins.dossier_hote, "run", "--rm", "vm-centrale", "creer-admin"]
     )
     executer_sur_hote(["systemctl", "daemon-reload"])
+    # Le premier `mettre-a-jour` du service pose aussi les tâches planifiées,
+    # depuis l'image déployée.
     executer_sur_hote(["systemctl", "enable", "--now", chemins.service])
-    # Import à l'appel : taches_planifiees importe ce module.
-    from vm_centrale.taches_planifiees import planifier_taches
-
-    planifier_taches(
-        chemins, lambda fichier: (deploiement / fichier).read_text(encoding="utf-8"), executer_sur_hote
-    )
 
     print()
     print(f"Environnement {environnement} installé et démarré (port {config.port_hote}).")
-    print("Valeurs générées, affichées une seule fois : à ranger dans le gestionnaire de mots de passe du cabinet.")
-    print(f"  Mot de passe Postgres : {mot_de_passe_postgres}")
-    print(f"  Clé maître ({chemins.cle_maitre_hote}) : {cle_maitre.decode()}")
-    print(f"  VM_ADMIN_KEY : {vm_admin_key}")
 
 
 def configurer_secret(environnement: str, variable: str) -> None:
@@ -218,8 +218,13 @@ def configurer_secret(environnement: str, variable: str) -> None:
     autres = [ligne for ligne in lignes if not ligne.startswith(f"{variable}=")]
     # Réécrit en place : le fichier garde son mode (root seul).
     _ecrire(chemins.env, "".join(f"{ligne}\n" for ligne in [*autres, f"{variable}={valeur}"]))
-    executer_sur_hote(["systemctl", "restart", chemins.service])
-    print(f"{variable} remplacée ; {chemins.service} redémarré.")
+    # Le conteneur de la VM seul, recréé pour relire le .env (images en
+    # service) : redémarrer le service lancerait `mettre-a-jour`, donc une
+    # montée de version.
+    executer_sur_hote(
+        ["docker", "compose", "--project-directory", chemins.dossier_hote, "up", "-d", "vm-centrale"]
+    )
+    print(f"{variable} remplacée ; VM {environnement} redémarrée sur sa version en service.")
 
 
 def creer_admin(db: Session) -> None:
