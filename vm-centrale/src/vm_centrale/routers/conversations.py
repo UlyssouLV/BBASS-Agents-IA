@@ -82,10 +82,10 @@ from vm_centrale.moduleo.client import ClientModuleo, get_client_moduleo
 from vm_centrale.moduleo.ecritures import (
     cartes_par_message,
     detacher_de_la_conversation,
-    ecriture_confirmee,
     expirer,
     rattacher_ecritures_au_message,
     resultats_par_message,
+    routes_confirmees,
 )
 from vm_centrale.moduleo.droits import SANS_AUCUN_GROUPE, droits_du_compte
 from vm_centrale.moteur_recherche import MoteurRecherche, get_moteur_recherche
@@ -884,12 +884,10 @@ def _appliquer_garde_fous(
 
 
 def _annonce_une_ecriture(db: Session, conversation_id: int, reponse: str) -> bool:
-    # Une carte écrite en texte, ou une écriture dite faite alors qu'aucune
-    # de la Conversation n'a été confirmée (#252). Après une confirmation,
-    # le modèle peut redire son résultat (« Écrit dans Moduléo »).
-    return annonce_une_carte(reponse) or (
-        affirme_une_ecriture(reponse) and not ecriture_confirmee(db, conversation_id)
-    )
+    # Une carte ou une confirmation écrite en texte, ou une écriture dite
+    # faite (#252). Après une confirmation, le modèle peut redire son
+    # résultat (« Écrit dans Moduléo »), pas en annoncer une autre (#259).
+    return annonce_une_carte(reponse) or affirme_une_ecriture(reponse, routes_confirmees(db, conversation_id))
 
 
 def _identite_connue(compte: Compte | None) -> str:

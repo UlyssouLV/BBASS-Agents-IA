@@ -139,15 +139,14 @@ def expirer(db: Session, conversation_id: int) -> None:
     ).update({EcritureModuleo.statut: EXPIREE, EcritureModuleo.date_decision: _maintenant()})
 
 
-def ecriture_confirmee(db: Session, conversation_id: int) -> bool:
-    # Une écriture de la Conversation déjà écrite dans Moduléo (#252) : le
-    # modèle peut alors dire, d'après son résultat, qu'elle est faite.
-    return (
-        db.query(EcritureModuleo.id)
-        .filter(EcritureModuleo.conversation_id == conversation_id, EcritureModuleo.statut == CONFIRMEE)
-        .first()
-        is not None
+def routes_confirmees(db: Session, conversation_id: int) -> list[str]:
+    # Route de chaque écriture de la Conversation déjà écrite dans Moduléo
+    # (#252) : le modèle peut redire, d'après son résultat, qu'elle est
+    # faite, pour son seul élément (#259).
+    lignes = db.query(EcritureModuleo.route).filter(
+        EcritureModuleo.conversation_id == conversation_id, EcritureModuleo.statut == CONFIRMEE
     )
+    return [route for (route,) in lignes]
 
 
 def ids_renvoyes(db: Session, conversation_id: int) -> set[tuple[str, str]]:

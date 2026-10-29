@@ -1296,19 +1296,91 @@ def test_carte_ouverte_la_reponse_ne_dit_pas_l_ecriture_faite(
     assert _ECRIRE_IMPOSE not in mistral_client_factice.tool_choices_appels_reponse
 
 
+@pytest.mark.parametrize(
+    "resultat", ["Le téléphone a été ajouté dans Moduléo.", "Écrit dans Moduléo.", "Le numéro est enregistré."]
+)
 def test_apres_une_confirmation_le_modele_peut_redire_l_ecriture_faite(
-    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide, resultat
 ):
     conversation_id, ecriture_id = _une_carte(client, faux_moduleo, mistral_client_factice, jeton_valide)
     _decider(client, jeton_valide, ecriture_id)
-    mistral_client_factice.repondre("Le téléphone a été ajouté dans Moduléo.", resume_et_profil=_resume_et_profil())
+    mistral_client_factice.repondre(resultat, resume_et_profil=_resume_et_profil())
 
     reponse = client.post(
         f"/conversations/{conversation_id}/messages", json={"message": "C'est fait ?"}, headers=_autorisation(jeton_valide)
     )
 
-    assert fin(reponse)["reponse"] == "Le téléphone a été ajouté dans Moduléo."
+    assert fin(reponse)["reponse"] == resultat
     assert _ECRIRE_IMPOSE not in mistral_client_factice.tool_choices_appels_reponse
+
+
+def test_apres_une_confirmation_une_autre_ecriture_dite_faite_relancee_puis_phrase_fixe(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide
+):
+    # Second passage de #206 (#259) : « La note … est supprimée. » après un
+    # téléphone confirmé, alors que la note existe toujours.
+    conversation_id, ecriture_id = _une_carte(client, faux_moduleo, mistral_client_factice, jeton_valide)
+    _decider(client, jeton_valide, ecriture_id)
+    faux_moduleo.ajouter_note(5, "Rappeler le client", IdContact=40, IdAffaire=12, TypeNote=1)
+    supprimee = "La note Rappeler le client est supprimée."
+    mistral_client_factice.repondre_a_l_outil_impose(_ECRIRE, _supprimer(_NOTE, idNote=5))
+    mistral_client_factice.repondre(supprimee, supprimee, resume_et_profil=_resume_et_profil())
+
+    reponse = client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Supprime la note Rappeler le client"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert mistral_client_factice.tool_choices_appels_reponse.count(_ECRIRE_IMPOSE) == 1
+    assert _cartes(reponse) == []
+    assert fin(reponse)["reponse"].startswith("Aucune carte de confirmation n'a été ouverte")
+    # Seul le téléphone confirmé a été écrit.
+    assert len(faux_moduleo.ecritures) == 1
+
+
+@pytest.mark.parametrize(
+    "confirmation",
+    [
+        "Souhaitez-vous que je procède à la saisie du téléphone du bureau ?",
+        "Confirmez l'ajout du téléphone du bureau au contact Étude Dupont.",
+        "L'écriture est prête à être confirmée par vos soins. Validez-la sur la carte qui s'affiche.",
+    ],
+)
+def test_confirmation_demandee_en_texte_relance_et_la_carte_s_ouvre(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide, confirmation
+):
+    # #256 point 3, second passage de #206 (#259) : la carte est la
+    # confirmation.
+    _contact_et_affaire(faux_moduleo)
+
+    reponse = _annoncer(
+        client, mistral_client_factice, jeton_valide, confirmation, "Voici la carte.", force=_telephone()
+    )
+
+    assert mistral_client_factice.tool_choices_appels_reponse[:2] == [None, _ECRIRE_IMPOSE]
+    assert len(_cartes(reponse)) == 1
+    assert fin(reponse)["reponse"] == "Voici la carte."
+
+
+def test_carte_ouverte_la_fausse_carte_en_texte_a_cote_part(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide
+):
+    # Second passage de #206 (#259) : route, paramètre et corps écrits à
+    # côté de la vraie carte, avec un id.
+    _contact_et_affaire(faux_moduleo)
+    texte = (
+        "Voici l'ajout du téléphone.\n"
+        "Route : POST moduleo/telephone\n"
+        "Paramètre : idTelephone = 152\n"
+        "Corps : Lieu = Bureau\n"
+        "Confirmez ou annulez sur la carte."
+    )
+
+    reponse = _proposer(client, mistral_client_factice, jeton_valide, _telephone(), reponse=texte)
+
+    assert len(_cartes(reponse)) == 1
+    assert fin(reponse)["reponse"] == "Voici l'ajout du téléphone.\nConfirmez ou annulez sur la carte."
 
 
 def test_apres_une_confirmation_l_id_renvoye_cite_ne_laisse_pas_de_phrase_coupee(
