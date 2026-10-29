@@ -24,6 +24,8 @@ Créations (POST), modifications (PUT) et suppressions (DELETE) passent toutes p
 Quand le modèle appelle `ecrire_moduleo`, une carte apparaît dans le fil, pendant la réponse :
 
 - ce qui sera écrit, **en noms** : l’affaire devient « affaire 2024-123 », le contact « Étude Dupont », l’utilisateur « Jean Martin ». Un id qu’aucun résolveur ne sait nommer s’affiche brut, avec « non résolu » ;
+- un id que Moduléo ne trouve pas (une catégorie qui n’existe pas…) n’ouvre pas de carte : le modèle doit demander au collaborateur l’élément voulu plutôt que d’essayer un autre id ;
+- certaines catégories (de tâche à faire, de note) ne se lisent que par leur id : le chat ne sait pas les retrouver à partir de leur nom (« Terrain » ne suffit pas). Le modèle le dit, et propose l’écriture sans catégorie si elle est facultative ;
 - pour une **modification**, la VM relit d’abord l’élément dans Moduléo ; la carte montre l’élément visé (sa fiche de lecture, sinon ses champs en noms), puis seulement ce qui change, champ par champ, ancien → nouveau (« Libellé : Bornage → Bornage lot B ») ; un champ vidé s’affiche « (vide) ». Un corps qui ne change rien n’ouvre pas de carte ;
 - pour une **suppression**, la carte montre l’élément entier sous **« Sera supprimé »** : sa fiche de lecture (temps passé, tâche du planning), sinon ses champs en noms ;
 - un élément introuvable à la relecture, ou que le compte n’a pas le droit de lire, n’ouvre pas de carte : le modèle reçoit une phrase fixe et rien n’est envoyé ;

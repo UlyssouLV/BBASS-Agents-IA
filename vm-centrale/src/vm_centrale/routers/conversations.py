@@ -362,7 +362,9 @@ _MESSAGE_IDS_MODULEO = {
         "Les fiches Moduléo portent l'id de chaque élément au format [id Moduléo <n>], "
         "réservé à tes outils. Ne cite jamais un id Moduléo dans ta réponse, sous aucune "
         "forme : nomme chaque élément par sa référence (numéro d'affaire, de devis ou de "
-        "facture, nom du contact, date du temps passé, libellé et date de la tâche)."
+        "facture, nom du contact, date du temps passé, libellé et date de la tâche). "
+        "N'annonce pas non plus l'id, ni « sous l'id … » ni « numéro … » : dis seulement "
+        "que l'élément est enregistré, sans tournure qui introduirait un id."
     ),
 }
 

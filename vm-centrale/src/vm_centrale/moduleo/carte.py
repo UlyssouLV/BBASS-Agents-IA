@@ -11,6 +11,7 @@ from vm_centrale.moduleo.resolution import (
     resoudre_communes,
     resoudre_contacts,
     resoudre_equipements,
+    resoudre_libelles,
     resoudre_participants,
     resoudre_utilisateurs,
 )
@@ -19,7 +20,8 @@ from vm_centrale.moduleo.resolution import (
 # corps et chaque paramètre de la route, en noms. Un id est nommé par les
 # résolveurs existants d'après le nom de son champ ; un id qu'aucun ne sait
 # nommer (champ inconnu, élément introuvable, lecture refusée ou en panne)
-# s'affiche brut, avec « non résolu ».
+# s'affiche brut, avec « non résolu ». Un id qu'un résolveur a cherché
+# sans que Moduléo le trouve empêche la carte (`IdIntrouvable`, #254).
 #
 # PUT (#205) : les seuls champs du corps qui changent l'élément relu,
 # ancien (`avant`) → nouveau, un champ vide valant « (vide) », sous la
@@ -35,6 +37,12 @@ VIDE = "(vide)"
 _IGNORES = {"ProprietesModifiees"}
 # Erreurs d'un résolveur : l'id reste non résolu.
 _ILLISIBLE = (DroitManquant, ErreurModuleo, RequeteInterdite, KeyError, TypeError, ValueError)
+
+
+class IdIntrouvable(Exception):
+    # Un id proposé que Moduléo ne trouve pas (#254) : « Catégorie 3 ».
+    def __init__(self, champ: str, id_element: int) -> None:
+        super().__init__(f"{champ} {id_element}")
 
 
 def _multi(lecteur: LecteurModuleo, route: str, ids: Iterable[int]) -> list[dict]:
@@ -53,7 +61,7 @@ def _devis(lecteur: LecteurModuleo, ids: Iterable[int]) -> dict[int, str]:
 
 
 def _utilisateurs(lecteur: LecteurModuleo, ids: Iterable[int]) -> dict[int, str]:
-    return {i: u.nom for i, u in resoudre_utilisateurs(lecteur, ids).items() if u.nom}
+    return {i: u.nom for i, u in resoudre_utilisateurs(lecteur, ids).items()}
 
 
 def _activites(lecteur: LecteurModuleo, ids: Iterable[int]) -> dict[int, str]:
@@ -62,11 +70,25 @@ def _activites(lecteur: LecteurModuleo, ids: Iterable[int]) -> dict[int, str]:
 
 Resolveur = Callable[[LecteurModuleo, Iterable[int]], dict[int, str]]
 
+
+def _par_id(route: str, parametre: str) -> Resolveur:
+    # Élément sans route `multi` : son libellé, lu id par id (#254).
+    return lambda lecteur, ids: resoudre_libelles(lecteur, route, parametre, ids)
+
+
 # Nom du champ (casse indifférente) → résolveur de son id ou de ses ids.
 _RESOLVEURS: dict[str, Resolveur] = {
     **dict.fromkeys(("idaffaire", "idsaffaires"), _affaires),
     **dict.fromkeys(
-        ("idcontact", "idclient", "idrepresentant", "idscontacts", "idcontactlie", "iddestinataire"),
+        (
+            "idcontact",
+            "idclient",
+            "idrepresentant",
+            "idscontacts",
+            "idcontactlie",
+            "iddestinataire",
+            "idcontactparent",
+        ),
         resoudre_contacts,
     ),
     **dict.fromkeys(
@@ -80,15 +102,26 @@ _RESOLVEURS: dict[str, Resolveur] = {
             "idacteurencharge",
             "idsdestinataires",
             "idsutilisateurs",
+            "idutilisateursaffectes",
+            "ideffectueepar",
+            "iduser",
         ),
         _utilisateurs,
     ),
-    "idcommune": resoudre_communes,
+    **dict.fromkeys(("idcommune", "idcommunenaissance", "idcommuneenregistrementrcs"), resoudre_communes),
     "idcodeactivite": resoudre_codes_activite,
     "idactivite": _activites,
     "iddevis": _devis,
     "participants": resoudre_participants,
     "equipements": resoudre_equipements,
+    "idcategorietacheafaire": _par_id(
+        "moduleo/categorietacheafaire/{idCategorieTacheAFaire}", "idCategorieTacheAFaire"
+    ),
+    "idcategorienote": _par_id("cogeo/categorienote/{idCategorieNote}", "idCategorieNote"),
+    "idsite": _par_id("moduleo/site/{idSite}", "idSite"),
+    "idservice": _par_id("moduleo/service/{idService}", "idService"),
+    "idlieu": _par_id("cogeo/lieu/{idLieu}", "idLieu"),
+    "idtypefrais": _par_id("cogeo/typefrais/{idTypeFrais}", "idTypeFrais"),
 }
 
 
@@ -149,8 +182,9 @@ def _feuille(champ: str) -> str:
 
 
 def _resoudre(lecteur: LecteurModuleo, champs: list[tuple[str, Any]]) -> dict[str, dict[int, str]]:
-    # Par résolveur, tous les ids de la carte en une fois. Une lecture
-    # refusée ou en panne laisse ses ids non résolus.
+    # Par résolveur, tous les ids de la carte en une fois : id → nom, vide
+    # pour un élément trouvé sans nom. Une lecture refusée ou en panne
+    # laisse ses ids non résolus : son résolveur n'a pas de clé.
     a_resoudre: dict[str, list[int]] = {}
     for champ, valeur in champs:
         cle = _feuille(champ).casefold()
@@ -161,8 +195,18 @@ def _resoudre(lecteur: LecteurModuleo, champs: list[tuple[str, Any]]) -> dict[st
         try:
             noms[cle] = _RESOLVEURS[cle](lecteur, ids)
         except _ILLISIBLE:
-            noms[cle] = {}
+            continue
     return noms
+
+
+def _verifier_trouves(champs: list[tuple[str, Any]], noms: dict[str, dict[int, str]]) -> None:
+    # Les ids proposés qu'un résolveur a cherchés doivent exister (#254).
+    for champ, valeur in champs:
+        cle = _feuille(champ).casefold()
+        if cle in noms and not _vide(_feuille(champ), valeur):
+            for id_element in _ids(valeur):
+                if id_element and id_element not in noms[cle]:
+                    raise IdIntrouvable(_libelle_complet(champ), id_element)
 
 
 def _libelle_complet(champ: str) -> str:
@@ -177,12 +221,17 @@ def _en_noms(champ: str, valeur: Any, noms: dict[str, dict[int, str]]) -> str:
     if _est_un_id(feuille):
         connus = noms.get(feuille.casefold(), {})
         ids = _ids(valeur) or [valeur]
-        return ", ".join(connus[i] if i in connus else f"{i} ({NON_RESOLU})" for i in ids)
+        return ", ".join(connus.get(i) or f"{i} ({NON_RESOLU})" for i in ids)
     return _texte(valeur)
 
 
-def _lignes(lecteur: LecteurModuleo, champs: list[tuple[str, Any]]) -> list[dict[str, str]]:
+def _lignes(
+    lecteur: LecteurModuleo, champs: list[tuple[str, Any]], proposes: bool = True
+) -> list[dict[str, str]]:
+    # `proposes` : les valeurs viennent du modèle, pas de l'élément relu.
     noms = _resoudre(lecteur, champs)
+    if proposes:
+        _verifier_trouves(champs, noms)
     return [{"champ": _libelle_complet(champ), "valeur": _en_noms(champ, valeur, noms)} for champ, valeur in champs]
 
 
@@ -236,6 +285,7 @@ def differences_en_noms(
     # Champs du corps, dans son ordre, dont la valeur change l'élément relu.
     changes = [(champ, ancien, nouveau) for _, champ, ancien, nouveau in _changements(existant, corps, identites)]
     noms = _resoudre(lecteur, [(champ, v) for champ, ancien, nouveau in changes for v in (ancien, nouveau)])
+    _verifier_trouves([(champ, nouveau) for champ, _, nouveau in changes], noms)
     return [
         {
             "champ": _libelle_complet(champ),
@@ -293,7 +343,7 @@ def element_en_noms(
     if route_lue in _FICHES:
         return retirer_ids_moduleo(_FICHES[route_lue](lecteur, element, droits)), []
     champs = [(champ, valeur) for champ, valeur in _aplatir(element) if _feuille(champ).casefold() not in identites]
-    return None, _lignes(lecteur, champs)
+    return None, _lignes(lecteur, champs, proposes=False)
 
 
 def fiche_en_noms(

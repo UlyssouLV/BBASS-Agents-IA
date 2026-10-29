@@ -7,7 +7,7 @@ from flux_sse import evenements, fin
 
 from vm_centrale.main import app
 from vm_centrale.moduleo.client import ClientModuleo, get_client_moduleo
-from vm_centrale.models import DroitModuleo, EchangeInspecteur, EcritureModuleo, GroupeModuleo, GroupeModuleoDroit
+from vm_centrale.models import DroitModuleo, EchangeInspecteur, EcritureModuleo, GroupeModuleo, GroupeModuleoDroit, Message
 from vm_centrale.moduleo.client import (
     ModuleoDonneesRefusees,
     ModuleoIndisponible,
@@ -161,6 +161,68 @@ def test_decrire_route_du_telephone_avec_son_exemple(
     assert '"Numero": "sample string 1"' in resultat
 
 
+_SANS_RECHERCHE = (
+    "Champs sans moyen de retrouver l'id à partir d'un nom (l'API ne les lit que par id) : {champs}. "
+    "Ne devine jamais leur valeur : utilise seulement un id donné par le collaborateur. Sinon, dis-lui "
+    "qu'il n'existe pas, depuis le chat, de moyen de retrouver l'élément à partir de son nom, et propose "
+    "l'écriture sans ce champ s'il est facultatif."
+)
+
+
+@pytest.mark.parametrize(
+    ("route", "champs"),
+    [("POST moduleo/tacheafaire", "IdCategorieTacheAFaire"), ("PUT cogeo/note/{idNote}", "IdCategorieNote")],
+)
+def test_decrire_signale_les_champs_sans_moyen_de_retrouver_l_id_par_un_nom(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide, route, champs
+):
+    mistral_client_factice.repondre_avec_appel_outil(_DECRIRE, {"route": route})
+    mistral_client_factice.repondre("Voici les champs.", "Titre")
+
+    client.post("/conversations", json={"message": "Quels champs ?"}, headers=_autorisation(jeton_valide))
+
+    assert _resultat_outil(mistral_client_factice).endswith(_SANS_RECHERCHE.format(champs=champs))
+
+
+def test_decrire_sans_champ_de_ce_genre_ne_signale_rien(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide
+):
+    mistral_client_factice.repondre_avec_appel_outil(_DECRIRE, {"route": _TELEPHONE})
+    mistral_client_factice.repondre("Voici les champs.", "Titre")
+
+    client.post("/conversations", json={"message": "Quels champs ?"}, headers=_autorisation(jeton_valide))
+
+    assert "Champs sans moyen" not in _resultat_outil(mistral_client_factice)
+
+
+def test_categorie_terrain_demandee_par_son_nom_pas_de_carte_devinee(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide, db_session
+):
+    # Tests humains #206 : « catégorie Terrain ». Le modèle lit les champs,
+    # apprend que la catégorie ne se retrouve pas par son nom, et le dit
+    # sans proposer de carte.
+    faux_moduleo.ajouter_categorie_tache_a_faire(1, "Terrain")
+    mistral_client_factice.repondre_avec_appel_outil(_DECRIRE, {"route": "POST moduleo/tacheafaire"})
+    reponse_du_modele = (
+        "Il n'existe pas, depuis le chat, de moyen de retrouver la catégorie « Terrain » à partir de son nom. "
+        "Je peux créer la tâche sans catégorie."
+    )
+    mistral_client_factice.repondre(reponse_du_modele, "Titre")
+
+    reponse = client.post(
+        "/conversations",
+        json={"message": "Crée une tâche à faire « Relevé sur place », catégorie Terrain"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert "IdCategorieTacheAFaire" in _resultat_outil(mistral_client_factice)
+    assert "Ne devine jamais leur valeur" in _resultat_outil(mistral_client_factice)
+    assert _cartes(reponse) == []
+    assert fin(reponse)["reponse"] == reponse_du_modele
+    assert faux_moduleo.appels == [] and faux_moduleo.ecritures == []
+    assert _journal(db_session) == []
+
+
 @pytest.mark.parametrize("route", ["POST moduleo/inconnue", "POST webhook", "cogeo/note", "DELETE webhook"])
 def test_decrire_route_inconnue_ou_fermee_phrase_fixe(
     client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide, route
@@ -208,14 +270,15 @@ def test_ecrire_n_envoie_rien_et_la_carte_arrive_en_noms(
     assert noms.index("carte") < noms.index("fin")
 
 
-def test_carte_nomme_affaire_et_utilisateur_et_signale_un_id_non_resolu(
+def test_carte_nomme_affaire_utilisateur_et_categorie_de_note(
     client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide
 ):
     _contact_et_affaire(faux_moduleo)
+    faux_moduleo.ajouter_categorie_note(3, "Rendez-vous")
     note = {
         "route": "POST cogeo/note",
         "parametres": {},
-        "corps": {"Message": "Rappeler le client", "IdAffaire": 12, "IdsDestinataires": [7, 99], "IdCategorieNote": 3},
+        "corps": {"Message": "Rappeler le client", "IdAffaire": 12, "IdsDestinataires": [7], "IdCategorieNote": 3},
     }
 
     reponse = _proposer(client, mistral_client_factice, jeton_valide, note)
@@ -224,10 +287,68 @@ def test_carte_nomme_affaire_et_utilisateur_et_signale_un_id_non_resolu(
     assert carte["lignes"] == [
         {"champ": "Message", "valeur": "Rappeler le client", "avant": None},
         {"champ": "Affaire", "valeur": "affaire 2024-123", "avant": None},
-        {"champ": "Destinataires", "valeur": "Jean Martin, 99 (non résolu)", "avant": None},
-        {"champ": "CategorieNote", "valeur": "3 (non résolu)", "avant": None},
+        {"champ": "Destinataires", "valeur": "Jean Martin", "avant": None},
+        {"champ": "CategorieNote", "valeur": "Rendez-vous", "avant": None},
     ]
     assert faux_moduleo.ecritures == []
+
+
+def _tache_a_faire(**corps) -> dict:
+    return {
+        "route": "POST moduleo/tacheafaire",
+        "parametres": {},
+        "corps": {"Libelle": "Relevé sur place", "IdCategorieTacheAFaire": 1, "IdUtilisateursAffectes": [7], **corps},
+    }
+
+
+def test_carte_d_une_tache_a_faire_nomme_sa_categorie_et_signale_un_id_non_resolu(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide
+):
+    # Tests humains #206 : « 1 (non résolu) » cachait une catégorie inventée.
+    _contact_et_affaire(faux_moduleo)
+    faux_moduleo.ajouter_categorie_tache_a_faire(1, "Terrain")
+
+    tache = _tache_a_faire(IdEffectueePar=7, IdGedElement=8)
+
+    reponse = _proposer(client, mistral_client_factice, jeton_valide, tache)
+
+    (carte,) = _cartes(reponse)
+    # Un id qu'aucun résolveur ne sait nommer reste affiché brut.
+    assert carte["lignes"] == [
+        {"champ": "Libelle", "valeur": "Relevé sur place", "avant": None},
+        {"champ": "CategorieTacheAFaire", "valeur": "Terrain", "avant": None},
+        {"champ": "UtilisateursAffectes", "valeur": "Jean Martin", "avant": None},
+        {"champ": "EffectueePar", "valeur": "Jean Martin", "avant": None},
+        {"champ": "GedElement", "valeur": "8 (non résolu)", "avant": None},
+    ]
+
+
+@pytest.mark.parametrize(
+    ("corps", "phrase"),
+    [
+        ({"IdCategorieTacheAFaire": 3}, "CategorieTacheAFaire 3"),
+        ({"IdUtilisateursAffectes": [7, 99]}, "UtilisateursAffectes 99"),
+        ({"IdAffaire": 404}, "Affaire 404"),
+    ],
+    ids=["categorie-null", "utilisateur-404", "affaire-absente-du-multi"],
+)
+def test_id_introuvable_dans_moduleo_pas_de_carte_et_demander_au_collaborateur(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide, db_session, corps, phrase
+):
+    # Tests humains #206 : la catégorie 3 n'existe pas ; Moduléo a refusé
+    # l'écriture confirmée (403). Elle ne doit plus arriver sur une carte.
+    _contact_et_affaire(faux_moduleo)
+    faux_moduleo.ajouter_categorie_tache_a_faire(1, "Terrain")
+
+    reponse = _proposer(client, mistral_client_factice, jeton_valide, _tache_a_faire(**corps))
+
+    assert _cartes(reponse) == []
+    assert faux_moduleo.ecritures == []
+    assert _journal(db_session) == []
+    assert _resultat_outil(mistral_client_factice) == (
+        f"Élément introuvable dans Moduléo : {phrase}. Écriture non proposée. Rien n'a été écrit. "
+        "N'essaie pas un autre id : demande au collaborateur quel élément il veut."
+    )
 
 
 def test_ecrire_sans_le_droit_refuse_phrase_fixe_sans_carte(
@@ -969,6 +1090,26 @@ def test_apres_une_confirmation_le_modele_peut_redire_l_ecriture_faite(
 
     assert fin(reponse)["reponse"] == "Le téléphone a été ajouté dans Moduléo."
     assert _ECRIRE_IMPOSE not in mistral_client_factice.tool_choices_appels_reponse
+
+
+def test_apres_une_confirmation_l_id_renvoye_cite_ne_laisse_pas_de_phrase_coupee(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide, db_session
+):
+    # Tests humains #206 : « … enregistrée dans Moduléo sous l'. ».
+    conversation_id, ecriture_id = _une_carte(client, faux_moduleo, mistral_client_factice, jeton_valide)
+    _decider(client, jeton_valide, ecriture_id)
+    mistral_client_factice.repondre(
+        "Le téléphone est enregistré dans Moduléo sous l'[id Moduléo 4].", resume_et_profil=_resume_et_profil()
+    )
+
+    reponse = client.post(
+        f"/conversations/{conversation_id}/messages", json={"message": "C'est fait ?"}, headers=_autorisation(jeton_valide)
+    )
+
+    assert "id Moduléo" not in reponse.text
+    assert fin(reponse)["reponse"] == "Le téléphone est enregistré dans Moduléo."
+    dernier = db_session.query(Message).filter(Message.role == "assistant").order_by(Message.id.desc()).first()
+    assert dernier.contenu == "Le téléphone est enregistré dans Moduléo."
 
 
 def test_fausse_carte_au_message_suivant_aussi_relancee(

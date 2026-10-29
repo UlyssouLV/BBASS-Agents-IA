@@ -76,6 +76,10 @@ class FauxModuleo:
         self._proprietaires: dict[int, dict] = {}
         # Notes, relues avant leur modification ou suppression (#208).
         self._notes: dict[int, dict] = {}
+        # Catégories lues seulement par id (#254) : `null`, et non 404,
+        # pour un id inconnu, comme Moduléo.
+        self._categories_tache: dict[int, dict] = {}
+        self._categories_note: dict[int, dict] = {}
         self._filtre_utilisateurs = True
         self._exception: Exception | None = None
 
@@ -407,6 +411,12 @@ class FauxModuleo:
         # IdAffaire, TypeNote, IdCategorieNote…
         self._notes[id_note] = {"IdNote": id_note, "Message": message, **champs}
 
+    def ajouter_categorie_tache_a_faire(self, id_categorie: int, libelle: str) -> None:
+        self._categories_tache[id_categorie] = {"IdCategorieTacheAFaire": id_categorie, "Libelle": libelle}
+
+    def ajouter_categorie_note(self, id_categorie: int, libelle: str) -> None:
+        self._categories_note[id_categorie] = {"IdCategorieNote": id_categorie, "Libelle": libelle}
+
     def ajouter_qualification(self, id_qualification: int, libelle: str) -> None:
         self._qualifications[id_qualification] = libelle
 
@@ -513,6 +523,10 @@ class FauxModuleo:
             if parametres["idNote"] not in self._notes:
                 raise ModuleoIntrouvable(f"404 sur {route}")
             return self._notes[parametres["idNote"]]
+        if route == "moduleo/categorietacheafaire/{idCategorieTacheAFaire}":
+            return self._categories_tache.get(parametres["idCategorieTacheAFaire"])
+        if route == "cogeo/categorienote/{idCategorieNote}":
+            return self._categories_note.get(parametres["idCategorieNote"])
         if route == "cogeo/intervenant/multi?ids={ids}":
             return [self._intervenants[i] for i in _ids(parametres) if i in self._intervenants]
         if route == "moduleo/utilisateur/{idUtilisateur}":

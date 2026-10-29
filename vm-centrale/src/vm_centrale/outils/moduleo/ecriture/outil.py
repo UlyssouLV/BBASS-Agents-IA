@@ -1,8 +1,10 @@
 import json
 import logging
+import re
 from typing import Any
 
 from vm_centrale.moduleo.carte import (
+    IdIntrouvable,
     champs_modifies,
     differences_en_noms,
     element_en_noms,
@@ -13,6 +15,7 @@ from vm_centrale.moduleo.client import ErreurModuleo, LecteurModuleo, RequeteInt
 from vm_centrale.moduleo.droits import DroitManquant, DroitsModuleo, ecriture_possible
 from vm_centrale.moduleo.ecritures import REFUSEE, carte_de, proposer
 from vm_centrale.moduleo.relecture import RELECTURES, ElementIntrouvable, relire
+from vm_centrale.moduleo.resolution import IDS_SANS_RECHERCHE_PAR_NOM
 from vm_centrale.moduleo.routes import ROUTES_ECRITURE, RouteEcriture
 from vm_centrale.outils.base import ContexteTour, Outil, ResultatOutil
 from vm_centrale.outils.moduleo.commun import INDISPONIBLE, LecteurTrace
@@ -31,6 +34,10 @@ SERA_SUPPRIME = "Sera supprimé"
 
 PROPOSEE = "Écriture proposée au collaborateur, en attente de sa confirmation. Rien n'a été écrit."
 _INTROUVABLE = "L'élément visé n'existe pas dans Moduléo : écriture non proposée. Rien n'a été écrit."
+_ID_INTROUVABLE = (
+    "Élément introuvable dans Moduléo : {id}. Écriture non proposée. Rien n'a été écrit. "
+    "N'essaie pas un autre id : demande au collaborateur quel élément il veut."
+)
 _RELECTURE_REFUSEE = (
     "Votre compte ne peut pas lire l'élément visé dans Moduléo : écriture non proposée. Rien n'a été écrit. "
     "Demandez à un compte administrateur si vous en avez besoin."
@@ -42,6 +49,14 @@ _ROUTE_INCONNUE = (
 )
 _NON_PROPOSEE = "Écriture non proposée : {erreur} Rien n'a été écrit."
 _JSON_ILLISIBLE = "« {nom} » n'est pas un objet JSON valide."
+_SANS_RECHERCHE = (
+    "Champs sans moyen de retrouver l'id à partir d'un nom (l'API ne les lit que par id) : {champs}. "
+    "Ne devine jamais leur valeur : utilise seulement un id donné par le collaborateur. Sinon, dis-lui "
+    "qu'il n'existe pas, depuis le chat, de moyen de retrouver l'élément à partir de son nom, et propose "
+    "l'écriture sans ce champ s'il est facultatif."
+)
+# Clé d'un objet de l'exemple de corps JSON.
+_CLE_JSON = re.compile(r'"(\w+)"\s*:')
 _PROPRIETES_MODIFIEES = "ProprietesModifiees"
 _SANS_MOT = "Ne dis jamais que l'écriture est faite : seul le collaborateur la confirme, sur la carte."
 
@@ -115,7 +130,13 @@ def _executer_decrire(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
         if decrite.exemple is not None
         else "Pas de corps."
     )
-    return ResultatOutil(f"{_nom_route(decrite)} : {decrite.description}\nParamètres : {parametres}\n{corps}")
+    texte = f"{_nom_route(decrite)} : {decrite.description}\nParamètres : {parametres}\n{corps}"
+    # Champs dont l'id ne se retrouve pas par un nom (#254).
+    champs = [*decrite.parametres, *_CLE_JSON.findall(decrite.exemple or "")]
+    sans_recherche = [c for c in dict.fromkeys(champs) if c.casefold() in IDS_SANS_RECHERCHE_PAR_NOM]
+    if sans_recherche:
+        texte += "\n" + _SANS_RECHERCHE.format(champs=", ".join(sans_recherche))
+    return ResultatOutil(texte)
 
 
 def _declarer_ecrire(contexte: ContexteTour) -> dict | None:
@@ -254,6 +275,11 @@ def _executer_ecrire(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
         return _refuser(contexte, methode, route, parametres, corps, _RELECTURE_REFUSEE, refus.refus)
     except ElementIntrouvable:
         return ResultatOutil(_INTROUVABLE, trace={"route": f"{methode} {route}", "routes": lecteur.routes})
+    except IdIntrouvable as introuvable:
+        # Un id du corps ou des paramètres que Moduléo ne trouve pas (#254).
+        return ResultatOutil(
+            _ID_INTROUVABLE.format(id=introuvable), trace={"route": f"{methode} {route}", "routes": lecteur.routes}
+        )
     except ErreurModuleo as erreur:
         logger.warning("Moduléo indisponible : %s", erreur)
         return ResultatOutil(INDISPONIBLE, trace={"route": f"{methode} {route}", "erreur": str(erreur)})

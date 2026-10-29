@@ -1,5 +1,6 @@
 import json
 
+import pytest
 from flux_sse import fin
 
 from vm_centrale.models import EchangeInspecteur, Message
@@ -78,9 +79,40 @@ def test_le_motif_est_retire_au_message_suivant_aussi(
     )
 
     assert "id Moduléo" not in reponse.text
-    assert fin(reponse)["reponse"] == "Affaire 2024-123 ()."
+    assert fin(reponse)["reponse"] == "Affaire 2024-123."
     dernier = db_session.query(Message).filter(Message.role == "assistant").order_by(Message.id.desc()).first()
     assert "id Moduléo" not in dernier.contenu
+
+
+@pytest.mark.parametrize(
+    ("brute", "visible"),
+    [
+        # Tests humains #206 : « … sous l'. » s'affichait.
+        ("L'affaire 2024-123 figure dans Moduléo sous l'[id Moduléo 1234].", "L'affaire 2024-123 figure dans Moduléo."),
+        ("Note créée avec l’id [id Moduléo 4], pour l'affaire 2024-123.", "Note créée, pour l'affaire 2024-123."),
+        ("Tâche enregistrée sous le numéro [id Moduléo 4].", "Tâche enregistrée."),
+        ("Affaire 2024-123 ([id Moduléo 1234]).", "Affaire 2024-123."),
+    ],
+)
+def test_la_tournure_qui_introduit_l_id_est_retiree_avec_lui(
+    client, faux_moduleo, mistral_client_factice, jeton_valide, db_session, brute, visible
+):
+    _affaire(faux_moduleo)
+
+    reponse = _retrouver(client, mistral_client_factice, jeton_valide, brute)
+
+    assert "id Moduléo" not in reponse.text
+    assert fin(reponse)["reponse"] == visible
+    (enregistre,) = db_session.query(Message).filter(Message.role == "assistant").all()
+    assert enregistre.contenu == visible
+
+
+def test_la_consigne_interdit_aussi_d_annoncer_l_id(client, faux_moduleo, mistral_client_factice, jeton_valide):
+    mistral_client_factice.repondre("Bonjour.", "Titre")
+
+    client.post("/conversations", json={"message": "Bonjour"}, headers=_autorisation(jeton_valide))
+
+    assert "ni « sous l'id … »" in _systemes(mistral_client_factice)
 
 
 def test_linspecteur_garde_la_reponse_brute_avec_lid(
