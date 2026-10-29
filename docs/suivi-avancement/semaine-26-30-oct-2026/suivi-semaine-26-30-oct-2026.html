@@ -419,6 +419,7 @@
               <li><a href="#version-1-5-3">V1.5.3 — Administration des groupes et droits Moduléo</a></li>
               <li><a href="#version-1-6-0">V1.6.0 — Versions vérifiées et prêtes à livrer</a></li>
               <li><a href="#version-1-6-1">V1.6.1 — Installer et mettre à jour le serveur central sans l’alternant</a></li>
+              <li><a href="#version-1-6-2">V1.6.2 — Installer et mettre à jour les postes sans l’alternant</a></li>
               <li><a href="#version-1-8-0">V1.8.0 — Workflows n8n</a></li>
               <li><a href="#version-1-9-0">V1.9.0 — Analyse approfondie des pièces jointes</a></li>
             </ol>
@@ -461,7 +462,8 @@
     <div class="jour">
       <h3>Jeudi 29 octobre</h3>
       <ul>
-        <li>À compléter.</li>
+        <li>V1.6.2 livrée : BBASS s’installe sur un poste Windows avec un simple programme d’installation, sans droits administrateur ni intervention de l’alternant, et se met à jour seul à chaque lancement sur la version du serveur central ; retour automatique à la version précédente si la nouvelle ne démarre pas ; écran de connexion revu avec réglage du serveur et « À propos » ; tests humains joués juste après la livraison, puisque le programme d’installation n’existe qu’une fois la version publiée.</li>
+        <li>V1.5.2 toujours en attente des identifiants du serveur de test Moduléo — c’est pourquoi la 1.6.2 a été livrée avant elle.</li>
       </ul>
     </div>
     <div class="jour">
@@ -476,7 +478,6 @@
     <h2>Reste à implémenter</h2>
     <ul>
       <li><strong>V1.5.2</strong> — écrire dans Moduléo depuis le chat, essayé sur le serveur de test fourni par Kipaware. Bloquée tant que les identifiants de ce serveur de test (accès à l’API) ne sont pas reçus : aucune écriture n’est essayée sur le serveur réel du cabinet. Finalisation visée mercredi 28 octobre.</li>
-      <li><strong>V1.6.2</strong> — installer et mettre à jour le logiciel sur les postes du cabinet, sans intervention de l’alternant.</li>
       <li><strong>V1.8.0</strong> — automatisations n8n branchées sur Moduléo.</li>
       <li><strong>V1.9.0</strong> — analyse et traitement approfondis des pièces jointes.</li>
       <li>Suite « Plus tard » de la feuille de route (documentation mémoire / souveraineté, agents par pôle, bugs connus, etc.).</li>
@@ -486,8 +487,8 @@
     <section class="bloc" id="livre-pour">
     <h2>Livré pour le 29/10/2026</h2>
     <div class="recap">
-      <p><strong>Point jeudi 29 octobre — visé : V1.5.1 · livré : V1.5.1 (lundi 26 octobre), V1.5.3 et V1.6.0 (mardi 27 octobre), V1.6.1 (mercredi 28 octobre)</strong></p>
-      <p>V1.5.2 reportée : identifiants du serveur de test Moduléo non reçus, pas d’essai d’écriture sur le serveur réel ; d’où la livraison de la 1.5.3, de la 1.6.0 et de la 1.6.1 avant elle.</p>
+      <p><strong>Point jeudi 29 octobre — visé : V1.5.1 · livré : V1.5.1 (lundi 26 octobre), V1.5.3 et V1.6.0 (mardi 27 octobre), V1.6.1 (mercredi 28 octobre), V1.6.2 (jeudi 29 octobre)</strong></p>
+      <p>V1.5.2 reportée : identifiants du serveur de test Moduléo non reçus, pas d’essai d’écriture sur le serveur réel ; d’où la livraison de la 1.5.3, de la 1.6.0, de la 1.6.1 et de la 1.6.2 avant elle.</p>
     </div>
     </section>
 
@@ -572,6 +573,24 @@
             <li><strong>Mise à jour sans risque</strong> : une commande ou un redémarrage du serveur ; sauvegarde des données avant chaque changement de version ; si le logiciel ne répond pas correctement après la mise à jour, l’ancienne version est remise automatiquement et le problème est signalé ; sans Internet, le serveur redémarre sur la version déjà installée.</li>
             <li><strong>Entretien automatique</strong> : les tâches régulières du serveur sont planifiées au même endroit ; le cache des pages web est purgé toutes les heures.</li>
             <li><strong>Guide administrateur</strong> : installation et mise à jour décrites pas à pas sur le site de documentation.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="version" id="version-1-6-2">
+        <div class="version-head">
+          <h3>V1.6.2 — Installer et mettre à jour les postes sans l’alternant</h3>
+          <span class="deploye">Déployé le 29/10/2026 à 08:55</span>
+        </div>
+        <div class="version-body">
+          <p>BBASS devient un vrai logiciel Windows sur le poste du collaborateur : il s’installe sans le code source, sans droits administrateur et sans l’alternant, puis reste toujours à la même version que le serveur central auquel il est relié.</p>
+          <ul>
+            <li><strong>Installation simple</strong> : un programme d’installation joint à chaque version, en quatre étapes (bienvenue, adresse du serveur avec test de connexion, options, installation) ; raccourcis menu Démarrer et Bureau ; la désinstallation garde la configuration.</li>
+            <li><strong>Mise à jour automatique</strong> : à chaque lancement, le poste se met à la version du serveur central ; seules les versions signées par le cabinet sont installées ; si la nouvelle version ne démarre pas, l’ancienne est remise automatiquement ; sans Internet ou sans serveur, le logiciel démarre quand même, avec un message.</li>
+            <li><strong>Toujours disponible</strong> : fermer la fenêtre laisse BBASS dans la zone de notification ; il peut aussi s’ouvrir dans le navigateur, ne se lance qu’une fois, et démarre avec Windows.</li>
+            <li><strong>Écran de connexion revu</strong> : état de la connexion au serveur visible d’un coup d’œil ; menu « … » pour changer de serveur sans réinstaller, ouvrir le dossier de configuration, voir la version (« À propos ») et vérifier les mises à jour.</li>
+            <li><strong>Guides</strong> : installation, dépannage et administration des postes décrits pas à pas sur le site de documentation.</li>
+            <li><strong>Tests humains</strong> : joués juste après la livraison, le programme d’installation n’existant qu’une fois la version publiée ; un problème trouvé donnera une version de correction.</li>
           </ul>
         </div>
       </div>
