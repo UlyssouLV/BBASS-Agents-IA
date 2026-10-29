@@ -2,7 +2,13 @@ import json
 import logging
 from typing import Any
 
-from vm_centrale.moduleo.carte import champs_modifies, differences_en_noms, element_en_noms, lignes_en_noms
+from vm_centrale.moduleo.carte import (
+    champs_modifies,
+    differences_en_noms,
+    element_en_noms,
+    fiche_en_noms,
+    lignes_en_noms,
+)
 from vm_centrale.moduleo.client import ErreurModuleo, LecteurModuleo, RequeteInterdite
 from vm_centrale.moduleo.droits import DroitManquant, DroitsModuleo, ecriture_possible
 from vm_centrale.moduleo.ecritures import REFUSEE, carte_de, proposer
@@ -171,16 +177,19 @@ def _carte(
     if decrite.methode == "DELETE":
         fiche, lignes = element_en_noms(lecteur, relecture.route, element, droits, relecture.identites)
         return {"titre": decrite.description, "lignes": lignes, "rubrique": SERA_SUPPRIME, "fiche": fiche}, corps
+    # PUT : la fiche de l'élément visé, au-dessus des lignes (#253).
+    fiche = fiche_en_noms(lecteur, relecture.route, element, droits, relecture.identites)
     if not isinstance(corps, dict):
         # PUT sans corps (émettre un devis…) : ses paramètres, en noms.
-        return {"titre": decrite.description, "lignes": lignes_en_noms(lecteur, parametres, corps)}, corps
+        lignes = lignes_en_noms(lecteur, parametres, corps)
+        return {"titre": decrite.description, "lignes": lignes, "fiche": fiche}, corps
     lignes = differences_en_noms(lecteur, element, corps, relecture.identites)
     if decrite.exemple is not None and _PROPRIETES_MODIFIEES in decrite.exemple:
         # Le PUT de Moduléo remet à vide un champ absent du corps, sauf
         # ceux hors de `ProprietesModifiees` (#251) : seuls ceux de la carte,
         # jamais la liste du modèle.
         corps = {**corps, _PROPRIETES_MODIFIEES: champs_modifies(element, corps, relecture.identites)}
-    return ({"titre": decrite.description, "lignes": lignes} if lignes else None), corps
+    return ({"titre": decrite.description, "lignes": lignes, "fiche": fiche} if lignes else None), corps
 
 
 def _refuser(

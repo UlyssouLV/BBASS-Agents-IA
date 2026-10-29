@@ -9,9 +9,9 @@ import { cn } from "@/lib/utils";
 // Carte de confirmation d'une écriture Moduléo (spec 1.5.2, #204) : ce que
 // le modèle propose d'écrire, en noms, et deux boutons traités par la VM,
 // hors du modèle. Un « oui » tapé dans le chat ne confirme rien. Style
-// provisoire, revu avec les Agents par pôle. PUT (#205) : « ancien →
-// nouveau » des seuls champs modifiés ; DELETE : la fiche sous « Sera
-// supprimé ».
+// provisoire, revu avec les Agents par pôle. PUT (#205) : la fiche de
+// l'élément visé (#253), puis « ancien → nouveau » des seuls champs
+// modifiés ; DELETE : la fiche sous « Sera supprimé ».
 //
 // `desactivee` : tant que le tour qui l'a proposée n'est pas fini, la carte
 // n'est pas encore en base côté VM.

@@ -520,7 +520,7 @@ def test_put_relit_l_element_et_la_carte_montre_les_seuls_champs_modifies_en_nom
     assert faux_moduleo.ecritures == []
     assert _resultat_outil(mistral_client_factice).startswith(_PROPOSEE)
     (carte,) = _cartes(reponse)
-    assert (carte["methode"], carte["statut"], carte["rubrique"], carte["fiche"]) == ("PUT", "proposee", None, None)
+    assert (carte["methode"], carte["statut"], carte["rubrique"]) == ("PUT", "proposee", None)
     assert carte["lignes"] == [
         {"champ": "Contact", "avant": "Étude Dupont", "valeur": "Cabinet Martin"},
         {"champ": "Numero", "avant": "04 67 00 00 00", "valeur": "04 67 11 11 11"},
@@ -557,6 +557,50 @@ def test_put_sans_aucun_changement_pas_de_carte(
         "Écriture non proposée : le corps ne change aucun champ de l'élément visé. Rien n'a été écrit."
     )
     assert _journal(db_session) == []
+
+
+# Élément visé d'un PUT (#253, test humain #206) : la carte ne disait pas
+# quelle tâche elle modifiait. Comme pour un DELETE, la fiche de l'élément
+# relu, au-dessus des différences.
+
+
+def test_put_carte_avec_la_fiche_de_l_element_vise_aussi_au_rechargement(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide
+):
+    _contact_et_affaire(faux_moduleo)
+    faux_moduleo.ajouter_tache(
+        8, "Bornage", "2026-10-12T08:00:00", "2026-10-12T12:00:00", IdAffaire=12, Emplacement="Lot A"
+    )
+    tache = {
+        "route": "PUT planning/tacheplanning/{idTachePlanning}",
+        "parametres": {"idTachePlanning": 8},
+        "corps": {"IdTachePlanning": 8, "Libelle": "Bornage lot B"},
+    }
+
+    reponse = _proposer(client, mistral_client_factice, jeton_valide, tache)
+
+    (carte,) = _cartes(reponse)
+    assert carte["fiche"].startswith("Tâche « Bornage »")
+    for attendu in ("Date : 12/10/2026", "Affaire : 2024-123", "Lieu : Lot A"):
+        assert attendu in carte["fiche"]
+    assert "id Moduléo" not in carte["fiche"]
+    assert carte["lignes"] == [{"champ": "Libelle", "avant": "Bornage", "valeur": "Bornage lot B"}]
+    conversation_id = fin(reponse)["conversation"]["id"]
+    detail = client.get(f"/conversations/{conversation_id}", headers=_autorisation(jeton_valide)).json()
+    (rechargee,) = detail["messages"][1]["cartes"]
+    assert (rechargee["fiche"], rechargee["lignes"]) == (carte["fiche"], carte["lignes"])
+
+
+def test_put_sans_fiche_de_lecture_l_element_vise_en_noms(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide
+):
+    _telephone_existant(faux_moduleo)
+
+    reponse = _proposer(client, mistral_client_factice, jeton_valide, _modifier_telephone(Numero="04 67 11 11 11"))
+
+    (carte,) = _cartes(reponse)
+    assert carte["fiche"] == "Numero : 04 67 00 00 00\nLieu : Bureau\nContact : Étude Dupont"
+    assert carte["lignes"] == [{"champ": "Numero", "avant": "04 67 00 00 00", "valeur": "04 67 11 11 11"}]
 
 
 def test_delete_carte_sera_supprime_avec_la_fiche_existante(

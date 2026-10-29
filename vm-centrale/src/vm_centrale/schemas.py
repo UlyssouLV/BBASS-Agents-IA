@@ -143,7 +143,8 @@ class CarteEcriture(BaseModel):
     titre: str
     lignes: list[LigneCarteEcriture]
     # DELETE (#205) : « Sera supprimé », et la fiche de l'élément quand il
-    # en a une (sinon ses champs dans `lignes`).
+    # en a une (sinon ses champs dans `lignes`). PUT (#253) : l'élément
+    # visé, sa fiche ou ses champs en noms.
     rubrique: str | None = None
     fiche: str | None = None
     message: str | None

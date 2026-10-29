@@ -22,10 +22,11 @@ from vm_centrale.moduleo.resolution import (
 # s'affiche brut, avec « non résolu ».
 #
 # PUT (#205) : les seuls champs du corps qui changent l'élément relu,
-# ancien (`avant`) → nouveau, un champ vide valant « (vide) ». DELETE : la
-# fiche de lecture de l'élément quand elle existe (temps passé, tâche du
-# planning), sinon ses champs en noms. `identites` : les champs qui portent
-# l'id de l'élément lui-même, jamais montrés.
+# ancien (`avant`) → nouveau, un champ vide valant « (vide) », sous la
+# fiche de l'élément visé (#253). DELETE : la fiche de lecture de l'élément
+# quand elle existe (temps passé, tâche du planning), sinon ses champs en
+# noms. `identites` : les champs qui portent l'id de l'élément lui-même,
+# jamais montrés.
 
 NON_RESOLU = "non résolu"
 VIDE = "(vide)"
@@ -293,3 +294,12 @@ def element_en_noms(
         return retirer_ids_moduleo(_FICHES[route_lue](lecteur, element, droits)), []
     champs = [(champ, valeur) for champ, valeur in _aplatir(element) if _feuille(champ).casefold() not in identites]
     return None, _lignes(lecteur, champs)
+
+
+def fiche_en_noms(
+    lecteur: LecteurModuleo, route_lue: str, element: dict[str, Any], droits: DroitsModuleo, identites: set[str]
+) -> str:
+    # L'élément visé par un PUT (#253), en texte : sa fiche de lecture, sinon
+    # une ligne « Champ : valeur » par champ en noms.
+    fiche, lignes = element_en_noms(lecteur, route_lue, element, droits, identites)
+    return fiche if fiche is not None else "\n".join(f"{ligne['champ']} : {ligne['valeur']}" for ligne in lignes)
