@@ -1,11 +1,87 @@
+import json
 import os
+import sys
+from pathlib import Path
 
 from dotenv import load_dotenv
 
-load_dotenv()
+# Mode paquet (ADR-0022) : backend figé par PyInstaller et démarré par le
+# Lanceur. L'adresse du Serveur BBASS vient alors du fichier de configuration
+# de l'utilisateur, partagé avec le Lanceur ; en dev, du `.env` du clone.
+EN_MODE_PAQUET = bool(getattr(sys, "frozen", False))
+
+# Format du fichier de configuration (lu aussi par le Lanceur) :
+# {"serveur_bbass": {"hote": "10.0.0.5", "port": 8000}}
+FICHIER_CONFIGURATION = Path(os.environ.get("LOCALAPPDATA", "")) / "BBASS" / "configuration.json"
+# Résultat de la dernière vérification de mise à jour, écrit par le Lanceur à
+# chaque lancement (ADR-0022) : bandeau de l'application, « À propos ».
+FICHIER_ETAT_MISE_A_JOUR = FICHIER_CONFIGURATION.parent / "mise-a-jour.json"
+# Journaux du Lanceur et du backend, en mode paquet seulement.
+DOSSIER_JOURNAUX = FICHIER_CONFIGURATION.parent / "journaux"
+# Donnés par le Lanceur à son backend (lanceur/src/sidecar.rs) : version du
+# poste et exe à relancer pour « Vérifier les mises à jour maintenant ».
+VERSION_POSTE = os.environ.get("BBASS_VERSION") or None
+LANCEUR = os.environ.get("BBASS_LANCEUR") or None
+
+
+# Adresse prod par défaut du Serveur BBASS (spec 1.6.2, point 10), même
+# constante que le Lanceur (lanceur/coeur/src/configuration.rs). Vide tant
+# qu'elle n'est pas connue : le premier lancement ouvre alors la Configuration.
+ADRESSE_PROD = ""
+PORT_PAR_DEFAUT = 8000
+
+
+# Dernière lecture du fichier de configuration, gardée tant que le fichier ne
+# change pas (chemin, date, taille) : l'adresse sert à chaque appel au Serveur BBASS.
+_derniere_lecture: tuple[tuple[Path, int, int], tuple[str, int] | None] | None = None
+
+
+def lire_serveur_bbass() -> tuple[str, int] | None:
+    """Hôte et port du fichier de configuration, `None` s'il est absent, illisible ou sans hôte."""
+    global _derniere_lecture
+    try:
+        etat = FICHIER_CONFIGURATION.stat()
+    except OSError:
+        return None
+    cle = (FICHIER_CONFIGURATION, etat.st_mtime_ns, etat.st_size)
+    if _derniere_lecture is not None and _derniere_lecture[0] == cle:
+        return _derniere_lecture[1]
+    try:
+        serveur = json.loads(FICHIER_CONFIGURATION.read_text(encoding="utf-8"))["serveur_bbass"]
+        hote, port = str(serveur["hote"]).strip(), int(serveur["port"])
+        lu = (hote, port) if hote else None
+    except (OSError, ValueError, KeyError, TypeError):
+        lu = None
+    _derniere_lecture = (cle, lu)
+    return lu
+
+
+def oublier_la_configuration_lue() -> None:
+    """Après une écriture du fichier : la prochaine lecture le relit, même à date et taille égales."""
+    global _derniere_lecture
+    _derniere_lecture = None
+
+
+def adresse_http(hote: str, port: int) -> str:
+    """Adresse d'un Serveur BBASS : HTTP, il est joint sur le réseau local du cabinet (ADR-0022)."""
+    return f"http://{hote}:{port}"  # NOSONAR python:S5332 — Serveur BBASS sur le réseau local, sans TLS.
+
+
+def adresse_serveur_bbass() -> str:
+    """Adresse du Serveur BBASS, relue dès que le fichier change en mode paquet :
+    la Configuration (menu « … ») vaut sans redémarrer ni réinstaller."""
+    if not EN_MODE_PAQUET:
+        return VM_CENTRALE_BASE_URL
+    serveur = lire_serveur_bbass()
+    return adresse_http(*serveur) if serveur else ADRESSE_PROD
+
+
+if not EN_MODE_PAQUET:
+    load_dotenv()
 
 POSTE_HOST = os.environ.get("POSTE_HOST", "127.0.0.1")
 POSTE_PORT = int(os.environ.get("POSTE_PORT", "8100"))
+# Dev seulement (`.env` du clone) ; en mode paquet, adresse_serveur_bbass().
 VM_CENTRALE_BASE_URL = os.environ.get("VM_CENTRALE_BASE_URL", "http://localhost:8000").rstrip("/")
 # Doit couvrir le pire tour de la VM centrale : sinon le poste abandonne,
 # affiche une erreur, et la VM enregistre quand même le tour (un nouvel essai

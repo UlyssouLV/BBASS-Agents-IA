@@ -24,7 +24,7 @@ See `agents/domain.md`. File roles and path lookup: `agents/roles.yml`. `/code-r
 
 ## Tests
 
-HTTP-boundary tests only (observable responses). Do not praise or require tests of internal function calls. Same convention as V1 and `docs/specs/`. Pytest: `/t`. Quality gate: `/qg` (`-w` waits up to 15 min for the CI analysis of this HEAD). Both: `/vf` / « Vérifie la fiabilité du code ». Fix a red gate: `/cqg`. `encadrer-implement` closes the child after the push and does not wait for Sonar. After human tests and an accepted `/code-review`, `finaliser-la-version` runs `/qg -w` once on the PR HEAD before the tag, then `/cqg` if the gate is not `OK`.
+Test-roots: `vm-centrale`, `poste` (Python, pytest) and `lanceur` (Rust / Tauri v2 Lanceur of the packaged Poste, `cargo test`; ADR-0022). HTTP-boundary tests only (observable responses). Do not praise or require tests of internal function calls. Same convention as V1 and `docs/specs/`. Pytest: `/t`. Quality gate: `/qg` (`-w` waits up to 15 min for the CI analysis of this HEAD). Both: `/vf` / « Vérifie la fiabilité du code ». Fix a red gate: `/cqg`. `encadrer-implement` closes the child after the push and does not wait for Sonar. After human tests and an accepted `/code-review`, `finaliser-la-version` runs `/qg -w` once on the PR HEAD before the tag, then `/cqg` if the gate is not `OK`.
 
 ## Docs
 

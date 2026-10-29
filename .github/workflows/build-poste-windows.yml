@@ -1,0 +1,72 @@
+name: Build poste Windows
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  # Path filter en job (pas au niveau workflow) : un skip par `if` compte
+  # Success pour le ruleset (skip→vert). Un `paths:` sur `on:` laisserait le
+  # check required en Pending.
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      paquet: ${{ steps.filter.outputs.paquet }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad # v3.0.4
+        id: filter
+        with:
+          filters: |
+            paquet:
+              - 'poste/**'
+              - 'lanceur/**'
+              - '.github/workflows/build-poste-windows.yml'
+
+  build-poste-windows:
+    name: build-poste-windows
+    needs: changes
+    if: needs.changes.outputs.paquet == 'true'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: poste/frontend/package-lock.json
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: lanceur
+
+      # Front, sidecar PyInstaller et Lanceur, assemblés dans lanceur\target\paquet\BBASS\.
+      - name: Construire le paquet
+        shell: pwsh
+        run: ./lanceur/scripts/construire-paquet.ps1
+
+      - name: Test de fumée
+        shell: pwsh
+        run: ./lanceur/scripts/test-fumee.ps1

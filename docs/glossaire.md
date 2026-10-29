@@ -227,3 +227,21 @@ Une installation complète de la VM centrale sur la machine de Castries : sa bas
 Le geste qui fait passer en prod une version déjà essayée en staging : l'étiquette `prod` est posée sur les mêmes images, sans reconstruction, par un workflow GitHub manuel et tracé ([ADR-0021](./adr/0021-cd-vm-centrale-staging-prod.md)). Refusée pour une version jamais passée par le staging. Revenir en arrière, c'est promouvoir l'ancienne version.
 
 À éviter : déploiement (la prod se met à jour ensuite, à la commande ou au redémarrage), release (la Release crée la version et l'envoie au staging).
+
+## Lanceur {#lanceur}
+
+Le programme `BBASS.exe` installé sur le Poste ([ADR-0022](./adr/0022-poste-application-windows-version-dictee-par-la-vm.md)) : il installe et désinstalle BBASS, met le Poste à la version du Serveur BBASS à chaque lancement, ouvre la fenêtre, garde l'icône dans la zone de notification et démarre le backend du Poste. Il se met à jour avec le Paquet poste.
+
+À éviter : updater, installateur (l'installateur n'est qu'un mode du Lanceur), launcher.
+
+## Paquet poste {#paquet-poste}
+
+Le fichier signé `bbass-poste-vX.Y.Z-windows-x64.zip`, joint à chaque GitHub Release : Lanceur, backend du Poste et front, d'une même version ([ADR-0022](./adr/0022-poste-application-windows-version-dictee-par-la-vm.md)). Le Lanceur ne l'installe que si sa signature est valide, et garde la version précédente pour revenir en arrière.
+
+À éviter : image (les images sont celles de la VM centrale), build, setup.
+
+## Serveur BBASS {#serveur-bbass}
+
+L'adresse (hôte et port) de la VM centrale à laquelle un Poste est relié, saisie à l'installation et modifiable dans le menu « … » de l'écran de connexion. Par défaut, l'Environnement prod. Sa version, lue sur `/sante`, décide de la version du Poste : changer le Serveur BBASS vers le staging fait passer le Poste à la version du staging au lancement suivant.
+
+À éviter : URL de la VM, environnement (le Poste ne choisit pas d'Environnement, il suit une adresse).

@@ -169,14 +169,15 @@ class node_database,node_collaborator,node_mistral,node_searxng toneIndigo
 
 ## Semaine du 26 au 30 octobre 2026
 
-**V1.6.1 livrée** (CD : la VM centrale livrée en images Docker publiques sur GHCR, installée en une commande et mise à jour par une commande ou un redémarrage sur une VM Ubuntu Server 26.04 LTS, sans cloner le dépôt ; deux Environnements sur la même VM, staging et prod, Promotion de l’un à l’autre, sauvegarde avant changement de version et retour automatique si `/sante` échoue, [ADR-0021](docs/adr/0021-cd-vm-centrale-staging-prod.md)). Avant elle, **V1.6.0** (CI : chaque version vérifiée automatiquement avant d’entrer sur `main`, [ADR-0020](docs/adr/0020-ci-argos-compartimentee.md)) et **V1.5.3** (administration des groupes et droits Moduléo depuis le Panel). **V1.5.2** (écriture Moduléo sur le serveur de test Kipaware) n’est pas encore finalisable : les identifiants du serveur de test pour l’API Moduléo ne sont pas reçus, et on ne teste pas d’écriture sur le serveur de production ; d’où la 1.5.3, la 1.6.0 et la 1.6.1 livrées avant elle. Suite sur la feuille de route : **V1.5.2** (écriture Moduléo), **V1.6.2** (installation des postes), **V1.8.0** (workflows n8n), **V1.9.0** (pièces jointes approfondies).
+**V1.6.2 livrée** (le poste devient une application Windows : `BBASS-Setup-vX.Y.Z.exe` joint à chaque Release l’installe sans git ni droits administrateur, et chaque lancement met le poste à la version du Serveur BBASS, avec paquet signé et retour arrière ; fenêtre, zone de notification, démarrage avec Windows, écran de connexion revu avec Configuration et À propos, [ADR-0022](docs/adr/0022-poste-application-windows-version-dictee-par-la-vm.md)). Avant elle, **V1.6.1** (CD : la VM centrale livrée en images Docker sur GHCR, staging et prod, [ADR-0021](docs/adr/0021-cd-vm-centrale-staging-prod.md)), **V1.6.0** (CI : chaque version vérifiée automatiquement avant d’entrer sur `main`, [ADR-0020](docs/adr/0020-ci-argos-compartimentee.md)) et **V1.5.3** (administration des groupes et droits Moduléo depuis le Panel). **V1.5.2** (écriture Moduléo sur le serveur de test Kipaware) n’est pas encore finalisable : les identifiants du serveur de test pour l’API Moduléo ne sont pas reçus, et on ne teste pas d’écriture sur le serveur de production ; d’où la 1.5.3, la 1.6.0, la 1.6.1 et la 1.6.2 livrées avant elle. Suite sur la feuille de route : **V1.5.2** (écriture Moduléo), **V1.7.0** (documentation fonctionnelle), **V1.8.0** (workflows n8n), **V1.9.0** (pièces jointes approfondies).
 
 ```mermaid
 flowchart LR
   V160["V1.6.0<br/>CI versions vérifiées<br/>livrée"] --> V161["V1.6.1<br/>CD de la VM centrale<br/>livrée"]
-  V161 --> V152["V1.5.2<br/>écriture Moduléo<br/>attend le serveur de test"]
-  V152 --> V162["V1.6.2<br/>installation des postes"]
-  V162 --> V180["V1.8.0<br/>workflows n8n"]
+  V161 --> V162["V1.6.2<br/>installation des postes<br/>livrée"]
+  V162 --> V152["V1.5.2<br/>écriture Moduléo<br/>attend le serveur de test"]
+  V152 --> V170["V1.7.0<br/>documentation fonctionnelle"]
+  V170 --> V180["V1.8.0<br/>workflows n8n"]
   V180 --> V190["V1.9.0<br/>pièces jointes approfondies"]
 ```
 
@@ -194,7 +195,7 @@ flowchart LR
 
 ## Démarrer
 
-Ce parcours est celui du **développement**. La VM centrale du cabinet ne s’installe plus depuis un clone : depuis la 1.6.1, elle s’installe et se met à jour à partir des images publiées à chaque Release — voir le guide admin [Installer et mettre à jour la VM centrale](docs/exploitation/vm-centrale.md).
+Ce parcours est celui du **développement**. La VM centrale du cabinet ne s’installe plus depuis un clone : depuis la 1.6.1, elle s’installe et se met à jour à partir des images publiées à chaque Release — voir le guide admin [Installer et mettre à jour la VM centrale](docs/exploitation/vm-centrale.md). De même, depuis la 1.6.2, un poste de collaborateur s’installe avec `BBASS-Setup-vX.Y.Z.exe` de la Release et se met à jour seul — voir [Installer et utiliser BBASS sur son poste](docs/exploitation/poste-collaborateur.md) et [Administrer les postes BBASS](docs/exploitation/poste-admin.md).
 
 Après avoir installé les prérequis ci-dessus (Python 3.11, Docker Desktop installé ; Docker Desktop est lancé par le lanceur s’il est arrêté), le parcours officiel est : cloner le dépôt, puis double-cliquer sur l'un des deux scripts à la racine correspondant à ton OS — aucune autre commande à taper.
 

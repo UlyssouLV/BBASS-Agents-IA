@@ -1,5 +1,9 @@
 import { useEffect } from "react";
 
+import { BandeauMiseAJour } from "@/components/BandeauMiseAJour";
+import { AProposApresVerification } from "@/components/DialogueAPropos";
+import { MenuConfiguration } from "@/components/MenuConfiguration";
+import { PastilleServeurBbass } from "@/components/PastilleServeurBbass";
 import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
 import { useSession } from "@/hooks/useSession";
@@ -30,6 +34,8 @@ export function App() {
 
   return (
     <>
+      <BandeauMiseAJour />
+      <AProposApresVerification />
       {_ecran()}
       <Toaster />
     </>
@@ -51,10 +57,13 @@ export function App() {
     if (!compte && erreurInitiale) {
       return (
         <main className="mx-auto mt-24 w-full max-w-sm text-center">
+          {/* Menu « … » : régler l'adresse du Serveur BBASS sans session (spec 1.6.2, point 9). */}
+          <MenuConfiguration ouvrirSiAdresseInconnue className="fixed top-4 right-4" />
           <p role="alert" className="mb-4 text-sm text-destructive">
             Impossible de vérifier la session en cours. Vérifiez la connexion au serveur puis réessayez.
           </p>
           <Button onClick={() => reessayerChargementInitial()}>Réessayer</Button>
+          <PastilleServeurBbass className="mt-6" />
         </main>
       );
     }

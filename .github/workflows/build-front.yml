@@ -31,6 +31,7 @@ jobs:
             front:
               - 'poste/frontend/**'
               - 'poste/src/poste/static/**'
+              - 'lanceur/ecran/installateur/**'
               - '.github/workflows/build-front.yml'
 
   build-front:
@@ -67,3 +68,17 @@ jobs:
             exit 1
           fi
           echo "static/ aligné avec npm run build."
+
+      # Assistant du Setup (spec 1.6.2), embarqué dans BBASS.exe : même règle que static/.
+      - name: Build de l'assistant d'installation
+        working-directory: poste/frontend
+        run: npm run build:installateur
+
+      - name: Contrôle de dérive de l'assistant d'installation
+        run: |
+          if [ -n "$(git status --porcelain -- lanceur/ecran/installateur/)" ]; then
+            echo "::error::lanceur/ecran/installateur/ dérive du résultat de npm run build:installateur (rebuild et commit requis)."
+            git status -- lanceur/ecran/installateur/
+            exit 1
+          fi
+          echo "ecran/installateur/ aligné avec npm run build:installateur."
