@@ -46,9 +46,22 @@ Ce n’est **pas** une spec (ça vient après « Ouvre la version »).
 
 **État au 27/10/2026.** Pas encore finalisable : les identifiants du serveur de test Kipaware pour l’API Moduléo ne sont pas encore reçus, et on ne teste pas d’écriture sur le serveur de production. Finalisation visée le **mercredi 28/10/2026** ; d’où la livraison de la **1.5.3**, de la **1.6.0**, de la **1.6.1** puis de la **1.6.2** avant elle.
 
-**Numéro produit.** Arrive sur `main` après la 1.6.2 : livrée en **1.6.3** (Release « V1.6.3 — Écrire dans Moduléo depuis le chat (développement 1.5.2) »).
+**Numéro produit.** Calculé à « Finalise la version » : **1.6.4** si la 1.6.3 (corrections de bugs, en parallèle depuis `main`) arrive avant sur `main`, sinon **1.6.3**.
 
 **Hors périmètre.** Écriture sur le serveur de **production** tant que les essais sur le serveur de test ne sont pas validés. Administration des groupes et droits Moduléo (livrée en **1.5.3**). Retrouver par son nom un élément que l’API ne lit que par id (→ **1.8.1**).
+
+## Ensuite : 1.6.3 — Corriger les bugs existants
+
+*(Menée en parallèle de la 1.5.2, depuis `main`. Embarque aussi la séparation numéro de développement / numéro produit et la planification des séries 1.7.x et 1.8.x, pour pouvoir les ouvrir depuis `main` sans attendre la 1.5.2.)*
+
+**Objectif.** Les bugs connus hors écriture Moduléo sont corrigés :
+
+- un compte ne voit jamais les données d’un autre : après une déconnexion puis une connexion à un autre compte, la barre latérale ne montre pas les conversations du compte précédent, et un compte recréé avec le même identifiant ne retrouve pas celles de l’ancien ([#161](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/161)) ;
+- quand la recherche web ou la pièce jointe ne contient pas l’information, la réponse dit qu’elle ne l’a pas trouvée, au lieu d’estimer des tarifs, des dates ou de citer une source qui n’existe pas ([#131](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/131)) ;
+- pendant l’animation de frappe, la réponse s’affiche déjà mise en forme, sans balises Markdown brutes ([#170](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/170)) ;
+- le bandeau « Mise à jour impossible… » ne recouvre plus le bouton **…** de l’écran de connexion ([#249](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/249)).
+
+**Hors périmètre.** Bugs de l’écriture Moduléo, dont le code n’est que sur la branche 1.5.2 (#256 dans la 1.5.2 ; #263, #264 en Plus tard). Pages refusées par les sites (HTTP 403) et PDF trouvés sur le web (Plus tard). Nouvelles fonctionnalités.
 
 ## Ensuite : 1.7.0 — Site de documentation à trois lectures : Collaborateur, Administrateur, Développeur
 
@@ -204,12 +217,6 @@ Déjà tranché : un Agent est une configuration dans le flux chat de la VM cent
 
 À trancher à l’ouverture : comment un tour choisit son Agent (pôle du compte, choix explicite, plusieurs pôles), quelles capacités pour chaque pôle, lien avec le traitement des pièces jointes par pôle (1.10.0).
 
-### Dire « pas trouvé » plutôt qu’inventer après une recherche (ex-1.4.5, #131)
-
-Corriger le bug [#131](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/131), constaté au test humain de la 1.4.0 : quand la recherche (ou la pièce jointe) ne contient pas l’information, la réponse dit qu’elle ne l’a pas trouvée, au lieu d’estimer des tarifs, des dates ou de citer une source qui n’existe pas. Jamais « sourcé » ni « confirmé par » sans résultat de l’outil qui le contient ; une source dont le lien est retiré ne reste pas affichée comme source ; le contenu de la pièce jointe prime sur une généralité du web. Les garde-fous ne cassent plus la mise en forme (indentation des listes et tableaux, parenthèses vides) ; une page quasi vide n’est pas comptée comme lue ; la date du jour est donnée en toutes lettres et seule l’année va dans la requête. À trancher au grilling : sort d’une réponse dont beaucoup de chiffres sont retirés (marqueur visible, réécriture, phrase fixe), contrôle des petits montants (« 5 € »), et traitement ici ou à part du profil de travail et du résumé qui débordent d’une conversation à l’autre.
-
-**Hors périmètre.** Pages refusées par les sites (HTTP 403) et PDF trouvés sur le web ; vérification de la fiabilité des sources ; modes Rapide / Approfondi. Pas de changement du contrat HTTP du poste.
-
 ### Bug — lien de source peu visible (#99)
 
 **Constat :** malgré les travaux front sur le rendu des sources (suite #98), l’affichage **ne valide toujours pas** les critères — le texte de l’ancre n’est pas clairement cliquable (URL au survol natif), et l’affordance (couleur / soulignement) ne rend pas le lien repérable sans pastille seule, ni sans laisser croire que toute la phrase est cliquable.
@@ -225,38 +232,6 @@ Corriger le bug [#131](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/131),
 **Hors périmètre :** vm-centrale / prompt de style (hors sujet, déjà #96).
 
 **Suivi :** [#99](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/99) (`bug`). Trouvé dans : Informations manquantes · Contexte : essai manuel · Date : 2026-10-05 · Priorité : Informations manquantes.
-
-### Bug — données d’un compte visibles par un autre compte (#161)
-
-**Constat :** après une déconnexion puis une connexion à un autre compte, la barre latérale affiche d’abord les conversations du compte précédent, jusqu’au rafraîchissement ; un compte recréé avec le même identifiant retrouve les conversations de l’ancien compte supprimé.
-
-**Reproductibilité :** (1) compte A → déconnexion → compte B sur le même poste : sidebar montre d’abord les conversations de A jusqu’au rafraîchissement ; (2) supprimer un compte puis le recréer avec le même identifiant → anciennes conversations / données liées réapparaissent.
-
-**Impact :** un collaborateur peut voir, même brièvement, les conversations d’un autre compte ; un compte recréé hérite des données de l’ancien (isolation des comptes).
-
-**Cause probable :** poste — déconnexion ne vide pas le cache React Query ; VM centrale — suppression de compte n’efface pas les tables liées par identifiant.
-
-**À corriger :** la déconnexion vide toute la mémoire du compte côté poste ; la suppression d’un compte supprime aussi ses conversations, pièces jointes, profil de travail et échanges d’inspecteur, avec nettoyage des données déjà orphelines.
-
-**Hors périmètre :** décision de garder ou non la consommation d’un compte supprimé pour le suivi des coûts — à trancher.
-
-**Suivi :** [#161](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/161) (`bug`). Trouvé dans : 1.4.3 · Contexte : test humain · Date : 2026-10-07 · Priorité : non prioritaire en dev.
-
-### Bug — Markdown brut pendant l'animation de frappe (#170)
-
-**Constat :** pendant l'animation de frappe d'une réponse, le Markdown s'affiche brut : les balises (`**`, `#`, `-`, `|` des tableaux…) sont visibles et le texte ne se met en forme qu'à la fin de l'animation, d'un coup.
-
-**Reproductibilité :** poser une question dont la réponse contient du gras, des titres, des listes ou un tableau (ex. « Compare ces aides dans un tableau ») et regarder la réponse s'écrire : balises visibles pendant toute la frappe, mise en forme à la dernière étape.
-
-**Impact :** rendu peu lisible pendant la frappe, puis « saut » visuel à la fin ; tous les comptes, sur chaque réponse mise en forme.
-
-**Cause probable :** choix volontaire de `TexteAnimeReponse` (`poste/frontend/src/onglets/OngletChat.tsx`, suite #99) : tant que le texte révélé est tronqué, il est affiché en texte brut ; le rendu Markdown (remark-gfm, Prism) n'est fait qu'une fois, à la fin, pour éviter une syntaxe incomplète cassée à chaque étape.
-
-**À corriger :** la réponse se met en forme au fur et à mesure de la frappe, sans balises Markdown visibles ni syntaxe incomplète cassée (lien, tableau, bloc de code non refermé).
-
-**Hors périmètre :** pas dans la V1.4.4. Streaming du texte de la réponse depuis la VM (les garde-fous s'appliquent au texte complet).
-
-**Suivi :** [#170](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/170) (`bug`). Trouvé dans : 1.4.4 · Contexte : test humain · Date : 2026-10-07 · Priorité : non prioritaire en dev.
 
 ### Bug — heure de l'inspecteur, titre de carte en jargon et confirmation en texte avant la carte (#256)
 
@@ -405,22 +380,6 @@ Constat (grilling 1.6.1) : la mise à jour reste déclenchée par l’admin (com
 - Activer **Ubuntu Pro** (gratuit jusqu’à 5 machines ; correctifs jusqu’en 2036) avec un compte **Ubuntu One au nom du cabinet** (adresse générique, double authentification). Ce compte ne donne aucun accès à la machine ; une fuite permettrait au pire de détacher la VM des correctifs étendus. Revérifier à ce moment que l’offre gratuite couvre toujours l’usage commercial.
 - Ranger dans le **gestionnaire de mots de passe du cabinet** : identifiants Ubuntu One, valeurs générées par l’installateur (mots de passe Postgres, `VM_ADMIN_KEY` de chaque Environnement), emplacement des clés maîtres.
 - Vérifier que l’admin du cabinet a joué seul, avec le guide, une mise à jour et une Promotion.
-
-### Bug — le bandeau de mise à jour recouvre le bouton « … » (#249)
-
-**Constat :** quand la mise à jour au lancement échoue (ici : Serveur BBASS éteint), le bandeau rouge « Mise à jour impossible… » s’affiche en haut de la fenêtre, sur toute la largeur, et recouvre le bouton **…** en haut à droite de l’écran de connexion : le bouton n’est pas cliquable tant qu’on n’a pas fermé le bandeau par sa croix. Le bandeau touche aussi le haut du logo du panneau gauche (captures en pièce jointe sur #249).
-
-**Reproductibilité :** poste installé en v1.6.2, Serveur BBASS arrêté : quitter BBASS puis le relancer → bandeau sur l’écran de connexion ; clic sur **…** → rien ne s’ouvre. Reproduit à chaque fois, dans la fenêtre BBASS comme dans le navigateur.
-
-**Impact :** tous les collaborateurs dont la mise à jour échoue ; c’est justement quand le serveur est injoignable qu’il faut **…** → **Configuration** ou **À propos** (guide poste-collaborateur, « En cas de problème »), et rien n’indique qu’il faut d’abord fermer le bandeau.
-
-**Cause probable :** `BandeauMiseAJour` est en `fixed inset-x-0 top-0 z-50` par-dessus l’écran, et `MenuConfiguration` est lui aussi en haut à droite (`absolute top-4 right-4` sur l’écran de connexion, `fixed top-4 right-4` dans `App.tsx`).
-
-**À corriger :** le bouton **…** reste visible et cliquable quand le bandeau est affiché (par exemple le bandeau pousse le contenu au lieu de le recouvrir), sans chevaucher le logo.
-
-**Hors périmètre :** Aucun.
-
-**Suivi :** [#249](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/249) (`bug`). Trouvé dans : 1.6.2 · Contexte : test humain · Date : 2026-10-29 · Priorité : Informations manquantes.
 
 ### Bug — « Écrit dans Moduléo. » après une suppression (#263)
 
