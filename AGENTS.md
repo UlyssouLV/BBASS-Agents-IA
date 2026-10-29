@@ -4,6 +4,8 @@
 
 **« Ouvre la version »** → implement each `ready-for-agent` child (close when tests are green) → human tests (`/th` on the `ready-for-human` child) → **`/code-review`** → **« Finalise la version »** (quality gate, then **`/cqg`** if it is not `OK`). The **parent** spec closes via `Fixes` on the squash. Do **not** leave implemented children Open. Do **not** close the parent from `encadrer-implement`. New repo: **`/init`** / **« Initialise le repo »**.
 
+Version numbers: the roadmap, specs, branches and issues use the **development** number (one series per minor; two series may land on `main` alternately). The Release, `/sante` and the Poste use the **product** number, always increasing, computed at Finalise; no Release when nothing under role **`livrables`** changed. Rule: `docs/dev/feuille-de-route/README.md` (*Numéro de développement et numéro produit*).
+
 - **« Initialise le repo »** (`/init`): skill `initialise-le-repo`
 - **« Ouvre la version »** (must include **`X.Y.Z`**): skill `ouvrir-la-version`
 - Child-ticket TDD: `/implement`, then skill `encadrer-implement`
@@ -24,7 +26,7 @@ See `agents/domain.md`. File roles and path lookup: `agents/roles.yml`. `/code-r
 
 ## Tests
 
-HTTP-boundary tests only (observable responses). Do not praise or require tests of internal function calls. Same convention as V1 and `docs/specs/`. Pytest: `/t`. Quality gate: `/qg` (`-w` waits up to 15 min for the CI analysis of this HEAD). Both: `/vf` / « Vérifie la fiabilité du code ». Fix a red gate: `/cqg`. `encadrer-implement` closes the child after the push and does not wait for Sonar. After human tests and an accepted `/code-review`, `finaliser-la-version` runs `/qg -w` once on the PR HEAD before the tag, then `/cqg` if the gate is not `OK`.
+Test-roots: `vm-centrale`, `poste` (Python, pytest) and `lanceur` (Rust / Tauri v2 Lanceur of the packaged Poste, `cargo test`; ADR-0022). HTTP-boundary tests only (observable responses). Do not praise or require tests of internal function calls. Same convention as V1 and `docs/specs/`. Pytest: `/t`. Quality gate: `/qg` (`-w` waits up to 15 min for the CI analysis of this HEAD). Both: `/vf` / « Vérifie la fiabilité du code ». Fix a red gate: `/cqg`. `encadrer-implement` closes the child after the push and does not wait for Sonar. After human tests and an accepted `/code-review`, `finaliser-la-version` runs `/qg -w` once on the PR HEAD before the tag, then `/cqg` if the gate is not `OK`.
 
 ## Docs
 
