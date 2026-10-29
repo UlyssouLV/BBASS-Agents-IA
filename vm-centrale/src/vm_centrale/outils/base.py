@@ -55,6 +55,9 @@ class ContexteTour:
     # Ids des écritures dont une carte est partie pendant ce tour (#252) :
     # sans aucune, la réponse ne peut pas annoncer d'écriture.
     cartes_du_tour: list[int] = field(default_factory=list)
+    # Phrases du garde des droits renvoyées par les outils du tour (#262) :
+    # la réponse visible les montre telles quelles.
+    refus_des_droits: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

@@ -38,6 +38,7 @@ from vm_centrale.garde_fous import (
     ajouter_sources,
     annonce_une_carte,
     mentionner_pages_trop_longues,
+    montrer_refus_des_droits,
     nettoyer_titre,
     normaliser_url,
     plafonner,
@@ -785,6 +786,7 @@ def _reponse_visible(
     outils_appeles: list[str],
     moduleo_configure: bool,
     cartes_du_tour: list[int],
+    refus_des_droits: list[str],
 ) -> str:
     # Ligne garde_fous de l'inspecteur à chaque réponse de chat (spec 1.4.0,
     # décision 15), même sans retrait : sans elle, on ne voit pas pourquoi la
@@ -815,6 +817,11 @@ def _reponse_visible(
         contacts_lus or not moduleo_configure,
         cartes_du_tour,
     )
+    # Refus du garde des droits (#262) : sa phrase, telle quelle, nomme le
+    # droit manquant ; elle remplace une phrase fixe de la VM, plus vague.
+    if refus_des_droits and visible.startswith(_PHRASES_FIXES):
+        visible = ""
+    visible = montrer_refus_des_droits(visible, refus_des_droits)
     visible = ajouter_sources(
         visible,
         _messages_du_compte(db, conversation_id, nouveau_message)
@@ -1272,6 +1279,7 @@ def _tour_creer_conversation(
         contexte_outils.outils_appeles,
         contexte_outils.client_moduleo is not None,
         contexte_outils.cartes_du_tour,
+        contexte_outils.refus_des_droits,
     )
 
     publier(TITRAGE)
@@ -1708,6 +1716,8 @@ def _executer_appels_outils(
         )
         for appel_mistral in resultat.appels_mistral:
             _enregistrer_appel_mistral_outil(contexte_outils, identifiant_compte, appel_mistral)
+        if "garde_des_droits" in resultat.trace:
+            contexte_outils.refus_des_droits.append(resultat.contenu)
         messages_outils.append(
             {"role": "tool", "tool_call_id": appel.id, "name": appel.nom, "content": resultat.contenu}
         )
@@ -2196,6 +2206,7 @@ def _tour_envoyer_message(
         contexte_outils.outils_appeles,
         contexte_outils.client_moduleo is not None,
         contexte_outils.cartes_du_tour,
+        contexte_outils.refus_des_droits,
     )
     _enregistrer_questions_du_tour(db, attendre_questions, identifiant_compte, conversation.id, piece_jointe)
 

@@ -129,6 +129,37 @@ def test_appel_sans_le_droit_refuse_avant_tout_envoi(
     assert "ApiKey" not in texte and "SecurityCode" not in texte
 
 
+def test_refus_reformule_par_le_modele_la_reponse_montre_la_phrase_du_garde(
+    client, faux_moduleo, compte_du_groupe, mistral_client_factice, jeton_valide
+):
+    # Tests humains #206, scénario 20 (#262) : le modèle reformulait le
+    # refus sans nommer le droit.
+    compte_du_groupe(_COMPTABILITE)
+    mistral_client_factice.repondre_avec_appel_outil(_CONTACTS, {"texte": "Dupont"})
+    mistral_client_factice.repondre(
+        "Je n'ai pas accès à la recherche des contacts dans Moduléo. "
+        "Veuillez transmettre cette demande à un administrateur du système.",
+        "Titre",
+    )
+
+    reponse = client.post("/conversations", json={"message": "Cherche Dupont"}, headers=_autorisation(jeton_valide))
+
+    assert fin(reponse)["reponse"] == _REFUS_CONTACTS
+
+
+def test_refus_deja_cite_par_le_modele_la_reponse_garde_son_texte(
+    client, faux_moduleo, compte_du_groupe, mistral_client_factice, jeton_valide
+):
+    compte_du_groupe(_COMPTABILITE)
+    mistral_client_factice.repondre_avec_appel_outil(_CONTACTS, {"texte": "Dupont"})
+    texte = f"{_REFUS_CONTACTS}\n\nJe peux chercher ses affaires."
+    mistral_client_factice.repondre(texte, "Titre")
+
+    reponse = client.post("/conversations", json={"message": "Cherche Dupont"}, headers=_autorisation(jeton_valide))
+
+    assert fin(reponse)["reponse"] == texte
+
+
 def test_outil_sans_le_droit_non_propose(client, faux_moduleo, compte_du_groupe, mistral_client_factice, jeton_valide):
     compte_du_groupe(_COMPTABILITE)
 

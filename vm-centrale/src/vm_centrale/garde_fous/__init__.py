@@ -12,6 +12,7 @@ from vm_centrale.garde_fous.ecriture_annoncee import (
 )
 from vm_centrale.garde_fous.longueur import plafonner
 from vm_centrale.garde_fous.pages_trop_longues import mentionner_pages_trop_longues
+from vm_centrale.garde_fous.refus_des_droits import montrer_refus_des_droits
 from vm_centrale.garde_fous.sources import LectureSource, PageSource, ajouter_sources
 from vm_centrale.garde_fous.titre import nettoyer_titre
 from vm_centrale.garde_fous.urls import normaliser_url, retirer_urls_inventees, urls_ecrites
@@ -26,6 +27,7 @@ __all__ = [
     "ajouter_sources",
     "annonce_une_carte",
     "mentionner_pages_trop_longues",
+    "montrer_refus_des_droits",
     "nettoyer_titre",
     "normaliser_url",
     "plafonner",

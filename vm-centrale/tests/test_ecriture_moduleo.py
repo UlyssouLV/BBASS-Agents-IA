@@ -425,6 +425,27 @@ def test_ecrire_sans_le_droit_refuse_phrase_fixe_sans_carte(
     assert [(e.statut, e.carte) for e in _journal(db_session)] == [("refusee", None)]
 
 
+def test_ecriture_refusee_reformulee_par_le_modele_la_reponse_montre_la_phrase_du_garde(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide, db_session
+):
+    # Tests humains #206, scénario 20 bis (#262) : « Rien n'a été écrit »
+    # et le nom du droit disparaissaient de la réponse.
+    db_session.add(GroupeModuleo(application="cogeo", nom="Sans droit"))
+    db_session.flush()
+    rattacher(db_session, "j.dupont", "Sans droit", None, None)
+    db_session.commit()
+
+    reponse = _proposer(
+        client, mistral_client_factice, jeton_valide, _telephone(),
+        reponse="Je ne peux pas ajouter ce téléphone : votre compte Moduléo n'a pas les droits nécessaires.",
+    )
+
+    assert fin(reponse)["reponse"] == (
+        "Votre compte n'a pas le droit Moduléo « Rechercher des contacts ». Rien n'a été écrit. "
+        "Demandez à un compte administrateur si vous en avez besoin."
+    )
+
+
 # Confirmation : un clic, hors du modèle, une seule écriture.
 
 
@@ -1077,14 +1098,20 @@ def test_note_sans_le_droit_refusee_par_le_garde_sans_carte(
     _note_existante(faux_moduleo)
     _groupe_cogeo(db_session, "Notes › Supprimer / Éditer ses propres notes")
 
-    reponse = _proposer(client, mistral_client_factice, jeton_valide, appel)
+    reponse = _proposer(
+        client, mistral_client_factice, jeton_valide, appel,
+        reponse="Je ne peux pas modifier cette note : votre compte n'a pas les droits nécessaires.",
+    )
 
-    assert _cartes(reponse) == []
-    assert faux_moduleo.appels == [] and faux_moduleo.ecritures == []
-    assert _resultat_outil(mistral_client_factice) == (
+    refus = (
         "Votre compte n'a pas le droit Moduléo « Supprimer / Éditer les notes des autres ». Rien n'a été écrit. "
         "Demandez à un compte administrateur si vous en avez besoin."
     )
+    assert _cartes(reponse) == []
+    assert faux_moduleo.appels == [] and faux_moduleo.ecritures == []
+    assert _resultat_outil(mistral_client_factice) == refus
+    # Tests humains #206, scénario 20 bis, variante notes (#262).
+    assert fin(reponse)["reponse"] == refus
 
 
 # Route classée mais non ouverte au compte (#255, tests humains #206,
@@ -1104,13 +1131,16 @@ def test_decrire_route_hors_des_droits_du_compte_nomme_le_droit_manquant(
     # Groupe Cogeo sans droit : la note reste ouverte, la tâche à faire non.
     _groupe_cogeo(db_session)
     mistral_client_factice.repondre_avec_appel_outil(_DECRIRE, {"route": _MODIFIER_TACHE})
-    mistral_client_factice.repondre("Votre compte n'a pas ce droit.", "Titre")
+    mistral_client_factice.repondre(
+        "Je ne peux pas modifier cette tâche : votre compte Moduléo n'a pas les droits nécessaires.", "Titre"
+    )
 
     reponse = client.post(
         "/conversations", json={"message": "Renomme la tâche à faire 5"}, headers=_autorisation(jeton_valide)
     )
 
     assert _resultat_outil(mistral_client_factice) == _SANS_EDITION_TACHE
+    assert fin(reponse)["reponse"] == _SANS_EDITION_TACHE
     assert _cartes(reponse) == []
     assert faux_moduleo.appels == [] and faux_moduleo.ecritures == []
     assert _journal(db_session) == []
@@ -1270,13 +1300,16 @@ def test_relance_refusee_par_le_garde_la_reponse_qui_suit_dit_le_refus(
     assert mistral_client_factice.tool_choices_appels_reponse[1] == _ECRIRE_IMPOSE
     assert _resultat_outil(mistral_client_factice, appel=2).startswith("Votre compte n'a pas le droit Moduléo")
     assert _cartes(reponse) == []
-    assert fin(reponse)["reponse"] == refus
+    # La phrase du garde, pas la reformulation du modèle (#262).
+    assert fin(reponse)["reponse"] == _resultat_outil(mistral_client_factice, appel=2)
     assert [e.statut for e in _journal(db_session)] == ["refusee"]
 
 
-def test_relance_sans_carte_et_reponse_qui_annonce_encore_phrase_fixe(
+def test_relance_refusee_et_reponse_qui_annonce_encore_phrase_du_garde(
     client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide, db_session
 ):
+    # La phrase fixe « Aucune carte… » cède la place à celle du garde, qui
+    # nomme le droit manquant (#262).
     _sans_droit_telephone(db_session)
 
     reponse = _annoncer(
@@ -1286,8 +1319,8 @@ def test_relance_sans_carte_et_reponse_qui_annonce_encore_phrase_fixe(
 
     assert _cartes(reponse) == []
     assert fin(reponse)["reponse"] == (
-        "Aucune carte de confirmation n'a été ouverte : rien n'a été écrit dans Moduléo. "
-        "Reformulez la demande d'écriture si besoin."
+        "Votre compte n'a pas le droit Moduléo « Rechercher des contacts ». Rien n'a été écrit. "
+        "Demandez à un compte administrateur si vous en avez besoin."
     )
     # Une seule relance par message.
     assert mistral_client_factice.tool_choices_appels_reponse.count(_ECRIRE_IMPOSE) == 1
