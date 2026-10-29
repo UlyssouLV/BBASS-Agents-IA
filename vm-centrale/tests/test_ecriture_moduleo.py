@@ -123,6 +123,21 @@ def test_outils_d_ecriture_proposes_barriere_ouverte_avec_un_droit(
     assert "webhook" not in description
 
 
+def test_ecrire_consigne_de_proposer_la_carte_sans_question_en_texte(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide
+):
+    # Tests humains #206 (#256) : « Souhaitez-vous que je crée cette tâche ? »
+    # avant la carte, 3 fois sur 8. La carte est la confirmation.
+    _demander(client, mistral_client_factice, jeton_valide)
+
+    (ecrire,) = [
+        outil for outil in mistral_client_factice.tools_appels_reponse[0] if outil["function"]["name"] == _ECRIRE
+    ]
+    description = ecrire["function"]["description"]
+    assert "sans demander de confirmation en texte" in description
+    assert "la carte est la confirmation" in description
+
+
 def _resultat_outil(mistral_client_factice, appel: int = 1, rang: int = -1) -> str:
     # Contenu du message `tool` reçu par l'appel principal suivant.
     outils = [m for m in mistral_client_factice.appels_reponse[appel] if m.get("role") == "tool"]
@@ -259,7 +274,8 @@ def test_ecrire_n_envoie_rien_et_la_carte_arrive_en_noms(
     (carte,) = _cartes(reponse)
     assert carte["statut"] == "proposee"
     assert carte["methode"] == "POST" and carte["route"] == "moduleo/telephone"
-    assert carte["titre"] == "Crée un numéro de téléphone."
+    # Titre en langage métier, pas la phrase de la doc de la route (#256).
+    assert carte["titre"] == "Créer un numéro de téléphone"
     assert carte["lignes"] == [
         {"champ": "Contact", "valeur": "Étude Dupont", "avant": None},
         {"champ": "Numero", "valeur": "04 67 00 00 00", "avant": None},
@@ -321,6 +337,24 @@ def test_carte_d_une_tache_a_faire_nomme_sa_categorie_et_signale_un_id_non_resol
         {"champ": "EffectueePar", "valeur": "Jean Martin", "avant": None},
         {"champ": "GedElement", "valeur": "8 (non résolu)", "avant": None},
     ]
+
+
+def test_carte_d_une_tache_a_faire_titre_metier_et_dates_lisibles_heure_de_paris(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide
+):
+    # Tests humains #206 (#256) : « DateLimite 2026-11-15T00:00:00+01:00 ».
+    _contact_et_affaire(faux_moduleo)
+    faux_moduleo.ajouter_categorie_tache_a_faire(1, "Terrain")
+    tache = _tache_a_faire(DateLimite="2026-11-15T00:00:00+01:00", DateRealisationSouhaitee="2026-11-02T13:30:00Z")
+
+    reponse = _proposer(client, mistral_client_factice, jeton_valide, tache)
+
+    (carte,) = _cartes(reponse)
+    assert carte["titre"] == "Créer une tâche à faire"
+    lignes = {ligne["champ"]: ligne["valeur"] for ligne in carte["lignes"]}
+    assert lignes["DateLimite"] == "15 novembre 2026"
+    # 13:30 UTC le 2 novembre : 14:30 à Paris (UTC+1).
+    assert lignes["DateRealisationSouhaitee"] == "2 novembre 2026 à 14:30"
 
 
 @pytest.mark.parametrize(
@@ -642,6 +676,8 @@ def test_put_relit_l_element_et_la_carte_montre_les_seuls_champs_modifies_en_nom
     assert _resultat_outil(mistral_client_factice).startswith(_PROPOSEE)
     (carte,) = _cartes(reponse)
     assert (carte["methode"], carte["statut"], carte["rubrique"]) == ("PUT", "proposee", None)
+    # « Met à jour un … en fonction de son identifiant unique. » (#256).
+    assert carte["titre"] == "Modifier un numéro de téléphone"
     assert carte["lignes"] == [
         {"champ": "Contact", "avant": "Étude Dupont", "valeur": "Cabinet Martin"},
         {"champ": "Numero", "avant": "04 67 00 00 00", "valeur": "04 67 11 11 11"},

@@ -1,10 +1,20 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import AfterValidator, BaseModel, Field, field_validator
 
 from vm_centrale.poles import POLES_VALIDES
+
+
+def _en_utc(moment: datetime) -> datetime:
+    return moment.replace(tzinfo=timezone.utc) if moment.tzinfo is None else moment
+
+
+# Les dates sont enregistrées en UTC, sans fuseau (colonnes `DateTime`) :
+# servies sans fuseau, le poste les lisait comme heures locales, une heure
+# de moins à Paris (#256).
+DateUtc = Annotated[datetime, AfterValidator(_en_utc)]
 
 
 def _valider_poles(poles: list[str]) -> list[str]:
@@ -120,7 +130,7 @@ class ConversationCreeResponse(BaseModel):
 class ConversationResponse(BaseModel):
     id: int
     titre: str
-    date_derniere_activite: datetime
+    date_derniere_activite: DateUtc
 
 
 class LigneCarteEcriture(BaseModel):
@@ -158,7 +168,7 @@ class MessageResponse(BaseModel):
     id: int
     role: str
     contenu: str
-    date_creation: datetime
+    date_creation: DateUtc
     # Voir MessageEnvoyeResponse ; null pour un message `user` ou d'avant la
     # 1.4.2.
     tokens_contexte: int | None
@@ -171,8 +181,8 @@ class MessageResponse(BaseModel):
 class ConversationDetailResponse(BaseModel):
     id: int
     titre: str
-    date_creation: datetime
-    date_derniere_activite: datetime
+    date_creation: DateUtc
+    date_derniere_activite: DateUtc
     messages: list[MessageResponse]
     # Pagination par curseur (issue #103) : indique s'il reste des messages
     # plus anciens que `messages` à charger (un nouvel appel avec avant_id =
@@ -215,7 +225,7 @@ class PieceJointeCreeeResponse(BaseModel):
 
 class ProfilTravailResponse(BaseModel):
     contenu: str
-    date_derniere_maj: datetime | None
+    date_derniere_maj: DateUtc | None
 
 
 class DetailConsommationCategorie(BaseModel):
@@ -264,8 +274,8 @@ class InspecteurCompteResponse(BaseModel):
 class InspecteurConversationResponse(BaseModel):
     id: int
     titre: str
-    date_creation: datetime
-    date_derniere_activite: datetime
+    date_creation: DateUtc
+    date_derniere_activite: DateUtc
 
 
 class InspecteurEchangeResumeResponse(BaseModel):
@@ -277,7 +287,7 @@ class InspecteurEchangeResumeResponse(BaseModel):
     origine: str
     type_appel: str
     statut: str
-    date_creation: datetime
+    date_creation: DateUtc
 
 
 class InspecteurEchangeDetailResponse(BaseModel):
@@ -292,4 +302,4 @@ class InspecteurEchangeDetailResponse(BaseModel):
     reponse_payload: dict | None
     statut: str
     erreur: str | None
-    date_creation: datetime
+    date_creation: DateUtc

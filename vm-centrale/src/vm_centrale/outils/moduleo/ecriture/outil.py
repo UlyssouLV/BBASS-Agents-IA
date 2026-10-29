@@ -80,6 +80,38 @@ def _nom_route(decrite: RouteEcriture) -> str:
     return f"{decrite.methode} {decrite.route}"
 
 
+# Titre de la carte en langage métier (#256) : la description de la route,
+# première phrase de la description de la route, verbe à l'infinitif, sans
+# « en fonction de son identifiant unique ».
+_VERBES = {
+    "Met à jour": "Modifier",
+    "Permet de modifier": "Modifier",
+    "Modifie": "Modifier",
+    "Crée": "Créer",
+    "Supprime": "Supprimer",
+    "Ajoute": "Ajouter",
+    "Enleve": "Enlever",
+    "Remplace": "Remplacer",
+    "Affecte": "Affecter",
+    "Annule": "Annuler",
+    "Signe": "Signer",
+    "Valide": "Valider",
+    "Configure": "Configurer",
+}
+_SANS_IDENTIFIANT = " en fonction de son identifiant unique"
+
+
+def _titre(decrite: RouteEcriture) -> str:
+    # « Met à jour une tâche à faire en fonction de son identifiant
+    # unique. » → « Modifier une tâche à faire ».
+    phrase = decrite.description.strip().split(". ", 1)[0]
+    titre = phrase.removesuffix(".").replace(_SANS_IDENTIFIANT, "")
+    for verbe, infinitif in _VERBES.items():
+        if titre.startswith(f"{verbe} "):
+            return f"{infinitif}{titre[len(verbe):]}"
+    return titre
+
+
 def _route_connue(nom: Any) -> RouteEcriture | None:
     # « POST moduleo/telephone » → la route du WADL.
     methode, _, route = str(nom or "").strip().partition(" ")
@@ -159,6 +191,9 @@ def _declarer_ecrire(contexte: ContexteTour) -> dict | None:
             "description": (
                 "Propose une écriture dans Moduléo (serveur de test) quand le collaborateur la demande. "
                 "N'envoie rien : le collaborateur voit une carte de confirmation et décide lui-même. "
+                # #256 : la question en texte avant la carte coûtait un tour.
+                "Quand la demande d'écriture est claire, appelle cet outil directement, sans demander "
+                "de confirmation en texte : la carte est la confirmation. "
                 "Désigne chaque élément par son id lu dans une fiche ([id Moduléo <n>]) ; demande "
                 "d'abord les champs avec decrire_ecriture_moduleo. Une écriture par appel. "
                 f"Routes ouvertes :\n{liste}"
@@ -201,24 +236,24 @@ def _carte(
     # qui ne change rien.
     relecture = RELECTURES.get((decrite.methode, decrite.route))
     if relecture is None:
-        return {"titre": decrite.description, "lignes": lignes_en_noms(lecteur, parametres, corps)}, corps
+        return {"titre": _titre(decrite), "lignes": lignes_en_noms(lecteur, parametres, corps)}, corps
     element = relire(lecteur, relecture, parametres, corps)
     if decrite.methode == "DELETE":
         fiche, lignes = element_en_noms(lecteur, relecture.route, element, droits, relecture.identites)
-        return {"titre": decrite.description, "lignes": lignes, "rubrique": SERA_SUPPRIME, "fiche": fiche}, corps
+        return {"titre": _titre(decrite), "lignes": lignes, "rubrique": SERA_SUPPRIME, "fiche": fiche}, corps
     # PUT : la fiche de l'élément visé, au-dessus des lignes (#253).
     fiche = fiche_en_noms(lecteur, relecture.route, element, droits, relecture.identites)
     if not isinstance(corps, dict):
         # PUT sans corps (émettre un devis…) : ses paramètres, en noms.
         lignes = lignes_en_noms(lecteur, parametres, corps)
-        return {"titre": decrite.description, "lignes": lignes, "fiche": fiche}, corps
+        return {"titre": _titre(decrite), "lignes": lignes, "fiche": fiche}, corps
     lignes = differences_en_noms(lecteur, element, corps, relecture.identites)
     if decrite.exemple is not None and _PROPRIETES_MODIFIEES in decrite.exemple:
         # Le PUT de Moduléo remet à vide un champ absent du corps, sauf
         # ceux hors de `ProprietesModifiees` (#251) : seuls ceux de la carte,
         # jamais la liste du modèle.
         corps = {**corps, _PROPRIETES_MODIFIEES: champs_modifies(element, corps, relecture.identites)}
-    return ({"titre": decrite.description, "lignes": lignes, "fiche": fiche} if lignes else None), corps
+    return ({"titre": _titre(decrite), "lignes": lignes, "fiche": fiche} if lignes else None), corps
 
 
 def _refuser(

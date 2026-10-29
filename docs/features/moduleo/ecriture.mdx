@@ -21,8 +21,9 @@ Créations (POST), modifications (PUT) et suppressions (DELETE) passent toutes p
 
 ## La Carte de confirmation
 
-Quand le modèle appelle `ecrire_moduleo`, une carte apparaît dans le fil, pendant la réponse :
+Quand le modèle appelle `ecrire_moduleo`, une carte apparaît dans le fil, pendant la réponse. Quand la demande est claire, le modèle propose la carte directement, sans poser d’abord la question en texte : la carte est la confirmation.
 
+- un titre en langage métier (« Créer une tâche à faire », « Modifier un numéro de téléphone ») et les dates en lettres, à l’heure de Paris (« 15 novembre 2026 ») ;
 - ce qui sera écrit, **en noms** : l’affaire devient « affaire 2024-123 », le contact « Étude Dupont », l’utilisateur « Jean Martin ». Un id qu’aucun résolveur ne sait nommer s’affiche brut, avec « non résolu » ;
 - un id que Moduléo ne trouve pas (une catégorie qui n’existe pas…) n’ouvre pas de carte : le modèle doit demander au collaborateur l’élément voulu plutôt que d’essayer un autre id ;
 - certaines catégories (de tâche à faire, de note) ne se lisent que par leur id : le chat ne sait pas les retrouver à partir de leur nom (« Terrain » ne suffit pas). Le modèle le dit, et propose l’écriture sans catégorie si elle est facultative ;

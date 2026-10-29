@@ -1,6 +1,7 @@
 from collections.abc import Callable, Iterable
 from typing import Any
 
+from vm_centrale.dates import date_heure_en_lettres
 from vm_centrale.moduleo.client import ErreurModuleo, LecteurModuleo, RequeteInterdite
 from vm_centrale.moduleo.droits import DroitManquant, DroitsModuleo
 from vm_centrale.moduleo.fiches import NomsPlanning, NomsTempsPasses, fiche_tache, fiche_temps_passe
@@ -161,7 +162,8 @@ def _texte(valeur: Any) -> str:
         return "oui" if valeur else "non"
     if isinstance(valeur, list):
         return ", ".join(_texte(element) for element in valeur)
-    return str(valeur)
+    # Une date en lettres, à l'heure de Paris (#256).
+    return (isinstance(valeur, str) and date_heure_en_lettres(valeur)) or str(valeur)
 
 
 def _aplatir(valeurs: dict[str, Any], prefixe: str = "", vides: bool = False) -> list[tuple[str, Any]]:
