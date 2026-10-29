@@ -1,7 +1,7 @@
 from collections.abc import Callable, Iterable
 from typing import Any
 
-from vm_centrale.dates import date_heure_en_lettres
+from vm_centrale.dates import date_heure_en_lettres, jour_en_lettres
 from vm_centrale.moduleo.client import ErreurModuleo, LecteurModuleo, RequeteInterdite
 from vm_centrale.moduleo.droits import DroitManquant, DroitsModuleo
 from vm_centrale.moduleo.fiches import NomsPlanning, NomsTempsPasses, fiche_tache, fiche_temps_passe
@@ -30,12 +30,40 @@ from vm_centrale.moduleo.resolution import (
 # quand elle existe (temps passé, tâche du planning), sinon ses champs en
 # noms. `identites` : les champs qui portent l'id de l'élément lui-même,
 # jamais montrés.
+#
+# Fiche visée en noms (#261) : créateur et dernier modificateur nommés,
+# libellés métier (« Créée par »), ni date vide de Moduléo (`0001-01-01`)
+# ni énumération `Type…` à 0. Un champ « date seule » (`_DATES_SEULES`) se
+# lit en jour, sans fuseau.
 
 NON_RESOLU = "non résolu"
 VIDE = "(vide)"
 
 # Champs que la carte ne montre pas : Moduléo les remplit lui-même.
 _IGNORES = {"ProprietesModifiees"}
+# Libellés métier, par nom de champ (casse indifférente) : seules la note
+# et la tâche du planning, toutes deux au féminin, portent ces champs.
+_LIBELLES = {
+    "idcreator": "Créée par",
+    "idlastmodificator": "Modifiée par",
+    "datecreation": "Créée le",
+    "datedernieremodification": "Modifiée le",
+}
+# Champs des routes ouvertes qui ne portent qu'un jour (README du module).
+_DATES_SEULES = {
+    "date",
+    "datecloture",
+    "datecreation",
+    "datedebutregime",
+    "datefin",
+    "datelimite",
+    "datelivraison",
+    "datenaissance",
+    "dateouverture",
+    "freedate",
+}
+# Date d'un champ vide dans Moduléo.
+_DATE_VIDE = "0001-01-01"
 # Erreurs d'un résolveur : l'id reste non résolu.
 _ILLISIBLE = (DroitManquant, ErreurModuleo, RequeteInterdite, KeyError, TypeError, ValueError)
 
@@ -106,6 +134,8 @@ _RESOLVEURS: dict[str, Resolveur] = {
             "idutilisateursaffectes",
             "ideffectueepar",
             "iduser",
+            "idcreator",
+            "idlastmodificator",
         ),
         _utilisateurs,
     ),
@@ -134,6 +164,8 @@ def _est_un_id(champ: str) -> bool:
 def _libelle(champ: str) -> str:
     # « IdAffaire » → « Affaire », « IdsContacts » → « Contacts »,
     # « idAffaire » (paramètre) → « Affaire ».
+    if champ.casefold() in _LIBELLES:
+        return _LIBELLES[champ.casefold()]
     for prefixe in ("Ids", "Id", "ids", "id"):
         reste = champ.removeprefix(prefixe)
         if reste != champ and reste[:1].isupper():
@@ -153,8 +185,16 @@ def _ids(valeur: Any) -> list[int]:
 
 
 def _vide(champ: str, valeur: Any) -> bool:
-    # Un id à 0 est un id non renseigné.
-    return valeur is None or valeur == "" or valeur == [] or (_est_un_id(champ) and _ids(valeur) == [0])
+    # Un id à 0 est un id non renseigné, comme une énumération `Type…` à 0
+    # et la date `0001-01-01`.
+    return (
+        valeur is None
+        or valeur == ""
+        or valeur == []
+        or (_est_un_id(champ) and _ids(valeur) == [0])
+        or (champ.casefold().startswith("type") and valeur == 0 and not isinstance(valeur, bool))
+        or (isinstance(valeur, str) and valeur.strip().startswith(_DATE_VIDE))
+    )
 
 
 def _texte(valeur: Any) -> str:
@@ -224,6 +264,8 @@ def _en_noms(champ: str, valeur: Any, noms: dict[str, dict[int, str]]) -> str:
         connus = noms.get(feuille.casefold(), {})
         ids = _ids(valeur) or [valeur]
         return ", ".join(connus.get(i) or f"{i} ({NON_RESOLU})" for i in ids)
+    if feuille.casefold() in _DATES_SEULES and isinstance(valeur, str):
+        return jour_en_lettres(valeur) or valeur
     return _texte(valeur)
 
 

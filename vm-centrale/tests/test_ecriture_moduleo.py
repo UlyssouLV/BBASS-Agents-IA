@@ -357,6 +357,25 @@ def test_carte_d_une_tache_a_faire_titre_metier_et_dates_lisibles_heure_de_paris
     assert lignes["DateRealisationSouhaitee"] == "2 novembre 2026 à 14:30"
 
 
+@pytest.mark.parametrize("decalage", ["+02:00", "+01:00"])
+def test_carte_d_un_temps_passe_la_date_seule_en_jour_sans_heure(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide, decalage
+):
+    # Second passage de #206 (#261) : un temps passé du 28/10 envoyé avec
+    # le décalage d'été s'affichait « 27 octobre 2026 à 23:00 ».
+    _contact_et_affaire(faux_moduleo)
+    temps = {
+        "route": "POST cogeo/tempspasse",
+        "parametres": {},
+        "corps": {"Date": f"2026-10-28T00:00:00{decalage}", "NombreHeure": 3, "IdAffaire": 12, "IdUtilisateur": 7},
+    }
+
+    reponse = _proposer(client, mistral_client_factice, jeton_valide, temps)
+
+    (carte,) = _cartes(reponse)
+    assert {ligne["champ"]: ligne["valeur"] for ligne in carte["lignes"]}["Date"] == "28 octobre 2026"
+
+
 @pytest.mark.parametrize(
     ("corps", "phrase"),
     [
@@ -989,6 +1008,42 @@ def test_put_note_carte_avec_les_seuls_champs_modifies_en_noms(
         {"champ": "Message", "avant": "Rappeler le client", "valeur": "Relancer le géomètre"},
         {"champ": "Affaire", "avant": "affaire 2024-123", "valeur": "affaire 2024-124"},
     ]
+
+
+def test_put_note_brute_fiche_visee_en_noms_sans_id_ni_date_vide(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide
+):
+    # Second passage de #206 (#261) : « Creator : 41 (non résolu) »,
+    # « DateDerniereModification : 1er janvier 1 », « TypeNote : 0 ».
+    _contact_et_affaire(faux_moduleo)
+    faux_moduleo.ajouter_utilisateur(41, "U", "LB")
+    faux_moduleo.ajouter_note(
+        5,
+        "Rappeler le client",
+        IdAffaire=12,
+        IdContact=0,
+        IdCreator=41,
+        IdLastModificator=41,
+        DateCreation="2026-10-28T09:15:00+01:00",
+        DateDerniereModification="0001-01-01T00:00:00",
+        TypeNote=0,
+        IdCategorieNote=0,
+        NotificationMobile=None,
+    )
+
+    reponse = _proposer_apres_creation(
+        client, faux_moduleo, mistral_client_factice, jeton_valide, _NOTE_CREEE, 5,
+        {"route": f"PUT {_NOTE}", "parametres": {"idNote": 5}, "corps": {"Message": "Relancer le géomètre"}},
+    )
+
+    (carte,) = _cartes(reponse)
+    assert carte["fiche"] == (
+        "Message : Rappeler le client\n"
+        "Affaire : affaire 2024-123\n"
+        "Créée par : U LB\n"
+        "Modifiée par : U LB\n"
+        "Créée le : 28 octobre 2026"
+    )
 
 
 def test_delete_note_carte_sera_supprime_avec_les_champs_en_noms(

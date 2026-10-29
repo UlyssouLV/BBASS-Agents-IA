@@ -19,6 +19,25 @@ def date_du_jour() -> date:
     return datetime.now(_FUSEAU_CABINET).date()
 
 
+def _jour(jour: date) -> str:
+    return f"{'1er' if jour.day == 1 else jour.day} {_MOIS[jour.month - 1]} {jour.year}"
+
+
+def jour_en_lettres(valeur: str) -> str | None:
+    # Un champ Moduléo qui ne porte qu'un jour (#261) : « 28 octobre 2026 »,
+    # le jour écrit dans la date, sans conversion de fuseau. Le modèle
+    # envoie parfois minuit avec le décalage d'été en hiver (« +02:00 ») :
+    # à l'heure de Paris, ce serait la veille à 23:00. None si ce n'est pas
+    # une date.
+    texte = valeur.strip()
+    if not (_DATE_HEURE_ISO.fullmatch(texte) or re.fullmatch(r"\d{4}-\d{2}-\d{2}", texte)):
+        return None
+    try:
+        return _jour(date.fromisoformat(texte[:10]))
+    except ValueError:
+        return None
+
+
 def date_heure_en_lettres(valeur: str) -> str | None:
     # Une date ISO de Moduléo, lisible et à l'heure de Paris (#256) :
     # « 15 novembre 2026 », ou « 2 novembre 2026 à 14:30 » quand l'heure
@@ -33,7 +52,7 @@ def date_heure_en_lettres(valeur: str) -> str | None:
     if moment.tzinfo is None:
         moment = moment.replace(tzinfo=_FUSEAU_CABINET)
     moment = moment.astimezone(_FUSEAU_CABINET)
-    jour = f"{'1er' if moment.day == 1 else moment.day} {_MOIS[moment.month - 1]} {moment.year}"
+    jour = _jour(moment.date())
     if (moment.hour, moment.minute) == (0, 0):
         return jour
     return f"{jour} à {moment:%H:%M}"
