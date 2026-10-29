@@ -132,7 +132,7 @@ Ce n’est **pas** une spec (ça vient après « Ouvre la version »).
 
 *(Série **1.8.x** : reprend l’entrée Plus tard « Serveur MCP Moduléo » (spec 1.5.2, tests humains [#206](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/206)), menée en parallèle de la série **1.7.x**. Les workflows n8n passent en **1.9.0**.)*
 
-**Objectif.** Les lectures Moduléo du chat passent par un **serveur MCP** (Model Context Protocol) Moduléo, sans changement visible pour le collaborateur : mêmes fiches en noms, mêmes droits par groupe, mêmes phrases fixes, mêmes sources des garde-fous. La VM centrale devient l’**hôte** MCP : elle garde la boucle Mistral et présente au modèle les outils du serveur. Socle des **1.8.1** et **1.8.2**.
+**Objectif.** Les lectures Moduléo du chat passent par un **serveur MCP** (Model Context Protocol) Moduléo, sans changement visible pour le collaborateur : mêmes fiches en noms, mêmes droits par groupe, mêmes phrases fixes, mêmes sources des garde-fous. La VM centrale devient l’**hôte** MCP : elle garde la boucle Mistral et présente au modèle les outils du serveur. À « Qu’est-ce que tu sais faire avec Moduléo ? », le chat répond avec ce que le compte peut réellement lire, tiré de la liste d’outils du serveur filtrée par ses droits, et non de ce que le modèle imagine (tests humains [#206](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/206) : réponse inventée, puis avalée par le garde-fou des chiffres). Socle des **1.8.1** et **1.8.2**.
 
 **Recherche** (dans `docs/dev/recherches/`, avant d’ouvrir la version). Partir de la doc officielle : [Getting started](https://modelcontextprotocol.io/docs/2026-07-28/getting-started/intro), [Architecture](https://modelcontextprotocol.io/docs/2026-07-28/learn/architecture), [Server concepts](https://modelcontextprotocol.io/docs/2026-07-28/learn/server-concepts), [Build servers](https://modelcontextprotocol.io/docs/2026-07-28/develop/build-server), [Security best practices](https://modelcontextprotocol.io/docs/2026-07-28/tutorials/security/security_best_practices). Trancher :
 
@@ -145,7 +145,7 @@ Ce n’est **pas** une spec (ça vient après « Ouvre la version »).
 
 ## Ensuite : 1.8.1 — Serveur MCP Moduléo : retrouver par son nom ce que l’API ne lit que par id
 
-**Objectif.** Le collaborateur peut dire « catégorie Terrain » : le serveur construit et tient à jour la correspondance nom → id des éléments que l’API Moduléo ne lit que par id (catégories de tâche à faire `moduleo/categorietacheafaire/{id}`, de note `cogeo/categorienote/{id}`…), en lisant les ids un à un et en les mettant en cache faute de route de liste, ou par une route de liste si Kipaware en ouvre une. Lève la limite de la 1.5.2 (« pas de moyen de retrouver l’élément à partir de son nom »).
+**Objectif.** Le collaborateur peut dire « catégorie Terrain » : le serveur construit et tient à jour la correspondance nom → id des éléments que l’API Moduléo ne lit que par id (catégories de tâche à faire `moduleo/categorietacheafaire/{id}`, de note `cogeo/categorienote/{id}`…), en lisant les ids un à un et en les mettant en cache faute de route de liste, ou par une route de liste si Kipaware en ouvre une. Le serveur donne aussi au modèle l’id des éléments que les fiches de la 1.5.2 ne portent pas (téléphones, e-mails et adresses d’un contact, notes, tâches à faire, codes activité), pour pouvoir les modifier ou les supprimer. Lève les limites de la 1.5.2 (« pas de moyen de retrouver l’élément à partir de son nom », écritures refusées faute d’id, [#257](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/257)).
 
 **À trancher au grilling.** Durée de vie du cache et rafraîchissement. Borne de lecture des ids. Exposition des listes comme ressources du serveur.
 
@@ -153,7 +153,7 @@ Ce n’est **pas** une spec (ça vient après « Ouvre la version »).
 
 ## Ensuite : 1.8.2 — Serveur MCP Moduléo : écrire par le serveur
 
-**Objectif.** Les écritures Moduléo de la 1.5.2 passent par le serveur MCP avec toutes leurs garanties : garde des droits appliqué par le serveur pour le compte authentifié, carte de confirmation dans le poste et confirmation hors du modèle, identifiant de carte lié au compte (le posséder ne suffit pas à confirmer), serveur de test seulement, ids jamais à l’écran. Le serveur refuse une écriture non confirmée, quel que soit l’hôte qui l’appelle.
+**Objectif.** Les écritures Moduléo de la 1.5.2 passent par le serveur MCP avec toutes leurs garanties : garde des droits appliqué par le serveur pour le compte authentifié, carte de confirmation dans le poste et confirmation hors du modèle, identifiant de carte lié au compte (le posséder ne suffit pas à confirmer), serveur de test seulement, ids jamais à l’écran. Le serveur refuse une écriture non confirmée, quel que soit l’hôte qui l’appelle. La réponse à « Qu’est-ce que tu sais faire avec Moduléo ? » (1.8.0) couvre alors les écritures : celles que le compte peut proposer, d’après les outils d’écriture du serveur et ses droits.
 
 **À trancher au grilling.** Rôle de l’elicitation MCP (demande de confirmation du serveur à l’hôte) à côté de la carte, qui reste la garantie.
 
@@ -421,3 +421,35 @@ Constat (grilling 1.6.1) : la mise à jour reste déclenchée par l’admin (com
 **Hors périmètre :** Aucun.
 
 **Suivi :** [#249](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/249) (`bug`). Trouvé dans : 1.6.2 · Contexte : test humain · Date : 2026-10-29 · Priorité : Informations manquantes.
+
+### Bug — « Écrit dans Moduléo. » après une suppression (#263)
+
+**Constat :** au second passage des tests humains V1.5.2 (#206, scénario 17), la confirmation d'une suppression de temps passé affiche « Écrit dans Moduléo. » sur la carte « Sera supprimé » ; l'élément est bien supprimé, mais la phrase dit « écrit ».
+
+**Reproductibilité :** demander « Supprime mon temps passé du <date> sur l'affaire <numéro> », puis Confirmer. Systématique (même phrase pour toute méthode).
+
+**Impact :** formulation ambiguë après une suppression ; aucune donnée fausse.
+
+**Cause probable :** une seule phrase fixe après confirmation, quelle que soit la méthode (spec 1.5.2 : « Écrit dans Moduléo »).
+
+**À corriger :** phrase selon la méthode : « Créé dans Moduléo. », « Modifié dans Moduléo. », « Supprimé de Moduléo. », sur la carte et dans le résultat d'outil vu par le modèle ; spec à amender en même temps.
+
+**Hors périmètre :** Aucun.
+
+**Suivi :** [#263](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/263) (`bug`, capture en pièce jointe). Trouvé dans : 1.5.2 · Contexte : test humain · Date : 2026-10-29 · Priorité : non prioritaire.
+
+### Bug — Moduléo supprime le téléphone vide d'un contact quand on lui en ajoute un (#264)
+
+**Constat :** au second passage des tests humains V1.5.2 (#206, scénarios 5 et 6), CLIENT EXEMPLE 11 avait un téléphone n°160 vide ; après un seul `POST moduleo/telephone` de BBASS (id renvoyé 161), la liste du contact est `[161]` et le n°160 n'existe plus. Chaque contact de test semble avoir un tel téléphone vide.
+
+**Reproductibilité :** sur le serveur de test, lire les téléphones d'un contact qui n'a qu'un téléphone vide, créer un téléphone depuis le chat et confirmer, relire. Vu une fois.
+
+**Impact :** aucun a priori pour le collaborateur (téléphone vide) ; un id de téléphone lu avant une création peut ne plus exister après.
+
+**Cause probable :** comportement du serveur Moduléo (Kipaware), pas de BBASS ; voulu ou non, à confirmer.
+
+**À corriger :** demander à Kipaware si c'est voulu et dans quels cas (e-mails, adresses ?) ; si oui, le noter dans le README du module Moduléo (écriture), sinon le signaler. Rien à changer dans BBASS tant que ce n'est pas confirmé.
+
+**Hors périmètre :** ids des téléphones absents des fiches (#257).
+
+**Suivi :** [#264](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/264) (`bug`). Trouvé dans : 1.5.2 · Contexte : test humain · Date : 2026-10-29 · Priorité : non prioritaire.
