@@ -71,7 +71,7 @@ const sidebars: SidebarsConfig = {
       collapsed: false,
       items: [
         {type: 'doc', id: 'exploitation/vm-centrale', label: 'Installer et mettre à jour la VM centrale'},
-        {type: 'doc', id: 'exploitation/poste-collaborateur', label: 'Installer et utiliser BBASS sur son poste'},
+        {type: 'doc', id: 'exploitation/poste-collaborateur', label: 'Installer et utiliser le Copilote BBASS sur son poste'},
         {type: 'doc', id: 'exploitation/poste-admin', label: 'Administrer les postes BBASS'},
       ],
     },

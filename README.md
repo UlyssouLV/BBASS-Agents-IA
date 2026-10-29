@@ -195,7 +195,7 @@ flowchart LR
 
 ## Démarrer
 
-Ce parcours est celui du **développement**. La VM centrale du cabinet ne s’installe plus depuis un clone : depuis la 1.6.1, elle s’installe et se met à jour à partir des images publiées à chaque Release — voir le guide admin [Installer et mettre à jour la VM centrale](docs/exploitation/vm-centrale.md). De même, depuis la 1.6.2, un poste de collaborateur s’installe avec `BBASS-Setup-vX.Y.Z.exe` de la Release et se met à jour seul — voir [Installer et utiliser BBASS sur son poste](docs/exploitation/poste-collaborateur.md) et [Administrer les postes BBASS](docs/exploitation/poste-admin.md).
+Ce parcours est celui du **développement**. La VM centrale du cabinet ne s’installe plus depuis un clone : depuis la 1.6.1, elle s’installe et se met à jour à partir des images publiées à chaque Release — voir le guide admin [Installer et mettre à jour la VM centrale](docs/exploitation/vm-centrale.md). De même, depuis la 1.6.2, un poste de collaborateur s’installe avec `BBASS-Setup-vX.Y.Z.exe` de la Release et se met à jour seul — voir [Installer et utiliser le Copilote BBASS sur son poste](docs/exploitation/poste-collaborateur.md) et [Administrer les postes BBASS](docs/exploitation/poste-admin.md).
 
 Après avoir installé les prérequis ci-dessus (Python 3.11, Docker Desktop installé ; Docker Desktop est lancé par le lanceur s’il est arrêté), le parcours officiel est : cloner le dépôt, puis double-cliquer sur l'un des deux scripts à la racine correspondant à ton OS — aucune autre commande à taper.
 

@@ -317,7 +317,7 @@ Constat (grilling 1.6.1) : la mise à jour reste déclenchée par l’admin (com
 
 **Reproductibilité :** poste installé en v1.6.2, Serveur BBASS arrêté : quitter BBASS puis le relancer → bandeau sur l’écran de connexion ; clic sur **…** → rien ne s’ouvre. Reproduit à chaque fois, dans la fenêtre BBASS comme dans le navigateur.
 
-**Impact :** tous les collaborateurs dont la mise à jour échoue ; c’est justement quand le serveur est injoignable qu’il faut **…** → **Configuration** ou **À propos** (guide poste-collaborateur, § 5), et rien n’indique qu’il faut d’abord fermer le bandeau.
+**Impact :** tous les collaborateurs dont la mise à jour échoue ; c’est justement quand le serveur est injoignable qu’il faut **…** → **Configuration** ou **À propos** (guide poste-collaborateur, « En cas de problème »), et rien n’indique qu’il faut d’abord fermer le bandeau.
 
 **Cause probable :** `BandeauMiseAJour` est en `fixed inset-x-0 top-0 z-50` par-dessus l’écran, et `MenuConfiguration` est lui aussi en haut à droite (`absolute top-4 right-4` sur l’écran de connexion, `fixed top-4 right-4` dans `App.tsx`).
 
