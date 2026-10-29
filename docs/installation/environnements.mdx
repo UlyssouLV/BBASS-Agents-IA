@@ -1,0 +1,49 @@
+import ApercuDeconnexion from '@site/src/components/connexion/ApercuDeconnexion';
+
+# Environnement : Production vs Test
+
+Le serveur du Copilote BBASS fait tourner **deux Environnements** côte à côte, sur la même machine. Ils ne partagent rien : ni comptes, ni conversations, ni version.
+
+| | Production | Test (staging) |
+| --- | --- | --- |
+| Pour qui | tous les collaborateurs | un poste d’essai |
+| Port | **`8000`** | **`8001`** |
+| Version | celle validée et promue | chaque nouvelle version, dès sa sortie |
+| Moduléo lu | serveur Moduléo du cabinet | serveur de test Kipaware |
+| Comptes et conversations | ceux de la prod | distincts, propres au test |
+
+Le poste n’a pas de bouton « prod / test » : il suit le serveur dont il a l’adresse. **Changer d’Environnement, c’est changer de port.** Au lancement suivant, le poste se met tout seul à la version de cet Environnement.
+
+:::warning Un poste d’essai seulement
+Un collaborateur laissé sur le test reçoit chaque nouvelle version avant qu’elle soit validée.
+:::
+
+## Changer d’Environnement
+
+### 1. Se déconnecter
+
+**Profil** (puce du compte, en bas de la barre latérale) → **Se déconnecter**. Une Session de la prod ne vaut pas sur le test, et inversement.
+
+<ApercuDeconnexion />
+
+### 2. Ouvrir « … » → Configuration
+
+Sur l’écran de connexion, bouton **…** en haut à droite → **Configuration**.
+
+<img src={require("../img/installation/poste-collaborateur/menu-trois-points.png").default} alt="Menu « … » de l’écran de connexion" width="380" style={{border: "1px solid #ddd", borderRadius: 6}} />
+
+### 3. Changer le port
+
+Garder le même **Hôte**, mettre le **Port** de l’Environnement voulu (`8001` pour le test, `8000` pour revenir en prod) → **Tester la connexion** (vert attendu) → **Enregistrer**.
+
+<img src={require("../img/installation/poste-collaborateur/configuration.png").default} alt="Configuration : hôte et port" width="420" style={{border: "1px solid #ddd", borderRadius: 6}} />
+
+### 4. Prendre la version de l’Environnement
+
+**…** → **À propos** → **Vérifier les mises à jour maintenant**. Le Copilote redémarre à la version du nouvel Environnement ; « Version du poste » et « Version de la VM » doivent être identiques.
+
+<img src={require("../img/installation/poste-collaborateur/a-propos.png").default} alt="À propos : versions du poste et de la VM" width="420" style={{border: "1px solid #ddd", borderRadius: 6}} />
+
+### 5. Se reconnecter
+
+Avec un compte **de cet Environnement** : un compte de la prod n’existe pas sur le test.

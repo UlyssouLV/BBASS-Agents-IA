@@ -297,7 +297,7 @@ Constat (tests humains 1.6.1, #236, scénario 10) : dans `/opt/bbass/<env>/.env`
 
 ### Migrer le compte Ubuntu One propriétaire d’Ubuntu Pro
 
-Constat (tests humains 1.6.1, #236) : Ubuntu Pro de la VM est rattaché au compte Ubuntu One `j.rasolofono@bbass.fr` (gérant du cabinet), pas à une adresse générique du cabinet. Passer l’abonnement sur un compte au nom du cabinet pour qu’il ne dépende pas d’une personne ; modalités à transmettre par le cabinet. Mettre à jour le guide [Installer et mettre à jour la VM centrale](../../exploitation/vm-centrale.md) en même temps.
+Constat (tests humains 1.6.1, #236) : Ubuntu Pro de la VM est rattaché au compte Ubuntu One `j.rasolofono@bbass.fr` (gérant du cabinet), pas à une adresse générique du cabinet. Passer l’abonnement sur un compte au nom du cabinet pour qu’il ne dépende pas d’une personne ; modalités à transmettre par le cabinet. Mettre à jour le guide [Installation du serveur du Copilote BBASS](../../installation/serveur.mdx) en même temps.
 
 ### Déploiement automatique (pull périodique ou runner à Castries)
 

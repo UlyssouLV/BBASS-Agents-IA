@@ -27,7 +27,7 @@ S’il parle d’un fichier « peu téléchargé », choisir **Conserver** (dans
 
 Le fichier n’est pas signé par un certificat Microsoft payant : Windows affiche **« Windows a protégé votre ordinateur »**. Cliquer sur **Informations complémentaires**, vérifier que l’application est bien `BBASS-Setup-vX.Y.Z.exe`, puis **Exécuter quand même**.
 
-<img src={require("../img/exploitation/poste-collaborateur/alerte-windows.png").default} alt="Alerte Windows : Exécuter quand même" width="420" style={{border: "1px solid #ddd", borderRadius: 6}} />
+<img src={require("../img/installation/poste-collaborateur/alerte-windows.png").default} alt="Alerte Windows : Exécuter quand même" width="420" style={{border: "1px solid #ddd", borderRadius: 6}} />
 
 Les mises à jour ne déclenchent plus cette alerte : le Copilote vérifie lui-même que chaque version vient bien du cabinet.
 
@@ -40,7 +40,7 @@ Les mises à jour ne déclenchent plus cette alerte : le Copilote vérifie lui-m
 | **Options** | laisser cochés **Démarrer avec Windows** et **Raccourci sur le Bureau** |
 | **Installation** | quelques secondes, puis **Lancer BBASS** |
 
-<img src={require("../img/exploitation/poste-collaborateur/assistant-serveur.png").default} alt="Étape Serveur BBASS : pastille verte" width="420" style={{border: "1px solid #ddd", borderRadius: 6}} />
+<img src={require("../img/installation/poste-collaborateur/assistant-serveur.png").default} alt="Étape Serveur BBASS : pastille verte" width="420" style={{border: "1px solid #ddd", borderRadius: 6}} />
 
 :::warning Hôte : le nom seul
 
@@ -59,13 +59,13 @@ Le Copilote s’ouvre dans sa propre fenêtre, sur l’écran de connexion. La *
 - **verte** « Connecté à BBASS vX.Y.Z » : tout va bien ;
 - **orange** « Serveur BBASS injoignable, nouvel essai… » : le problème ne vient **pas** de votre mot de passe (voir [En cas de problème](#en-cas-de-probleme)).
 
-<img src={require("../img/exploitation/poste-collaborateur/connexion-pastille-orange.png").default} alt="Pastille orange : serveur injoignable" width="320" style={{border: "1px solid #ddd", borderRadius: 6}} />
+<img src={require("../img/installation/poste-collaborateur/connexion-pastille-orange.png").default} alt="Pastille orange : serveur injoignable" width="320" style={{border: "1px solid #ddd", borderRadius: 6}} />
 
 ### Fermer la fenêtre ne l’arrête pas
 
 Le Copilote reste dans la **zone de notification**, à droite de la barre des tâches (parfois derrière la flèche **^**). Un clic sur son icône rouvre la fenêtre ; un clic droit ouvre son menu :
 
-<img src={require("../img/exploitation/poste-collaborateur/menu-icone.png").default} alt="Menu de l’icône" width="220" style={{border: "1px solid #ddd", borderRadius: 6}} />
+<img src={require("../img/installation/poste-collaborateur/menu-icone.png").default} alt="Menu de l’icône" width="220" style={{border: "1px solid #ddd", borderRadius: 6}} />
 
 | Entrée | Effet |
 | --- | --- |
@@ -79,7 +79,7 @@ Avec **Démarrer avec Windows**, le Copilote démarre en fond à l’ouverture d
 
 Le bouton **…** en haut à droite de l’écran de connexion marche **sans être connecté**. Une fois connecté, on le retrouve dans **Profil**, à côté de **Se déconnecter**.
 
-<img src={require("../img/exploitation/poste-collaborateur/menu-trois-points.png").default} alt="Menu « … »" width="380" style={{border: "1px solid #ddd", borderRadius: 6}} />
+<img src={require("../img/installation/poste-collaborateur/menu-trois-points.png").default} alt="Menu « … »" width="380" style={{border: "1px solid #ddd", borderRadius: 6}} />
 
 | Entrée | Sert à |
 | --- | --- |
@@ -91,7 +91,7 @@ Le bouton **…** en haut à droite de l’écran de connexion marche **sans êt
 
 Saisir l’**hôte** et le **port**, **Tester la connexion** (vert ou orange), puis **Enregistrer**. **Annuler** ne change rien. Si aucune adresse n’est encore réglée, cette fenêtre s’ouvre d’elle-même.
 
-<img src={require("../img/exploitation/poste-collaborateur/configuration.png").default} alt="Configuration" width="420" style={{border: "1px solid #ddd", borderRadius: 6}} />
+<img src={require("../img/installation/poste-collaborateur/configuration.png").default} alt="Configuration" width="420" style={{border: "1px solid #ddd", borderRadius: 6}} />
 
 ### Ouvrir le dossier de configuration
 
@@ -101,13 +101,13 @@ Ouvre `%LOCALAPPDATA%\BBASS` dans l’Explorateur. Le dossier **`journaux`** est
 
 Montre la version du poste, celle du serveur (« VM ») et la dernière vérification de mise à jour. **Vérifier les mises à jour maintenant** redémarre le Copilote, refait la vérification, puis rouvre « À propos » avec le résultat.
 
-<img src={require("../img/exploitation/poste-collaborateur/a-propos.png").default} alt="À propos" width="420" style={{border: "1px solid #ddd", borderRadius: 6}} />
+<img src={require("../img/installation/poste-collaborateur/a-propos.png").default} alt="À propos" width="420" style={{border: "1px solid #ddd", borderRadius: 6}} />
 
 ## 4. En cas de problème {#en-cas-de-probleme}
 
 Quand la mise à jour échoue, le Copilote **démarre quand même** sur la version installée et affiche un bandeau rouge. Le chat marche en général ; certaines fonctions récentes peuvent manquer.
 
-<img src={require("../img/exploitation/poste-collaborateur/bandeau-mise-a-jour.png").default} alt="Bandeau « Mise à jour impossible »" style={{border: "1px solid #ddd", borderRadius: 6}} />
+<img src={require("../img/installation/poste-collaborateur/bandeau-mise-a-jour.png").default} alt="Bandeau « Mise à jour impossible »" style={{border: "1px solid #ddd", borderRadius: 6}} />
 
 | Ce que vous voyez | Que faire |
 | --- | --- |

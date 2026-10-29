@@ -1,0 +1,139 @@
+# Maintenance du serveur du Copilote BBASS
+
+Ce guide s’adresse à l’admin du cabinet qui entretient le serveur central une fois [installé](./serveur.mdx). Chaque commande se copie telle quelle dans un terminal du serveur, avec un compte qui a le droit `sudo`.
+
+Le serveur porte deux Environnements, **Test** et **Production** (voir [Environnement : Production vs Test](./environnements.mdx)). Dans les commandes, chacun a son nom, ou étiquette : `staging` pour le Test (port `8001`), `prod` pour la Production (port `8000`). Les commandes ci-dessous visent la Production : remplacer `prod` par `staging` (et `8000` par `8001`) pour agir sur le Test.
+
+## 1. Mettre à jour
+
+Le Test (étiquette `staging`) reçoit chaque nouvelle version dès sa sortie ; la Production (étiquette `prod`) ne reçoit que les versions promues. Le serveur ne se met pas à jour tout seul : elle le fait **au redémarrage** ou **à la commande**.
+
+À la commande :
+
+```bash
+sudo docker run --rm --user root --privileged --pid=host --network host -v /:/hote ghcr.io/ulyssoulv/bbass-vm-centrale:prod mettre-a-jour prod
+```
+
+Ou en redémarrant le serveur (les deux Environnements se mettent à jour) :
+
+```bash
+sudo reboot
+```
+
+Dans les deux cas, la mise à jour :
+
+1. télécharge les images de l’étiquette (sans Internet, redémarre sur les images déjà présentes et le note au journal) ;
+2. si la version change, **sauvegarde la base** avant de démarrer la nouvelle version ;
+3. attend que le serveur réponde (jusqu’à 3 minutes) ;
+4. si elle ne répond pas, **remet automatiquement la version précédente** et le dit.
+
+Un téléchargement « refusé par GHCR (paquet privé ou étiquette absente) » n’est pas un problème de réseau : la version n’a pas été publiée comme il faut ; le serveur continue sur sa version actuelle, prévenir le développeur.
+
+La dernière ligne affichée dit ce qui tourne, par exemple `prod : version 1.6.1 en service.` Un retour automatique se termine par « … Version précédente X.Y.Z remise en service. » : la nouvelle version n’est pas en service, prévenir le développeur.
+
+### Promouvoir une version en Production {#promouvoir-une-version-en-prod}
+
+Une version arrive en Production quand elle a été essayée en Test. Ce geste se fait sur GitHub, par une personne ayant les droits d’écriture sur le dépôt :
+
+1. Sur [la page Actions du dépôt](https://github.com/UlyssouLV/BBASS-Agents-IA/actions/workflows/promouvoir-en-prod.yml), workflow **Promouvoir en prod** → **Run workflow**.
+2. Saisir la version, au format `vX.Y.Z` (par exemple `v1.6.1`) → **Run workflow**.
+3. Attendre la coche verte. Le workflow refuse une version qui n’est jamais passée par le Test.
+4. Sur le serveur, mettre à jour la Production (commande ci-dessus, ou redémarrage).
+
+Chaque promotion reste visible dans l’historique Actions : version, auteur, date.
+
+### Revenir à la version précédente
+
+Revenir en arrière, c’est **promouvoir l’ancienne version** (par exemple `v1.6.0`) puis mettre à jour la Production, exactement comme ci-dessus. La base n’est pas modifiée : les messages écrits depuis sont conservés. Pour remettre aussi la base dans son état d’avant, voir la section suivante.
+
+## 2. Restaurer une sauvegarde
+
+Une sauvegarde de la base est faite **avant chaque changement de version** ; les 5 dernières sont gardées par Environnement. La restauration n’est jamais automatique : elle **efface tout ce qui a été écrit depuis la sauvegarde** (conversations, comptes, réglages).
+
+Lister les sauvegardes (le nom contient la date et l’heure, en temps universel) :
+
+```bash
+sudo ls /opt/bbass/prod/sauvegardes/
+```
+
+Restaurer, en remplaçant le nom du fichier par celui choisi dans la liste :
+
+```bash
+sudo docker run --rm -it --user root --privileged --pid=host --network host -v /:/hote ghcr.io/ulyssoulv/bbass-vm-centrale:prod restaurer prod prod-20261028T091500.123456Z.sql
+```
+
+La commande demande de taper `restaurer` pour confirmer, arrête l’Environnement le temps de remettre la base, puis la redémarre. Si quoi que ce soit échoue pendant la remise, la base reste telle qu’avant.
+
+## 3. Changer une clé
+
+Pour remplacer la clé Mistral, la clé Moduléo ou le SecurityCode Moduléo d’un Environnement (clé renouvelée, Moduléo branché plus tard…), choisir la ligne correspondante :
+
+```bash
+sudo docker run --rm -it --user root --privileged --pid=host -v /:/hote ghcr.io/ulyssoulv/bbass-vm-centrale:prod configurer-secret prod MISTRAL_API_KEY_CHIFFREE
+```
+
+```bash
+sudo docker run --rm -it --user root --privileged --pid=host -v /:/hote ghcr.io/ulyssoulv/bbass-vm-centrale:prod configurer-secret prod MODULEO_API_KEY_CHIFFREE
+```
+
+```bash
+sudo docker run --rm -it --user root --privileged --pid=host -v /:/hote ghcr.io/ulyssoulv/bbass-vm-centrale:prod configurer-secret prod MODULEO_SECURITY_CODE_CHIFFRE
+```
+
+La commande demande la nouvelle valeur (non affichée), la chiffre, puis redémarre l’Environnement **sur sa version en service** : changer une clé ne déclenche jamais de mise à jour. Pour retirer Moduléo, laisser la valeur vide.
+
+## 4. Où sont les données {#ou-sont-les-donnees}
+
+Pour chaque Environnement (ici la Production, `prod`) :
+
+| Emplacement | Contenu |
+| --- | --- |
+| `/opt/bbass/prod/.env` | réglages et clés chiffrées ; lisible par root seul ; **ne pas modifier à la main** (utiliser `configurer-secret`) |
+| `/opt/bbass/prod/donnees/postgres/` | la base de données |
+| `/opt/bbass/prod/donnees/pieces_jointes/` | les pièces jointes envoyées dans le chat |
+| `/opt/bbass/prod/sauvegardes/` | les 5 dernières sauvegardes de la base |
+| `/etc/bbass/prod/cle-maitre` | la clé maître qui déchiffre les clés du `.env` |
+
+:::warning Les sauvegardes sont sur le même disque
+Elles protègent contre une mise à jour ratée, **pas contre la perte du serveur**. Les pièces jointes ne sont pas sauvegardées. Une copie hors du serveur est prévue plus tard ; en attendant, s’appuyer sur les sauvegardes de la VM elle-même (instantanés de l’hyperviseur).
+:::
+
+Si le fichier de clé maître est perdu (restauration partielle de la VM…), le recréer avec la valeur rangée dans le gestionnaire de mots de passe, en remplaçant `<clé maître>` :
+
+```bash
+sudo mkdir -p -m 700 /etc/bbass/prod
+echo -n '<clé maître>' | sudo tee /etc/bbass/prod/cle-maitre > /dev/null
+sudo chown 10001 /etc/bbass/prod/cle-maitre
+sudo chmod 400 /etc/bbass/prod/cle-maitre
+sudo systemctl restart bbass-vm-prod
+```
+
+## 5. Surveiller
+
+### État d’un Environnement
+
+```bash
+systemctl status bbass-vm-prod
+curl http://localhost:8000/sante
+cd /opt/bbass/prod && sudo docker compose ps
+```
+
+`docker compose ps` liste les trois conteneurs de l’Environnement (`vm-centrale`, `postgres`, `searxng`).
+
+### Journal des mises à jour
+
+Mises à jour, sauvegardes, retours automatiques et restaurations, qu’ils viennent d’une commande ou d’un redémarrage :
+
+```bash
+sudo journalctl -t bbass-vm-prod
+```
+
+Ajouter `-e` pour aller directement aux dernières lignes, `--since today` pour la journée.
+
+### Tâches planifiées
+
+Le serveur lance seul ses tâches d’entretien, dans chaque Environnement :
+
+| Tâche | Quand | Ce qu’elle fait |
+| --- | --- | --- |
+| `purger-cache-pages` | toutes les heures | efface les pages web expirées du cache commun |
