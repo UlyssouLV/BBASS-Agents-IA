@@ -187,6 +187,22 @@ Corriger le bug [#131](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/131),
 
 **Suivi :** [#170](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/170) (`bug`). Trouvé dans : 1.4.4 · Contexte : test humain · Date : 2026-10-07 · Priorité : non prioritaire en dev.
 
+### Bug — heure de l'inspecteur, titre de carte en jargon et confirmation en texte avant la carte (#256)
+
+**Constat :** trois défauts mineurs du premier passage des tests humains V1.5.2 (#206) : l'inspecteur affiche les heures une heure en retard (11:07 pour 12:07, heure de Paris) ; la carte d'écriture reprend la description de la route de la doc Moduléo (« Met à jour une tâche à faire en fonction de son identifiant unique. ») ; le modèle demande souvent une confirmation en texte avant de proposer la carte.
+
+**Reproductibilité :** comparer une heure de l'inspecteur à l'heure locale ; lire le titre d'une carte de modification de tâche à faire ; demander la création d'une tâche à faire sans « propose directement la carte » (question en texte 3 fois sur 8 au premier passage).
+
+**Impact :** lecture moins claire (heure fausse, titre technique) et un tour de chat de plus avant de pouvoir confirmer ; aucune écriture fausse.
+
+**Cause probable :** heures en UTC affichées sans conversion ; titre de carte = description de la route ; consigne système « pose la question de confirmation » qui prend le pas sur la carte.
+
+**À corriger :** heures de l'inspecteur en heure de Paris, lisibles par un humain (« 29 octobre 2026 à 12:07 », pas un format technique), et même règle pour les dates de la carte (« 15 novembre 2026 » au lieu de « 2026-11-15T00:00:00+01:00 ») ; titre de carte en langage métier ; carte proposée directement quand la demande d'écriture est claire.
+
+**Hors périmètre :** fausses cartes et écritures annoncées sans carte (#252) ; ids non résolus et phrase coupée (#254) ; refonte du style de la carte (Agents par pôle).
+
+**Suivi :** [#256](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/256) (`bug`, captures en pièce jointe). Trouvé dans : 1.5.2 · Contexte : test humain · Date : 2026-10-29 · Priorité : non prioritaire en dev.
+
 ### Agent IA de continuation du développement, validation par compte administrateur
 
 Constat (grilling 1.2.0) : à terme, plus aucune personne qualifiée ne sera sur place pour faire évoluer le logiciel elle-même. L'évolution du code (nouvelles versions, corrections, nouveaux Agents métier) serait alors portée par un agent IA dédié à la continuation du développement, avec un compte administrateur qui ne fait que **valider** (approuver/refuser) les changements proposés, sans avoir à coder ni à relire le code en détail.
@@ -264,6 +280,16 @@ Constat (grilling 1.5.1) : les droits de la clé d’API Moduléo font foi sur c
 ### Restriction d’accès Moduléo par affaire
 
 Constat (grilling 1.5.1) : Moduléo peut limiter l’accès à certaines affaires (« Limiter l’accès à des affaires aux autres collaborateurs », groupes rattachés à une affaire). La copie des droits de la 1.5.1 ne s’applique qu’aux catégories, pas affaire par affaire. Piste : lire les groupes de chaque affaire trouvée et filtrer les fiches dans le garde des droits.
+
+### Serveur MCP Moduléo
+
+Constat (spec 1.5.2, tests humains [#206](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/206)) : BBASS parle à Moduléo par des outils écrits dans la VM (lecture typée, puis `decrire_ecriture_moduleo` / `ecrire_moduleo` génériques). L’API de Kipaware ne lit certains éléments que par leur id, sans liste ni recherche par nom (catégories de tâche à faire `moduleo/categorietacheafaire/{id}`, de note `cogeo/categorienote/{id}`) : depuis la 1.5.2, le modèle dit au collaborateur qu’il ne peut pas retrouver « Terrain » à partir de son nom, au lieu de deviner un id.
+
+**Objectif.** Un serveur MCP (Model Context Protocol) Moduléo expose aux modèles, de façon standard, les lectures et les écritures Moduléo de BBASS, et ajoute ce qui manque au chat : retrouver par son nom un élément que l’API ne lit que par id (catégories de tâche à faire, de note…), en construisant la correspondance nom → id (lecture des ids un à un, mise en cache) faute de route de liste, ou par une route de liste si Kipaware en ouvre une. Les garanties de la 1.5.2 restent : garde des droits, carte de confirmation, serveur de test seulement pour l’écriture, ids jamais à l’écran.
+
+**Prise en main** (premier serveur MCP du projet) : partir de l’introduction officielle [modelcontextprotocol.io — Getting started](https://modelcontextprotocol.io/docs/2026-07-28/getting-started/intro), puis ses pages « Architecture » (concepts : hôte, client, serveur), « Build servers » (construire un serveur ; choisir le SDK Python) et « Security » (bonnes pratiques). Prévoir une recherche dans `docs/dev/recherches/` avant d’ouvrir la version : où tourne le serveur (dans la VM centrale ou à côté), transport, et ce qui remplace ou enveloppe les outils actuels.
+
+**Hors périmètre.** Écriture sur le serveur Moduléo du cabinet (décision à part) ; ouvrir le serveur MCP à des clients hors BBASS ; demander à Kipaware une route de liste (démarche à mener en parallèle, sans bloquer).
 
 ### Doc-site : administration des groupes et droits Moduléo (hors version)
 
