@@ -35,11 +35,13 @@ export function AssistantInstallation() {
   const [raccourciBureau, setRaccourciBureau] = useState(true);
 
   useEffect(() => {
-    lireInformations().then((lues) => {
-      setInformations(lues);
-      setHote(lues.hote);
-      setPort(String(lues.port));
-    });
+    lireInformations()
+      .then((lues) => {
+        setInformations(lues);
+        setHote(lues.hote);
+        setPort(String(lues.port));
+      })
+      .catch((erreur: unknown) => console.error("Informations du Setup non lues :", erreur));
   }, []);
 
   return (
@@ -179,9 +181,13 @@ function EtapeServeur({ hote, port, onHote, onPort, onRetour, onContinuer }: Rea
     let abandonne = false;
     setEtat("test");
     const minuterie = setTimeout(() => {
-      testerServeur(hote.trim(), Number(port)).then((resultat) => {
-        if (!abandonne) setEtat(resultat);
-      });
+      testerServeur(hote.trim(), Number(port))
+        .then((resultat) => {
+          if (!abandonne) setEtat(resultat);
+        })
+        .catch(() => {
+          if (!abandonne) setEtat({ joignable: false, version: null });
+        });
     }, DELAI_AVANT_TEST_MS);
     return () => {
       abandonne = true;
@@ -205,7 +211,7 @@ function EtapeServeur({ hote, port, onHote, onPort, onRetour, onContinuer }: Rea
           <Label htmlFor="setup-hote">Hôte</Label>
           <Input
             id="setup-hote"
-            placeholder="10.0.0.5"
+            placeholder="serveur-bbass"
             required
             autoFocus
             value={hote}

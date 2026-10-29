@@ -62,13 +62,18 @@ def oublier_la_configuration_lue() -> None:
     _derniere_lecture = None
 
 
+def adresse_http(hote: str, port: int) -> str:
+    """Adresse d'un Serveur BBASS : HTTP, il est joint sur le réseau local du cabinet (ADR-0022)."""
+    return f"http://{hote}:{port}"  # NOSONAR python:S5332 — Serveur BBASS sur le réseau local, sans TLS.
+
+
 def adresse_serveur_bbass() -> str:
     """Adresse du Serveur BBASS, relue dès que le fichier change en mode paquet :
     la Configuration (menu « … ») vaut sans redémarrer ni réinstaller."""
     if not EN_MODE_PAQUET:
         return VM_CENTRALE_BASE_URL
     serveur = lire_serveur_bbass()
-    return f"http://{serveur[0]}:{serveur[1]}" if serveur else ADRESSE_PROD
+    return adresse_http(*serveur) if serveur else ADRESSE_PROD
 
 
 if not EN_MODE_PAQUET:

@@ -76,7 +76,7 @@ def lire_configuration() -> ConfigurationResponse:
 def tester_la_connexion(
     requete: ServeurBbassRequest, client: httpx.Client = Depends(get_client_sante)
 ) -> EtatServeurBbassResponse:
-    return etat_a_l_adresse(client, f"http://{requete.hote.strip()}:{requete.port}")
+    return etat_a_l_adresse(client, config.adresse_http(requete.hote.strip(), requete.port))
 
 
 @router.put("/configuration")
@@ -87,14 +87,15 @@ def enregistrer_la_configuration(requete: ServeurBbassRequest) -> ConfigurationR
             detail="En développement, l'adresse du Serveur BBASS se règle dans le fichier .env (VM_CENTRALE_BASE_URL).",
         )
     fichier = config.FICHIER_CONFIGURATION
-    # Les autres réglages du fichier (démarrage avec Windows…) sont gardés.
+    # Le choix « démarrer avec Windows » du Setup est gardé ; seuls les
+    # réglages connus sont réécrits, pas le contenu lu tel quel.
+    contenu: dict[str, object] = {"serveur_bbass": {"hote": requete.hote.strip(), "port": requete.port}}
     try:
-        contenu = json.loads(fichier.read_text(encoding="utf-8"))
-        if not isinstance(contenu, dict):
-            contenu = {}
+        existant = json.loads(fichier.read_text(encoding="utf-8"))
+        if isinstance(existant, dict) and isinstance(existant.get("demarrage_windows"), bool):
+            contenu["demarrage_windows"] = existant["demarrage_windows"] is True
     except (OSError, ValueError):
-        contenu = {}
-    contenu["serveur_bbass"] = {"hote": requete.hote.strip(), "port": requete.port}
+        pass
     try:
         fichier.parent.mkdir(parents=True, exist_ok=True)
         provisoire = fichier.with_suffix(".json.tmp")

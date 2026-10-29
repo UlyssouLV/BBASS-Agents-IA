@@ -277,9 +277,15 @@ Pas de travail avant que le besoin se confirme — portée très différente d'u
 
 Constat (grilling 1.6.1) : la base de la VM se crée au démarrage et ne sait qu’**ajouter** tables et colonnes ([ADR-0008](../../adr/0008-postgresql-vm-centrale.md)). Alembic transformerait chaque changement de schéma en script numéroté, appliqué dans l’ordre au démarrage. **Déclencheur** : la première version qui renomme ou supprime une colonne, ou déplace des données.
 
-### HTTPS sur le LAN
+### HTTPS partout : poste, réseau du cabinet et services internes de la VM
 
-Constat (grilling 1.6.1) : la VM n’est servie qu’en HTTP, acceptable tant qu’elle reste sur le LAN de Castries ([ADR-0003](../../adr/0003-v1-scope-castries-seule.md)). À reprendre avec l’ouverture aux satellites ou à Internet, ou si le cabinet l’exige pour le LAN.
+Constat (grilling 1.6.1, puis quality gate Sonar de la 1.6.2, PR #248) : la VM n’est servie qu’en HTTP sur le LAN de Castries ([ADR-0003](../../adr/0003-v1-scope-castries-seule.md), [ADR-0021](../../adr/0021-cd-vm-centrale-staging-prod.md)). Entre le poste et le Serveur BBASS passent donc en clair les mots de passe, les jetons de session, les conversations, les pièces jointes et les données Moduléo : tout appareil du réseau peut les lire ou se faire passer pour le Serveur BBASS. L’alerte Sonar (`python:S5332`) est acceptée pour l’instant par un `# NOSONAR` dans `poste/src/poste/config.py` (`adresse_http`).
+
+**Objectif.** Tous les échanges de BBASS passent en HTTPS, internes compris, avec vérification du certificat : backend poste et Lanceur vers le Serveur BBASS, test du Setup, fenêtre BBASS vers le backend du poste (`127.0.0.1:8100`), VM vers Postgres et SearXNG, script de mise à jour de la VM. Le passage se fait sans casser les postes déjà installés : la VM sert HTTP et HTTPS le temps que les postes se mettent à jour, puis l’admin ferme l’HTTP. Le collaborateur n’a rien à installer à la main ; l’admin confirme une seule fois l’empreinte du certificat du cabinet au Setup.
+
+**Orientation technique (à trancher au grilling).** Méthodes détaillées, avantages et limites dans la note [HTTPS sur tous les échanges BBASS](../recherches/recherche-https-partout.md) : reverse proxy TLS devant la VM (Caddy recommandé) ou TLS dans uvicorn ; certificat d’une autorité interne épinglée dans les clients BBASS (recommandé), certificat public Let’s Encrypt par défi DNS sur un nom du cabinet, PKI Active Directory du cabinet, ou auto-signé épinglé ; Postgres en `verify-full` et SearXNG derrière le proxy ; pour la boucle locale du poste, HTTP gardé et assumé par ADR, certificat par poste accepté par WebView2, ou plus de port TCP (IPC Tauri). Décision figée dans un ADR qui révise l’ADR-0021, et retrait du `# NOSONAR`.
+
+**Hors périmètre.** TLS mutuel (certificat par poste), VPN, ouverture aux satellites ou à Internet.
 
 ### Sauvegarde nocturne et copie hors de la VM
 

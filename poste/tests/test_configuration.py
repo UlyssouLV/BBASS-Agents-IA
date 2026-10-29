@@ -133,8 +133,8 @@ def test_une_adresse_invalide_est_refusee(client, fichier_configuration, serveur
     assert not fichier_configuration.exists()
 
 
-def test_enregistrer_ecrit_l_adresse_et_garde_les_autres_reglages(client, fichier_configuration):
-    _ecrire(fichier_configuration, {"serveur_bbass": {"hote": "10.0.0.5", "port": 8000}, "demarrage_avec_windows": False})
+def test_enregistrer_ecrit_l_adresse_et_garde_le_demarrage_avec_windows(client, fichier_configuration):
+    _ecrire(fichier_configuration, {"serveur_bbass": {"hote": "10.0.0.5", "port": 8000}, "demarrage_windows": False})
 
     reponse = client.put("/configuration", json={"hote": " 10.0.0.6 ", "port": 8001})
 
@@ -142,7 +142,7 @@ def test_enregistrer_ecrit_l_adresse_et_garde_les_autres_reglages(client, fichie
     assert reponse.json() == {"hote": "10.0.0.6", "port": 8001, "modifiable": True}
     assert json.loads(fichier_configuration.read_text(encoding="utf-8")) == {
         "serveur_bbass": {"hote": "10.0.0.6", "port": 8001},
-        "demarrage_avec_windows": False,
+        "demarrage_windows": False,
     }
     assert client.get("/configuration").json()["hote"] == "10.0.0.6"
 

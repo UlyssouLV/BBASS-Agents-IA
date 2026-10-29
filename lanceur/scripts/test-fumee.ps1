@@ -22,7 +22,10 @@ try {
         try {
             $reponse = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 5
             if ($reponse.StatusCode -eq 200 -and $reponse.Content -match "<div id=`"root`">") { $repond = $true; break }
-        } catch { }
+        } catch {
+            # Backend pas encore à l'écoute : nouvel essai dans une seconde.
+            Write-Verbose "Pas encore de réponse sur ${url} : $($_.Exception.Message)"
+        }
         Start-Sleep -Seconds 1
     }
     if ($lanceur.HasExited) { throw "BBASS.exe s'est arrêté (code $($lanceur.ExitCode)) avant que le backend réponde." }

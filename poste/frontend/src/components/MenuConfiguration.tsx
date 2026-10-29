@@ -135,7 +135,7 @@ function FormulaireConfiguration({ configuration, onFermer }: Readonly<Formulair
             <Label htmlFor="configuration-hote">Hôte</Label>
             <Input
               id="configuration-hote"
-              placeholder="10.0.0.5"
+              placeholder="serveur-bbass"
               required
               value={hote}
               onChange={(evenement) => modifier(() => setHote(evenement.target.value))}
