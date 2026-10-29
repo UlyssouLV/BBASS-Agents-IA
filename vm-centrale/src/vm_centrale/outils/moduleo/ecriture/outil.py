@@ -12,7 +12,7 @@ from vm_centrale.moduleo.carte import (
     lignes_en_noms,
 )
 from vm_centrale.moduleo.client import ErreurModuleo, LecteurModuleo, RequeteInterdite
-from vm_centrale.moduleo.droits import DroitManquant, DroitsModuleo, ecriture_possible
+from vm_centrale.moduleo.droits import DroitManquant, DroitsModuleo, ecriture_possible, refus_d_ecriture
 from vm_centrale.moduleo.ecritures import REFUSEE, carte_de, proposer
 from vm_centrale.moduleo.relecture import RELECTURES, ElementIntrouvable, relire
 from vm_centrale.moduleo.resolution import IDS_SANS_RECHERCHE_PAR_NOM
@@ -123,6 +123,14 @@ def _executer_decrire(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
     nom = arguments.get("route")
     decrite = _route_ouverte(contexte, nom)
     if decrite is None:
+        # Route classée mais hors des droits du compte : la phrase du garde
+        # nomme le droit manquant (#255).
+        connue = _route_connue(nom)
+        if connue is not None and _routes_ouvertes(contexte):
+            refus = refus_d_ecriture(connue.methode, connue.route, contexte.droits_moduleo)
+            if refus is not None:
+                logger.info("Garde des droits Moduléo : %s", refus.refus)
+                return ResultatOutil(refus.phrase, trace={"route": _nom_route(connue), "garde_des_droits": refus.refus})
         return ResultatOutil(_ROUTE_INCONNUE.format(route=nom or ""))
     parametres = ", ".join(f"{p} ({t})" for p, t in decrite.parametres.items()) or "aucun"
     corps = (

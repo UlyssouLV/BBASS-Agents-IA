@@ -928,6 +928,87 @@ def test_note_sans_le_droit_refusee_par_le_garde_sans_carte(
     )
 
 
+# Route classée mais non ouverte au compte (#255, tests humains #206,
+# scénario 20 bis) : la phrase du garde nomme le droit manquant, dès
+# decrire_ecriture_moduleo.
+
+_MODIFIER_TACHE = "PUT moduleo/tacheafaire/{idTacheAFaire}"
+_SANS_EDITION_TACHE = (
+    "Votre compte n'a pas le droit Moduléo « Supprimer / Éditer les tâches à faire dont il n'est pas le créateur ». "
+    "Rien n'a été écrit. Demandez à un compte administrateur si vous en avez besoin."
+)
+
+
+def test_decrire_route_hors_des_droits_du_compte_nomme_le_droit_manquant(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide, db_session
+):
+    # Groupe Cogeo sans droit : la note reste ouverte, la tâche à faire non.
+    _groupe_cogeo(db_session)
+    mistral_client_factice.repondre_avec_appel_outil(_DECRIRE, {"route": _MODIFIER_TACHE})
+    mistral_client_factice.repondre("Votre compte n'a pas ce droit.", "Titre")
+
+    reponse = client.post(
+        "/conversations", json={"message": "Renomme la tâche à faire 5"}, headers=_autorisation(jeton_valide)
+    )
+
+    assert _resultat_outil(mistral_client_factice) == _SANS_EDITION_TACHE
+    assert _cartes(reponse) == []
+    assert faux_moduleo.appels == [] and faux_moduleo.ecritures == []
+    assert _journal(db_session) == []
+    db_session.expire_all()
+    (echange,) = db_session.query(EchangeInspecteur).filter_by(type_appel=f"outil:{_DECRIRE}").all()
+    assert echange.reponse_payload["garde_des_droits"] == (
+        "refusé, droit manquant « Tâches à faire › Supprimer / Éditer les tâches à faire dont il n'est pas le "
+        "créateur » (PUT moduleo/tacheafaire/{idTacheAFaire})"
+    )
+
+
+def _groupe_planning_avec_ecriture(db_session) -> None:
+    # Rattache j.dupont au seul groupe Planning « Test », avec « Créer une tâche ».
+    groupe = GroupeModuleo(application=PLANNING, nom="Test")
+    db_session.add(groupe)
+    db_session.flush()
+    droit = db_session.query(DroitModuleo).filter_by(chemin="Planning › Créer une tâche").one()
+    db_session.add(GroupeModuleoDroit(groupe_id=groupe.id, droit_id=droit.id))
+    rattacher(db_session, "j.dupont", None, "Test", None)
+    db_session.commit()
+
+
+def test_decrire_sans_le_groupe_de_l_application_le_nomme(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide, db_session
+):
+    # Groupe Planning seul, avec un droit d'écriture qui ouvre les outils :
+    # une route Cogeo demandée, le groupe Cogeo manque.
+    _groupe_planning_avec_ecriture(db_session)
+    mistral_client_factice.repondre_avec_appel_outil(_DECRIRE, {"route": _MODIFIER_TACHE})
+    mistral_client_factice.repondre("Non.", "Titre")
+
+    client.post("/conversations", json={"message": "Renomme la tâche"}, headers=_autorisation(jeton_valide))
+
+    assert _resultat_outil(mistral_client_factice) == (
+        "Votre compte n'est rattaché à aucun groupe Moduléo Cogeo. Rien n'a été écrit. "
+        "Demandez à un compte administrateur si vous en avez besoin."
+    )
+
+
+def test_ecrire_route_hors_des_droits_du_compte_nomme_le_droit_manquant_sans_carte(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide, db_session
+):
+    _groupe_cogeo(db_session)
+    tache = {
+        "route": _MODIFIER_TACHE,
+        "parametres": {"idTacheAFaire": 5},
+        "corps": {"IdTacheAFaire": 5, "Libelle": "Relancer le client"},
+    }
+
+    reponse = _proposer(client, mistral_client_factice, jeton_valide, tache)
+
+    assert _resultat_outil(mistral_client_factice) == _SANS_EDITION_TACHE
+    assert _cartes(reponse) == []
+    assert faux_moduleo.appels == [] and faux_moduleo.ecritures == []
+    assert [(e.statut, e.carte) for e in _journal(db_session)] == [("refusee", None)]
+
+
 # PUT partiel (#251) : le PUT de Moduléo remet à vide un champ absent du
 # corps, sauf `ProprietesModifiees`. La VM y met les seuls champs de la
 # carte : un champ non annoncé garde sa valeur.

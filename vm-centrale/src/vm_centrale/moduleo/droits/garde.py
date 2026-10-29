@@ -302,6 +302,21 @@ def ecriture_possible(methode: str, route: str, droits: DroitsModuleo) -> bool:
     )
 
 
+def refus_d_ecriture(methode: str, route: str, droits: DroitsModuleo) -> DroitManquant | None:
+    # Une route classée, non fermée, que ecriture_possible n'ouvre pas au
+    # compte : le refus qui nomme le groupe ou le droit manquant (#255).
+    # None si elle s'ouvre, ou si elle n'est ouverte à aucun compte.
+    exigence = CLASSEMENT_ECRITURE.get((methode, route))
+    if exigence is None or exigence.fermee or ecriture_possible(methode, route, droits):
+        return None
+    if exigence.groupe is not None:
+        return _sans_groupe(exigence.groupe, _SANS_ECRITURE)
+    application = _APPLICATIONS[exigence.droit]
+    if _groupe(droits, application) is None:
+        return _sans_groupe(application, _SANS_ECRITURE)
+    return _droit_manquant(exigence.droit, f"{methode} {route}", _SANS_ECRITURE)
+
+
 def autorise(route: str, droits: DroitsModuleo, parametres: dict[str, Any] | None = None) -> bool:
     try:
         verifier(route, droits, parametres)
