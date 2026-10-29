@@ -150,6 +150,18 @@ def ecriture_confirmee(db: Session, conversation_id: int) -> bool:
     )
 
 
+def ids_renvoyes(db: Session, conversation_id: int) -> set[tuple[str, str]]:
+    # (route, id) de chaque création confirmée de la Conversation dont
+    # Moduléo a renvoyé l'id (#257) : le modèle peut encore la désigner.
+    lignes = db.query(EcritureModuleo.route, EcritureModuleo.id_renvoye).filter(
+        EcritureModuleo.conversation_id == conversation_id,
+        EcritureModuleo.statut == CONFIRMEE,
+        EcritureModuleo.methode == "POST",
+        EcritureModuleo.id_renvoye.is_not(None),
+    )
+    return {(route, id_renvoye) for route, id_renvoye in lignes}
+
+
 def rattacher_ecritures_au_message(db: Session, message: Message) -> None:
     # Les écritures sans message sont celles de ce tour.
     db.flush()

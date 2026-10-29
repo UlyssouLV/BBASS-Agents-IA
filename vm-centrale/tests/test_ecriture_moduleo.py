@@ -196,7 +196,7 @@ def test_decrire_signale_les_champs_sans_moyen_de_retrouver_l_id_par_un_nom(
 
     client.post("/conversations", json={"message": "Quels champs ?"}, headers=_autorisation(jeton_valide))
 
-    assert _resultat_outil(mistral_client_factice).endswith(_SANS_RECHERCHE.format(champs=champs))
+    assert _SANS_RECHERCHE.format(champs=champs) in _resultat_outil(mistral_client_factice)
 
 
 def test_decrire_sans_champ_de_ce_genre_ne_signale_rien(
@@ -662,18 +662,64 @@ def _supprimer(route: str, **parametres) -> dict:
     return {"route": f"DELETE {route}", "parametres": parametres}
 
 
+# Aucune fiche ne donne l'id d'un téléphone, d'une note ou d'une tâche à
+# faire (#257) : seul celui d'une création confirmée de la Conversation
+# permet de la modifier ou de la supprimer.
+_TELEPHONE_CREE = "moduleo/telephone"
+_NOTE_CREEE = "cogeo/note"
+_CREATIONS = {
+    "moduleo/telephone": _CORPS_TELEPHONE,
+    "cogeo/note": {"Message": "Rappeler le client", "IdAffaire": 12},
+    "moduleo/tacheafaire": {"Libelle": "Relancer"},
+}
+
+
+def _cree_dans_la_conversation(client, faux_moduleo, mistral_client_factice, jeton: str, route: str, id_cree) -> int:
+    # Propose et confirme la création ; Moduléo renvoie `id_cree`. Renvoie
+    # l'id de la Conversation, sans écriture ni lecture gardée par le faux.
+    creation = {"route": f"POST {route}", "parametres": {}, "corps": _CREATIONS[route]}
+    reponse = _proposer(client, mistral_client_factice, jeton, creation)
+    (carte,) = _cartes(reponse)
+    faux_moduleo.reponse_ecriture = id_cree
+    assert _decider(client, jeton, carte["id"]).json()["statut"] == "confirmee"
+    faux_moduleo.ecritures.clear()
+    faux_moduleo.appels.clear()
+    return fin(reponse)["conversation"]["id"]
+
+
+def _proposer_dans(client, mistral_client_factice, jeton: str, conversation_id: int, *appels: dict):
+    # Message suivant de la Conversation, qui appelle ecrire_moduleo.
+    mistral_client_factice.repondre_avec_appels_outils([(_ECRIRE, arguments, "") for arguments in appels])
+    mistral_client_factice.repondre("Voici la carte.", resume_et_profil=_resume_et_profil())
+    return client.post(
+        f"/conversations/{conversation_id}/messages", json={"message": "Modifie-le"}, headers=_autorisation(jeton)
+    )
+
+
+def _proposer_apres_creation(
+    client, faux_moduleo, mistral_client_factice, jeton: str, route: str, id_cree, *appels: dict
+):
+    conversation_id = _cree_dans_la_conversation(client, faux_moduleo, mistral_client_factice, jeton, route, id_cree)
+    return _proposer_dans(client, mistral_client_factice, jeton, conversation_id, *appels)
+
+
+def _dernier_resultat(mistral_client_factice) -> str:
+    return _resultat_outil(mistral_client_factice, appel=-1)
+
+
 def test_put_relit_l_element_et_la_carte_montre_les_seuls_champs_modifies_en_noms(
     client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide
 ):
     _telephone_existant(faux_moduleo)
 
-    reponse = _proposer(
-        client, mistral_client_factice, jeton_valide, _modifier_telephone(IdContact=41, Numero="04 67 11 11 11")
+    reponse = _proposer_apres_creation(
+        client, faux_moduleo, mistral_client_factice, jeton_valide, _TELEPHONE_CREE, 30,
+        _modifier_telephone(IdContact=41, Numero="04 67 11 11 11"),
     )
 
     assert (_TELEPHONE_EXISTANT, {"idTelephone": 30}) in faux_moduleo.appels
     assert faux_moduleo.ecritures == []
-    assert _resultat_outil(mistral_client_factice).startswith(_PROPOSEE)
+    assert _dernier_resultat(mistral_client_factice).startswith(_PROPOSEE)
     (carte,) = _cartes(reponse)
     assert (carte["methode"], carte["statut"], carte["rubrique"]) == ("PUT", "proposee", None)
     # « Met à jour un … en fonction de son identifiant unique. » (#256).
@@ -707,13 +753,15 @@ def test_put_sans_aucun_changement_pas_de_carte(
 ):
     _telephone_existant(faux_moduleo)
 
-    reponse = _proposer(client, mistral_client_factice, jeton_valide, _modifier_telephone())
+    reponse = _proposer_apres_creation(
+        client, faux_moduleo, mistral_client_factice, jeton_valide, _TELEPHONE_CREE, 30, _modifier_telephone()
+    )
 
     assert _cartes(reponse) == []
-    assert _resultat_outil(mistral_client_factice) == (
+    assert _dernier_resultat(mistral_client_factice) == (
         "Écriture non proposée : le corps ne change aucun champ de l'élément visé. Rien n'a été écrit."
     )
-    assert _journal(db_session) == []
+    assert [e.methode for e in _journal(db_session)] == ["POST"]
 
 
 # Élément visé d'un PUT (#253, test humain #206) : la carte ne disait pas
@@ -753,7 +801,10 @@ def test_put_sans_fiche_de_lecture_l_element_vise_en_noms(
 ):
     _telephone_existant(faux_moduleo)
 
-    reponse = _proposer(client, mistral_client_factice, jeton_valide, _modifier_telephone(Numero="04 67 11 11 11"))
+    reponse = _proposer_apres_creation(
+        client, faux_moduleo, mistral_client_factice, jeton_valide, _TELEPHONE_CREE, 30,
+        _modifier_telephone(Numero="04 67 11 11 11"),
+    )
 
     (carte,) = _cartes(reponse)
     assert carte["fiche"] == "Numero : 04 67 00 00 00\nLieu : Bureau\nContact : Étude Dupont"
@@ -784,8 +835,9 @@ def test_delete_sans_fiche_existante_les_champs_en_noms(
 ):
     _telephone_existant(faux_moduleo)
 
-    reponse = _proposer(
-        client, mistral_client_factice, jeton_valide, _supprimer(_TELEPHONE_EXISTANT, idTelephone=30)
+    reponse = _proposer_apres_creation(
+        client, faux_moduleo, mistral_client_factice, jeton_valide, _TELEPHONE_CREE, 30,
+        _supprimer(_TELEPHONE_EXISTANT, idTelephone=30),
     )
 
     (carte,) = _cartes(reponse)
@@ -805,13 +857,16 @@ def test_delete_sans_fiche_existante_les_champs_en_noms(
 def test_element_introuvable_a_la_relecture_pas_de_carte_phrase_fixe(
     client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide, appel
 ):
+    # Créé dans la Conversation, puis supprimé hors du chat.
     _telephone_existant(faux_moduleo)
 
-    reponse = _proposer(client, mistral_client_factice, jeton_valide, appel)
+    reponse = _proposer_apres_creation(
+        client, faux_moduleo, mistral_client_factice, jeton_valide, _TELEPHONE_CREE, 999, appel
+    )
 
     assert _cartes(reponse) == []
     assert faux_moduleo.ecritures == []
-    assert _resultat_outil(mistral_client_factice) == _INTROUVABLE_A_LA_RELECTURE
+    assert _dernier_resultat(mistral_client_factice) == _INTROUVABLE_A_LA_RELECTURE
 
 
 def _groupe_cogeo(db_session, *chemins: str) -> None:
@@ -832,6 +887,9 @@ def test_relecture_refusee_par_le_garde_pas_de_carte_phrase_fixe(
     # dont il n'est pas le créateur » mais se lit avec « Voir les tâches à
     # faire des autres » : sans ce dernier, la VM ne peut pas montrer ce qui
     # changerait.
+    conversation_id = _cree_dans_la_conversation(
+        client, faux_moduleo, mistral_client_factice, jeton_valide, "moduleo/tacheafaire", 5
+    )
     _groupe_cogeo(db_session, "Tâches à faire › Supprimer / Éditer les tâches à faire dont il n'est pas le créateur")
     tache = {
         "route": "PUT moduleo/tacheafaire/{idTacheAFaire}",
@@ -839,7 +897,7 @@ def test_relecture_refusee_par_le_garde_pas_de_carte_phrase_fixe(
         "corps": {"IdTacheAFaire": 5, "Libelle": "Relancer le client"},
     }
 
-    reponse = _proposer(client, mistral_client_factice, jeton_valide, tache)
+    reponse = _proposer_dans(client, mistral_client_factice, jeton_valide, conversation_id, tache)
 
     assert _cartes(reponse) == []
     assert faux_moduleo.appels == [] and faux_moduleo.ecritures == []
@@ -847,8 +905,8 @@ def test_relecture_refusee_par_le_garde_pas_de_carte_phrase_fixe(
         "Votre compte ne peut pas lire l'élément visé dans Moduléo : écriture non proposée. Rien n'a été écrit. "
         "Demandez à un compte administrateur si vous en avez besoin."
     )
-    assert _resultat_outil(mistral_client_factice) == phrase
-    assert [(e.statut, e.carte, e.erreur) for e in _journal(db_session)] == [("refusee", None, phrase)]
+    assert _dernier_resultat(mistral_client_factice) == phrase
+    assert [(e.statut, e.carte, e.erreur) for e in _journal(db_session)][1:] == [("refusee", None, phrase)]
 
 
 @pytest.mark.parametrize(
@@ -877,7 +935,11 @@ def test_confirmer_put_ou_delete_une_seule_requete_avec_la_bonne_methode(
     client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide, db_session, appel, attendue
 ):
     _telephone_existant(faux_moduleo)
-    (carte,) = _cartes(_proposer(client, mistral_client_factice, jeton_valide, appel))
+    (carte,) = _cartes(
+        _proposer_apres_creation(
+            client, faux_moduleo, mistral_client_factice, jeton_valide, _TELEPHONE_CREE, 30, appel
+        )
+    )
 
     reponse = _decider(client, jeton_valide, carte["id"])
 
@@ -886,7 +948,10 @@ def test_confirmer_put_ou_delete_une_seule_requete_avec_la_bonne_methode(
     # La carte confirmée garde ce qu'elle montrait.
     assert (reponse.json()["lignes"], reponse.json()["rubrique"]) == (carte["lignes"], carte["rubrique"])
     assert faux_moduleo.ecritures == [attendue]
-    assert [(e.methode, e.statut) for e in _journal(db_session)] == [(attendue[0], "confirmee")]
+    assert [(e.methode, e.statut) for e in _journal(db_session)] == [
+        ("POST", "confirmee"),
+        (attendue[0], "confirmee"),
+    ]
 
 
 # Notes (#208) : la relecture d'une note s'ouvre au droit de son écriture,
@@ -911,8 +976,9 @@ def test_put_note_carte_avec_les_seuls_champs_modifies_en_noms(
 ):
     _note_existante(faux_moduleo)
 
-    reponse = _proposer(
-        client, mistral_client_factice, jeton_valide, _modifier_note(Message="Relancer le géomètre", IdAffaire=13)
+    reponse = _proposer_apres_creation(
+        client, faux_moduleo, mistral_client_factice, jeton_valide, _NOTE_CREEE, 5,
+        _modifier_note(Message="Relancer le géomètre", IdAffaire=13),
     )
 
     assert (_NOTE, {"idNote": 5}) in faux_moduleo.appels
@@ -930,7 +996,9 @@ def test_delete_note_carte_sera_supprime_avec_les_champs_en_noms(
 ):
     _note_existante(faux_moduleo)
 
-    reponse = _proposer(client, mistral_client_factice, jeton_valide, _supprimer(_NOTE, idNote=5))
+    reponse = _proposer_apres_creation(
+        client, faux_moduleo, mistral_client_factice, jeton_valide, _NOTE_CREEE, 5, _supprimer(_NOTE, idNote=5)
+    )
 
     assert faux_moduleo.ecritures == []
     (carte,) = _cartes(reponse)
@@ -1055,7 +1123,9 @@ def test_put_partiel_confirme_ne_change_que_les_champs_de_la_carte(
 ):
     _note_existante(faux_moduleo)
     partiel = {"route": f"PUT {_NOTE}", "parametres": {"idNote": 5}, "corps": {"IdNote": 5, "Message": "Relancer"}}
-    (carte,) = _cartes(_proposer(client, mistral_client_factice, jeton_valide, partiel))
+    (carte,) = _cartes(
+        _proposer_apres_creation(client, faux_moduleo, mistral_client_factice, jeton_valide, _NOTE_CREEE, 5, partiel)
+    )
     assert [ligne["champ"] for ligne in carte["lignes"]] == ["Message"]
 
     reponse = _decider(client, jeton_valide, carte["id"])
@@ -1077,7 +1147,9 @@ def test_put_proprietes_modifiees_du_modele_remplacees_par_les_champs_de_la_cart
     _note_existante(faux_moduleo)
     corps = {"IdNote": 5, "Message": "Relancer", "TypeNote": 1, "ProprietesModifiees": ["Message", "IdAffaire"]}
     appel = {"route": f"PUT {_NOTE}", "parametres": {"idNote": 5}, "corps": corps}
-    (carte,) = _cartes(_proposer(client, mistral_client_factice, jeton_valide, appel))
+    (carte,) = _cartes(
+        _proposer_apres_creation(client, faux_moduleo, mistral_client_factice, jeton_valide, _NOTE_CREEE, 5, appel)
+    )
 
     _decider(client, jeton_valide, carte["id"])
 
@@ -1245,3 +1317,210 @@ def test_fausse_carte_au_message_suivant_aussi_relancee(
 
     assert len(_cartes(reponse)) == 1
     assert fin(reponse)["reponse"] == "Voici la carte."
+
+
+# Id qu'aucune fiche ne donne (#257, tests humains #206, scénarios 10, 12,
+# 16, 19) : le modèle recopiait l'exemple de la doc (IdTelephone 1) ou un
+# autre id (celui du contact) qui existe ailleurs. Pas de carte, pas de
+# relecture, phrase fixe ; seul l'id d'une création confirmée de la
+# Conversation passe.
+
+_PAS_ENCORE_POSSIBLE = (
+    "Cette écriture n'est pas encore possible depuis le chat : BBASS ne peut pas retrouver {element} dans "
+    "Moduléo. Rien n'a été écrit. Ne devine pas d'id et n'en demande pas au collaborateur : dis-lui seulement "
+    "que cette écriture n'est pas encore possible depuis le chat."
+)
+
+
+def _coordonnees_existantes(faux_moduleo) -> None:
+    # Des éléments qui existent, d'autres contacts : la relecture les
+    # trouverait.
+    _note_existante(faux_moduleo)
+    faux_moduleo.ajouter_contact(41, "Cabinet Martin")
+    faux_moduleo.ajouter_telephone(1, 41, "04 67 99 99 99", "Bureau")
+    faux_moduleo.ajouter_email(1, 41, "contact@exemple.fr")
+    faux_moduleo.ajouter_adresse(1, 41, "1 rue de la Paix")
+
+
+@pytest.mark.parametrize(
+    ("appel", "element"),
+    [
+        (_modifier_telephone(1, Numero="04 67 12 34 56"), "le téléphone"),
+        (_supprimer(_TELEPHONE_EXISTANT, idTelephone=40), "le téléphone"),
+        (
+            {"route": "PUT cogeo/email/{idEmail}", "parametres": {"idEmail": 1}, "corps": {"Adresse": "a@b.fr"}},
+            "l'e-mail",
+        ),
+        (_supprimer("cogeo/email/{idEmail}", idEmail=1), "l'e-mail"),
+        (
+            {"route": "PUT moduleo/adresse/{idAdresse}", "parametres": {"idAdresse": 1}, "corps": {"Rue": "2 rue"}},
+            "l'adresse",
+        ),
+        (_supprimer("moduleo/adresse/{idAdresse}", idAdresse=1), "l'adresse"),
+        (_modifier_note(Message="Relancer"), "la note"),
+        (_supprimer(_NOTE, idNote=5), "la note"),
+        (
+            {
+                "route": _MODIFIER_TACHE,
+                "parametres": {"idTacheAFaire": 5},
+                "corps": {"IdTacheAFaire": 5, "Libelle": "Relancer"},
+            },
+            "la tâche à faire",
+        ),
+    ],
+    ids=[
+        "PUT-telephone-exemple",
+        "DELETE-telephone-id-du-contact",
+        "PUT-email",
+        "DELETE-email",
+        "PUT-adresse",
+        "DELETE-adresse",
+        "PUT-note",
+        "DELETE-note",
+        "PUT-tache-a-faire",
+    ],
+)
+def test_element_sans_id_fourni_pas_de_carte_phrase_fixe(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide, db_session, appel, element
+):
+    _coordonnees_existantes(faux_moduleo)
+
+    reponse = _proposer(client, mistral_client_factice, jeton_valide, appel)
+
+    assert _cartes(reponse) == []
+    assert _resultat_outil(mistral_client_factice) == _PAS_ENCORE_POSSIBLE.format(element=element)
+    assert faux_moduleo.appels == [] and faux_moduleo.ecritures == []
+    assert _journal(db_session) == []
+    db_session.expire_all()
+    (echange,) = db_session.query(EchangeInspecteur).filter_by(type_appel=f"outil:{_ECRIRE}").all()
+    assert echange.reponse_payload["ids_non_fournis"] == [element]
+
+
+def test_code_activite_d_un_temps_passe_refuse_omis_la_carte_est_proposee(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide
+):
+    # Scénario 10 : un code activité deviné. Omis (facultatif), la carte part.
+    _contact_et_affaire(faux_moduleo)
+    faux_moduleo.ajouter_code_activite(3, "Bornage")
+    temps = {"Date": "2026-10-28T00:00:00", "NombreHeure": 3, "IdAffaire": 12, "IdUtilisateur": 7}
+    avec_code = {"route": "POST cogeo/tempspasse", "parametres": {}, "corps": {**temps, "IdCodeActivite": 3}}
+    sans_code = {"route": "POST cogeo/tempspasse", "parametres": {}, "corps": {**temps, "IdCodeActivite": None}}
+
+    reponse = _proposer(client, mistral_client_factice, jeton_valide, avec_code, sans_code)
+
+    (carte,) = _cartes(reponse)
+    assert "CodeActivite" not in {ligne["champ"] for ligne in carte["lignes"]}
+    assert _resultat_outil(mistral_client_factice, rang=-2) == _PAS_ENCORE_POSSIBLE.format(element="le code activité")
+    assert _resultat_outil(mistral_client_factice).startswith(_PROPOSEE)
+
+
+def test_ecrire_consigne_de_ne_jamais_demander_un_id_au_collaborateur(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide
+):
+    _demander(client, mistral_client_factice, jeton_valide)
+
+    (ecrire,) = [
+        outil for outil in mistral_client_factice.tools_appels_reponse[0] if outil["function"]["name"] == _ECRIRE
+    ]
+    assert "ne devine jamais un id et n'en demande jamais au collaborateur" in ecrire["function"]["description"]
+
+
+@pytest.mark.parametrize(
+    ("route", "champs"),
+    [
+        (f"PUT {_TELEPHONE_EXISTANT}", "idTelephone, IdTelephone"),
+        ("DELETE cogeo/note/{idNote}", "idNote"),
+        ("POST cogeo/tempspasse", "IdCodeActivite"),
+    ],
+)
+def test_decrire_signale_les_champs_dont_aucune_fiche_ne_donne_l_id(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide, route, champs
+):
+    mistral_client_factice.repondre_avec_appel_outil(_DECRIRE, {"route": route})
+    mistral_client_factice.repondre("Voici les champs.", "Titre")
+
+    client.post("/conversations", json={"message": "Quels champs ?"}, headers=_autorisation(jeton_valide))
+
+    resultat = _resultat_outil(mistral_client_factice)
+    assert f"Champs dont aucune fiche ne donne l'id : {champs}. " in resultat
+    assert "ne demande jamais d'id au collaborateur" in resultat
+
+
+def test_decrire_la_creation_ne_signale_pas_l_id_de_l_element_cree(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide
+):
+    mistral_client_factice.repondre_avec_appel_outil(_DECRIRE, {"route": _TELEPHONE})
+    mistral_client_factice.repondre("Voici les champs.", "Titre")
+
+    client.post("/conversations", json={"message": "Quels champs ?"}, headers=_autorisation(jeton_valide))
+
+    assert "Champs dont aucune fiche" not in _resultat_outil(mistral_client_factice)
+
+
+def test_creation_du_telephone_avec_l_id_de_l_exemple_reste_proposee(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide
+):
+    # L'id de l'élément créé n'en désigne aucun autre.
+    _contact_et_affaire(faux_moduleo)
+
+    reponse = _proposer(client, mistral_client_factice, jeton_valide, _telephone(IdTelephone=1))
+
+    assert len(_cartes(reponse)) == 1
+
+
+def test_note_creee_dans_la_conversation_modifiee_puis_supprimee(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide, db_session
+):
+    _note_existante(faux_moduleo)
+    conversation_id = _cree_dans_la_conversation(
+        client, faux_moduleo, mistral_client_factice, jeton_valide, _NOTE_CREEE, 5
+    )
+
+    (modification,) = _cartes(
+        _proposer_dans(client, mistral_client_factice, jeton_valide, conversation_id, _modifier_note(Message="Relancer"))
+    )
+    assert _decider(client, jeton_valide, modification["id"]).json()["statut"] == "confirmee"
+    (suppression,) = _cartes(
+        _proposer_dans(client, mistral_client_factice, jeton_valide, conversation_id, _supprimer(_NOTE, idNote=5))
+    )
+    assert _decider(client, jeton_valide, suppression["id"]).json()["statut"] == "confirmee"
+
+    assert [(m, r) for m, r, _, _ in faux_moduleo.ecritures] == [("PUT", _NOTE), ("DELETE", _NOTE)]
+    assert [(e.methode, e.statut) for e in _journal(db_session)] == [
+        ("POST", "confirmee"),
+        ("PUT", "confirmee"),
+        ("DELETE", "confirmee"),
+    ]
+
+
+def test_id_renvoye_par_une_autre_creation_ne_designe_pas_une_note(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide
+):
+    # Le téléphone créé a l'id 5 : ce n'est pas l'id d'une note.
+    _note_existante(faux_moduleo)
+    conversation_id = _cree_dans_la_conversation(
+        client, faux_moduleo, mistral_client_factice, jeton_valide, _TELEPHONE_CREE, 5
+    )
+
+    reponse = _proposer_dans(client, mistral_client_factice, jeton_valide, conversation_id, _supprimer(_NOTE, idNote=5))
+
+    assert _cartes(reponse) == []
+    assert _dernier_resultat(mistral_client_factice) == _PAS_ENCORE_POSSIBLE.format(element="la note")
+
+
+def test_creation_annulee_ne_rend_pas_son_id_utilisable(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide
+):
+    _note_existante(faux_moduleo)
+    creation = {"route": "POST cogeo/note", "parametres": {}, "corps": _CREATIONS[_NOTE_CREEE]}
+    reponse = _proposer(client, mistral_client_factice, jeton_valide, creation)
+    (carte,) = _cartes(reponse)
+    faux_moduleo.reponse_ecriture = 5
+    _decider(client, jeton_valide, carte["id"], "annuler")
+
+    suite = _proposer_dans(
+        client, mistral_client_factice, jeton_valide, fin(reponse)["conversation"]["id"], _supprimer(_NOTE, idNote=5)
+    )
+
+    assert _cartes(suite) == []
+    assert _dernier_resultat(mistral_client_factice) == _PAS_ENCORE_POSSIBLE.format(element="la note")

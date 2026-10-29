@@ -13,7 +13,7 @@ from vm_centrale.moduleo.carte import (
 )
 from vm_centrale.moduleo.client import ErreurModuleo, LecteurModuleo, RequeteInterdite
 from vm_centrale.moduleo.droits import DroitManquant, DroitsModuleo, ecriture_possible, refus_d_ecriture
-from vm_centrale.moduleo.ecritures import REFUSEE, carte_de, proposer
+from vm_centrale.moduleo.ecritures import REFUSEE, carte_de, ids_renvoyes, proposer
 from vm_centrale.moduleo.relecture import RELECTURES, ElementIntrouvable, relire
 from vm_centrale.moduleo.resolution import IDS_SANS_RECHERCHE_PAR_NOM
 from vm_centrale.moduleo.routes import ROUTES_ECRITURE, RouteEcriture
@@ -55,6 +55,41 @@ _SANS_RECHERCHE = (
     "qu'il n'existe pas, depuis le chat, de moyen de retrouver l'élément à partir de son nom, et propose "
     "l'écriture sans ce champ s'il est facultatif."
 )
+_NON_FOURNIS = (
+    "Champs dont aucune fiche ne donne l'id : {champs}. Ne devine jamais leur valeur et ne demande jamais "
+    "d'id au collaborateur : seul un id renvoyé par une écriture confirmée de cette conversation "
+    "([id Moduléo <n>]) est utilisable. Sinon, omets le champ s'il est facultatif ; s'il est requis, dis au "
+    "collaborateur que cette écriture n'est pas encore possible depuis le chat."
+)
+_PAS_ENCORE_POSSIBLE = (
+    "Cette écriture n'est pas encore possible depuis le chat : BBASS ne peut pas retrouver {elements} dans "
+    "Moduléo. Rien n'a été écrit."
+)
+_SANS_ID_DEVINE = (
+    "Ne devine pas d'id et n'en demande pas au collaborateur : dis-lui seulement que cette écriture n'est pas "
+    "encore possible depuis le chat."
+)
+# Ids qu'aucune fiche de lecture ne donne au modèle (#257) : champ (en
+# minuscules) → (élément, routes POST qui le créent). Le modèle recopiait
+# l'exemple de la doc ou un autre id, qui existe ailleurs (#254 ne l'arrête
+# pas). En attendant le serveur MCP Moduléo (1.8.x), seul un id renvoyé par
+# une création confirmée de la Conversation sur l'une de ces routes passe.
+IDS_NON_FOURNIS: dict[str, tuple[str, tuple[str, ...]]] = {
+    "idtelephone": ("le téléphone", ("moduleo/telephone",)),
+    "idemail": ("l'e-mail", ("cogeo/email", "cogeo/elementged/email")),
+    "idadresse": ("l'adresse", ("moduleo/adresse",)),
+    "idnote": ("la note", ("cogeo/note",)),
+    "idtacheafaire": ("la tâche à faire", ("moduleo/tacheafaire",)),
+    "idcodeactivite": ("le code activité", ()),
+    "iddocument": ("le document", ("cogeo/elementged/document",)),
+    "idplan": ("le plan", ("cogeo/elementged/plan",)),
+    "idfrais": ("le frais", ("cogeo/frais",)),
+    "idrecurrence": ("la récurrence", ("planning/recurrence",)),
+    "idarchive": ("l'archive", ("cogeo/archive",)),
+    "idlocalisant": ("le localisant", ("cogeo/localisant?idAffaire={idAffaire}",)),
+    "idenveloppeprevisionnelle": ("l'enveloppe prévisionnelle", ("cogeo/enveloppe",)),
+    "idgroupecontacts": ("le groupe de contacts", ("cogeo/contact/groupecontacts",)),
+}
 # Clé d'un objet de l'exemple de corps JSON.
 _CLE_JSON = re.compile(r'"(\w+)"\s*:')
 _PROPRIETES_MODIFIEES = "ProprietesModifiees"
@@ -176,7 +211,40 @@ def _executer_decrire(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
     sans_recherche = [c for c in dict.fromkeys(champs) if c.casefold() in IDS_SANS_RECHERCHE_PAR_NOM]
     if sans_recherche:
         texte += "\n" + _SANS_RECHERCHE.format(champs=", ".join(sans_recherche))
+    # Champs dont aucune fiche ne donne l'id (#257).
+    non_fournis = [c for c in dict.fromkeys(champs) if _non_fourni(decrite, c)]
+    if non_fournis:
+        texte += "\n" + _NON_FOURNIS.format(champs=", ".join(non_fournis))
     return ResultatOutil(texte)
+
+
+def _non_fourni(decrite: RouteEcriture, champ: str) -> bool:
+    # Hors l'id de l'élément qu'un POST crée (IdTelephone de
+    # `POST moduleo/telephone`).
+    non_fourni = IDS_NON_FOURNIS.get(champ.casefold())
+    return non_fourni is not None and not (decrite.methode == "POST" and decrite.route in non_fourni[1])
+
+
+def _valeurs_d_id(valeur: Any) -> list[str]:
+    # Les ids portés par un champ ; vide, 0 ou null : champ omis.
+    valeurs = valeur if isinstance(valeur, list) else [valeur]
+    return [str(v).strip() for v in valeurs if v not in (None, "", 0, "0") and not isinstance(v, bool)]
+
+
+def _elements_sans_id(
+    decrite: RouteEcriture, parametres: dict[str, Any], corps: Any, renvoyes: set[tuple[str, str]]
+) -> list[str]:
+    # Éléments désignés par un id qu'aucune fiche ne donne et qu'aucune
+    # création confirmée de la Conversation n'a renvoyé (#257).
+    champs = [*parametres.items(), *(corps.items() if isinstance(corps, dict) else [])]
+    elements: list[str] = []
+    for champ, valeur in champs:
+        if not _non_fourni(decrite, champ):
+            continue
+        element, creations = IDS_NON_FOURNIS[champ.casefold()]
+        if not all(any((route, v) in renvoyes for route in creations) for v in _valeurs_d_id(valeur)):
+            elements.append(element)
+    return list(dict.fromkeys(elements))
 
 
 def _declarer_ecrire(contexte: ContexteTour) -> dict | None:
@@ -194,8 +262,9 @@ def _declarer_ecrire(contexte: ContexteTour) -> dict | None:
                 # #256 : la question en texte avant la carte coûtait un tour.
                 "Quand la demande d'écriture est claire, appelle cet outil directement, sans demander "
                 "de confirmation en texte : la carte est la confirmation. "
-                "Désigne chaque élément par son id lu dans une fiche ([id Moduléo <n>]) ; demande "
-                "d'abord les champs avec decrire_ecriture_moduleo. Une écriture par appel. "
+                "Désigne chaque élément par son id lu dans une fiche ([id Moduléo <n>]) ou renvoyé par "
+                "une écriture confirmée ; ne devine jamais un id et n'en demande jamais au collaborateur. "
+                "Demande d'abord les champs avec decrire_ecriture_moduleo. Une écriture par appel. "
                 f"Routes ouvertes :\n{liste}"
             ),
             "parameters": {
@@ -311,6 +380,14 @@ def _executer_ecrire(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
         # La relecture d'un élément `siens` (garde des droits) a échoué.
         logger.warning("Moduléo indisponible : %s", erreur)
         return ResultatOutil(INDISPONIBLE, trace={"route": f"{methode} {route}", "erreur": str(erreur)})
+    # Un id qu'aucune fiche ne donne (#257) : refusé avant la carte, sans
+    # relecture ni journal.
+    renvoyes = ids_renvoyes(contexte.db, contexte.conversation_id)
+    if elements := _elements_sans_id(decrite, parametres, corps, renvoyes):
+        phrase = _PAS_ENCORE_POSSIBLE.format(elements=" ni ".join(elements))
+        return ResultatOutil(
+            f"{phrase} {_SANS_ID_DEVINE}", trace={"route": f"{methode} {route}", "ids_non_fournis": elements}
+        )
     try:
         carte, corps = _carte(lecteur, contexte.droits_moduleo, decrite, parametres, corps)
     except DroitManquant as refus:
