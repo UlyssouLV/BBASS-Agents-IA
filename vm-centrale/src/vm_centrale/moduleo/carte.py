@@ -208,17 +208,32 @@ def _normal(champ: str, valeur: Any) -> Any:
     return str(valeur).strip()
 
 
+def _changements(
+    existant: dict[str, Any], corps: dict[str, Any], identites: set[str]
+) -> list[tuple[str, str, Any, Any]]:
+    # (clé du corps, champ aplati, avant, valeur) de chaque champ du corps,
+    # dans son ordre, dont la valeur change l'élément relu.
+    avant = dict(_aplatir(existant, vides=True))
+    return [
+        (cle, champ, avant.get(champ), valeur)
+        for cle in corps
+        for champ, valeur in _aplatir({cle: corps[cle]}, vides=True)
+        if _feuille(champ).casefold() not in identites
+        and _normal(_feuille(champ), avant.get(champ)) != _normal(_feuille(champ), valeur)
+    ]
+
+
+def champs_modifies(existant: dict[str, Any], corps: dict[str, Any], identites: set[str]) -> list[str]:
+    # Clés du corps que la carte annonce : `ProprietesModifiees` d'un PUT
+    # (#251).
+    return list(dict.fromkeys(cle for cle, *_ in _changements(existant, corps, identites)))
+
+
 def differences_en_noms(
     lecteur: LecteurModuleo, existant: dict[str, Any], corps: dict[str, Any], identites: set[str]
 ) -> list[dict[str, str]]:
     # Champs du corps, dans son ordre, dont la valeur change l'élément relu.
-    avant = dict(_aplatir(existant, vides=True))
-    changes = [
-        (champ, avant.get(champ), valeur)
-        for champ, valeur in _aplatir(corps, vides=True)
-        if _feuille(champ).casefold() not in identites
-        and _normal(_feuille(champ), avant.get(champ)) != _normal(_feuille(champ), valeur)
-    ]
+    changes = [(champ, ancien, nouveau) for _, champ, ancien, nouveau in _changements(existant, corps, identites)]
     noms = _resoudre(lecteur, [(champ, v) for champ, ancien, nouveau in changes for v in (ancien, nouveau)])
     return [
         {

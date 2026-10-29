@@ -659,7 +659,13 @@ def test_relecture_refusee_par_le_garde_pas_de_carte_phrase_fixe(
                 "PUT",
                 _TELEPHONE_EXISTANT,
                 {"idTelephone": 30},
-                {"IdTelephone": 30, "IdContact": 40, "Numero": "04 67 11 11 11", "Lieu": "Bureau"},
+                {
+                    "IdTelephone": 30,
+                    "IdContact": 40,
+                    "Numero": "04 67 11 11 11",
+                    "Lieu": "Bureau",
+                    "ProprietesModifiees": ["Numero"],
+                },
             ),
         ),
         (_supprimer(_TELEPHONE_EXISTANT, idTelephone=30), ("DELETE", _TELEPHONE_EXISTANT, {"idTelephone": 30}, None)),
@@ -755,3 +761,44 @@ def test_note_sans_le_droit_refusee_par_le_garde_sans_carte(
         "Votre compte n'a pas le droit Moduléo « Supprimer / Éditer les notes des autres ». Rien n'a été écrit. "
         "Demandez à un compte administrateur si vous en avez besoin."
     )
+
+
+# PUT partiel (#251) : le PUT de Moduléo remet à vide un champ absent du
+# corps, sauf `ProprietesModifiees`. La VM y met les seuls champs de la
+# carte : un champ non annoncé garde sa valeur.
+
+
+def test_put_partiel_confirme_ne_change_que_les_champs_de_la_carte(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide
+):
+    _note_existante(faux_moduleo)
+    partiel = {"route": f"PUT {_NOTE}", "parametres": {"idNote": 5}, "corps": {"IdNote": 5, "Message": "Relancer"}}
+    (carte,) = _cartes(_proposer(client, mistral_client_factice, jeton_valide, partiel))
+    assert [ligne["champ"] for ligne in carte["lignes"]] == ["Message"]
+
+    reponse = _decider(client, jeton_valide, carte["id"])
+
+    assert reponse.status_code == 200, reponse.text
+    assert faux_moduleo.note(5) == {
+        "IdNote": 5,
+        "Message": "Relancer",
+        "IdContact": 40,
+        "IdAffaire": 12,
+        "TypeNote": 1,
+    }
+
+
+def test_put_proprietes_modifiees_du_modele_remplacees_par_les_champs_de_la_carte(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide
+):
+    # Le modèle liste un champ qu'il n'envoie pas : il serait effacé.
+    _note_existante(faux_moduleo)
+    corps = {"IdNote": 5, "Message": "Relancer", "TypeNote": 1, "ProprietesModifiees": ["Message", "IdAffaire"]}
+    appel = {"route": f"PUT {_NOTE}", "parametres": {"idNote": 5}, "corps": corps}
+    (carte,) = _cartes(_proposer(client, mistral_client_factice, jeton_valide, appel))
+
+    _decider(client, jeton_valide, carte["id"])
+
+    ((_, _, _, envoye),) = faux_moduleo.ecritures
+    assert envoye["ProprietesModifiees"] == ["Message"]
+    assert faux_moduleo.note(5)["IdAffaire"] == 12

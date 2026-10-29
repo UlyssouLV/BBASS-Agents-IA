@@ -2,7 +2,7 @@ import json
 import logging
 from typing import Any
 
-from vm_centrale.moduleo.carte import differences_en_noms, element_en_noms, lignes_en_noms
+from vm_centrale.moduleo.carte import champs_modifies, differences_en_noms, element_en_noms, lignes_en_noms
 from vm_centrale.moduleo.client import ErreurModuleo, LecteurModuleo, RequeteInterdite
 from vm_centrale.moduleo.droits import DroitManquant, DroitsModuleo, ecriture_possible
 from vm_centrale.moduleo.ecritures import REFUSEE, carte_de, proposer
@@ -36,6 +36,7 @@ _ROUTE_INCONNUE = (
 )
 _NON_PROPOSEE = "Écriture non proposée : {erreur} Rien n'a été écrit."
 _JSON_ILLISIBLE = "« {nom} » n'est pas un objet JSON valide."
+_PROPRIETES_MODIFIEES = "ProprietesModifiees"
 _SANS_MOT = "Ne dis jamais que l'écriture est faite : seul le collaborateur la confirme, sur la carte."
 
 logger = logging.getLogger(__name__)
@@ -159,21 +160,27 @@ def _objet(arguments: dict, nom: str, defaut: Any) -> Any:
 
 def _carte(
     lecteur: LecteurModuleo, droits: DroitsModuleo, decrite: RouteEcriture, parametres: dict[str, Any], corps: Any
-) -> dict | None:
-    # POST : paramètres et corps en noms. PUT / DELETE (#205) : l'élément
-    # visé relu d'abord. None : un PUT qui ne change rien.
+) -> tuple[dict | None, Any]:
+    # La carte et le corps à envoyer. POST : paramètres et corps en noms.
+    # PUT / DELETE (#205) : l'élément visé relu d'abord. Carte None : un PUT
+    # qui ne change rien.
     relecture = RELECTURES.get((decrite.methode, decrite.route))
     if relecture is None:
-        return {"titre": decrite.description, "lignes": lignes_en_noms(lecteur, parametres, corps)}
+        return {"titre": decrite.description, "lignes": lignes_en_noms(lecteur, parametres, corps)}, corps
     element = relire(lecteur, relecture, parametres, corps)
     if decrite.methode == "DELETE":
         fiche, lignes = element_en_noms(lecteur, relecture.route, element, droits, relecture.identites)
-        return {"titre": decrite.description, "lignes": lignes, "rubrique": SERA_SUPPRIME, "fiche": fiche}
+        return {"titre": decrite.description, "lignes": lignes, "rubrique": SERA_SUPPRIME, "fiche": fiche}, corps
     if not isinstance(corps, dict):
         # PUT sans corps (émettre un devis…) : ses paramètres, en noms.
-        return {"titre": decrite.description, "lignes": lignes_en_noms(lecteur, parametres, corps)}
+        return {"titre": decrite.description, "lignes": lignes_en_noms(lecteur, parametres, corps)}, corps
     lignes = differences_en_noms(lecteur, element, corps, relecture.identites)
-    return {"titre": decrite.description, "lignes": lignes} if lignes else None
+    if decrite.exemple is not None and _PROPRIETES_MODIFIEES in decrite.exemple:
+        # Le PUT de Moduléo remet à vide un champ absent du corps, sauf
+        # ceux hors de `ProprietesModifiees` (#251) : seuls ceux de la carte,
+        # jamais la liste du modèle.
+        corps = {**corps, _PROPRIETES_MODIFIEES: champs_modifies(element, corps, relecture.identites)}
+    return ({"titre": decrite.description, "lignes": lignes} if lignes else None), corps
 
 
 def _refuser(
@@ -232,7 +239,7 @@ def _executer_ecrire(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
         logger.warning("Moduléo indisponible : %s", erreur)
         return ResultatOutil(INDISPONIBLE, trace={"route": f"{methode} {route}", "erreur": str(erreur)})
     try:
-        carte = _carte(lecteur, contexte.droits_moduleo, decrite, parametres, corps)
+        carte, corps = _carte(lecteur, contexte.droits_moduleo, decrite, parametres, corps)
     except DroitManquant as refus:
         # Le garde refuse la relecture de l'élément visé (#205).
         return _refuser(contexte, methode, route, parametres, corps, _RELECTURE_REFUSEE, refus.refus)

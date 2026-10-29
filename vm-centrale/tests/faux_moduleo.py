@@ -85,12 +85,26 @@ class FauxModuleo:
 
     def ecrire(self, methode: str, route: str, parametres: dict[str, Any], corps: Any) -> Any:
         # Accepte toute écriture d'une route du WADL, sans rien changer aux
-        # données lues.
+        # données lues, sauf le PUT d'une note (#251).
         assert (methode, route) in ROUTES_ECRITURE, (methode, route)
         self.ecritures.append((methode, route, parametres, corps))
         if self._exception is not None:
             raise self._exception
+        if (methode, route) == ("PUT", "cogeo/note/{idNote}") and parametres["idNote"] in self._notes:
+            self._modifier(self._notes[parametres["idNote"]], corps)
         return self.reponse_ecriture
+
+    @staticmethod
+    def _modifier(element: dict, corps: dict) -> None:
+        # PUT de Moduléo, relevé sur le serveur de test (#251) : avec
+        # `ProprietesModifiees`, seuls les champs listés changent ; sans, un
+        # champ absent du corps est remis à vide.
+        listes = corps.get("ProprietesModifiees")
+        for champ in listes if listes is not None else [c for c in element if c != "IdNote"]:
+            element[champ] = corps.get(champ)
+
+    def note(self, id_note: int) -> dict:
+        return dict(self._notes[id_note])
 
     def ajouter_affaire(self, id_affaire: int, numero: str, objet: str = "", **champs: Any) -> None:
         # `champs` : les autres clés de l'affaire, au nom du JSON Moduléo
