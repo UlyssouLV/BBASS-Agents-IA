@@ -297,7 +297,7 @@ Constat (tests humains 1.6.1, #236, scénario 10) : dans `/opt/bbass/<env>/.env`
 
 ### Migrer le compte Ubuntu One propriétaire d’Ubuntu Pro
 
-Constat (tests humains 1.6.1, #236) : Ubuntu Pro de la VM est rattaché au compte Ubuntu One `j.rasolofono@bbass.fr` (gérant du cabinet), pas à une adresse générique du cabinet. Passer l’abonnement sur un compte au nom du cabinet pour qu’il ne dépende pas d’une personne ; modalités à transmettre par le cabinet. Mettre à jour le guide [Installer et mettre à jour la VM centrale](../../exploitation/vm-centrale.md) en même temps.
+Constat (tests humains 1.6.1, #236) : Ubuntu Pro de la VM est rattaché au compte Ubuntu One `j.rasolofono@bbass.fr` (gérant du cabinet), pas à une adresse générique du cabinet. Passer l’abonnement sur un compte au nom du cabinet pour qu’il ne dépende pas d’une personne ; modalités à transmettre par le cabinet. Mettre à jour le guide [Installation du serveur du Copilote BBASS](../../installation/serveur.mdx) en même temps.
 
 ### Déploiement automatique (pull périodique ou runner à Castries)
 
@@ -310,3 +310,19 @@ Constat (grilling 1.6.1) : la mise à jour reste déclenchée par l’admin (com
 - Activer **Ubuntu Pro** (gratuit jusqu’à 5 machines ; correctifs jusqu’en 2036) avec un compte **Ubuntu One au nom du cabinet** (adresse générique, double authentification). Ce compte ne donne aucun accès à la machine ; une fuite permettrait au pire de détacher la VM des correctifs étendus. Revérifier à ce moment que l’offre gratuite couvre toujours l’usage commercial.
 - Ranger dans le **gestionnaire de mots de passe du cabinet** : identifiants Ubuntu One, valeurs générées par l’installateur (mots de passe Postgres, `VM_ADMIN_KEY` de chaque Environnement), emplacement des clés maîtres.
 - Vérifier que l’admin du cabinet a joué seul, avec le guide, une mise à jour et une Promotion.
+
+### Bug — le bandeau de mise à jour recouvre le bouton « … » (#249)
+
+**Constat :** quand la mise à jour au lancement échoue (ici : Serveur BBASS éteint), le bandeau rouge « Mise à jour impossible… » s’affiche en haut de la fenêtre, sur toute la largeur, et recouvre le bouton **…** en haut à droite de l’écran de connexion : le bouton n’est pas cliquable tant qu’on n’a pas fermé le bandeau par sa croix. Le bandeau touche aussi le haut du logo du panneau gauche (captures en pièce jointe sur #249).
+
+**Reproductibilité :** poste installé en v1.6.2, Serveur BBASS arrêté : quitter BBASS puis le relancer → bandeau sur l’écran de connexion ; clic sur **…** → rien ne s’ouvre. Reproduit à chaque fois, dans la fenêtre BBASS comme dans le navigateur.
+
+**Impact :** tous les collaborateurs dont la mise à jour échoue ; c’est justement quand le serveur est injoignable qu’il faut **…** → **Configuration** ou **À propos** (guide poste-collaborateur, « En cas de problème »), et rien n’indique qu’il faut d’abord fermer le bandeau.
+
+**Cause probable :** `BandeauMiseAJour` est en `fixed inset-x-0 top-0 z-50` par-dessus l’écran, et `MenuConfiguration` est lui aussi en haut à droite (`absolute top-4 right-4` sur l’écran de connexion, `fixed top-4 right-4` dans `App.tsx`).
+
+**À corriger :** le bouton **…** reste visible et cliquable quand le bandeau est affiché (par exemple le bandeau pousse le contenu au lieu de le recouvrir), sans chevaucher le logo.
+
+**Hors périmètre :** Aucun.
+
+**Suivi :** [#249](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/249) (`bug`). Trouvé dans : 1.6.2 · Contexte : test humain · Date : 2026-10-29 · Priorité : Informations manquantes.

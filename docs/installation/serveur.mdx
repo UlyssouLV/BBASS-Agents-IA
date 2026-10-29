@@ -1,0 +1,178 @@
+# Installation du serveur du Copilote BBASS
+
+Ce guide s’adresse à l’admin du cabinet qui installe le serveur central du Copilote BBASS (la « VM centrale »), à Castries. Chaque commande se copie telle quelle dans un terminal du serveur, avec un compte qui a le droit `sudo`. Pour l’entretenir ensuite, voir [Maintenance du serveur du Copilote BBASS](./maintenance-serveur.mdx).
+
+:::tip En bref
+
+1. Installer Ubuntu Server 26.04 LTS.
+2. Installer Docker.
+3. Activer Ubuntu Pro.
+4. Installer l’Environnement de Test, puis celui de Production.
+
+:::
+
+## 1. Installer Ubuntu Server 26.04 LTS
+
+### La machine
+
+- Une VM (ou une machine) sur le réseau du cabinet, avec **accès à Internet** (pour télécharger les mises à jour).
+- Conseillé : **2 vCPU, 4 Go de RAM, 40 Go de disque**.
+- Une **adresse IP fixe** (ou réservée sur la box / le DHCP du cabinet) : les postes s’y connectent par cette adresse ou par le nom du serveur.
+
+### L’image
+
+Télécharger l’ISO **Ubuntu Server 26.04 LTS** sur [ubuntu.com/download/server](https://ubuntu.com/download/server), puis démarrer la VM dessus (ou une clé USB créée avec [Rufus](https://rufus.ie) ou balenaEtcher pour une machine physique).
+
+### L’installateur
+
+| Écran | À faire |
+| --- | --- |
+| **Language** | `Français` |
+| **Keyboard configuration** | `French` |
+| **Type d’installation** | **Ubuntu Server** (pas « minimized ») |
+| **Configuration réseau** | l’interface doit avoir une adresse ; la mettre en **IPv4 manuelle** si l’IP fixe n’est pas réservée ailleurs |
+| **Proxy** | laisser vide, sauf proxy du cabinet |
+| **Miroir d’archive Ubuntu** | laisser la valeur proposée |
+| **Configuration du stockage** | **Utiliser un disque entier**, avec LVM (valeurs par défaut) → **Terminé** → **Continuer** |
+| **Configuration du profil** | votre nom, le **nom du serveur** (ex. `serveur-bbass`), un nom d’utilisateur et un mot de passe ; les ranger dans le gestionnaire de mots de passe du cabinet |
+| **Ubuntu Pro** | **Passer pour le moment** : il s’active à l’étape 3 |
+| **Configuration SSH** | cocher **Installer le serveur OpenSSH** |
+| **Snaps en vedette** | **ne rien cocher**, en particulier pas `docker` : Docker s’installe à l’étape 2 |
+
+Attendre « Installation terminée », **Redémarrer maintenant**, retirer l’ISO quand c’est demandé, puis se connecter avec l’utilisateur créé (console, ou `ssh utilisateur@serveur-bbass` depuis un poste).
+
+Mettre le système à jour :
+
+```bash
+sudo apt-get update && sudo apt-get upgrade -y
+sudo reboot
+```
+
+## 2. Installer Docker
+
+Docker est l’outil qui **télécharge les nouvelles versions du serveur BBASS et les fait tourner**. Il s’installe une fois ; ensuite, chaque mise à jour passe par lui.
+
+Installer Docker Engine et son plugin **Compose** depuis le dépôt officiel de Docker (pas le paquet `docker.io` d’Ubuntu, ni le snap). Procédure officielle ([docs.docker.com/engine/install/ubuntu](https://docs.docker.com/engine/install/ubuntu/), à suivre si elle a changé) :
+
+```bash
+sudo apt-get update
+sudo apt-get install -y ca-certificates curl
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+sudo tee /etc/apt/sources.list.d/docker.sources <<EOF
+Types: deb
+URIs: https://download.docker.com/linux/ubuntu
+Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
+Components: stable
+Signed-By: /etc/apt/keyrings/docker.asc
+EOF
+sudo apt-get update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+```
+
+Vérifier :
+
+```bash
+sudo docker run --rm hello-world
+sudo docker compose version
+```
+
+La première affiche « Hello from Docker! », la seconde un numéro de version.
+
+## 3. Activer Ubuntu Pro
+
+Ubuntu Pro est gratuit jusqu’à 5 machines et prolonge les correctifs de sécurité jusqu’en 2036 (contre 2031 sans). Il se rattache à un **compte Ubuntu One** :
+
+- aujourd’hui le compte **`j.rasolofono@bbass.fr`** (gérant du cabinet) ; un passage sur une adresse générique du cabinet est prévu plus tard ;
+- protégé par la **double authentification** ;
+- identifiants rangés dans le gestionnaire de mots de passe du cabinet.
+
+Ce compte ne donne **aucun accès à la machine** : il sert seulement à obtenir le jeton qui active les correctifs.
+
+1. Se connecter sur [ubuntu.com/pro/dashboard](https://ubuntu.com/pro/dashboard) avec ce compte et copier le **Token** de l’abonnement affiché (ce n’est pas la rubrique « Clés SSH » du compte Ubuntu One).
+2. Sur le serveur, remplacer `<jeton>` par ce jeton :
+
+```bash
+sudo pro attach <jeton>
+sudo pro status
+```
+
+`pro status` liste les services ; `esm-infra` et `esm-apps` doivent être `enabled`.
+
+## 4. Installer les Environnements
+
+Le serveur fait tourner **deux Environnements** : un de **Test**, pour essayer chaque nouvelle version avant les collaborateurs, et un de **Production**, celui des collaborateurs. Chacun a ses propres comptes et ses propres conversations : toucher à l’un ne touche jamais l’autre. Côté poste, voir [Environnement : Production vs Test](./environnements.mdx).
+
+On installe d’abord le Test, puis la Production.
+
+Installer le Test :
+
+```bash
+sudo docker run --rm -it --user root --privileged --pid=host -v /:/hote ghcr.io/ulyssoulv/bbass-vm-centrale:staging installer staging
+```
+
+Installer la Production :
+
+```bash
+sudo docker run --rm -it --user root --privileged --pid=host -v /:/hote ghcr.io/ulyssoulv/bbass-vm-centrale:prod installer prod
+```
+
+L’installation pose les questions suivantes. Les clés tapées ne s’affichent pas ; elles sont chiffrées avant d’être écrites, jamais stockées en clair.
+
+| Question | Réponse |
+| --- | --- |
+| Clé API Mistral | obligatoire (sans elle, le serveur ne démarre pas) |
+| Clé API Moduléo | la clé dédiée à BBASS, ou Entrée pour démarrer sans Moduléo |
+| SecurityCode Moduléo | ou Entrée pour démarrer sans Moduléo |
+| Identifiant, Prénom, Nom, Agence | le **premier compte administrateur** de cet Environnement |
+
+Elle crée ensuite les dossiers, démarre l’Environnement et le fait redémarrer avec le serveur.
+
+### Ranger les valeurs affichées une seule fois
+
+Pendant l’installation (avant même le premier démarrage, puis à la création du compte administrateur), des valeurs **qui ne seront plus jamais affichées** apparaissent. Les ranger tout de suite dans le **gestionnaire de mots de passe du cabinet**, une fiche par Environnement (« BBASS VM — Test », « BBASS VM — Production ») :
+
+| Valeur affichée | À quoi elle sert |
+| --- | --- |
+| Mot de passe du compte administrateur | première connexion au chat (il faudra le changer) |
+| Mot de passe Postgres | accès direct à la base, en dépannage |
+| Clé maître | recréer le fichier de clé maître s’il est perdu (voir [Où sont les données](./maintenance-serveur.mdx#ou-sont-les-donnees)) |
+| `VM_ADMIN_KEY` | clé d’administration du serveur, demandée par l’Inspecteur |
+
+### Vérifier
+
+Test :
+
+```bash
+curl http://localhost:8001/sante
+```
+
+Production :
+
+```bash
+curl http://localhost:8000/sante
+```
+
+Chacune répond `{"statut":"ok","version":"X.Y.Z"}`. Depuis un poste du cabinet, le serveur répond à son adresse sur le port `8000` (Production) ou `8001` (Test).
+
+### Installation interrompue
+
+Si l’installation s’arrête en cours de route, la relancer répond « déjà installé ». Supprimer alors les dossiers de cet Environnement (et **seulement** après une installation ratée : cela efface sa base), puis relancer l’installation.
+
+Test :
+
+```bash
+sudo rm -rf /opt/bbass/staging /etc/bbass/staging
+```
+
+Production :
+
+```bash
+sudo rm -rf /opt/bbass/prod /etc/bbass/prod
+```
+
+## Ensuite
+
+- Installer les postes : [Installer et utiliser le Copilote BBASS sur son poste](./poste-collaborateur.md).
+- Mettre à jour, promouvoir, sauvegarder, surveiller : [Maintenance du serveur du Copilote BBASS](./maintenance-serveur.mdx).

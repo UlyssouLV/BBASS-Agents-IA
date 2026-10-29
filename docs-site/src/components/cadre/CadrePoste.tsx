@@ -1,11 +1,18 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import cssPoste from '@site/src/poste/cadreCss.js';
 
 import styles from './cadre.module.css';
 
 let feuille: CSSStyleSheet | null = null;
+
+// Certains composants du poste (menu « … ») appellent leurs hooks de
+// requête : sur le site de doc il n'y a pas de backend, rien ne part.
+const clientRequetes = new QueryClient({
+  defaultOptions: {queries: {enabled: false, retry: false}},
+});
 
 function feuillePoste(): CSSStyleSheet {
   if (!feuille) {
@@ -45,7 +52,12 @@ export default function CadrePoste({
 
   return (
     <div ref={hote} className={etroit ? styles.etroit : styles.cadre}>
-      {montage ? createPortal(children, montage) : null}
+      {montage
+        ? createPortal(
+            <QueryClientProvider client={clientRequetes}>{children}</QueryClientProvider>,
+            montage,
+          )
+        : null}
     </div>
   );
 }
