@@ -1238,6 +1238,36 @@ def test_relance_sans_carte_et_reponse_qui_annonce_encore_phrase_fixe(
     assert mistral_client_factice.tool_choices_appels_reponse.count(_ECRIRE_IMPOSE) == 1
 
 
+def test_relance_qui_expire_phrase_fixe_et_le_tour_aboutit(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide, db_session
+):
+    # Second passage de #206 (#258) : 8 868 tokens en 76 s sur l'appel
+    # imposé, au-delà du délai, et « service indisponible ».
+    mistral_client_factice.echouer_a_l_outil_impose(TimeoutError("Read timed out"))
+
+    reponse = _annoncer(client, mistral_client_factice, jeton_valide, _FAUSSE_CARTE)
+
+    assert reponse.status_code == 200
+    assert mistral_client_factice.tool_choices_appels_reponse[1] == _ECRIRE_IMPOSE
+    assert fin(reponse)["reponse"].startswith(
+        "Aucune carte de confirmation n'a été ouverte : rien n'a été écrit dans Moduléo."
+    )
+    assert _cartes(reponse) == []
+    dernier = db_session.query(Message).filter(Message.role == "assistant").order_by(Message.id.desc()).first()
+    assert dernier.contenu.startswith("Aucune carte de confirmation n'a été ouverte")
+
+
+def test_relance_bornee_en_tokens_et_en_delai(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide
+):
+    _contact_et_affaire(faux_moduleo)
+
+    _annoncer(client, mistral_client_factice, jeton_valide, _FAUSSE_CARTE, "Voici la carte.", force=_telephone())
+
+    assert mistral_client_factice.bornes_appels_reponse[0] == (None, None)
+    assert mistral_client_factice.bornes_appels_reponse[1] == (1024, 20.0)
+
+
 def test_ecriture_dite_faite_sans_outil_d_ecriture_phrase_fixe_sans_relance(
     client, faux_moduleo, mistral_client_factice, jeton_valide
 ):

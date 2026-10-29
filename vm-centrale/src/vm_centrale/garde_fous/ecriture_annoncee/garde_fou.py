@@ -26,6 +26,13 @@ _FAITE = re.compile(
     r"\s+(?:dans|sur)\s+(?:le\s+logiciel\s+)?modul[eé]o\b",
     re.IGNORECASE,
 )
+# Une lecture, pas une écriture (#258, second passage de #206) : une
+# négation dans la même proposition (« Aucun contact … n'est enregistré
+# dans Moduléo »), ou un état lu sur une fiche (« l'affaire est enregistrée
+# dans Moduléo »), sans « a été ».
+_PROPOSITION = re.compile(r"[^,;:]*$")
+_NEGATION = re.compile(r"\b(?:n['’]|ne\b|aucun|aucune|ni\b)", re.IGNORECASE)
+_CONSTAT = re.compile(r"\b(?:est|sont)\s+(?:bien\s+|déjà\s+|deja\s+)?$", re.IGNORECASE)
 
 
 def annonce_une_carte(reponse: str) -> bool:
@@ -34,14 +41,22 @@ def annonce_une_carte(reponse: str) -> bool:
 
 
 def affirme_une_ecriture(reponse: str) -> bool:
-    # « créé / écrit / modifié / supprimé dans Moduléo ».
-    return _FAITE.search(reponse) is not None
+    # « créé / écrit / modifié / supprimé dans Moduléo », hors lecture.
+    return any(_affirme(phrase) for phrase in _PHRASES.findall(reponse))
+
+
+def _affirme(phrase: str) -> bool:
+    for faite in _FAITE.finditer(phrase):
+        avant = _PROPOSITION.search(phrase[: faite.start()]).group()
+        if not _NEGATION.search(avant) and not _CONSTAT.search(avant):
+            return True
+    return False
 
 
 def retirer_ecriture_affirmee(reponse: str) -> str:
     # Avec une carte ouverte, rien n'est encore écrit : chaque phrase qui
     # dit le contraire part. Plus rien : la phrase de la carte.
-    sans = "".join(phrase for phrase in _PHRASES.findall(reponse) if not _FAITE.search(phrase)).strip()
+    sans = "".join(phrase for phrase in _PHRASES.findall(reponse) if not _affirme(phrase)).strip()
     if sans == reponse.strip():
         return reponse
     return sans or PHRASE_CARTE_OUVERTE

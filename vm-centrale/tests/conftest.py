@@ -137,6 +137,11 @@ class ClientMistralFactice:
         # Demandes d'outils des appels qui imposent un outil (`tool_choice`,
         # #252), à part : un appel ordinaire ne les consomme pas.
         self._demandes_imposees: list[list[AppelOutil]] = []
+        # Échec du prochain appel qui impose un outil (#258 : délai dépassé).
+        self._echec_outil_impose: Exception | None = None
+        # `max_tokens` et `timeout` de chaque appel de réponse de chat, même
+        # ordre (#258).
+        self.bornes_appels_reponse: list[tuple[int | None, float | None]] = []
         # Appels d'extraction de rechercher_web (spec 1.4.0, ADR-0014),
         # reconnus à leur consigne fixe : leur propre canal, pour ne pas
         # consommer la file `_reponses` du chat principal.
@@ -255,6 +260,9 @@ class ClientMistralFactice:
     def repondre_a_l_outil_impose(self, nom_outil: str, arguments: dict, tool_call_id: str = "call_impose") -> None:
         # Consommé par le prochain appel .chat() qui impose un outil.
         self._demandes_imposees.append([AppelOutil(id=tool_call_id, nom=nom_outil, arguments=arguments)])
+
+    def echouer_a_l_outil_impose(self, exception: Exception) -> None:
+        self._echec_outil_impose = exception
 
     def repondre_extraction(
         self, faits: list[tuple[str, str]] = (), questions: list[tuple[str, str, str]] = ()
@@ -391,7 +399,9 @@ class ClientMistralFactice:
             reponse_brute={"choices": [{"message": {"content": contenu}}]},
         )
 
-    def chat(self, messages, response_format=None, tools=None, tool_choice=None) -> ReponseChat:
+    def chat(
+        self, messages, response_format=None, tools=None, tool_choice=None, max_tokens=None, timeout=None
+    ) -> ReponseChat:
         with self._verrou:
             if not isinstance(messages, str) and messages and messages[0]["content"] == CONSIGNE_EXTRACTION:
                 return self._extraire(messages, response_format)
@@ -423,6 +433,7 @@ class ClientMistralFactice:
                 self.appels_reponse.append(messages)
                 self.tools_appels_reponse.append(tools)
                 self.tool_choices_appels_reponse.append(tool_choice)
+                self.bornes_appels_reponse.append((max_tokens, timeout))
 
             # payload_envoye factice (spec 1.3.0) : reprend la forme réelle du
             # payload MistralClient (model/messages/response_format/tools),
@@ -457,6 +468,10 @@ class ClientMistralFactice:
                     payload_envoye=payload,
                     reponse_brute={"choices": [{"message": {"content": self._reponse_structuree}}]},
                 )
+
+            if tool_choice is not None and self._echec_outil_impose is not None:
+                erreur, self._echec_outil_impose = self._echec_outil_impose, None
+                raise ErreurAppelMistral(str(erreur), payload_envoye=payload) from erreur
 
             file_demandes = self._demandes_imposees if tool_choice is not None else self._demandes_outils
             if tools and file_demandes:

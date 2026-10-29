@@ -20,6 +20,12 @@ PIECES_JOINTES_DIR = os.environ.get("VM_CENTRALE_PIECES_JOINTES_DIR", "./pieces_
 # le pire tour qui en découle, recherche web comprise : voir
 # poste/src/poste/config.py.
 MISTRAL_HTTP_TIMEOUT = float(os.environ.get("MISTRAL_HTTP_TIMEOUT", "30"))
+# Relance qui impose ecrire_moduleo (#252, #258) : un appel d'outil tient en
+# quelques centaines de tokens. Au second passage de #206, elle en a généré
+# 8 868 en 76 s. Au-delà de ces bornes, ou en cas d'échec, la phrase fixe
+# d'écriture non proposée, et le tour aboutit.
+MISTRAL_RELANCE_MAX_TOKENS = 1024
+MISTRAL_RELANCE_TIMEOUT = 20.0
 # SearXNG auto-hébergé du docker-compose.yml (spec 1.4.0, ADR-0013), publié
 # sur localhost seulement.
 SEARXNG_URL = os.environ.get("VM_CENTRALE_SEARXNG_URL", "http://localhost:8888")

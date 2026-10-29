@@ -19,6 +19,8 @@ from vm_centrale.concurrence import cache_idempotence, verrous_comptes
 from vm_centrale.config import (
     FICHES_MODELES,
     INTERVALLE_STATUT_ATTENTE_SECONDES,
+    MISTRAL_RELANCE_MAX_TOKENS,
+    MISTRAL_RELANCE_TIMEOUT,
     MODELE_CHAT,
     MODELE_OCR,
     PIECES_JOINTES_DIR,
@@ -1793,6 +1795,45 @@ def _a_relancer(reponse: str, tools: list[dict] | None, contexte_outils: Context
     )
 
 
+def _relancer_en_imposant(
+    client: MistralClient,
+    messages: list[dict],
+    tools: list[dict] | None,
+    contexte_outils: ContexteTour,
+    identifiant_compte: str,
+    piece_jointe_id: int | None,
+) -> ReponseChat | None:
+    # Bornée en tokens et en délai (#258) ; un échec ou un délai dépassé
+    # rend None, et le tour aboutit : il ne fait pas tomber le message.
+    # AppelOutilDemande, la carte attendue, remonte à la boucle.
+    try:
+        return client.chat(
+            messages,
+            tools=tools,
+            tool_choice=_ECRIRE_IMPOSE,
+            max_tokens=MISTRAL_RELANCE_MAX_TOKENS,
+            timeout=MISTRAL_RELANCE_TIMEOUT,
+        )
+    except AppelOutilDemande:
+        raise
+    except Exception as erreur:
+        # Sans commit : la ligne suit le tour, qui continue.
+        enregistrer_echange_echec(
+            contexte_outils.db,
+            identifiant_compte=identifiant_compte,
+            conversation_id=contexte_outils.conversation_id,
+            piece_jointe_id=piece_jointe_id,
+            type_appel="chat",
+            modele=MODELE_CHAT,
+            requete_payload=payload_depuis_erreur(erreur),
+            erreur=str(erreur),
+            reponse_payload=reponse_depuis_erreur(erreur),
+            commit=False,
+        )
+        logger.warning("Relance imposant ecrire_moduleo en échec : phrase fixe", exc_info=True)
+        return None
+
+
 def _resoudre_reponse_chat(
     obtenir_reponse: Callable[[], ReponseChat],
     client: MistralClient,
@@ -1831,7 +1872,14 @@ def _resoudre_reponse_chat(
                     reponse = obtenir_reponse()
                 elif imposer:
                     imposer = False
-                    reponse = client.chat(messages, tools=tools, tool_choice=_ECRIRE_IMPOSE)
+                    relance = _relancer_en_imposant(
+                        client, messages, tools, contexte_outils, identifiant_compte, piece_jointe_id
+                    )
+                    if relance is None:
+                        # La réponse annoncée reste : _appliquer_garde_fous
+                        # en fait la phrase fixe, sans carte du tour.
+                        return reponse
+                    reponse = relance
                 else:
                     dernier_tour = tour == tours_max
                     reponse = client.chat(messages, tools=None if dernier_tour else tools)

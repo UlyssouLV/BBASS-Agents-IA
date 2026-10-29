@@ -121,6 +121,10 @@ class MistralClient:
         tools: Sequence[Mapping[str, object]] | None = None,
         # Outil imposé (#252) : {"type": "function", "function": {"name": …}}.
         tool_choice: Mapping[str, object] | None = None,
+        # Bornes d'un appel (#258) : tokens générés, et délai en secondes à
+        # la place de MISTRAL_HTTP_TIMEOUT.
+        max_tokens: int | None = None,
+        timeout: float | None = None,
     ) -> ReponseChat:
         if isinstance(messages, str):
             messages = [{"role": "user", "content": messages}]
@@ -136,12 +140,16 @@ class MistralClient:
             payload["tools"] = tools
         if tool_choice is not None:
             payload["tool_choice"] = tool_choice
+        if max_tokens is not None:
+            payload["max_tokens"] = max_tokens
+        options = {} if timeout is None else {"timeout": timeout}
 
         try:
             reponse = _http_client.post(
                 _API_URL_CHAT,
                 headers={"Authorization": f"Bearer {api_key}"},
                 json=payload,
+                **options,
             )
             reponse.raise_for_status()
             corps = reponse.json()
