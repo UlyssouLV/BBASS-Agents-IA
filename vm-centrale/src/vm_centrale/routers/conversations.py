@@ -55,9 +55,7 @@ from vm_centrale.mistral_client import (
 )
 from vm_centrale.models import (
     Compte,
-    Consommation,
     Conversation,
-    EchangeInspecteur,
     Message,
     PieceJointe,
     ProfilTravail,
@@ -68,7 +66,6 @@ from vm_centrale.lectures_outils import (
     LectureDeLaConversation,
     lectures_de_la_conversation,
     rattacher_lectures_au_message,
-    supprimer_lectures,
 )
 from vm_centrale.moduleo.client import ClientModuleo, get_client_moduleo
 from vm_centrale.moduleo.droits import SANS_AUCUN_GROUPE, droits_du_compte
@@ -103,6 +100,7 @@ from vm_centrale.schemas import (
     PieceJointeResume,
 )
 from vm_centrale.telechargement_pages import TelechargeurPages, get_telechargeur_pages
+from vm_centrale.suppression import supprimer_donnees_conversation
 
 _TAILLE_FENETRE_HISTORIQUE = 3
 # Fenêtre renvoyée avec la jauge de contexte (spec 1.4.2) : celle de la fiche
@@ -1360,46 +1358,7 @@ def supprimer_conversation(
 ) -> None:
     conversation = _recuperer_conversation_du_compte(db, conversation_id, identifiant_compte)
 
-    # echanges_inspecteur disparaît avec sa conversation (FK ON DELETE
-    # CASCADE, spec 1.3.0) — contrairement à Consommation ci-dessous.
-    # Supprimé ici explicitement, comme Message/PieceJointe plus bas, pour un
-    # comportement identique quel que soit le moteur de base (la base de
-    # test SQLite n'applique pas les contraintes FK par défaut).
-    db.query(EchangeInspecteur).filter(EchangeInspecteur.conversation_id == conversation.id).delete()
-    # Même chose pour les questions couvertes (spec 1.4.1), avant les
-    # résultats de recherche et les pièces jointes qu'elles référencent, et
-    # pour les résultats de recherche (spec 1.4.0).
-    db.query(QuestionCouverte).filter(QuestionCouverte.conversation_id == conversation.id).delete()
-    db.query(ResultatRechercheWeb).filter(
-        ResultatRechercheWeb.conversation_id == conversation.id
-    ).delete()
-    supprimer_lectures(db, conversation.id)
-
-    # Consommation n'a pas de cascade ORM déclarée sur Conversation (spec
-    # 1.1.3) : la ligne survit à la conversation qui l'a produite, seul le
-    # rattachement disparaît — jamais de suppression en cascade comme pour
-    # les messages/pièces jointes ci-dessous. Même transaction que le reste
-    # de la suppression.
-    db.query(Consommation).filter(Consommation.conversation_id == conversation.id).update(
-        {Consommation.conversation_id: None}
-    )
-
-    # Pièces jointes (base + fichier disque) supprimées avant les messages
-    # (spec 1.1.2) : PieceJointe.message_id référence Message, donc l'ordre
-    # inverse violerait l'intégrité référentielle. missing_ok=True car un
-    # fichier déjà absent ne doit jamais empêcher la suppression de la
-    # conversation elle-même.
-    pieces_jointes = db.query(PieceJointe).filter(PieceJointe.conversation_id == conversation.id).all()
-    for piece_jointe in pieces_jointes:
-        (Path(PIECES_JOINTES_DIR) / piece_jointe.chemin_fichier).unlink(missing_ok=True)
-    db.query(PieceJointe).filter(PieceJointe.conversation_id == conversation.id).delete()
-
-    # Message n'a pas de cascade ORM déclarée sur Conversation (même
-    # convention que Jeton/Compte, voir comptes.py) : la suppression des
-    # messages associés doit donc être explicite, avant celle de la
-    # conversation elle-même.
-    db.query(Message).filter(Message.conversation_id == conversation.id).delete()
-    db.delete(conversation)
+    supprimer_donnees_conversation(db, conversation, PIECES_JOINTES_DIR)
     db.commit()
 
 

@@ -4,7 +4,7 @@ from contextlib import AbstractContextManager, contextmanager
 from sqlalchemy import Engine, create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
-from vm_centrale.config import DATABASE_URL
+from vm_centrale.config import DATABASE_URL, PIECES_JOINTES_DIR
 
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
 engine = create_engine(DATABASE_URL, connect_args=connect_args)
@@ -39,9 +39,13 @@ def init_db(bind: Engine = engine) -> None:
     # catalogue.json, ensuite plus rien n'est réécrit au démarrage (spec
     # 1.5.3, ADR-0019). Import ici : models importe Base.
     from vm_centrale.moduleo.droits import charger_catalogue
+    from vm_centrale.suppression import nettoyer_comptes_supprimes
 
     with Session(bind=bind) as db:
         charger_catalogue(db)
+        # Données des comptes supprimés avant la 1.6.3 (#161) : à chaque
+        # démarrage, sans effet une fois nettoyées.
+        nettoyer_comptes_supprimes(db, PIECES_JOINTES_DIR)
         db.commit()
 
 
