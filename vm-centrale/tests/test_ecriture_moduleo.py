@@ -1626,3 +1626,70 @@ def test_creation_annulee_ne_rend_pas_son_id_utilisable(
 
     assert _cartes(suite) == []
     assert _dernier_resultat(mistral_client_factice) == _PAS_ENCORE_POSSIBLE.format(element="la note")
+
+
+# Id de l'élément dans le corps d'un PUT (#260) : Moduléo le veut dans le
+# corps (« Id ne peut pas être null ou égal à 0 pour la mise à jour… ») ; le
+# modèle ne le mettait que dans le paramètre de la route.
+
+_PERSONNE = "cogeo/contact/personne/{idPersonne}"
+_REFUS_ID_NUL = "Id ne peut pas être null ou égal à 0 pour la mise à jour de ApiIncomingPersonne"
+
+
+def _modifier_personne(**corps) -> dict:
+    return {"route": f"PUT {_PERSONNE}", "parametres": {"idPersonne": 153}, "corps": corps}
+
+
+def _personne_proposee(client, faux_moduleo, mistral_client_factice, jeton: str, **corps) -> dict:
+    faux_moduleo.ajouter_personne(153, "CLIENT EXEMPLE 11", Commentaire="")
+    return _proposer(client, mistral_client_factice, jeton, _modifier_personne(**corps))
+
+
+def test_put_sans_id_dans_le_corps_part_avec_l_id_du_parametre_de_route(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide
+):
+    reponse = _personne_proposee(
+        client, faux_moduleo, mistral_client_factice, jeton_valide, Nom="CLIENT EXEMPLE 11", Commentaire="Client fidèle"
+    )
+    (carte,) = _cartes(reponse)
+    assert carte["lignes"] == [{"champ": "Commentaire", "avant": "(vide)", "valeur": "Client fidèle"}]
+
+    reponse = _decider(client, jeton_valide, carte["id"])
+
+    assert reponse.status_code == 200, reponse.text
+    ((methode, route, parametres, corps),) = faux_moduleo.ecritures
+    assert (methode, route, parametres) == ("PUT", _PERSONNE, {"idPersonne": 153})
+    assert corps["Id"] == 153
+    assert corps["ProprietesModifiees"] == ["Commentaire"]
+
+
+def test_put_id_du_corps_contredit_le_parametre_de_route_pas_de_carte_phrase_fixe(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide, db_session
+):
+    reponse = _personne_proposee(
+        client, faux_moduleo, mistral_client_factice, jeton_valide, Id=12, Commentaire="Client fidèle"
+    )
+
+    assert _cartes(reponse) == []
+    assert _resultat_outil(mistral_client_factice) == (
+        "Écriture non proposée : le champ Id du corps (12) ne désigne pas le même élément que le paramètre "
+        "idPersonne de la route (153). Rien n'a été écrit."
+    )
+    assert faux_moduleo.appels == [] and faux_moduleo.ecritures == []
+    assert _journal(db_session) == []
+
+
+def test_refus_de_moduleo_a_la_confirmation_dit_sa_raison(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide, db_session
+):
+    (carte,) = _cartes(
+        _personne_proposee(client, faux_moduleo, mistral_client_factice, jeton_valide, Commentaire="Client fidèle")
+    )
+    faux_moduleo.echouer(ModuleoRefuse(f"403 sur {_PERSONNE}", _REFUS_ID_NUL))
+
+    reponse = _decider(client, jeton_valide, carte["id"])
+
+    message = f"Moduléo refuse cette écriture. Rien n'a été écrit. Raison donnée par Moduléo : {_REFUS_ID_NUL}"
+    assert (reponse.json()["statut"], reponse.json()["message"]) == ("en_echec", message)
+    (ecriture,) = _journal(db_session)
+    assert ecriture.erreur == message

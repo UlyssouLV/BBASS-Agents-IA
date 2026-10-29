@@ -425,6 +425,19 @@ def test_donnees_refusees_par_moduleo_levent_son_message(ecriture_active, monkey
     assert erreur.value.message == "Le numéro de téléphone est obligatoire."
 
 
+@pytest.mark.parametrize("statut", [401, 403])
+def test_refus_de_moduleo_sur_une_ecriture_levent_son_message_sans_cle_ni_code(ecriture_active, monkeypatch, statut):
+    # #260 : la carte dit pourquoi Moduléo refuse ; la clé et le code, s'il
+    # les répétait, n'en sortent pas.
+    message = "Id ne peut pas être null ou égal à 0 (clé cle-api, code code-securite)"
+    client = _client_http(monkeypatch, lambda _: httpx.Response(statut, json={"Message": message}))
+
+    with pytest.raises(ModuleoRefuse) as erreur:
+        client.ecrire("POST", "moduleo/telephone", {}, _TELEPHONE, _CONTACTS)
+
+    assert erreur.value.message == "Id ne peut pas être null ou égal à 0 (clé …, code …)"
+
+
 def _delai_depasse(requete: httpx.Request) -> httpx.Response:
     raise httpx.ReadTimeout("délai dépassé", request=requete)
 

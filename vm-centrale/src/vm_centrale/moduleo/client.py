@@ -51,7 +51,10 @@ class ModuleoIndisponible(ErreurModuleo):
 
 class ModuleoRefuse(ErreurModuleo):
     # Refus : clé, SecurityCode ou droit refusé par Moduléo (401 / 403).
-    pass
+    # `message` : le sien sur une écriture (#260), sans la clé ni le code.
+    def __init__(self, detail: str, message: str | None = None) -> None:
+        super().__init__(detail)
+        self.message = message
 
 
 class ModuleoIntrouvable(ModuleoIndisponible):
@@ -190,12 +193,20 @@ class TransportHttp:
         if reponse.status_code == 400 and methode != "GET":
             raise ModuleoDonneesRefusees(_message_moduleo(reponse))
         if reponse.status_code in (401, 403):
-            raise ModuleoRefuse(f"{reponse.status_code} sur {route}")
+            message = self._sans_secrets(_message_moduleo(reponse)) if methode != "GET" else None
+            raise ModuleoRefuse(f"{reponse.status_code} sur {route}", message or None)
         if reponse.status_code == 404:
             raise ModuleoIntrouvable(f"404 sur {route}")
         if reponse.is_error:
             raise ModuleoIndisponible(f"{reponse.status_code} sur {route}")
         return reponse
+
+    def _sans_secrets(self, texte: str) -> str:
+        # Un message de Moduléo qui répéterait la clé ou le code.
+        for secret in self._en_tetes.values():
+            if secret:
+                texte = texte.replace(secret, "…")
+        return texte
 
 
 @cache
@@ -238,7 +249,8 @@ def _verifier_corps(methode: str, route: str, corps: Any) -> None:
 
 
 def _message_moduleo(reponse: httpx.Response) -> str:
-    # Le message d'un 400 de Moduléo (« Message » de l'API, sinon le texte).
+    # Le message d'un 400, 401 ou 403 de Moduléo (« Message » de l'API,
+    # sinon le texte).
     try:
         donnees = reponse.json()
     except ValueError:

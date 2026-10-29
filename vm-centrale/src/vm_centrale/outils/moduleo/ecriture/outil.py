@@ -49,6 +49,10 @@ _ROUTE_INCONNUE = (
 )
 _NON_PROPOSEE = "Écriture non proposée : {erreur} Rien n'a été écrit."
 _JSON_ILLISIBLE = "« {nom} » n'est pas un objet JSON valide."
+_ID_CONTREDIT = (
+    "le champ {champ} du corps ({valeur}) ne désigne pas le même élément que le paramètre {parametre} "
+    "de la route ({id})."
+)
 _SANS_RECHERCHE = (
     "Champs sans moyen de retrouver l'id à partir d'un nom (l'API ne les lit que par id) : {champs}. "
     "Ne devine jamais leur valeur : utilise seulement un id donné par le collaborateur. Sinon, dis-lui "
@@ -297,6 +301,30 @@ def _objet(arguments: dict, nom: str, defaut: Any) -> Any:
     return valeur
 
 
+def _avec_l_id_de_la_route(decrite: RouteEcriture, parametres: dict[str, Any], corps: Any) -> Any:
+    # Le PUT de Moduléo veut l'id de l'élément aussi dans le corps (« Id »,
+    # « IdNote »… de l'exemple) ; le modèle ne le met souvent que dans le
+    # paramètre de la route (#260). Absent : rempli ; différent : refusé.
+    relecture = RELECTURES.get((decrite.methode, decrite.route))
+    if decrite.methode != "PUT" or relecture is None or relecture.source.startswith("corps."):
+        return corps
+    id_route = parametres.get(relecture.source)
+    exemple = json.loads(decrite.exemple) if decrite.exemple is not None else None
+    if id_route is None or not isinstance(corps, dict) or not isinstance(exemple, dict):
+        return corps
+    for champ in exemple:
+        if champ.casefold() not in relecture.identites:
+            continue
+        valeur = corps.get(champ)
+        if valeur in (None, "", 0, "0"):
+            corps = {**corps, champ: id_route}
+        elif str(valeur).strip() != str(id_route).strip():
+            raise RequeteInterdite(
+                _ID_CONTREDIT.format(champ=champ, valeur=valeur, parametre=relecture.source, id=id_route)
+            )
+    return corps
+
+
 def _carte(
     lecteur: LecteurModuleo, droits: DroitsModuleo, decrite: RouteEcriture, parametres: dict[str, Any], corps: Any
 ) -> tuple[dict | None, Any]:
@@ -371,6 +399,7 @@ def _executer_ecrire(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
         if not isinstance(lus, dict):
             raise RequeteInterdite(_JSON_ILLISIBLE.format(nom="parametres"))
         parametres, corps = lus, _objet(arguments, "corps", None)
+        corps = _avec_l_id_de_la_route(decrite, parametres, corps)
         client.verifier_ecriture(methode, route, parametres, corps, contexte.droits_moduleo)
     except RequeteInterdite as erreur:
         return ResultatOutil(_NON_PROPOSEE.format(erreur=erreur), trace={"route": f"{methode} {route}"})

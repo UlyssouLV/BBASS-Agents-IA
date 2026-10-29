@@ -36,6 +36,7 @@ _EXPIREE = "Expirée : un nouveau message a été envoyé avant la confirmation.
 _BARRIERE = "L'écriture dans Moduléo n'est plus ouverte sur cette VM. Rien n'a été écrit."
 _DONNEES_REFUSEES = "Moduléo a refusé les données envoyées : {message}"
 _REFUS = "Moduléo refuse cette écriture. Rien n'a été écrit."
+_RAISON = "{refus} Raison donnée par Moduléo : {message}"
 _INTROUVABLE = "L'élément visé n'existe pas dans Moduléo. Rien n'a été écrit."
 _PANNE = "Moduléo est indisponible : l'écriture n'a pas pu être vérifiée. Vérifiez dans Moduléo avant de recommencer."
 
@@ -264,7 +265,9 @@ def decider(
     except ModuleoDonneesRefusees as erreur:
         return _echec(ecriture, EN_ECHEC, _DONNEES_REFUSEES.format(message=erreur.message), str(erreur))
     except ModuleoRefuse as erreur:
-        return _echec(ecriture, EN_ECHEC, _REFUS, str(erreur))
+        # La raison de Moduléo, quand il en donne une (#260).
+        phrase = _RAISON.format(refus=_REFUS, message=erreur.message) if erreur.message else _REFUS
+        return _echec(ecriture, EN_ECHEC, phrase, str(erreur))
     except ModuleoIntrouvable as erreur:
         return _echec(ecriture, EN_ECHEC, _INTROUVABLE, str(erreur))
     except ModuleoIndisponible as erreur:
