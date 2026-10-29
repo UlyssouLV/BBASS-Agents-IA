@@ -179,6 +179,10 @@ _SCHEMA_RESUME_ET_PROFIL = {
 # l'outil ou donnés par l'utilisateur peuvent être cités. Portée d'un fait
 # depuis la 1.4.3 (#160, conversation 103) : « en Savoie » devenait « en
 # France », même règle que les consignes qui lisent une page (REGLE_PORTEE).
+# « Non trouvé → le dire » depuis la 1.6.3 (#131, conversations 90 et 91) :
+# sans l'information dans les sources, le modèle écrivait quand même tarifs,
+# dates et « sourcé » / « confirmé par », et une généralité du web passait
+# avant la pièce jointe.
 _PROMPT_STYLE = (
     "Capacité réelle, avant toute autre consigne : tu peux chercher sur "
     "Internet avec l'outil rechercher_web ; tu cites les pages trouvées par "
@@ -189,7 +193,13 @@ _PROMPT_STYLE = (
     "explicitement d'inventer, d'imaginer ou de faire une hypothèse. Si tu "
     "n'es pas sûr qu'il faille inventer, pose la question de confirmation "
     "en tout début de réponse, et n'invente rien tant qu'il n'a pas "
-    "confirmé. Un fait tiré d'une page garde le lieu, la période et la "
+    "confirmé. Quand les résultats d'outils (de ce tour ou d'une recherche "
+    "précédente de la conversation) ou la pièce jointe ne contiennent pas "
+    "l'information, dis que tu ne l'as pas trouvée, au besoin avec les pages "
+    "consultées, plutôt que de la donner de mémoire. N'écris jamais "
+    "« sourcé », « confirmé par » ou « comme le confirme » sans un résultat "
+    "d'outil qui contient l'information. Le contenu de la pièce jointe prime "
+    "sur une généralité trouvée sur le web. Un fait tiré d'une page garde le lieu, la période et la "
     "population que la page lui donne (« en Savoie » ne devient jamais « en "
     "France ») ; tu n'ajoutes aucune conversion ni aucun calcul absent de la "
     "page.\n"
@@ -242,19 +252,22 @@ def _consigne_date_du_jour() -> str:
     # 26/10/2026 devenait les sept derniers jours. Bornes de la semaine
     # dernière données toutes calculées (rejeu #195) : le modèle les
     # calculait faux (« du lundi 20 au dimanche 26 octobre »).
+    # Date du jour sans ISO depuis la 1.6.3 (#131) : le modèle la recopiait
+    # dans la requête de rechercher_web. Les bornes gardent l'ISO, à
+    # recopier dans les filtres de date des outils Moduléo.
     aujourdhui = _date_du_jour()
     return (
-        f"Date du jour : {_en_lettres(aujourdhui)} ({aujourdhui.isoformat()}). "
+        f"Date du jour : {_en_lettres(aujourdhui)}. "
         f"Semaine en cours : {_bornes_en_lettres(*_semaine_en_cours())}. "
         f"Semaine dernière : {_bornes_en_lettres(*_semaine_derniere())}. Une "
         "semaine va du lundi au dimanche : « cette semaine » est la semaine en "
         "cours, « la semaine dernière » celle d'avant, avec ces dates exactes, "
         "sans les recalculer, et un jour nommé seul (« mercredi ») celui de la "
-        "semaine en cours. Pour une actualité ou une "
-        "information récente, mets l'année "
-        f"{aujourdhui.year} dans la requête de rechercher_web, jamais une année "
-        "plus ancienne de ta mémoire ; pour un texte déjà nommé (article de "
-        "loi, document daté par l'utilisateur), ne l'ajoute pas d'office."
+        "semaine en cours. Dans une requête de rechercher_web, jamais de date "
+        f"complète : pour une actualité ou une information récente, seule l'année "
+        f"{aujourdhui.year}, jamais une année plus ancienne de ta mémoire ; pour "
+        "un texte déjà nommé (article de loi, document daté par l'utilisateur), "
+        "ne l'ajoute pas d'office."
     )
 
 

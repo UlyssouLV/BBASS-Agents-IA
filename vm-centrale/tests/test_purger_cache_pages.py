@@ -62,7 +62,12 @@ def test_la_tache_ne_touche_pas_aux_copies_des_conversations(
     telechargeur_pages_factice.servir(
         _URL,
         "<html><head><title>Loi Climat</title></head><body><article><h1>Loi Climat</h1>"
-        + "<p>La loi compte 305 articles sur le climat et la résilience des territoires.</p>" * 5
+        # Paragraphes distincts : trafilatura retire les doublons, et une
+        # page sous le seuil de texte est quasi vide (#131).
+        + "".join(
+            f"<p>Le titre {numero} de la loi traite du climat et de la résilience des territoires.</p>"
+            for numero in range(5)
+        )
         + "</article></body></html>",
     )
     moteur_recherche_factice.repondre(("Loi Climat", _URL, "Texte de la loi."))

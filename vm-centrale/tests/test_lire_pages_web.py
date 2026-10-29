@@ -1000,7 +1000,12 @@ def test_une_page_de_recherche_sans_texte_est_servie_par_le_cache_au_tour_suivan
     db_session.add(
         PageWebEnCache(
             url=_URL_NON_LUE,
-            texte_nettoye="Le délai est de deux mois à Lyon.",
+            # Au-delà du seuil d'une page quasi vide (#131).
+            texte_nettoye=(
+                "Le bornage fixe la limite entre deux terrains contigus, à la demande d'un "
+                "propriétaire, par un géomètre-expert inscrit à l'Ordre. Il donne lieu à un "
+                "procès-verbal signé. Le délai est de deux mois à Lyon."
+            ),
             titre="Bornage à Lyon",
             date_telechargement=datetime.now(timezone.utc),
         )
