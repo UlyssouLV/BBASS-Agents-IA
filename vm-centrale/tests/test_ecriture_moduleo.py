@@ -802,3 +802,144 @@ def test_put_proprietes_modifiees_du_modele_remplacees_par_les_champs_de_la_cart
     ((_, _, _, envoye),) = faux_moduleo.ecritures
     assert envoye["ProprietesModifiees"] == ["Message"]
     assert faux_moduleo.note(5)["IdAffaire"] == 12
+
+
+# Écriture annoncée sans carte (#252, test humain #206) : le modèle écrivait
+# une fausse carte en texte, ou « a été créée dans Moduléo », sans appeler
+# ecrire_moduleo. La VM relance le tour en imposant l'outil.
+
+_FAUSSE_CARTE = (
+    "Voici la carte de confirmation :\n```json\n{\"route\": \"POST moduleo/tacheafaire\", "
+    "\"corps\": {\"Libelle\": \"Rappeler\"}}\n```\nValider pour appliquer."
+)
+_ECRIRE_IMPOSE = {"type": "function", "function": {"name": _ECRIRE}}
+
+
+def _annoncer(client, mistral_client_factice, jeton: str, *reponses: str, force: dict | None = None):
+    # Le modèle répond d'abord `reponses[0]` sans outil ; `force` : les
+    # arguments de ecrire_moduleo à l'appel où l'outil est imposé.
+    if force is not None:
+        mistral_client_factice.repondre_a_l_outil_impose(_ECRIRE, force)
+    mistral_client_factice.repondre(*reponses, "Titre")
+    return client.post(
+        "/conversations", json={"message": "Ajoute le téléphone du bureau"}, headers=_autorisation(jeton)
+    )
+
+
+def test_fausse_carte_en_texte_relance_le_tour_en_imposant_ecrire_moduleo(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide
+):
+    _contact_et_affaire(faux_moduleo)
+
+    reponse = _annoncer(
+        client, mistral_client_factice, jeton_valide, _FAUSSE_CARTE, "Voici la carte.", force=_telephone()
+    )
+
+    assert mistral_client_factice.tool_choices_appels_reponse[:2] == [None, _ECRIRE_IMPOSE]
+    (carte,) = _cartes(reponse)
+    assert carte["route"] == "moduleo/telephone"
+    assert fin(reponse)["reponse"] == "Voici la carte."
+    assert faux_moduleo.ecritures == []
+
+
+def _sans_droit_telephone(db_session) -> None:
+    # Groupe Cogeo sans « Rechercher des contacts » : le téléphone refusé.
+    db_session.add(GroupeModuleo(application="cogeo", nom="Sans droit"))
+    db_session.flush()
+    rattacher(db_session, "j.dupont", "Sans droit", None, None)
+    db_session.commit()
+
+
+def test_relance_refusee_par_le_garde_la_reponse_qui_suit_dit_le_refus(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide, db_session
+):
+    _sans_droit_telephone(db_session)
+    refus = "Votre compte n'a pas le droit Moduléo « Rechercher des contacts » : rien n'a été écrit."
+
+    reponse = _annoncer(client, mistral_client_factice, jeton_valide, _FAUSSE_CARTE, refus, force=_telephone())
+
+    assert mistral_client_factice.tool_choices_appels_reponse[1] == _ECRIRE_IMPOSE
+    assert _resultat_outil(mistral_client_factice, appel=2).startswith("Votre compte n'a pas le droit Moduléo")
+    assert _cartes(reponse) == []
+    assert fin(reponse)["reponse"] == refus
+    assert [e.statut for e in _journal(db_session)] == ["refusee"]
+
+
+def test_relance_sans_carte_et_reponse_qui_annonce_encore_phrase_fixe(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide, db_session
+):
+    _sans_droit_telephone(db_session)
+
+    reponse = _annoncer(
+        client, mistral_client_factice, jeton_valide, _FAUSSE_CARTE, "Le téléphone a été ajouté dans Moduléo.",
+        force=_telephone(),
+    )
+
+    assert _cartes(reponse) == []
+    assert fin(reponse)["reponse"] == (
+        "Aucune carte de confirmation n'a été ouverte : rien n'a été écrit dans Moduléo. "
+        "Reformulez la demande d'écriture si besoin."
+    )
+    # Une seule relance par message.
+    assert mistral_client_factice.tool_choices_appels_reponse.count(_ECRIRE_IMPOSE) == 1
+
+
+def test_ecriture_dite_faite_sans_outil_d_ecriture_phrase_fixe_sans_relance(
+    client, faux_moduleo, mistral_client_factice, jeton_valide
+):
+    reponse = _annoncer(client, mistral_client_factice, jeton_valide, "La tâche Rappeler a été créée dans Moduléo.")
+
+    assert _ECRIRE_IMPOSE not in mistral_client_factice.tool_choices_appels_reponse
+    assert fin(reponse)["reponse"].startswith("Aucune carte de confirmation n'a été ouverte")
+
+
+def test_carte_ouverte_la_reponse_ne_dit_pas_l_ecriture_faite(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide
+):
+    _contact_et_affaire(faux_moduleo)
+
+    reponse = _proposer(
+        client,
+        mistral_client_factice,
+        jeton_valide,
+        _telephone(),
+        reponse="Le téléphone a été ajouté dans Moduléo. Vérifiez la carte.",
+    )
+
+    assert len(_cartes(reponse)) == 1
+    assert fin(reponse)["reponse"] == "Vérifiez la carte."
+    # Une vraie carte : pas de relance.
+    assert _ECRIRE_IMPOSE not in mistral_client_factice.tool_choices_appels_reponse
+
+
+def test_apres_une_confirmation_le_modele_peut_redire_l_ecriture_faite(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide
+):
+    conversation_id, ecriture_id = _une_carte(client, faux_moduleo, mistral_client_factice, jeton_valide)
+    _decider(client, jeton_valide, ecriture_id)
+    mistral_client_factice.repondre("Le téléphone a été ajouté dans Moduléo.", resume_et_profil=_resume_et_profil())
+
+    reponse = client.post(
+        f"/conversations/{conversation_id}/messages", json={"message": "C'est fait ?"}, headers=_autorisation(jeton_valide)
+    )
+
+    assert fin(reponse)["reponse"] == "Le téléphone a été ajouté dans Moduléo."
+    assert _ECRIRE_IMPOSE not in mistral_client_factice.tool_choices_appels_reponse
+
+
+def test_fausse_carte_au_message_suivant_aussi_relancee(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide
+):
+    _contact_et_affaire(faux_moduleo)
+    conversation_id = fin(_demander(client, mistral_client_factice, jeton_valide))["conversation"]["id"]
+    mistral_client_factice.repondre_a_l_outil_impose(_ECRIRE, _telephone())
+    mistral_client_factice.repondre(_FAUSSE_CARTE, "Voici la carte.", resume_et_profil=_resume_et_profil())
+
+    reponse = client.post(
+        f"/conversations/{conversation_id}/messages",
+        json={"message": "Ajoute le téléphone du bureau"},
+        headers=_autorisation(jeton_valide),
+    )
+
+    assert len(_cartes(reponse)) == 1
+    assert fin(reponse)["reponse"] == "Voici la carte."

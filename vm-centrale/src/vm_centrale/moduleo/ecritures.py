@@ -139,6 +139,17 @@ def expirer(db: Session, conversation_id: int) -> None:
     ).update({EcritureModuleo.statut: EXPIREE, EcritureModuleo.date_decision: _maintenant()})
 
 
+def ecriture_confirmee(db: Session, conversation_id: int) -> bool:
+    # Une écriture de la Conversation déjà écrite dans Moduléo (#252) : le
+    # modèle peut alors dire, d'après son résultat, qu'elle est faite.
+    return (
+        db.query(EcritureModuleo.id)
+        .filter(EcritureModuleo.conversation_id == conversation_id, EcritureModuleo.statut == CONFIRMEE)
+        .first()
+        is not None
+    )
+
+
 def rattacher_ecritures_au_message(db: Session, message: Message) -> None:
     # Les écritures sans message sont celles de ce tour.
     db.flush()

@@ -119,6 +119,8 @@ class MistralClient:
         messages: str | Sequence[Mapping[str, object]],
         response_format: dict | None = None,
         tools: Sequence[Mapping[str, object]] | None = None,
+        # Outil imposé (#252) : {"type": "function", "function": {"name": …}}.
+        tool_choice: Mapping[str, object] | None = None,
     ) -> ReponseChat:
         if isinstance(messages, str):
             messages = [{"role": "user", "content": messages}]
@@ -132,6 +134,8 @@ class MistralClient:
             payload["response_format"] = response_format
         if tools is not None:
             payload["tools"] = tools
+        if tool_choice is not None:
+            payload["tool_choice"] = tool_choice
 
         try:
             reponse = _http_client.post(

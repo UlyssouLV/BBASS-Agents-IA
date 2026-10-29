@@ -262,6 +262,7 @@ def _executer_ecrire(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
     )
     carte_envoyee = carte_de(ecriture)
     contexte.publier_carte(carte_envoyee)
+    contexte.cartes_du_tour.append(ecriture.id)
     return ResultatOutil(
         f"{PROPOSEE} {_SANS_MOT}",
         trace={

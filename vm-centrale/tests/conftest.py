@@ -118,6 +118,8 @@ class ClientMistralFactice:
         # entrée par appel, y compris le second appel (tools=None) d'un
         # aller-retour d'outil.
         self.tools_appels_reponse: list = []
+        # `tool_choice` de chaque appel de réponse de chat, même ordre (#252).
+        self.tool_choices_appels_reponse: list = []
         self._verrou = threading.Lock()
         self._reponses: list[str] = []
         self._reponse_structuree: str | None = None
@@ -132,6 +134,9 @@ class ClientMistralFactice:
         # .chat() portant `tools`.
         self._demandes_outils: list[list[AppelOutil]] = []
         self._echec_apres_demandes_outils: Exception | None = None
+        # Demandes d'outils des appels qui imposent un outil (`tool_choice`,
+        # #252), à part : un appel ordinaire ne les consomme pas.
+        self._demandes_imposees: list[list[AppelOutil]] = []
         # Appels d'extraction de rechercher_web (spec 1.4.0, ADR-0014),
         # reconnus à leur consigne fixe : leur propre canal, pour ne pas
         # consommer la file `_reponses` du chat principal.
@@ -246,6 +251,10 @@ class ClientMistralFactice:
             [AppelOutil(id=id_appel, nom=nom, arguments=arguments) for nom, arguments, id_appel in demande]
             for demande in demandes
         )
+
+    def repondre_a_l_outil_impose(self, nom_outil: str, arguments: dict, tool_call_id: str = "call_impose") -> None:
+        # Consommé par le prochain appel .chat() qui impose un outil.
+        self._demandes_imposees.append([AppelOutil(id=tool_call_id, nom=nom_outil, arguments=arguments)])
 
     def repondre_extraction(
         self, faits: list[tuple[str, str]] = (), questions: list[tuple[str, str, str]] = ()
@@ -382,7 +391,7 @@ class ClientMistralFactice:
             reponse_brute={"choices": [{"message": {"content": contenu}}]},
         )
 
-    def chat(self, messages, response_format=None, tools=None) -> ReponseChat:
+    def chat(self, messages, response_format=None, tools=None, tool_choice=None) -> ReponseChat:
         with self._verrou:
             if not isinstance(messages, str) and messages and messages[0]["content"] == CONSIGNE_EXTRACTION:
                 return self._extraire(messages, response_format)
@@ -413,6 +422,7 @@ class ClientMistralFactice:
             else:
                 self.appels_reponse.append(messages)
                 self.tools_appels_reponse.append(tools)
+                self.tool_choices_appels_reponse.append(tool_choice)
 
             # payload_envoye factice (spec 1.3.0) : reprend la forme réelle du
             # payload MistralClient (model/messages/response_format/tools),
@@ -431,6 +441,8 @@ class ClientMistralFactice:
                 payload["response_format"] = response_format
             if tools is not None:
                 payload["tools"] = tools
+            if tool_choice is not None:
+                payload["tool_choice"] = tool_choice
 
             if self._exception is not None:
                 raise ErreurAppelMistral(str(self._exception), payload_envoye=payload) from self._exception
@@ -446,8 +458,9 @@ class ClientMistralFactice:
                     reponse_brute={"choices": [{"message": {"content": self._reponse_structuree}}]},
                 )
 
-            if tools and self._demandes_outils:
-                appels = self._demandes_outils.pop(0)
+            file_demandes = self._demandes_imposees if tool_choice is not None else self._demandes_outils
+            if tools and file_demandes:
+                appels = file_demandes.pop(0)
                 message_assistant = {
                     "role": "assistant",
                     "content": None,

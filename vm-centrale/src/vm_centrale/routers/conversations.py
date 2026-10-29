@@ -27,16 +27,21 @@ from vm_centrale.consommation import enregistrer_consommation
 from vm_centrale.database import FabriqueSession, get_db, get_fabrique_session
 from vm_centrale.dates import date_du_jour
 from vm_centrale.garde_fous import (
+    PHRASE_CARTE_OUVERTE,
     PHRASE_CONTACT_NON_LU,
+    PHRASE_ECRITURE_NON_PROPOSEE,
     LectureSource,
     PageSource,
+    affirme_une_ecriture,
     ajouter_sources,
+    annonce_une_carte,
     mentionner_pages_trop_longues,
     nettoyer_titre,
     normaliser_url,
     plafonner,
     remplacer_contact_non_lu,
     retirer_chiffres_hors_source,
+    retirer_ecriture_affirmee,
     retirer_urls_inventees,
     urls_ecrites,
 )
@@ -75,6 +80,7 @@ from vm_centrale.moduleo.client import ClientModuleo, get_client_moduleo
 from vm_centrale.moduleo.ecritures import (
     cartes_par_message,
     detacher_de_la_conversation,
+    ecriture_confirmee,
     expirer,
     rattacher_ecritures_au_message,
     resultats_par_message,
@@ -88,6 +94,7 @@ from vm_centrale.questions_couvertes import (
 )
 from vm_centrale.outils import AppelMistralOutil, ContexteTour, executer_appel, outils_du_tour
 from vm_centrale.outils.moduleo import affaires as outil_affaires, contacts as outil_contacts
+from vm_centrale.outils.moduleo.ecriture import OUTIL_ECRIRE
 from vm_centrale.statut_tour import (
     ATTENTE,
     REFLEXION,
@@ -642,7 +649,7 @@ _REPONSE_SANS_DONNEES_MODULEO = (
 _PHRASES_CHIFFRES = (_REPONSE_SANS_DONNEES, _REPONSE_SANS_DONNEES_MODULEO)
 # Le contact non lu (#183) n'est pas un échange à titrer, mais sa phrase dit
 # déjà au modèle quoi faire : pas de note au tour suivant.
-_PHRASES_FIXES = (*_PHRASES_CHIFFRES, PHRASE_CONTACT_NON_LU)
+_PHRASES_FIXES = (*_PHRASES_CHIFFRES, PHRASE_CONTACT_NON_LU, PHRASE_ECRITURE_NON_PROPOSEE)
 _OUTILS_MODULEO = {outil_affaires.OUTIL.nom, outil_contacts.OUTIL.nom}
 # Citation d'une fiche de contact lue (moduleo/fiches.py).
 _CITATION_CONTACT = "Moduléo, contact "
@@ -773,6 +780,7 @@ def _reponse_visible(
     publier: Publier,
     outils_appeles: list[str],
     moduleo_configure: bool,
+    cartes_du_tour: list[int],
 ) -> str:
     # Ligne garde_fous de l'inspecteur à chaque réponse de chat (spec 1.4.0,
     # décision 15), même sans retrait : sans elle, on ne voit pas pourquoi la
@@ -801,6 +809,7 @@ def _reponse_visible(
         moduleo_appele,
         # Sans Moduléo, la phrase fixe promettrait une recherche impossible.
         contacts_lus or not moduleo_configure,
+        cartes_du_tour,
     )
     visible = ajouter_sources(
         visible,
@@ -830,7 +839,15 @@ def _appliquer_garde_fous(
     lectures: list[LectureDeLaConversation],
     moduleo_appele: bool = False,
     contacts_lus: bool = False,
+    cartes_du_tour: list[int] | None = None,
 ) -> str:
+    # Écriture Moduléo annoncée sans carte, même après la relance (#252) :
+    # toute la réponse devient la phrase fixe. Avec une carte, rien n'est
+    # encore écrit : les phrases qui le disent partent.
+    if cartes_du_tour:
+        reponse = retirer_ecriture_affirmee(reponse)
+    elif _annonce_une_ecriture(db, conversation_id, reponse):
+        return PHRASE_ECRITURE_NON_PROPOSEE
     # Une absence de coordonnées dans Moduléo sans lecture du contact dans
     # le tour (#183) : toute la réponse devient la phrase fixe, rien d'autre
     # à contrôler.
@@ -860,6 +877,15 @@ def _appliquer_garde_fous(
     if (extraits or message_apporte_une_donnee) and sans_chiffre_invente:
         return sans_chiffre_invente
     return _REPONSE_SANS_DONNEES_MODULEO if moduleo_appele else _REPONSE_SANS_DONNEES
+
+
+def _annonce_une_ecriture(db: Session, conversation_id: int, reponse: str) -> bool:
+    # Une carte écrite en texte, ou une écriture dite faite alors qu'aucune
+    # de la Conversation n'a été confirmée (#252). Après une confirmation,
+    # le modèle peut redire son résultat (« Écrit dans Moduléo »).
+    return annonce_une_carte(reponse) or (
+        affirme_une_ecriture(reponse) and not ecriture_confirmee(db, conversation_id)
+    )
 
 
 def _identite_connue(compte: Compte | None) -> str:
@@ -1243,6 +1269,7 @@ def _tour_creer_conversation(
         publier,
         contexte_outils.outils_appeles,
         contexte_outils.client_moduleo is not None,
+        contexte_outils.cartes_du_tour,
     )
 
     publier(TITRAGE)
@@ -1749,6 +1776,21 @@ def _enregistrer_appel_principal(
     )
 
 
+# Choix d'outil imposé chez Mistral (#252).
+_ECRIRE_IMPOSE = {"type": "function", "function": {"name": OUTIL_ECRIRE.nom}}
+
+
+def _a_relancer(reponse: str, tools: list[dict] | None, contexte_outils: ContexteTour) -> bool:
+    # Seulement si ecrire_moduleo est proposé au tour : sinon, la phrase
+    # fixe de _appliquer_garde_fous.
+    propose = any(outil["function"]["name"] == OUTIL_ECRIRE.nom for outil in tools or [])
+    return (
+        propose
+        and not contexte_outils.cartes_du_tour
+        and _annonce_une_ecriture(contexte_outils.db, contexte_outils.conversation_id, reponse)
+    )
+
+
 def _resoudre_reponse_chat(
     obtenir_reponse: Callable[[], ReponseChat],
     client: MistralClient,
@@ -1769,16 +1811,27 @@ def _resoudre_reponse_chat(
     # False (creer_conversation) : le rollback d'un échec annule aussi la
     # conversation flushée, l'échange d'échec ne peut ni la référencer ni
     # référencer la pièce jointe (voir creer_conversation).
+    # Écriture annoncée sans carte (#252) : une seule relance par message,
+    # qui impose ecrire_moduleo, puis la réponse qui suit, en plus des tours
+    # ordinaires si besoin.
     db = contexte_outils.db
     messages = list(messages_pour_mistral)
+    tours_max = _TOURS_MAX_PAR_MESSAGE
+    imposer = False
+    relance_faite = False
     try:
-        for tour in range(1, _TOURS_MAX_PAR_MESSAGE + 1):
+        tour = 0
+        while tour < tours_max:
+            tour += 1
             contexte_outils.publier(REFLEXION)
             try:
                 if tour == 1:
                     reponse = obtenir_reponse()
+                elif imposer:
+                    imposer = False
+                    reponse = client.chat(messages, tools=tools, tool_choice=_ECRIRE_IMPOSE)
                 else:
-                    dernier_tour = tour == _TOURS_MAX_PAR_MESSAGE
+                    dernier_tour = tour == tours_max
                     reponse = client.chat(messages, tools=None if dernier_tour else tools)
             except AppelOutilDemande as demande:
                 _enregistrer_appel_principal(contexte_outils, identifiant_compte, piece_jointe_id, demande)
@@ -1791,6 +1844,12 @@ def _resoudre_reponse_chat(
                 messages = [*messages, demande.message_assistant, *messages_outils]
                 continue
             _enregistrer_appel_principal(contexte_outils, identifiant_compte, piece_jointe_id, reponse)
+            if not relance_faite and _a_relancer(reponse.contenu, tools, contexte_outils):
+                # La réponse annoncée n'est jamais montrée : le même
+                # historique, avec l'outil imposé.
+                relance_faite = imposer = True
+                tours_max = max(tours_max, tour + 2)
+                continue
             return reponse
         # Ne devrait pas arriver : le dernier tour part sans `tools`.
         raise RuntimeError("Demande d'outil sur le dernier tour, parti sans outils")
@@ -2088,6 +2147,7 @@ def _tour_envoyer_message(
         publier,
         contexte_outils.outils_appeles,
         contexte_outils.client_moduleo is not None,
+        contexte_outils.cartes_du_tour,
     )
     _enregistrer_questions_du_tour(db, attendre_questions, identifiant_compte, conversation.id, piece_jointe)
 

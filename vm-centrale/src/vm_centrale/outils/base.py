@@ -52,6 +52,9 @@ class ContexteTour:
     # proposée.
     identifiant_compte: str = ""
     publier_carte: PublierCarte = ne_rien_publier_carte
+    # Ids des écritures dont une carte est partie pendant ce tour (#252) :
+    # sans aucune, la réponse ne peut pas annoncer d'écriture.
+    cartes_du_tour: list[int] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
