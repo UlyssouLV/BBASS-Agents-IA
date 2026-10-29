@@ -39,6 +39,32 @@ Ce n’est **pas** une spec (la spec naît à « Ouvre la version »).
 - Titre de section : `## Prochaine : X.Y.Z — <titre>` ou `## Ensuite : X.Y.Z — <titre>`.
 - Un **seul job** par version (un objectif métier clair).
 
+### Numéro de développement et numéro produit
+
+Deux suivis, un seul nom de version côté développement :
+
+| | Numéro de développement | Numéro produit |
+| --- | --- | --- |
+| Où | ce fichier, specs, branches `vX.Y.Z-…`, issues, PR, suivi d’avancement | tag et titre de la GitHub Release, `/sante`, « À propos » et mise à jour du poste, Nouveautés du site |
+| Ordre | par thème ; deux séries peuvent arriver sur `main` en alternance | **toujours croissant**, dans l’ordre d’arrivée sur `main` |
+| Fixé | à l’ouverture de la version | à « Finalise la version » |
+
+Sens des chiffres (communs aux deux suivis) :
+
+- **majeur** — rupture qui demande un geste à tous (réinstaller les postes, migrer des données à la main, mise en production définitive) ; décidé dans ce fichier, jamais calculé ;
+- **mineur** — une **série** = un grand thème (1.4 recherche web, 1.5 Moduléo, 1.6 déploiement, 1.7 documentation, 1.8 serveur MCP Moduléo…) ;
+- **correctif** — une étape de plus dans la série, une correction, ou une version arrivée après une série plus récente.
+
+À « Finalise la version », le numéro produit se calcule ainsi :
+
+1. **Rien de livré à l’utilisateur final** — le diff de la branche (`origin/main...HEAD`) ne touche aucun chemin du rôle **`livrables`** (`agents/roles.yml` : ce qui entre dans les images de la VM et dans le Paquet poste), hors tests et fichiers `.md` → **pas de Release**, donc pas de numéro produit. La version passe en **Déjà livré** sous son numéro de développement ; le site de doc se publie à la fusion.
+2. **Numéro de développement plus grand que la dernière Release** `vX.Y.Z` (comparaison semver) → numéro produit = numéro de développement.
+3. **Sinon** → numéro produit = dernière Release, correctif + 1. Titre de la Release : `VX.Y.Z — <titre> (développement A.B.C)`.
+
+Exemples : développement 1.5.2 finalisée après la Release 1.6.2 → produit **1.6.3** ; série 1.7.x de documentation → aucune Release ; 1.8.0 après 1.6.3 → **1.8.0** ; une 1.8.3 finalisée après la Release 1.9.0 → **1.9.1**.
+
+Dans **Déjà livré**, la puce garde le numéro de développement et indique le numéro produit quand il diffère (`**1.5.2** — … Livrée en **1.6.3**.`) ou l’absence de Release (`Sans Release produit.`).
+
 ### Corps d’une version (Prochaine / Ensuite)
 
 - **`Objectif.`** — ce que le collaborateur gagne (langage produit).

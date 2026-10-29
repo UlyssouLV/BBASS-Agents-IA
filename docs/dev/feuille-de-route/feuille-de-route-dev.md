@@ -4,6 +4,8 @@ Ordre des **prochaines versions** produit, plus les sujets encore sans numéro.
 
 Ce n’est **pas** une spec (ça vient après « Ouvre la version »).
 
+**Numéro de développement, numéro produit.** Les numéros de ce fichier sont des numéros de **développement** : une série par numéro mineur (1.7.x documentation, 1.8.x serveur MCP Moduléo…), et deux séries peuvent arriver sur `main` en alternance. Le collaborateur ne voit que le **numéro produit** (tag de la Release, `/sante`, « À propos » du poste), toujours croissant. Règle : [README](https://github.com/UlyssouLV/BBASS-Agents-IA/blob/main/docs/dev/feuille-de-route/README.md#numéro-de-développement-et-numéro-produit).
+
 ## Déjà livré
 
 - **1.0.x** — Socle : comptes, connexion, chat, relais Mistral, session persistée (keyring), LAN Castries.
@@ -44,41 +46,135 @@ Ce n’est **pas** une spec (ça vient après « Ouvre la version »).
 
 **État au 27/10/2026.** Pas encore finalisable : les identifiants du serveur de test Kipaware pour l’API Moduléo ne sont pas encore reçus, et on ne teste pas d’écriture sur le serveur de production. Finalisation visée le **mercredi 28/10/2026** ; d’où la livraison de la **1.5.3**, de la **1.6.0**, de la **1.6.1** puis de la **1.6.2** avant elle.
 
-**Hors périmètre.** Écriture sur le serveur de **production** tant que les essais sur le serveur de test ne sont pas validés. Administration des groupes et droits Moduléo (livrée en **1.5.3**).
+**Numéro produit.** Calculé à « Finalise la version » : **1.6.4** si la 1.6.3 (corrections de bugs, en parallèle depuis `main`) arrive avant sur `main`, sinon **1.6.3**.
 
-## Ensuite : 1.7.0 — Documentation fonctionnelle : mémoire et souveraineté des données
+**Hors périmètre.** Écriture sur le serveur de **production** tant que les essais sur le serveur de test ne sont pas validés. Administration des groupes et droits Moduléo (livrée en **1.5.3**). Retrouver par son nom un élément que l’API ne lit que par id (→ **1.8.1**).
 
-*(Reprise du bloc Plus tard « Documentation : mémoire conversationnelle et souveraineté des données (ex-1.6.0) », élargi en série 1.7.x de documentation fonctionnelle.)*
+## Ensuite : 1.6.3 — Corriger les bugs existants
 
-**Objectif.** Le cabinet dispose d’un **wiki produit** consultable par des non-techniciens (partie **fonctionnelle** du doc-site) : d’abord une **convention courte** de format (structure type : objectif, schémas, tableaux « où vit / qui voit / ce qui sort », sans dump de code) qui servira de modèle aux documentations suivantes ; puis deux documents dans `docs/features/` **et** sur le site de doc, chacun porté par une issue GitHub labellee **`documentation`** (plan, schémas, captures, exemples). Pas de changement de code produit hors ajustements de doc / schémas / exemples de tests cités.
+*(Menée en parallèle de la 1.5.2, depuis `main`. Embarque aussi la séparation numéro de développement / numéro produit et la planification des séries 1.7.x et 1.8.x, pour pouvoir les ouvrir depuis `main` sans attendre la 1.5.2.)*
 
-1. **Persistance de la mémoire** (`docs/features/memoire-conversationnelle.md` ou équivalent). Schéma compréhensible (conversations, messages, résumé glissant, profil de travail, pièces jointes, résultats de recherche web, etc.), flux tour par tour (ce qui entre, ce qui sort de la fenêtre de 3, ce qui est plafonné, ce que le modèle relit via outils), choix déjà pris et **pourquoi** (persistance VM vs API Conversations Mistral, séparation identité / profil, etc.). Exemples concrets (inspecteur, états) et renvois aux tests HTTP-boundary en annexe courte. Inclut la Mémoire de la conversation et les questions couvertes (1.4.1), le cache des pages web (1.4.3).
+**Objectif.** Les bugs connus hors écriture Moduléo sont corrigés :
 
-2. **Souveraineté des données** (`docs/features/souverainete-des-donnees.md` ou équivalent). Cartographie de tous les choix qui font que **seul le cabinet** détient les données persistées : Postgres et fichiers sur la VM Castries, SearXNG auto-hébergé, pas de Files API / Conversations Mistral, ZDR / `chat/completions` sans rétention côté modèle, clé API unique derrière la VM, LAN uniquement, etc. Expliquer **pourquoi** chaque décision rend le cabinet souverain. **Carte globale** « où vit la donnée » et **ce qui quitte le cabinet** (Mistral, Moduléo, SearXNG, rien d’autre) pour les chemins critiques ; liens ADR / specs. Le détail *par outil* de ce qui part / revient est en **1.7.1**.
+- un compte ne voit jamais les données d’un autre : après une déconnexion puis une connexion à un autre compte, la barre latérale ne montre pas les conversations du compte précédent, et un compte recréé avec le même identifiant ne retrouve pas celles de l’ancien ([#161](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/161)) ;
+- quand la recherche web ou la pièce jointe ne contient pas l’information, la réponse dit qu’elle ne l’a pas trouvée, au lieu d’estimer des tarifs, des dates ou de citer une source qui n’existe pas ([#131](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/131)) ;
+- pendant l’animation de frappe, la réponse s’affiche déjà mise en forme, sans balises Markdown brutes ([#170](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/170)) ;
+- le bandeau « Mise à jour impossible… » ne recouvre plus le bouton **…** de l’écran de connexion ([#249](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/249)).
 
-**Hors périmètre.** Inventaire des outils du modèle et flux par outil (→ **1.7.1**). Doc détaillée du tool calling recherche web (→ **Optimisation de la recherche web**, Plus tard). Doc-site administration des groupes et droits Moduléo (reste **hors version**). Déploiement (→ **1.6.0** / **1.6.1** / **1.6.2**), n8n (→ **1.8.0**), Agents par pôle, bugs connus. Implémentation de nouvelles capacités mémoire ou cache.
+**Hors périmètre.** Bugs de l’écriture Moduléo, dont le code n’est que sur la branche 1.5.2 (#256 dans la 1.5.2 ; #263, #264 en Plus tard). Pages refusées par les sites (HTTP 403) et PDF trouvés sur le web (Plus tard). Nouvelles fonctionnalités.
 
-## Ensuite : 1.7.1 — Documentation fonctionnelle : outils du modèle et flux par outil
+## Ensuite : 1.7.0 — Site de documentation à trois lectures : Collaborateur, Administrateur, Développeur
 
-**Objectif.** Suite du wiki fonctionnel (même convention que la **1.7.0**) : un document (ou un ensemble de pages liées) qui inventorie **tous les outils** exposés au modèle — recherche web, relecture de pièces jointes / pages, Moduléo, etc. Pour chaque outil : à quoi il sert, paramètres utiles en langage produit, **ce qu’il envoie / reçoit / persiste**, ce qui reste sur la VM, lien avec l’inspecteur. Complète la carte souveraineté de la 1.7.0 **sans la réécrire**. Issue(s) GitHub **`documentation`** ; pages sur le doc-site partie fonctionnelle. Pas de changement de code produit hors doc / schémas / exemples.
+*(Série **1.7.x** : documentation seule, menée en parallèle de la série **1.8.x**. Aucune Release produit : le site se publie à chaque fusion sur `main` ([numéro produit](https://github.com/UlyssouLV/BBASS-Agents-IA/blob/main/docs/dev/feuille-de-route/README.md#numéro-de-développement-et-numéro-produit)). Les anciennes 1.7.0 à 1.7.3 deviennent **1.7.4** à **1.7.7**.)*
 
-**Hors périmètre.** Doc ultra-détaillée du tool calling recherche web (paramètres fins, tous les cheminements d’échec) — reste le livrable doc de **Optimisation de la recherche web** (Plus tard). Nouveaux outils, Agents par pôle, n8n (**1.8.0**), écriture Moduléo (**1.5.2**).
+**Objectif.** Toute personne qui ouvre le site de documentation choisit sa lecture d’un bouton : **Collaborateur** (utiliser le Copilote au quotidien), **Administrateur** (gérer les comptes, installer et maintenir), **Développeur** (comprendre et faire évoluer le système). Le choix est mémorisé ; l’accueil, le menu et la recherche montrent d’abord les pages de cette lecture, et une page commune adapte ses parties. La version livre aussi :
 
-## Ensuite : 1.7.2 — Documentation de la base de données
+- une **convention de page** courte (objectif, schémas, tableaux « où vit / qui voit / ce qui sort », pas de copie de code, public déclaré par page), modèle des versions 1.7.x suivantes ;
+- un socle d’**accessibilité** et d’ergonomie : contraste, navigation au clavier, textes alternatifs, langage simple et captures côté Collaborateur ;
+- les pages existantes (Connexion, Branchement Moduléo, Inspecteur, Installation) rangées dans la convention et rattachées à leur lecture ;
+- un **tableau de couverture** fonctionnalité → page → lecture, qui montre ce qui reste à documenter et se vide au fil de la série ;
+- le Changelog en deux suivis : **Nouveautés** (numéros produit, lectures Collaborateur et Administrateur) et **Journal de développement** (numéros de développement, lecture Développeur).
 
-**Objectif.** Toute la base de la VM centrale est **documentée et visualisée** sur le doc-site : un schéma lisible (diagramme des tables et de leurs relations), puis chaque table, chaque colonne, son rôle en langage clair, qui l’écrit, qui la lit, combien de temps les lignes vivent. Une personne qui découvre le projet comprend où vit chaque donnée sans lire le code. Issue(s) GitHub **`documentation`**. Pas de changement de code produit hors doc / schémas.
+À partir de cette version, toute version qui change une fonctionnalité met à jour sa page dans chaque lecture concernée.
 
-**Hors périmètre.** Relations entre les services (→ **1.7.3**). Système de migration de schéma (→ **Alembic**, Plus tard). Carte de souveraineté (→ **1.7.0**, non réécrite).
+**À trancher au grilling.** Page par lecture ou page commune à parties adaptées. Lecture par défaut à la première visite. Rendu de la bascule sur mobile. Outil de vérification de l’accessibilité.
 
-## Ensuite : 1.7.3 — Documentation des relations entre les services
+**Hors périmètre.** Nouveau contenu (→ **1.7.1** à **1.7.8**). Contrôle d’accès : le site reste public, la bascule ne cache rien. Traduction.
 
-**Objectif.** Une carte claire de **qui parle à qui** : poste, VM centrale, Postgres, SearXNG, Mistral, Moduléo, et les deux Environnements staging / prod mis en place en **1.6.1** — ports, sens des appels, ce qui reste sur le LAN et ce qui sort, ce qui se passe quand un service manque. Schémas sur le doc-site, même convention que la **1.7.0**. Issue(s) GitHub **`documentation`**. Pas de changement de code produit hors doc / schémas.
+## Ensuite : 1.7.1 — Documentation : utiliser le chat au quotidien
 
-**Hors périmètre.** Détail par outil du modèle (→ **1.7.1**). Tables et colonnes (→ **1.7.2**). Procédure d’installation (guide admin livré en **1.6.1**).
+**Objectif.** Lecture **Collaborateur**, avec captures : tout ce qu’on fait dans le chat. Conversations (créer, reprendre, renommer, supprimer, changer de conversation pendant une réponse), envoi et statut d’attente, pièces jointes, recherche web et sources, ce que l’IA retient d’une conversation et ce qu’elle relit, jauge de contexte, Profil, Consommation. Ce que l’IA refuse ou remplace, expliqué simplement (chiffre sans source, lien non fourni, « pas trouvé »). Lecture Développeur : renvois courts vers **1.7.4** et **1.7.5**.
 
-## Ensuite : 1.8.0 — Workflows n8n (socle d’automatisation), branchés sur Moduléo 1.5.0
+**Hors périmètre.** Moduléo (→ **1.7.2**). Panel d’administration (→ **1.7.3**). Détail des flux (→ **1.7.4**, **1.7.5**).
 
-*(Anciennement 1.6.0 / 1.7.0 — passé en 1.8.0 ; le créneau 1.7.x est repris par la documentation fonctionnelle.)*
+## Ensuite : 1.7.2 — Documentation : Moduléo depuis le chat
+
+**Objectif.** Les pages « Branchement Moduléo » reprises dans la convention et complétées de l’écriture livrée en 1.5.2 : ce qu’on peut lire et écrire, la carte de confirmation (création, modification, suppression), ce que veut dire chaque statut de carte, les refus faute de droit, le serveur de test. Lecture **Collaborateur** : demandes types et ce qu’on voit. Lecture **Administrateur** : configuration, droits, groupes. Lecture **Développeur** : garde des droits, routes classées, ADR.
+
+**Hors périmètre.** Serveur MCP Moduléo (série **1.8.x**, qui met ces pages à jour). Gestion des groupes dans le Panel (→ **1.7.3**).
+
+## Ensuite : 1.7.3 — Documentation : administrer BBASS
+
+**Objectif.** Lecture **Administrateur** : tout le Panel d’administration — comptes (création, mot de passe généré, changement forcé, révocation, pôle et agence), consommations, groupes et droits Moduléo (reprend l’ancienne entrée Plus tard « Doc-site : administration des groupes et droits Moduléo ») — et les guides d’installation et de maintenance du serveur et du poste (1.6.1, 1.6.2), rangés sous cette lecture, avec staging / prod et la promotion d’une version.
+
+**Hors périmètre.** Fonctionnement interne (→ **1.7.6**, **1.7.7**). Inspecteur (lecture Développeur, rangé en **1.7.0**).
+
+## Ensuite : 1.7.4 — Documentation : mémoire et souveraineté des données
+
+*(Ancienne 1.7.0.)*
+
+**Objectif.** Deux documents, chacun en deux lectures : **Collaborateur** (« où vont mes données, qui les voit », en une page simple) et **Développeur** (détail ci-dessous).
+
+1. **Persistance de la mémoire.** Schéma compréhensible (conversations, messages, résumé glissant, profil de travail, pièces jointes, résultats de recherche web, etc.), flux tour par tour (ce qui entre, ce qui sort de la fenêtre de 3, ce qui est plafonné, ce que le modèle relit via outils), choix déjà pris et **pourquoi** (persistance VM vs API Conversations Mistral, séparation identité / profil, etc.). Exemples concrets (inspecteur, états) et renvois aux tests HTTP-boundary en annexe courte. Inclut la Mémoire de la conversation et les questions couvertes (1.4.1), le cache des pages web (1.4.3).
+
+2. **Souveraineté des données.** Cartographie de tous les choix qui font que **seul le cabinet** détient les données persistées : Postgres et fichiers sur la VM Castries, SearXNG auto-hébergé, pas de Files API / Conversations Mistral, ZDR / `chat/completions` sans rétention côté modèle, clé API unique derrière la VM, LAN uniquement, etc. Expliquer **pourquoi** chaque décision rend le cabinet souverain. **Carte globale** « où vit la donnée » et **ce qui quitte le cabinet** (Mistral, Moduléo, SearXNG, rien d’autre) pour les chemins critiques ; liens ADR / specs.
+
+**Hors périmètre.** Détail par outil de ce qui part / revient (→ **1.7.5**). Doc détaillée du tool calling recherche web (→ **Optimisation de la recherche web**, Plus tard). Implémentation de nouvelles capacités mémoire ou cache.
+
+## Ensuite : 1.7.5 — Documentation : outils du modèle et flux par outil
+
+*(Ancienne 1.7.1.)*
+
+**Objectif.** Lecture **Développeur** : inventaire de **tous les outils** exposés au modèle — recherche web, relecture de pièces jointes / pages, Moduléo, etc. Pour chaque outil : à quoi il sert, paramètres utiles en langage produit, **ce qu’il envoie / reçoit / persiste**, ce qui reste sur la VM, lien avec l’inspecteur. Complète la carte de souveraineté de la **1.7.4** sans la réécrire.
+
+**Hors périmètre.** Doc ultra-détaillée du tool calling recherche web (→ **Optimisation de la recherche web**, Plus tard). Outils Moduléo passés par le serveur MCP (mis à jour par la série **1.8.x**).
+
+## Ensuite : 1.7.6 — Documentation : base de données
+
+*(Ancienne 1.7.2.)*
+
+**Objectif.** Lecture **Développeur** : toute la base de la VM centrale **documentée et visualisée** — un schéma lisible (tables et relations), puis chaque table, chaque colonne, son rôle en langage clair, qui l’écrit, qui la lit, combien de temps les lignes vivent. Une personne qui découvre le projet comprend où vit chaque donnée sans lire le code.
+
+**Hors périmètre.** Relations entre les services (→ **1.7.7**). Système de migration de schéma (→ **Alembic**, Plus tard). Carte de souveraineté (→ **1.7.4**, non réécrite).
+
+## Ensuite : 1.7.7 — Documentation : relations entre les services
+
+*(Ancienne 1.7.3.)*
+
+**Objectif.** Lectures **Développeur** et **Administrateur** : une carte claire de **qui parle à qui** — poste, VM centrale, Postgres, SearXNG, Mistral, Moduléo, et les deux Environnements staging / prod de la **1.6.1** : ports, sens des appels, ce qui reste sur le LAN et ce qui sort, ce qui se passe quand un service manque.
+
+**Hors périmètre.** Détail par outil du modèle (→ **1.7.5**). Tables et colonnes (→ **1.7.6**). Procédure d’installation (→ **1.7.3**). Serveur MCP Moduléo (ajouté à la carte par la série **1.8.x**).
+
+## Ensuite : 1.7.8 — Documentation : que faire si…
+
+**Objectif.** Toutes lectures : une entrée par situation que l’on peut rencontrer, retrouvable depuis le message vu à l’écran — bandeaux du poste (Serveur BBASS injoignable, mise à jour, retour arrière), phrases fixes de la VM (Moduléo en panne ou refusé, droit manquant, page trop longue, réponse remplacée par un garde-fou…), statuts de carte Moduléo, erreurs de connexion. Pour chacune : ce que ça veut dire, si c’est grave, quoi faire, qui prévenir. En fin de version, le tableau de couverture de la **1.7.0** est vide.
+
+**Hors périmètre.** Corriger ces situations (bugs → Plus tard).
+
+## Ensuite : 1.8.0 — Serveur MCP Moduléo : lire Moduléo par un serveur standard
+
+*(Série **1.8.x** : reprend l’entrée Plus tard « Serveur MCP Moduléo » (spec 1.5.2, tests humains [#206](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/206)), menée en parallèle de la série **1.7.x**. Les workflows n8n passent en **1.9.0**.)*
+
+**Objectif.** Les lectures Moduléo du chat passent par un **serveur MCP** (Model Context Protocol) Moduléo, sans changement visible pour le collaborateur : mêmes fiches en noms, mêmes droits par groupe, mêmes phrases fixes, mêmes sources des garde-fous. La VM centrale devient l’**hôte** MCP : elle garde la boucle Mistral et présente au modèle les outils du serveur. À « Qu’est-ce que tu sais faire avec Moduléo ? », le chat répond avec ce que le compte peut réellement lire, tiré de la liste d’outils du serveur filtrée par ses droits, et non de ce que le modèle imagine (tests humains [#206](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/206) : réponse inventée, puis avalée par le garde-fou des chiffres). Socle des **1.8.1** et **1.8.2**.
+
+**Recherche** (dans `docs/dev/recherches/`, avant d’ouvrir la version). Partir de la doc officielle : [Getting started](https://modelcontextprotocol.io/docs/2026-07-28/getting-started/intro), [Architecture](https://modelcontextprotocol.io/docs/2026-07-28/learn/architecture), [Server concepts](https://modelcontextprotocol.io/docs/2026-07-28/learn/server-concepts), [Build servers](https://modelcontextprotocol.io/docs/2026-07-28/develop/build-server), [Security best practices](https://modelcontextprotocol.io/docs/2026-07-28/tutorials/security/security_best_practices). Trancher :
+
+- où tourne le serveur : processus lancé par la VM (transport stdio) ou conteneur à côté sur le réseau Docker interne (Streamable HTTP) ;
+- comment le compte et ses droits Moduléo atteignent le serveur sans en faire un « adjoint confus » (un seul compte de service pour tous) et sans transmettre à Moduléo un jeton émis pour le serveur ;
+- ce qui reste un outil, ce qui devient une ressource (listes de référence) ;
+- SDK Python `mcp` (version 2 ou plus), tests à la frontière avec un client MCP de test, place du serveur dans l’inspecteur.
+
+**Hors périmètre.** Retrouver un élément par son nom (→ **1.8.1**). Écriture (→ **1.8.2**). Ouvrir le serveur à des clients hors BBASS.
+
+## Ensuite : 1.8.1 — Serveur MCP Moduléo : retrouver par son nom ce que l’API ne lit que par id
+
+**Objectif.** Le collaborateur peut dire « catégorie Terrain » : le serveur construit et tient à jour la correspondance nom → id des éléments que l’API Moduléo ne lit que par id (catégories de tâche à faire `moduleo/categorietacheafaire/{id}`, de note `cogeo/categorienote/{id}`…), en lisant les ids un à un et en les mettant en cache faute de route de liste, ou par une route de liste si Kipaware en ouvre une. Le serveur donne aussi au modèle l’id des éléments que les fiches de la 1.5.2 ne portent pas (téléphones, e-mails et adresses d’un contact, notes, tâches à faire, codes activité), pour pouvoir les modifier ou les supprimer. Lève les limites de la 1.5.2 (« pas de moyen de retrouver l’élément à partir de son nom », écritures refusées faute d’id, [#257](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/257)).
+
+**À trancher au grilling.** Durée de vie du cache et rafraîchissement. Borne de lecture des ids. Exposition des listes comme ressources du serveur.
+
+**Hors périmètre.** Demander une route de liste à Kipaware (démarche à mener en parallèle, sans bloquer). Écriture (→ **1.8.2**).
+
+## Ensuite : 1.8.2 — Serveur MCP Moduléo : écrire par le serveur
+
+**Objectif.** Les écritures Moduléo de la 1.5.2 passent par le serveur MCP avec toutes leurs garanties : garde des droits appliqué par le serveur pour le compte authentifié, carte de confirmation dans le poste et confirmation hors du modèle, identifiant de carte lié au compte (le posséder ne suffit pas à confirmer), serveur de test seulement, ids jamais à l’écran. Le serveur refuse une écriture non confirmée, quel que soit l’hôte qui l’appelle. La réponse à « Qu’est-ce que tu sais faire avec Moduléo ? » (1.8.0) couvre alors les écritures : celles que le compte peut proposer, d’après les outils d’écriture du serveur et ses droits.
+
+**À trancher au grilling.** Rôle de l’elicitation MCP (demande de confirmation du serveur à l’hôte) à côté de la carte, qui reste la garantie.
+
+**Hors périmètre.** Écriture sur le serveur Moduléo du cabinet (décision à part). Ouvrir le serveur à des clients hors BBASS.
+
+## Ensuite : 1.9.0 — Workflows n8n (socle d’automatisation), branchés sur Moduléo 1.5.0
+
+*(Anciennement 1.6.0 / 1.7.0 / 1.8.0 — passé en 1.9.0 ; 1.7.x documentation, 1.8.x serveur MCP Moduléo.)*
 
 S’appuie sur les **outils / client Moduléo lecture** livrés en 1.5.0. n8n devient le **runtime d’automatisation** (scénarios multi-étapes, plus tard d’autres logiciels), pas un miroir 1:1 de chaque route API.
 
@@ -94,11 +190,11 @@ S’appuie sur les **outils / client Moduléo lecture** livrés en 1.5.0. n8n de
 - Self-host Docker vs autre ; où tourne n8n par rapport à la VM.
 - Contrat outils chat ↔ n8n (webhook vs API execute).
 - Gouvernance : qui active un workflow ; audit des exécutions.
-- Comment réexposer ou appeler la stack Moduléo 1.5.0 depuis n8n (HTTP Request vers Moduléo vs rappel d’un service VM).
+- Comment réexposer ou appeler la stack Moduléo 1.5.0 depuis n8n (HTTP Request vers Moduléo vs rappel d’un service VM vs serveur MCP Moduléo de la série **1.8.x**).
 
-## Ensuite : 1.9.0 — Analyse et traitement des pièces jointes, approfondis
+## Ensuite : 1.10.0 — Analyse et traitement des pièces jointes, approfondis
 
-*(Anciennement 1.5.0 → 1.8.0 selon les décalages ; reste en 1.9.0. La documentation fonctionnelle est en **1.7.0** / **1.7.1**.)*
+*(Anciennement 1.5.0 → 1.9.0 selon les décalages ; passé en 1.10.0 après l’arrivée du serveur MCP Moduléo en 1.8.x.)*
 
 S’appuie sur la [1.1.2](../../specs/v1.1.2-pieces-jointes.md) (pipeline d’extraction, une pièce jointe par message). Le traitement par pôle suppose les **Agents métier par pôle** (Plus tard) : à livrer avant, ou à faire entrer ici. Deux limites actées volontairement en 1.1.2 sont à lever ici, pas avant : **plusieurs pièces jointes par message**, et un **traitement spécifique par pôle** (un agent Foncier ne traite pas un document comme un agent Urbanisme) — demande explicite du cabinet dès le grilling de 1.1.2, remise à plus tard faute d’Agent réel pour la justifier.
 
@@ -119,13 +215,7 @@ Sorti de la 1.5.0 pour la garder petite. Un **Agent** sert un pôle : sa consign
 
 Déjà tranché : un Agent est une configuration dans le flux chat de la VM centrale, **pas un conteneur Docker par Agent / par pôle** (pas de runtime propre, ops inutiles alors que peu de tech sera sur place). Si l’indépendance de déploiement devient un besoin : config rechargeable d’abord, et ne conteneuriser que ce qui a un vrai cycle de vie (adaptateur Moduléo en écriture, bac à sable d’exécution, n8n).
 
-À trancher à l’ouverture : comment un tour choisit son Agent (pôle du compte, choix explicite, plusieurs pôles), quelles capacités pour chaque pôle, lien avec le traitement des pièces jointes par pôle (1.9.0).
-
-### Dire « pas trouvé » plutôt qu’inventer après une recherche (ex-1.4.5, #131)
-
-Corriger le bug [#131](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/131), constaté au test humain de la 1.4.0 : quand la recherche (ou la pièce jointe) ne contient pas l’information, la réponse dit qu’elle ne l’a pas trouvée, au lieu d’estimer des tarifs, des dates ou de citer une source qui n’existe pas. Jamais « sourcé » ni « confirmé par » sans résultat de l’outil qui le contient ; une source dont le lien est retiré ne reste pas affichée comme source ; le contenu de la pièce jointe prime sur une généralité du web. Les garde-fous ne cassent plus la mise en forme (indentation des listes et tableaux, parenthèses vides) ; une page quasi vide n’est pas comptée comme lue ; la date du jour est donnée en toutes lettres et seule l’année va dans la requête. À trancher au grilling : sort d’une réponse dont beaucoup de chiffres sont retirés (marqueur visible, réécriture, phrase fixe), contrôle des petits montants (« 5 € »), et traitement ici ou à part du profil de travail et du résumé qui débordent d’une conversation à l’autre.
-
-**Hors périmètre.** Pages refusées par les sites (HTTP 403) et PDF trouvés sur le web ; vérification de la fiabilité des sources ; modes Rapide / Approfondi. Pas de changement du contrat HTTP du poste.
+À trancher à l’ouverture : comment un tour choisit son Agent (pôle du compte, choix explicite, plusieurs pôles), quelles capacités pour chaque pôle, lien avec le traitement des pièces jointes par pôle (1.10.0).
 
 ### Bug — lien de source peu visible (#99)
 
@@ -143,37 +233,21 @@ Corriger le bug [#131](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/131),
 
 **Suivi :** [#99](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/99) (`bug`). Trouvé dans : Informations manquantes · Contexte : essai manuel · Date : 2026-10-05 · Priorité : Informations manquantes.
 
-### Bug — données d’un compte visibles par un autre compte (#161)
+### Bug — heure de l'inspecteur, titre de carte en jargon et confirmation en texte avant la carte (#256)
 
-**Constat :** après une déconnexion puis une connexion à un autre compte, la barre latérale affiche d’abord les conversations du compte précédent, jusqu’au rafraîchissement ; un compte recréé avec le même identifiant retrouve les conversations de l’ancien compte supprimé.
+**Constat :** trois défauts mineurs du premier passage des tests humains V1.5.2 (#206) : l'inspecteur affiche les heures une heure en retard (11:07 pour 12:07, heure de Paris) ; la carte d'écriture reprend la description de la route de la doc Moduléo (« Met à jour une tâche à faire en fonction de son identifiant unique. ») ; le modèle demande souvent une confirmation en texte avant de proposer la carte.
 
-**Reproductibilité :** (1) compte A → déconnexion → compte B sur le même poste : sidebar montre d’abord les conversations de A jusqu’au rafraîchissement ; (2) supprimer un compte puis le recréer avec le même identifiant → anciennes conversations / données liées réapparaissent.
+**Reproductibilité :** comparer une heure de l'inspecteur à l'heure locale ; lire le titre d'une carte de modification de tâche à faire ; demander la création d'une tâche à faire sans « propose directement la carte » (question en texte 3 fois sur 8 au premier passage).
 
-**Impact :** un collaborateur peut voir, même brièvement, les conversations d’un autre compte ; un compte recréé hérite des données de l’ancien (isolation des comptes).
+**Impact :** lecture moins claire (heure fausse, titre technique) et un tour de chat de plus avant de pouvoir confirmer ; aucune écriture fausse.
 
-**Cause probable :** poste — déconnexion ne vide pas le cache React Query ; VM centrale — suppression de compte n’efface pas les tables liées par identifiant.
+**Cause probable :** heures en UTC affichées sans conversion ; titre de carte = description de la route ; consigne système « pose la question de confirmation » qui prend le pas sur la carte.
 
-**À corriger :** la déconnexion vide toute la mémoire du compte côté poste ; la suppression d’un compte supprime aussi ses conversations, pièces jointes, profil de travail et échanges d’inspecteur, avec nettoyage des données déjà orphelines.
+**À corriger :** heures de l'inspecteur en heure de Paris, lisibles par un humain (« 29 octobre 2026 à 12:07 », pas un format technique), et même règle pour les dates de la carte (« 15 novembre 2026 » au lieu de « 2026-11-15T00:00:00+01:00 ») ; titre de carte en langage métier ; carte proposée directement quand la demande d'écriture est claire.
 
-**Hors périmètre :** décision de garder ou non la consommation d’un compte supprimé pour le suivi des coûts — à trancher.
+**Hors périmètre :** fausses cartes et écritures annoncées sans carte (#252) ; ids non résolus et phrase coupée (#254) ; refonte du style de la carte (Agents par pôle).
 
-**Suivi :** [#161](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/161) (`bug`). Trouvé dans : 1.4.3 · Contexte : test humain · Date : 2026-10-07 · Priorité : non prioritaire en dev.
-
-### Bug — Markdown brut pendant l'animation de frappe (#170)
-
-**Constat :** pendant l'animation de frappe d'une réponse, le Markdown s'affiche brut : les balises (`**`, `#`, `-`, `|` des tableaux…) sont visibles et le texte ne se met en forme qu'à la fin de l'animation, d'un coup.
-
-**Reproductibilité :** poser une question dont la réponse contient du gras, des titres, des listes ou un tableau (ex. « Compare ces aides dans un tableau ») et regarder la réponse s'écrire : balises visibles pendant toute la frappe, mise en forme à la dernière étape.
-
-**Impact :** rendu peu lisible pendant la frappe, puis « saut » visuel à la fin ; tous les comptes, sur chaque réponse mise en forme.
-
-**Cause probable :** choix volontaire de `TexteAnimeReponse` (`poste/frontend/src/onglets/OngletChat.tsx`, suite #99) : tant que le texte révélé est tronqué, il est affiché en texte brut ; le rendu Markdown (remark-gfm, Prism) n'est fait qu'une fois, à la fin, pour éviter une syntaxe incomplète cassée à chaque étape.
-
-**À corriger :** la réponse se met en forme au fur et à mesure de la frappe, sans balises Markdown visibles ni syntaxe incomplète cassée (lien, tableau, bloc de code non refermé).
-
-**Hors périmètre :** pas dans la V1.4.4. Streaming du texte de la réponse depuis la VM (les garde-fous s'appliquent au texte complet).
-
-**Suivi :** [#170](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/170) (`bug`). Trouvé dans : 1.4.4 · Contexte : test humain · Date : 2026-10-07 · Priorité : non prioritaire en dev.
+**Suivi :** [#256](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/256) (`bug`, captures en pièce jointe). Trouvé dans : 1.5.2 · Contexte : test humain · Date : 2026-10-29 · Priorité : non prioritaire en dev.
 
 ### Agent IA de continuation du développement, validation par compte administrateur
 
@@ -212,7 +286,7 @@ Ce n’est **pas** le même objet que la 1.1.1 (résumé glissant de conversatio
 
 À creuser seulement si le besoin métier le justifie (doc Moduléo / Agents, corpus par pôle, multi-providers, etc.) :
 - Mémoire inter-conversationnelle plus fine que le seul profil de travail synthétique.
-- RAG sur un corpus cabinet, distinct des pièces jointes du fil courant (1.1.2 / 1.9.0).
+- RAG sur un corpus cabinet, distinct des pièces jointes du fil courant (1.1.2 / 1.10.0).
 - **Optimisation du résumé+profil actuel (1.1.1)** — **dans la même version** que le reste de ce chantier mémoire, pas une version à part. Distinct de la **1.3.1**, qui corrige le contenu figé (inventions reprises comme des faits, [#110](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/110)), pas la fréquence des appels ni un RAG. Aujourd’hui, dès qu’il y a des messages sortants, chaque tour fait **1 chat + 1 appel résumé/profil** (agrégés tous les deux en « Chat » côté conso) : fiable, mais ~2× les requêtes après le premier message. Pistes à trancher alors : résumé moins fréquent (tous les N tours / seuil de tokens), résumé en arrière-plan après la réponse affichée (façon *Dreaming*), ou mémoire à la demande (outil / notes) — en gardant éventuellement le combo résumé léger + embeddings pour le long terme.
 
 ### Éléments de réponse visuels plus riches dans le chat (graphiques, documents générés)
@@ -252,10 +326,6 @@ Constat (grilling 1.5.1) : les droits de la clé d’API Moduléo font foi sur c
 ### Restriction d’accès Moduléo par affaire
 
 Constat (grilling 1.5.1) : Moduléo peut limiter l’accès à certaines affaires (« Limiter l’accès à des affaires aux autres collaborateurs », groupes rattachés à une affaire). La copie des droits de la 1.5.1 ne s’applique qu’aux catégories, pas affaire par affaire. Piste : lire les groupes de chaque affaire trouvée et filtrer les fiches dans le garde des droits.
-
-### Doc-site : administration des groupes et droits Moduléo (hors version)
-
-Constat (grilling 1.5.1) : une page `features/moduleo` du site de documentation rappelle comment les droits Moduléo s’appliquent dans BBASS : groupes Cogeo et Planning, catalogue des droits, rattachement des comptes, mise à jour quand Moduléo change. Rédigée hors version par le développeur.
 
 ### Vérification de la fiabilité des sources web
 
@@ -311,18 +381,34 @@ Constat (grilling 1.6.1) : la mise à jour reste déclenchée par l’admin (com
 - Ranger dans le **gestionnaire de mots de passe du cabinet** : identifiants Ubuntu One, valeurs générées par l’installateur (mots de passe Postgres, `VM_ADMIN_KEY` de chaque Environnement), emplacement des clés maîtres.
 - Vérifier que l’admin du cabinet a joué seul, avec le guide, une mise à jour et une Promotion.
 
-### Bug — le bandeau de mise à jour recouvre le bouton « … » (#249)
+### Bug — « Écrit dans Moduléo. » après une suppression (#263)
 
-**Constat :** quand la mise à jour au lancement échoue (ici : Serveur BBASS éteint), le bandeau rouge « Mise à jour impossible… » s’affiche en haut de la fenêtre, sur toute la largeur, et recouvre le bouton **…** en haut à droite de l’écran de connexion : le bouton n’est pas cliquable tant qu’on n’a pas fermé le bandeau par sa croix. Le bandeau touche aussi le haut du logo du panneau gauche (captures en pièce jointe sur #249).
+**Constat :** au second passage des tests humains V1.5.2 (#206, scénario 17), la confirmation d'une suppression de temps passé affiche « Écrit dans Moduléo. » sur la carte « Sera supprimé » ; l'élément est bien supprimé, mais la phrase dit « écrit ».
 
-**Reproductibilité :** poste installé en v1.6.2, Serveur BBASS arrêté : quitter BBASS puis le relancer → bandeau sur l’écran de connexion ; clic sur **…** → rien ne s’ouvre. Reproduit à chaque fois, dans la fenêtre BBASS comme dans le navigateur.
+**Reproductibilité :** demander « Supprime mon temps passé du <date> sur l'affaire <numéro> », puis Confirmer. Systématique (même phrase pour toute méthode).
 
-**Impact :** tous les collaborateurs dont la mise à jour échoue ; c’est justement quand le serveur est injoignable qu’il faut **…** → **Configuration** ou **À propos** (guide poste-collaborateur, « En cas de problème »), et rien n’indique qu’il faut d’abord fermer le bandeau.
+**Impact :** formulation ambiguë après une suppression ; aucune donnée fausse.
 
-**Cause probable :** `BandeauMiseAJour` est en `fixed inset-x-0 top-0 z-50` par-dessus l’écran, et `MenuConfiguration` est lui aussi en haut à droite (`absolute top-4 right-4` sur l’écran de connexion, `fixed top-4 right-4` dans `App.tsx`).
+**Cause probable :** une seule phrase fixe après confirmation, quelle que soit la méthode (spec 1.5.2 : « Écrit dans Moduléo »).
 
-**À corriger :** le bouton **…** reste visible et cliquable quand le bandeau est affiché (par exemple le bandeau pousse le contenu au lieu de le recouvrir), sans chevaucher le logo.
+**À corriger :** phrase selon la méthode : « Créé dans Moduléo. », « Modifié dans Moduléo. », « Supprimé de Moduléo. », sur la carte et dans le résultat d'outil vu par le modèle ; spec à amender en même temps.
 
 **Hors périmètre :** Aucun.
 
-**Suivi :** [#249](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/249) (`bug`). Trouvé dans : 1.6.2 · Contexte : test humain · Date : 2026-10-29 · Priorité : Informations manquantes.
+**Suivi :** [#263](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/263) (`bug`, capture en pièce jointe). Trouvé dans : 1.5.2 · Contexte : test humain · Date : 2026-10-29 · Priorité : non prioritaire.
+
+### Bug — Moduléo supprime le téléphone vide d'un contact quand on lui en ajoute un (#264)
+
+**Constat :** au second passage des tests humains V1.5.2 (#206, scénarios 5 et 6), CLIENT EXEMPLE 11 avait un téléphone n°160 vide ; après un seul `POST moduleo/telephone` de BBASS (id renvoyé 161), la liste du contact est `[161]` et le n°160 n'existe plus. Chaque contact de test semble avoir un tel téléphone vide.
+
+**Reproductibilité :** sur le serveur de test, lire les téléphones d'un contact qui n'a qu'un téléphone vide, créer un téléphone depuis le chat et confirmer, relire. Vu une fois.
+
+**Impact :** aucun a priori pour le collaborateur (téléphone vide) ; un id de téléphone lu avant une création peut ne plus exister après.
+
+**Cause probable :** comportement du serveur Moduléo (Kipaware), pas de BBASS ; voulu ou non, à confirmer.
+
+**À corriger :** demander à Kipaware si c'est voulu et dans quels cas (e-mails, adresses ?) ; si oui, le noter dans le README du module Moduléo (écriture), sinon le signaler. Rien à changer dans BBASS tant que ce n'est pas confirmé.
+
+**Hors périmètre :** ids des téléphones absents des fiches (#257).
+
+**Suivi :** [#264](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/264) (`bug`). Trouvé dans : 1.5.2 · Contexte : test humain · Date : 2026-10-29 · Priorité : non prioritaire.

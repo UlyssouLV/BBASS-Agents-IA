@@ -22,7 +22,7 @@ Paths: **`agents/roles.yml`**.
 ## 1. Guards
 
 1. `git branch --show-current` is **protected** (base, `main`, `master`) → stop.
-2. Tag: from the message, or from the branch name `vX.Y.Z-<slug>`. Extract semver `X.Y.Z`, then set the Git tag to **tag(X.Y.Z)** (channel prefix or `v`). If the message already has the full prefixed tag, use it as-is when it matches **tag(X.Y.Z)**. If missing: ask and **wait**. Do not invent a bump.
+2. Tag: from the message, or from the branch name `vX.Y.Z-<slug>`. Extract semver `X.Y.Z`, then set the Git tag to **tag(X.Y.Z)** (channel prefix or `v`). If the message already has the full prefixed tag, use it as-is when it matches **tag(X.Y.Z)**. If missing: ask and **wait**. Do not invent a bump. A tag given in the message wins over the branch name: it may be a **product number** that differs from the branch's **development number** (`finaliser-la-version` step 0, `docs/dev/feuille-de-route/README.md`). Call that development number **`D`** (from the branch `vD-<slug>`).
 3. `git fetch`. `git tag -l '<full-tag>'` or `gh release view <full-tag>` already exists → stop. Never retag.
 
 ## 2. Target
@@ -37,7 +37,7 @@ Target = that SHA (or the branch name while it still exists), **not** **base**. 
 
 `VX.Y.Z — <purpose>`
 
-Purpose = the rest of the user / caller message after the tag, else the PR title after `VX.Y.Z —`, else the parent spec’s one-job sentence. Do not use a commit-subject dump as the title. (Title keeps `VX.Y.Z` for humans; the Git tag may be `orchestrator-vX.Y.Z`.)
+Purpose = the rest of the user / caller message after the tag, else the PR title after `VD —`, else the parent spec’s one-job sentence. Tag ≠ **`D`** → the purpose ends with ` (développement D)` (keep it when the caller already wrote it). Do not use a commit-subject dump as the title. (Title keeps `VX.Y.Z` for humans; the Git tag may be `orchestrator-vX.Y.Z`.)
 
 ## 4. Notes (body)
 
@@ -81,7 +81,7 @@ Issues laissées de côté (PR / spec hors périmètre) : #…
 ### Fill order
 
 1. Draft from the PR body (`Fixes`, summary), parent spec, and role **`adr`** files added on this branch. If the caller already passed notes, **fit them into these headings** — do not replace the layout with a free-form blob.
-2. **Human-test child (product illustration).** If a Closed child titled **`Tests humains — VX.Y.Z`** exists (see `agents/issue-tracker.md`, *Human-test child*), read its `## Ce qu’on peut faire maintenant` and **merge it into** the release section of the same name (text + Markdown images). Prefer that ticket’s product bullets and screenshots as the primary illustration; keep or add short gaps from the spec/PR only when they are still missing. Keep the pairing: each bullet **immediately followed by its proof screenshot** (blank line, image indented under the bullet), one image per sentence; never a block of images after the list. A gap without a screenshot is folded into the closest bullet's sentence or stays text-only. Do not invent a new top-level heading for preuves.
+2. **Human-test child (product illustration).** If a Closed child titled **`Tests humains — VD`** exists (development number) (see `agents/issue-tracker.md`, *Human-test child*), read its `## Ce qu’on peut faire maintenant` and **merge it into** the release section of the same name (text + Markdown images). Prefer that ticket’s product bullets and screenshots as the primary illustration; keep or add short gaps from the spec/PR only when they are still missing. Keep the pairing: each bullet **immediately followed by its proof screenshot** (blank line, image indented under the bullet), one image per sentence; never a block of images after the list. A gap without a screenshot is folded into the closest bullet's sentence or stays text-only. Do not invent a new top-level heading for preuves.
 3. **Gap pass (commits only to complete, not to rewrite).** Read `git log origin/<base>..HEAD --oneline` (or the PR commits). Compare to the draft. Add only what is **missing** from the notes and useful to a human: a real capability the spec/PR omitted, or a bugfix beyond the parent `Fixes`. Fold each gap into the existing headings — usually **Ce qu’on peut faire maintenant** (product wording) or **Historique des tickets** (extra `#n` if a ticket exists). Do **not** paste commit subjects, hashes, or a « changelog commits » section. Do **not** duplicate points already covered by the spec/PR or the human-test section. Skip chore / noise (typos, lockfile-only, WIP) unless they change what a user can do.
 
 Owner/repo from `git remote`. PR number from `gh pr view` for this branch.

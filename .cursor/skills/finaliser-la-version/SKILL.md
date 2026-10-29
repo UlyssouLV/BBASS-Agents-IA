@@ -3,7 +3,8 @@ name: finaliser-la-version
 description: >-
   When the user says « Finalise la version », « finalize the version »,
   « clôture la version », or asks to ship/squash-merge the current version
-  PR, create the GitHub Release, and delete the feature branch. Reads the
+  PR, create the GitHub Release under the product number (none when
+  nothing reaches the end user), and delete the feature branch. Reads the
   Sonar quality gate once on the PR HEAD before the tag. Not for a single
   child ticket or /implement.
 ---
@@ -22,7 +23,19 @@ Paths: **`agents/roles.yml`**.
 
 Resolve **base** / release **tag** prefix per `agents/docs/integration-channel.md`. Current branch must not be **protected** (`main` / `master` / **base**). Resolve the open PR for this branch (`gh pr view`). If none, stop. PR base must be **base**. Releases via `/crel` use **tag(X.Y.Z)** (e.g. `orchestrator-v0.1.0` on this channel).
 
-Infer **`X.Y.Z`** from the branch `vX.Y.Z-<slug>` or the PR title `VX.Y.Z — …`. If missing: ask and wait.
+Infer **`X.Y.Z`** from the branch `vX.Y.Z-<slug>` or the PR title `VX.Y.Z — …`. If missing: ask and wait. **`X.Y.Z`** is the **development** number (roadmap, spec, issues, suivi).
+
+**Up to date with base.** `git fetch`, then `git rev-list --count HEAD..origin/<base>`. Not `0` → **stop**: the Release must contain everything already on **base**. Tell the user the branch is behind by that many commits and to merge **base** into it (`git merge origin/<base>`, resolve conflicts), run **`/t`**, then **`/c -p`**, then « Finalise la version » again. Do not merge **base** yourself here.
+
+**Product number `P`** (rule: `docs/dev/feuille-de-route/README.md`, *Numéro de développement et numéro produit*). After `git fetch --tags`:
+
+1. **Nothing shipped to the end user** — `git diff --name-only origin/<base>...HEAD` lists no path under role **`livrables`** (`agents/roles.yml`), ignoring any path with a `tests/` segment and `*.md` files → **`P` = none**: no Release (step 4 skips `/crel`).
+2. Else let **`L`** = highest semver among Release tags `vA.B.C` (`gh release list --exclude-drafts --limit 100 --json tagName`). No Release yet, or **`X.Y.Z` > `L`** → **`P` = `X.Y.Z`**.
+3. Else **`P`** = **`L`** with patch + 1.
+
+Say in one line which rule applied and the value of **`P`** (e.g. « développement 1.5.2 → produit 1.6.3 (règle 3) »). Do not invent a major bump: a major only comes from the roadmap's **`X.Y.Z`**.
+
+Below, **`V<P>`** = `VP` when **`P`** exists, else `VX.Y.Z (sans Release produit)`.
 
 ## 1. Every related issue is published
 
@@ -45,12 +58,12 @@ Read each role below (paths from `agents/roles.yml`), against the parent spec / 
 - **`agent-adapter`** — adapter still valid (hook, `/implement` close, Standards pointer); skills named there exist under `agents/skills/` (synced to the IDE adapters); implement / finalise cycle matches those skills; process docs still match (tracker, labels, domain).
 - **`spec`** — spec for this version exists there.
 - **`adr`** — new ADRs if decisions changed.
-- **`roadmap`** — follow **`docs/dev/feuille-de-route/README.md`**: move **`X.Y.Z`** into **Déjà livré** (one bullet `**X.Y.Z** — titre : résumé…`); drop it from **Prochaine** / **Ensuite**; the first remaining **Ensuite** becomes the sole **Prochaine** (keep its Objectif / Hors périmètre). Drop claims this version has **not** delivered. Do not invent new versions; only reshuffle what is already listed. New version ideas → leave for **`/afr`**.
+- **`roadmap`** — follow **`docs/dev/feuille-de-route/README.md`**: move **`X.Y.Z`** into **Déjà livré** (one bullet `**X.Y.Z** — titre : résumé…`, ending with `Livrée en **P**.` when **`P`** ≠ **`X.Y.Z`**, or `Sans Release produit.` when **`P`** = none); drop it from **Prochaine** / **Ensuite**; the first remaining **Ensuite** becomes the sole **Prochaine** (keep its Objectif / Hors périmètre). Drop claims this version has **not** delivered. Do not invent new versions; only reshuffle what is already listed. New version ideas → leave for **`/afr`**.
 - **Bugs fixed by this version** (same docs commit as roadmap):
   1. From the open PR body, collect every `Fixes #<n>` / `Fix #<n>` / `Closes #<n>`.
   2. Keep only issues that still have label **`bug`** (`gh issue view <n> --json labels`). Also include any `#n` the parent **spec** / version narrative explicitly says this version closes, if it has label `bug` and is missing from the PR — then **edit the PR body** to add `Fixes #<n>` (same rule as step 1 for the parent).
   3. On role **`roadmap`**: delete each matching `### Bug — … (#n)` block under **Plus tard** (from that heading through the line before the next `###` / `##`). Already absent → OK.
-  4. For each such `#n` still **Open**: `gh issue close <n> --comment "Corrigé en VX.Y.Z."` (use this version’s semver). Already Closed → one line, continue.
+  4. For each such `#n` still **Open**: `gh issue close <n> --comment "Corrigé en V<P>."` (product number, see step 0; `V<P>` as defined there). Already Closed → one line, continue.
 - **`suivi-avancement`** (opt-in) — if that role is **missing or unresolved** in `agents/roles.yml` → one line soft-skip (suivi not enabled for this repo). Do **not** stop the release. If the role **is** resolved: run skill **`mettre-a-jour-suivi-avancement`** as if the user had typed **`/msa`** for this **`X.Y.Z`** (convention: **`docs/suivi-avancement/README.md`**). That skill soft-skips with a **`/os`** reminder when there is no current-week folder (do **not** stop the release). PDF failure after an HTML edit (when `generer-pdf.mjs` exists) → **stop** the release until fixed. Do not create a week folder here. Do not edit other weeks.
 - **`docs-site`** (opt-in) — if that role is missing → soft-skip (no site). If it is resolved: the Docusaurus site refreshes via GitHub Pages on the squash-merge push (workflow `deploy-docs.yml` — **build + Pages only**, no bot push on `main`, no release trigger). The README aperçus are **not** regenerated here: « Dernières versions » is built from the GitHub Releases, so a capture before `/crel` still shows the previous version. They are regenerated in step 4, after the release.
 
@@ -72,7 +85,11 @@ Otherwise run **`quality-gate`** as if **`/qg -w`**.
 
 ## 4. Release, then squash
 
-Run skill **`creer-release`** as if the user had typed **`/crel vX.Y.Z`**. That skill owns title (`VX.Y.Z — <purpose>`) and notes layout. Wait until the release is visible.
+**`P`** = none → no `/crel`: one line « Pas de Release produit (rien sous `livrables`) », then the aperçus below **without** the « Dernières versions » check, then `/mpr`.
+
+Otherwise run skill **`creer-release`** as if the user had typed **`/crel vP`**, with purpose `<purpose> (développement X.Y.Z)` when **`P`** ≠ **`X.Y.Z`**. That skill owns title (`VP — <purpose>`) and notes layout. Wait until the release is visible.
+
+Role **`docs-site`** resolved → **always** regenerate the README aperçus on this feature branch now, so the accueil lists **`P`** and the roadmap / suivi edits of step 2: in `docs-site`, `npm run build`, serve it (`npm run serve`), then `capturer-accueil`, `capturer-bugs`, `capturer-travail-realise`, `sync-architecture-readme`. Check that `docs/img/apercu-docs-accueil.png` shows **`vP`** at the top of « Dernières versions »; if not, the build did not see the release → stop. Run skill **`commit`** as if **`/c -a -p`** so they enter the squash (ArgOS / ADR-0020). The tag stays on the pre-aperçus SHA: do **not** move it. Never skip because « nothing preview-related changed », and never rely on `github-actions[bot]` after Finalise. Done when `git diff --name-only origin/<base>...HEAD` lists `docs/img/apercu-*.png` (a README diff with only line endings → `git checkout -- README.md`).
 
 Role **`docs-site`** resolved → **always** regenerate the README aperçus on this feature branch now, so the accueil lists **`X.Y.Z`** and the roadmap / suivi edits of step 2: in `docs-site`, `npm run build`, serve it (`npm run serve`), then `capturer-accueil`, `capturer-bugs`, `capturer-travail-realise`, `sync-architecture-readme`. Check that `docs/img/apercu-docs-accueil.png` shows **`vX.Y.Z`** at the top of « Dernières versions »; if not, the build did not see the release → stop. Run skill **`commit`** as if **`/c -a -p`** so they enter the squash (ArgOS / ADR-0020). The tag stays on the pre-aperçus SHA: do **not** move it. Never skip because « nothing preview-related changed », and never rely on `github-actions[bot]` after Finalise. Done when `git diff --name-only origin/<base>...HEAD` lists `docs/img/apercu-*.png` (a README diff with only line endings → `git checkout -- README.md`).
 
@@ -83,7 +100,7 @@ Then run skill **`fusionner-pr`** as if the user had typed **`/mpr`**.
 Read the spec section **Changements apportés aux versions antérieures** (format and blocks: `agents/issue-tracker.md`, *Changes to earlier versions* **and** the Critical newline rules there). `Aucun.` or no section → one line, go to step 6. Otherwise annotate each row's targets:
 
 1. `gh release view <tag> --json body` — keep the existing notes.
-2. Prepend each new `> **Modifié en VX.Y.Z** …` blockquote **with blank lines between blocks**, then a blank line, then the previous body starting at `## Pourquoi` (or whatever already headed the notes).
+2. Prepend each new `> **Modifié en V<P>** …` blockquote **with blank lines between blocks**, then a blank line, then the previous body starting at `## Pourquoi` (or whatever already headed the notes).
 3. Write with `gh release edit <tag> --notes-file` (UTF-8 file). Never collapse the body to a single line.
 4. Same block as a comment on each listed issue.
 

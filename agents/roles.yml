@@ -39,3 +39,21 @@ roles:
       - vm-centrale
       - poste
       - lanceur
+  # Ce qui atteint l'utilisateur final : images VM (vm-centrale/Dockerfile,
+  # searxng) et Paquet poste (lanceur/scripts/construire-paquet.ps1). Lu par
+  # finaliser-la-version : diff hors tests/ et *.md sur ces chemins → Release.
+  livrables:
+    paths:
+      - vm-centrale/Dockerfile
+      - vm-centrale/pyproject.toml
+      - vm-centrale/uv.lock
+      - vm-centrale/.python-version
+      - vm-centrale/src
+      - vm-centrale/deploiement
+      - searxng
+      - poste/pyproject.toml
+      - poste/uv.lock
+      - poste/.python-version
+      - poste/src
+      - poste/frontend
+      - lanceur
