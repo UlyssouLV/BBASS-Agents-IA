@@ -35,11 +35,12 @@ Ce n’est **pas** une spec (ça vient après « Ouvre la version »).
 
 ## Prochaine : 1.6.4 — Corriger les bugs constatés après la 1.6.3
 
-**Objectif.** Les trois problèmes trouvés à l’usage juste après la finalisation de la 1.6.3 sont corrigés, pour que le poste installé fasse ce que les dernières versions annoncent :
+**Objectif.** Les trois problèmes trouvés à l’usage juste après la finalisation de la 1.6.3 sont corrigés, pour que le poste installé fasse ce que les dernières versions annoncent, et le poste dit à quel Environnement il est relié :
 
 - **Le poste se met à la version du serveur** ([#277](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/277)) : « Vérifier les mises à jour maintenant » vérifie à chaque clic et rouvre BBASS sur le résultat, sans jamais le laisser fermé ; la mise à jour aboutit sur un poste équipé d’un antivirus, sans intervention du collaborateur ; après l’enregistrement d’une nouvelle adresse de serveur, le poste propose de redémarrer pour se mettre à la version de ce serveur ; le tout début du lanceur est journalisé pour qu’un échec se voie.
 - **Une conversation de l’ancien Environnement ne reste plus visible** ([#278](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/278)) : après un changement de serveur, le poste ne montre que les conversations du serveur auquel il est relié.
 - **L’écriture Moduléo fonctionne depuis un poste installé** ([#279](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/279)) : **Confirmer** et **Annuler** atteignent le serveur auquel le poste est relié, et après une mise à jour le poste montre l’interface de sa version, sans manipulation du collaborateur.
+- **Le poste affiche son Environnement** : la pastille indique « Connecté à BBASS vX.Y.Z production » ou « … test », sans jamais employer le mot « staging », ainsi que **Tester la connexion** et le Setup.
 
 **Contrainte.** Le chemin de mise à jour d’un poste est porté par le Lanceur déjà installé : les postes en place gardent l’ancien comportement jusqu’à ce qu’ils aient reçu le nouveau.
 
@@ -299,22 +300,6 @@ Compare le temps d’une tâche après la mise en service d’une solution à sa
 
 Le site est public par choix ; il publie notamment les échanges et les documents du Suivi de l’alternance (**1.7.0**). Le rendre privé protégerait ces contenus, sans couper l’accès du tuteur pédagogique, extérieur au cabinet.
 
-### Bug — lien de source peu visible (#99)
-
-**Constat :** malgré les travaux front sur le rendu des sources (suite #98), l’affichage **ne valide toujours pas** les critères — le texte de l’ancre n’est pas clairement cliquable (URL au survol natif), et l’affordance (couleur / soulignement) ne rend pas le lien repérable sans pastille seule, ni sans laisser croire que toute la phrase est cliquable.
-
-**Reproductibilité :** essai manuel — ouvrir une réponse qui cite une source et vérifier ancre, `href` au survol, et affordance dans le fil.
-
-**Impact :** citations de sources peu repérables / peu utilisables ; critères d’acceptation de #98 non tenus.
-
-**Cause probable :** Informations manquantes
-
-**À corriger :** rendre le texte de l’ancre cliquable (URL au survol natif) ; affordance claire sans pastille seule et sans faire croire que toute la phrase hors citation est cliquable (front `LienSource` / Markdown chat).
-
-**Hors périmètre :** vm-centrale / prompt de style (hors sujet, déjà #96).
-
-**Suivi :** [#99](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/99) (`bug`). Trouvé dans : Informations manquantes · Contexte : essai manuel · Date : 2026-10-05 · Priorité : Informations manquantes.
-
 ### Agent IA de continuation du développement, validation par compte administrateur
 
 Constat (grilling 1.2.0) : à terme, plus aucune personne qualifiée ne sera sur place pour faire évoluer le logiciel elle-même. L'évolution du code (nouvelles versions, corrections, nouveaux Agents métier) serait alors portée par un agent IA dédié à la continuation du développement, avec un compte administrateur qui ne fait que **valider** (approuver/refuser) les changements proposés, sans avoir à coder ni à relire le code en détail.
@@ -478,3 +463,51 @@ Constat (grilling 1.6.1) : la mise à jour reste déclenchée par l’admin (com
 **Hors périmètre :** ids des téléphones absents des fiches (#257).
 
 **Suivi :** [#264](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/264) (`bug`). Trouvé dans : 1.5.2 · Contexte : test humain · Date : 2026-10-29 · Priorité : non prioritaire.
+
+### Bug — le poste ne se met pas à la version du serveur (#277)
+
+**Constat :** Le poste reste sur son ancienne version alors que le Serveur BBASS est plus récent : poste en v1.6.2, VM en v1.6.3 sur le staging, « À propos » indique « Poste à jour en v1.6.2 ». Deux chemins ne mettent pas à jour. « Vérifier les mises à jour maintenant » ferme BBASS sans le relancer : `lanceur.log` montre « Vérification des mises à jour demandée depuis À propos » puis « Backend arrêté », sans « démarre (Verification) », aux clics du 30/10 à 11:19:32, 11:19:52 et 14:01:45 ; le clic du 29/10 à 09:49 avait fonctionné. Changer l'adresse du serveur (Configuration) ne déclenche aucune vérification : adresse enregistrée à 14:06 sur le staging, dernière vérification restée à 14:01. Fermer la fenêtre puis relancer BBASS, ou se connecter, ne vérifie rien non plus. Déjà signalé dans les notes de la V1.6.2 (« ferme parfois BBASS sans le relancer »), sans ticket. Même quand la mise à jour démarre, elle peut échouer à l'installation : le 30/10 à 14:16, après **Quitter** et relance, le paquet v1.6.3 est téléchargé et sa signature acceptée, puis `lanceur.log` indique « Installation de la version v1.6.3 impossible. (impossible de poser …\BBASS\versions\v1.6.3 (Accès refusé. (os error 5))) ». Le poste reste en v1.6.2, avec le bandeau « Mise à jour vers v1.6.3 impossible : certaines fonctionnalités peuvent ne pas fonctionner tant qu'elle n'a pas réussi. Nouvel essai au prochain lancement. ».
+
+**Reproductibilité :** Poste installé, relié à un serveur dont la version diffère. Vérifier : **…** → **À propos** → **Vérifier les mises à jour maintenant** : BBASS se ferme ; intermittent (3 clics sur 4 relevés). Adresse : changer le serveur dans **Configuration**, fermer la fenêtre, relancer BBASS : la fenêtre revient, la version du poste ne change pas. Seuls **Quitter** depuis la zone de notification puis une relance déclenchent une vérification. Installation : observée à la première vraie mise à jour d'un poste (v1.6.2 vers v1.6.3), sur un poste où Trend Micro et Bitdefender sont actifs. Le nouvel essai du 30/10 à 14:20, au lancement suivant, a réussi : l'échec n'est pas systématique, sa fréquence reste inconnue.
+
+**Impact :** Un collaborateur qui veut se mettre à jour, ou qui change de serveur, reste sur l'ancienne version sans le comprendre ; le bouton prévu pour ça ferme l'application. Un poste en retard sur son serveur peut avoir des fonctionnalités qui ne marchent pas. Tout poste qui reste ouvert en fond est concerné, puisque la mise à jour n'a lieu qu'au démarrage du processus. Si l'échec d'installation se répète, il touche chaque mise à jour et tous les postes équipés de ces antivirus : ils resteraient sur leur ancienne version après une promotion. Le chemin de mise à jour d'un poste étant porté par le Lanceur déjà installé, les postes en v1.6.2 gardent ce comportement.
+
+**Cause probable :** Vérifier : le processus relancé par `verifier_maintenant` (`lanceur/src/main.rs`) s'arrête avant sa première ligne de journal ; hypothèse non prouvée, le contrôle d'instance unique le prend pour un doublon au moment où le précédent quitte. Adresse et fenêtre : comportement voulu, la vérification n'a lieu qu'au démarrage du processus (« Seul moment de mise à jour »), et fermer la fenêtre la cache seulement. Installation : on pense que l'échec vient des antivirus du poste, qui analysent les fichiers tout juste extraits (420 entrées, dont 72 exécutables et bibliothèques) et les gardent ouverts ; Windows refuserait alors de renommer le dossier temporaire en `versions\v1.6.3`. Hypothèse non prouvée.
+
+**À corriger :** « Vérifier les mises à jour maintenant » vérifie vraiment à chaque clic et rouvre BBASS sur le résultat, sans jamais le laisser fermé. La mise à jour aboutit sur un poste équipé d'un antivirus, sans intervention du collaborateur. Après l'enregistrement d'une nouvelle adresse de serveur, le poste propose de redémarrer pour se mettre à la version de ce serveur. Journaliser le tout début du lanceur pour que l'échec se voie.
+
+**Hors périmètre :** Mise à jour pendant que BBASS tourne en fond (décision de l'ADR-0022). Sélecteur d'Environnement sur le poste.
+
+**Suivi :** [#277](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/277) (`bug`). Trouvé dans : 1.6.2 · Contexte : usage · Date : 2026-10-30 · Priorité : Informations manquantes.
+
+### Bug — une conversation de l'ancien environnement reste visible après un changement de serveur (#278)
+
+**Constat :** En passant le poste d'un Environnement à l'autre (prod et test), une conversation de l'ancien Environnement reste visible.
+
+**Reproductibilité :** Changer le Serveur BBASS du poste, de la prod vers le test ou l'inverse, puis regarder la liste des conversations. Fréquence : Informations manquantes.
+
+**Impact :** Le collaborateur voit dans un Environnement une conversation de l'autre, qui n'existe pas dans sa base : il peut croire travailler sur le mauvais serveur.
+
+**Cause probable :** Hypothèse, à confirmer : le cache des conversations du poste (React Query) n'est pas vidé au changement d'adresse. `useConfiguration.ts` n'invalide que `serveur-bbass`, et les clés de ce cache ne dépendent pas du serveur. La session est aussi gardée d'un serveur à l'autre.
+
+**À corriger :** Après un changement de serveur, le poste ne montre que les conversations du serveur auquel il est relié.
+
+**Hors périmètre :** Aucun.
+
+**Suivi :** [#278](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/278) (`bug`). Trouvé dans : 1.6.3 · Contexte : usage · Date : 2026-10-30 · Priorité : Informations manquantes.
+
+### Bug — sur un poste installé, la carte d'écriture n'apparaît pas après une mise à jour et Confirmer échoue (#279)
+
+**Constat :** Deux problèmes rencontrés sur un poste installé en v1.6.3, relié au staging. Après la mise à jour, la carte de confirmation n'apparaît pas alors qu'elle existe sur le serveur : la conversation contenait une vraie carte (n°2), invisible ; elle n'est apparue qu'après Ctrl+Maj+R. Ensuite, un clic sur **Confirmer** affiche « Le service de conversations de la VM centrale est indisponible » : quatre clics, `POST /ecritures-moduleo/{id}` renvoie 502 dans `poste-backend.log`, alors que le serveur répond sur `/sante`. Rien n'est écrit : les cartes n°3 et 4 restent « proposée ».
+
+**Reproductibilité :** Carte : mettre à jour le poste, puis demander une écriture dans le chat sur le staging, sans recharger la fenêtre ; fréquence : Non déterminé. Confirmer : sur un poste installé (pas un poste de dev), ouvrir une vraie carte et cliquer sur **Confirmer** ; reproduit à chaque clic (4 sur 4).
+
+**Impact :** Depuis un poste installé, l'écriture Moduléo ne peut pas aboutir, alors que la V1.6.3 annonce « Confirmer d'un clic » : la fonction principale de la version est inutilisable hors poste de dev. **Annuler** passe par le même appel (déduit du code, pas essayé). Le cache touche tout poste après chaque mise à jour : l'interface reste celle de la version précédente, face à un serveur plus récent, sans que le collaborateur le sache. Sans effet sur la prod pour Confirmer : elle n'ouvre aucune carte.
+
+**Cause probable :** Confirmer : `decider_ecriture` (`poste/src/poste/vm_centrale_client.py`) appelle `VM_CENTRALE_BASE_URL`, réservée au développement (`http://localhost:8000` sur un poste installé), alors que les 27 autres appels utilisent `config.adresse_serveur_bbass()`. Confirmé par le code et le journal. Pas vu aux tests humains de #206, joués sur un poste de dev, ni par les tests automatiques, qui remplacent ce client par un faux. Carte : `index.html` est servi sans `Cache-Control` (`poste/src/poste/main.py`), et il désigne le code de l'interface, propre à chaque version : le moteur web peut réutiliser l'ancienne page et l'ancienne interface, qui ne sait pas afficher les cartes. Hypothèse cohérente avec les dates du cache (poste en 1.6.3 à 14:21, nouveaux fichiers en cache à 14:39), non reproduite.
+
+**À corriger :** Depuis un poste installé, **Confirmer** et **Annuler** atteignent le serveur auquel le poste est relié. Après une mise à jour, le poste montre l'interface de sa version, sans manipulation du collaborateur.
+
+**Hors périmètre :** Texte du modèle qui annonce une carte inexistante (« à nouveau proposée »).
+
+**Suivi :** [#279](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/279) (`bug`). Trouvé dans : 1.6.3 · Contexte : usage · Date : 2026-10-30 · Priorité : Informations manquantes.

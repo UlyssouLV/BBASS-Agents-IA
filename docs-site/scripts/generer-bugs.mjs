@@ -1,6 +1,7 @@
 /**
  * Extrait les ### Bug — … de docs/dev/feuille-de-route/feuille-de-route-dev.md
  * → JSON accueil + pages docs/bugs/bug-<n>.md
+ * Compare ensuite cette liste aux issues ouvertes de label bug sur GitHub.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -16,6 +17,10 @@ const SOURCE = path.join(
 );
 const OUT_JSON = path.join(__dirname, '../src/data/bugs.json');
 const OUT_DIR = path.join(REPO_ROOT, 'docs/bugs');
+const OWNER = process.env.GITHUB_REPOSITORY_OWNER || 'UlyssouLV';
+const REPO = (process.env.GITHUB_REPOSITORY || 'UlyssouLV/BBASS-Agents-IA').split(
+  '/',
+)[1];
 
 const JETON = 'Informations manquantes';
 
@@ -248,7 +253,64 @@ ${escapeMdx(b.horsPerimetre)}
   });
 }
 
-function main() {
+async function bugsOuvertsSurGitHub() {
+  const headers = {
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+    'User-Agent': 'bbass-docs-bugs',
+  };
+  const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  const ouverts = [];
+  let page = 1;
+  for (;;) {
+    const url = `https://api.github.com/repos/${OWNER}/${REPO}/issues?state=open&labels=bug&per_page=100&page=${page}`;
+    const res = await fetch(url, {headers});
+    if (!res.ok) {
+      throw new Error(`GitHub issues ${res.status}`);
+    }
+    const batch = await res.json();
+    ouverts.push(
+      ...batch.filter((i) => !i.pull_request).map((i) => i.number),
+    );
+    if (batch.length < 100) {
+      return ouverts;
+    }
+    page += 1;
+  }
+}
+
+// Avertit sans bloquer : un ticket ouvert sur GitHub ne doit pas empêcher le
+// déploiement du site, et sans réseau les pages restent générées.
+async function signalerEcartsAvecGitHub(bugs) {
+  let ouverts;
+  try {
+    ouverts = await bugsOuvertsSurGitHub();
+  } catch (erreur) {
+    console.warn(`[bugs] comparaison avec GitHub impossible : ${erreur.message}`);
+    return;
+  }
+  const listes = bugs.map((b) => b.issue);
+  const ecarts = [
+    ...ouverts
+      .filter((n) => !listes.includes(n))
+      .map((n) => `#${n} ouvert sur GitHub, sans bloc ### Bug en Plus tard`),
+    ...listes
+      .filter((n) => !ouverts.includes(n))
+      .map((n) => `#${n} listé en Plus tard, mais pas ouvert avec le label bug`),
+  ];
+  const prefixe = process.env.GITHUB_ACTIONS ? '::warning::' : '[bugs] ';
+  for (const ecart of ecarts) {
+    console.warn(`${prefixe}${ecart}`);
+  }
+  if (ecarts.length === 0) {
+    console.log('[bugs] liste identique aux bugs ouverts sur GitHub');
+  }
+}
+
+async function main() {
   fs.mkdirSync(path.dirname(OUT_JSON), {recursive: true});
   if (!fs.existsSync(SOURCE)) {
     console.warn('[bugs] fichier introuvable:', SOURCE);
@@ -289,6 +351,7 @@ function main() {
   };
   fs.writeFileSync(OUT_JSON, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
   console.log(`[bugs] ${bugs.length} bug(s) → JSON + docs/bugs/`);
+  await signalerEcartsAvecGitHub(bugs);
 }
 
-main();
+await main();
