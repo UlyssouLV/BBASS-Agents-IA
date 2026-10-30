@@ -7,7 +7,7 @@ from urllib.parse import quote
 
 import httpx
 
-from vm_centrale.config import MODULEO_HTTP_TIMEOUT, get_moduleo_ecriture
+from vm_centrale.config import MODULEO_HTTP_TIMEOUT, get_environnement, get_moduleo_ecriture
 from vm_centrale.moduleo.configuration import config_moduleo
 from vm_centrale.moduleo.droits import DroitsModuleo, verifier, verifier_ecriture, verifier_reponse
 from vm_centrale.moduleo.routes import ROUTES_ECRITURE, ROUTES_GET
@@ -122,6 +122,8 @@ class ClientModuleo:
         parametres = parametres or {}
         _remplir_ecriture(methode, route, parametres)
         _verifier_corps(methode, route, corps)
+        if get_environnement() == "prod":
+            raise RequeteInterdite("Écriture Moduléo refusée : la prod n'écrit jamais dans Moduléo.")
         if not get_moduleo_ecriture():
             raise RequeteInterdite("Écriture Moduléo inactive : MODULEO_ECRITURE n'est pas actif.")
         if _sans_barre_finale(self._transport.url) not in SERVEURS_DE_TEST:

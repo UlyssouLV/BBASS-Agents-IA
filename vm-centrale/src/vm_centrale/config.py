@@ -188,12 +188,27 @@ class ConfigModuleoChiffree:
     fichier_cle_maitre: str | None
 
 
+def get_environnement() -> str:
+    # « staging » ou « prod » sur la VM de Castries (.env de l'installateur,
+    # ADR-0021) ; vide sur un poste de dev.
+    return (os.environ.get("BBASS_ENVIRONNEMENT") or "").strip().lower()
+
+
 def get_moduleo_ecriture() -> bool:
     # Réglage MODULEO_ECRITURE (spec 1.5.2, ADR-0023), lu à l'appel : absent
     # ou autre que « 1 », « true », « oui » = inactif. Seule une des deux
     # barrières de l'écriture : MODULEO_URL doit aussi figurer dans la liste
     # versionnée des serveurs de test (moduleo/serveurs_test.json).
-    return (os.environ.get("MODULEO_ECRITURE") or "").strip().lower() in {"1", "true", "oui"}
+    # Troisième passage de #206 : la prod n'écrit jamais ; le staging écrit
+    # sans réglage (son .env installé n'en porte pas), sauf
+    # MODULEO_ECRITURE=0.
+    environnement = get_environnement()
+    if environnement == "prod":
+        return False
+    valeur = (os.environ.get("MODULEO_ECRITURE") or "").strip().lower()
+    if environnement == "staging" and not valeur:
+        return True
+    return valeur in {"1", "true", "oui"}
 
 
 def get_config_moduleo_chiffree() -> ConfigModuleoChiffree:

@@ -133,6 +133,46 @@ def test_ecriture_inactive_refusee_sans_rien_envoyer(monkeypatch, valeur):
     assert _rien_recu(faux)
 
 
+# Troisième passage de #206 : l'écriture n'est pas au point pour la prod.
+# Prod (port 8000) : jamais, quel que soit MODULEO_ECRITURE ; staging (port
+# 8001) : ouverte sans réglage dans son .env, fermée par MODULEO_ECRITURE=0.
+
+
+@pytest.mark.parametrize("valeur", [None, "1"])
+def test_en_prod_l_ecriture_est_refusee_meme_activee(monkeypatch, valeur):
+    monkeypatch.setenv("BBASS_ENVIRONNEMENT", "prod")
+    if valeur is not None:
+        monkeypatch.setenv("MODULEO_ECRITURE", valeur)
+    faux = FauxModuleo()
+
+    with pytest.raises(RequeteInterdite, match="prod"):
+        ClientModuleo(faux).ecrire("POST", "moduleo/telephone", {}, _TELEPHONE, _CONTACTS)
+
+    assert not ClientModuleo(faux).ecriture_ouverte()
+    assert _rien_recu(faux)
+
+
+def test_en_staging_l_ecriture_est_ouverte_sans_reglage(monkeypatch):
+    monkeypatch.setenv("BBASS_ENVIRONNEMENT", "staging")
+    faux = FauxModuleo()
+
+    ClientModuleo(faux).ecrire("POST", "moduleo/telephone", {}, _TELEPHONE, _CONTACTS)
+
+    assert ClientModuleo(faux).ecriture_ouverte()
+    assert len(faux.ecritures) == 1
+
+
+def test_en_staging_moduleo_ecriture_0_ferme_l_ecriture(monkeypatch):
+    monkeypatch.setenv("BBASS_ENVIRONNEMENT", "staging")
+    monkeypatch.setenv("MODULEO_ECRITURE", "0")
+    faux = FauxModuleo()
+
+    with pytest.raises(RequeteInterdite, match="MODULEO_ECRITURE"):
+        ClientModuleo(faux).ecrire("POST", "moduleo/telephone", {}, _TELEPHONE, _CONTACTS)
+
+    assert _rien_recu(faux)
+
+
 @pytest.mark.parametrize("url", [_SERVEUR_DU_CABINET, f"{_SERVEUR_DU_CABINET}/", "https://autre.exemple/api"])
 def test_serveur_hors_de_la_liste_des_serveurs_de_test_refuse_sans_rien_envoyer(ecriture_active, url):
     # Le serveur du cabinet n'est pas un serveur de test : aucune écriture,

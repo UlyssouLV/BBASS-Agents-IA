@@ -80,6 +80,7 @@ def _cle_mistral_chiffree(monkeypatch, tmp_path_factory):
     # Écriture Moduléo inactive par défaut (spec 1.5.2, #202), quel que soit
     # le .env local.
     monkeypatch.delenv("MODULEO_ECRITURE", raising=False)
+    monkeypatch.delenv("BBASS_ENVIRONNEMENT", raising=False)
 
 
 # Usage/pages_processed factices (spec 1.1.3) : ce double ne sert encore
