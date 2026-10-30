@@ -7,7 +7,7 @@ export function escapeMdx(text) {
   return String(text)
     .replace(/\{/g, '\\{')
     .replace(/\}/g, '\\}')
-    .replace(/<([A-Za-z/])/g, '\\<$1');
+    .replace(/<([\p{L}/])/gu, '\\<$1');
 }
 
 export function escapeYaml(value) {

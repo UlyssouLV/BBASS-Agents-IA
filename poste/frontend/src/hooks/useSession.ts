@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { hashKey, useMutation, useQuery, useQueryClient, type Query, type QueryClient } from "@tanstack/react-query";
 
 import { appelApi, ErreurApi } from "@/lib/api";
 
@@ -22,7 +22,17 @@ export const CLE_SESSION = ["session", "compte"] as const;
 // un 401 sur n'importe quel appel signifie un jeton devenu invalide, même
 // traitement que verifierSessionActive/afficherEcranConnexion dans app.js —
 // bascule immédiate vers l'écran de connexion en vidant le compte du cache.
+// Issue #268 : tout le reste du cache part avec lui (conversations, profil,
+// consommation, inspecteur, administration…), sans liste de clés à tenir à
+// jour, pour que le compte suivant sur ce poste ne voie rien du précédent.
+// Seule la query de session est gardée, à null : son observateur dans App
+// reste monté et bascule sur l'écran de connexion. Elle est annulée comme les
+// autres : une lecture de /compte encore en vol ramènerait le compte précédent
+// par-dessus ce null.
 export function marquerSessionExpiree(queryClient: QueryClient): void {
+  void queryClient.cancelQueries();
+  queryClient.removeQueries({ predicate: (query: Query) => query.queryHash !== hashKey(CLE_SESSION) });
+  queryClient.getMutationCache().clear();
   queryClient.setQueryData(CLE_SESSION, null);
 }
 
@@ -95,7 +105,7 @@ export function useSession() {
       // (afficherEcranConnexion sur un 401 pendant le changement de mot de
       // passe).
       if (erreur instanceof ErreurApi && erreur.status === 401) {
-        queryClient.setQueryData(CLE_SESSION, null);
+        marquerSessionExpiree(queryClient);
       }
     },
   });
@@ -109,7 +119,7 @@ export function useSession() {
         "La déconnexion a échoué."
       ),
     onSettled: () => {
-      queryClient.setQueryData(CLE_SESSION, null);
+      marquerSessionExpiree(queryClient);
     },
   });
 

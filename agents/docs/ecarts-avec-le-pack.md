@@ -8,7 +8,7 @@ Modifications faites dans ce dépôt sur des fichiers qui viennent de `workflow-
 
 ## 2026-10-29 — Numéro de développement / numéro produit
 
-**Pourquoi.** Deux séries (1.7.x documentation, 1.8.x serveur MCP Moduléo) avancent en parallèle et arrivent sur `main` en alternance. Le numéro de la feuille de route (développement) ne peut plus servir tel quel de numéro de Release : le poste et la VM verraient la version reculer (1.8.0 puis 1.7.2). Le numéro produit, toujours croissant, est calculé à « Finalise la version » ; pas de Release quand rien n’atteint l’utilisateur final.
+**Pourquoi.** Deux séries (1.7.x documentation, 1.8.x cartographie des usages) avancent en parallèle et arrivent sur `main` en alternance. Le numéro de la feuille de route (développement) ne peut plus servir tel quel de numéro de Release : le poste et la VM verraient la version reculer (1.8.0 puis 1.7.2). Le numéro produit, toujours croissant, est calculé à « Finalise la version » ; pas de Release quand rien n’atteint l’utilisateur final.
 
 **Règle.** `docs/dev/feuille-de-route/README.md`, section *Numéro de développement et numéro produit*.
 

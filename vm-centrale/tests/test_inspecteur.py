@@ -602,6 +602,7 @@ def test_un_garde_fou_qui_retire_une_url_produit_une_ligne_garde_fous_brute_et_v
     echanges = client.get(
         f"/inspecteur/conversations/{conversation_id}/echanges", headers=entetes
     ).json()
+    # Pas de relecture isolée : ce tour n'a rien ramené à relire (ADR-0024).
     assert [(e["origine"], e["type_appel"]) for e in echanges] == [
         ("mistral", "chat"),
         ("local", "garde_fous"),

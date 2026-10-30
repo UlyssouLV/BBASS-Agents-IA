@@ -1,6 +1,8 @@
 import re
 from collections.abc import Iterable
 
+from vm_centrale.garde_fous.retrait import MARQUEUR_NON_TROUVE, Retrait
+
 # Une URL que le modèle écrit sans que le compte l'ait lui-même écrite dans
 # la conversation est inventée (essai du 2026-10-05, conversation 76, #110 —
 # onze liens « téléchargeables », tous morts). La consigne de style le lui
@@ -31,6 +33,11 @@ _MOTIF_URL_NUE = re.compile(
 # collées à une URL nue : appartiennent à la phrase, pas à l'URL (essai
 # 1.4.1, conversation 95 : « **https://bbass.fr/** » était retirée).
 _PONCTUATION_FINALE = ".,;:!?»*_`"
+# Place d'un lien retiré, avant de savoir s'il devient le marqueur ou part
+# avec sa parenthèse.
+_RETIRE = "\x00"
+_MOTIF_PARENTHESE_RETIREE = re.compile(r"[ \t]*\([ \t]*\x00(?:[ \t]*[,;][ \t]*\x00)*[ \t]*\)")
+_MOTIF_SUITE_RETIREE = re.compile(r"\x00(?:[ \t]*[,;][ \t]*\x00)*")
 
 
 def normaliser_url(url: str) -> str:
@@ -65,23 +72,34 @@ def _urls_du_compte(textes_du_compte: Iterable[str]) -> set[str]:
 
 def retirer_urls_inventees(
     reponse: str, textes_du_compte: Iterable[str], urls_trouvees: Iterable[str] = ()
-) -> str:
+) -> Retrait:
     # `urls_trouvees` : URL des résultats de recherche, comparées telles
     # quelles (pas extraites d'un texte, une URL de moteur peut contenir des
     # parenthèses).
     autorisees = _urls_du_compte(textes_du_compte) | {normaliser_url(url) for url in urls_trouvees}
 
+    # Un lien inventé ne laisse pas son texte, qui passerait pour une source
+    # (#131 : « comme le confirme : Leboncoin – Centre d'aide ») : il devient
+    # le marqueur, comme une URL nue inventée.
     def _lien(correspondance: re.Match[str]) -> str:
         if normaliser_url(correspondance.group(3)) in autorisees:
             return correspondance.group(0)
-        return correspondance.group(2)
+        return _RETIRE
 
     def _url_nue(correspondance: re.Match[str]) -> str:
         espace, url = correspondance.group(1), correspondance.group(2)
         url_sans_ponctuation = url.rstrip(_PONCTUATION_FINALE)
         if normaliser_url(url_sans_ponctuation) in autorisees:
             return correspondance.group(0)
-        return url[len(url_sans_ponctuation):]
+        return espace + _RETIRE + url[len(url_sans_ponctuation):]
 
     reponse = _MOTIF_LIEN_MARKDOWN.sub(_lien, reponse)
-    return _MOTIF_URL_NUE.sub(_url_nue, reponse)
+    reponse = _MOTIF_URL_NUE.sub(_url_nue, reponse)
+    if _RETIRE not in reponse:
+        return Retrait(reponse, False)
+    # Une parenthèse qui ne contenait que des liens inventés part entière,
+    # espaces qui la précèdent compris : jamais `()` (#131, « **Météo
+    # France** () ») ; plusieurs liens inventés à la suite font un marqueur.
+    reponse = _MOTIF_PARENTHESE_RETIREE.sub("", reponse)
+    reponse = _MOTIF_SUITE_RETIREE.sub(MARQUEUR_NON_TROUVE, reponse)
+    return Retrait(reponse, True)

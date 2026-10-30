@@ -13,16 +13,20 @@ from vm_centrale.garde_fous.ecriture_annoncee import (
 from vm_centrale.garde_fous.longueur import plafonner
 from vm_centrale.garde_fous.pages_trop_longues import mentionner_pages_trop_longues
 from vm_centrale.garde_fous.refus_des_droits import montrer_refus_des_droits
+from vm_centrale.garde_fous.retrait import MARQUEUR_NON_TROUVE, PHRASE_NON_TROUVE, Retrait
 from vm_centrale.garde_fous.sources import LectureSource, PageSource, ajouter_sources
 from vm_centrale.garde_fous.titre import nettoyer_titre
 from vm_centrale.garde_fous.urls import normaliser_url, retirer_urls_inventees, urls_ecrites
 
 __all__ = [
     "LectureSource",
+    "MARQUEUR_NON_TROUVE",
     "PHRASE_CARTE_OUVERTE",
     "PHRASE_CONTACT_NON_LU",
     "PHRASE_ECRITURE_NON_PROPOSEE",
+    "PHRASE_NON_TROUVE",
     "PageSource",
+    "Retrait",
     "affirme_une_ecriture",
     "ajouter_sources",
     "annonce_une_carte",

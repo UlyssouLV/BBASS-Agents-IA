@@ -168,6 +168,12 @@ Le nouveau téléchargement d'une page déjà lue dans une Conversation, demand�
 
 À éviter : rafraîchissement, actualisation.
 
+## Relecture isolée {#relecture-isolee}
+
+L'appel Mistral à part, sans outils ni historique, qui réécrit une réponse après un retrait de garde-fou à partir des résultats d'outils et de la pièce jointe du tour ([ADR-0024](./adr/0024-relecture-isolee-apres-garde-fou.md)). Les garde-fous repassent sur sa sortie : si elle ne convient pas, la réponse marquée « [non trouvé] » reste, avec la phrase fixe.
+
+À éviter : Relecture forcée (retélécharger une page), relance du modèle.
+
 ## Statut du tour {#statut-du-tour}
 
 L'étape en cours d'un tour de chat, publiée en direct par la VM centrale et affichée dans le fil à la place de « Réflexion… » (« Recherche sur le web : “…” », « Lecture de &lt;domaine&gt; », « Relecture de &lt;fichier&gt; »…). Une étape à la fois, jamais persistée ni visible dans l'inspecteur ([ADR-0016](./adr/0016-envoi-de-message-en-flux-sse.md)).

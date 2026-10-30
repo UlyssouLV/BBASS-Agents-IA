@@ -420,8 +420,8 @@
               <li><a href="#version-1-6-0">V1.6.0 — Versions vérifiées et prêtes à livrer</a></li>
               <li><a href="#version-1-6-1">V1.6.1 — Installer et mettre à jour le serveur central sans l’alternant</a></li>
               <li><a href="#version-1-6-2">V1.6.2 — Installer et mettre à jour les postes sans l’alternant</a></li>
-              <li><a href="#version-1-8-0">V1.8.0 — Workflows n8n</a></li>
-              <li><a href="#version-1-9-0">V1.9.0 — Analyse approfondie des pièces jointes</a></li>
+              <li><a href="#version-1-6-3">V1.6.3 — Corriger les bugs existants</a></li>
+              <li><a href="#version-1-6-4">V1.6.4 — Corriger les bugs constatés après la V1.6.3</a></li>
             </ol>
           </li>
           <li>
@@ -469,7 +469,8 @@
     <div class="jour">
       <h3>Vendredi 30 octobre</h3>
       <ul>
-        <li>V1.5.2 livrée (numéro produit 1.6.3) : le chat prépare une écriture dans Moduléo et le collaborateur la confirme d’un clic sur une carte, sur le serveur de test seulement ; le serveur du cabinet n’est jamais modifié ; ajouter un téléphone ou une note, modifier un contact et supprimer un temps passé fonctionnent ; les limites constatées aux trois passages de tests humains sont reportées en 1.8.1 et 1.8.2.</li>
+        <li>V1.5.2 livrée (numéro produit 1.6.3) : le chat prépare une écriture dans Moduléo et le collaborateur la confirme d’un clic sur une carte, sur le serveur de test seulement ; le serveur du cabinet n’est jamais modifié ; ajouter un téléphone ou une note, modifier un contact et supprimer un temps passé fonctionnent ; les limites constatées aux trois passages de tests humains sont reportées en 1.10.1 et 1.10.2.</li>
+        <li>V1.6.3 livrée (numéro produit 1.6.4) : un compte ne voit plus rien du précédent sur un poste partagé, supprimer un compte supprime ses données, l’IA dit ce qu’elle n’a pas trouvé au lieu d’inventer, la réponse est mise en forme pendant son affichage, et le bandeau de mise à jour ne recouvre plus le bouton « … ».</li>
       </ul>
     </div>
     </section>
@@ -477,17 +478,41 @@
     <section class="bloc" id="reste-a-implementer">
     <h2>Reste à implémenter</h2>
     <ul>
-      <li><strong>V1.8.0</strong> — automatisations n8n branchées sur Moduléo.</li>
-      <li><strong>V1.9.0</strong> — analyse et traitement approfondis des pièces jointes.</li>
-      <li>Suite « Plus tard » de la feuille de route (documentation mémoire / souveraineté, agents par pôle, bugs connus, etc.).</li>
+      <li><strong>V1.6.4</strong> — corriger les trois problèmes constatés juste après les livraisons de la semaine : la mise à jour des postes, les conversations affichées après un changement de serveur, et la confirmation des écritures Moduléo depuis un poste installé.</li>
     </ul>
     </section>
 
     <section class="bloc" id="livre-pour">
     <h2>Livré pour le 30/10/2026</h2>
     <div class="recap">
-      <p><strong>Point vendredi 30 octobre — visé : V1.5.1 · livré : V1.5.1 (lundi 26 octobre), V1.5.3 et V1.6.0 (mardi 27 octobre), V1.6.1 (mercredi 28 octobre), V1.6.2 (jeudi 29 octobre), V1.5.2 (vendredi 30 octobre, numéro produit 1.6.3)</strong></p>
-      <p>V1.5.2 livrée en dernier : les identifiants du serveur de test Moduléo sont arrivés le 29 octobre, d’où la livraison de la 1.5.3, de la 1.6.0, de la 1.6.1 et de la 1.6.2 avant elle. Elle sort sous le numéro produit 1.6.3.</p>
+      <p><strong>Ce qu’on peut faire aujourd’hui par rapport à la semaine du 5 octobre</strong></p>
+      <h3>Consulter Moduléo depuis le chat</h3>
+      <ul>
+        <li>Le 9 octobre, le chat ne retrouvait que les affaires et les contacts. On peut maintenant lui demander aussi où en sont les devis, si une facture est payée et ce qu’il reste à payer, les heures passées sur une affaire ou par collaborateur, le planning d’une personne, et les parcelles d’une affaire avec leurs propriétaires.</li>
+        <li>Les nombres, montants et heures sont calculés par le logiciel sur tout ce qui a été trouvé, jamais estimés par l’IA.</li>
+        <li>Chaque collaborateur ne voit que ce que ses droits Moduléo autorisent ; si un droit manque, le chat le dit clairement.</li>
+      </ul>
+      <h3>Écrire dans Moduléo, en essai</h3>
+      <ul>
+        <li>Sur le serveur de test uniquement, on peut demander au chat d’ajouter un téléphone à un contact, d’ajouter une note à une affaire, de modifier un contact ou de supprimer un temps passé. Une carte montre ce qui sera fait et rien ne part avant le clic sur Confirmer. Le serveur Moduléo du cabinet n’est jamais modifié.</li>
+        <li><strong>Limites actuelles</strong> : cela fonctionne depuis le poste de développement, mais pas encore depuis un poste installé, où Confirmer échoue (correction prévue en V1.6.4). Saisir un temps passé, créer une tâche à faire, ou modifier et supprimer un élément déjà enregistré ne sont pas encore possibles.</li>
+      </ul>
+      <h3>Gérer les droits sans intervention technique</h3>
+      <ul>
+        <li>Un compte administrateur crée les groupes, coche leurs droits comme dans Moduléo et rattache chaque compte depuis le Panel d’administration. Le changement vaut dès la question suivante, et un journal garde qui a changé quoi et quand.</li>
+      </ul>
+      <h3>Installer et mettre à jour sans l’alternant</h3>
+      <ul>
+        <li>BBASS s’installe sur un poste Windows avec un simple programme d’installation, sans droits administrateur, et se place à la version du serveur à chaque lancement.</li>
+        <li>Le serveur central s’installe en une commande. Une nouvelle version est d’abord essayée sur un environnement de test, puis passée en production ; les données sont sauvegardées avant chaque changement, et l’ancienne version revient automatiquement en cas de problème.</li>
+        <li>Chaque version est vérifiée automatiquement avant d’être acceptée, sans dépendre d’un contrôle à la main.</li>
+        <li><strong>Limite actuelle</strong> : la mise à jour d’un poste ne se fait pas encore à tous les coups, et le bouton « Vérifier les mises à jour maintenant » peut fermer BBASS sans le rouvrir (correction prévue en V1.6.4).</li>
+      </ul>
+      <h3>Réponses et comptes plus fiables</h3>
+      <ul>
+        <li>Quand la recherche ou le document ne contient pas l’information, l’IA dit ce qu’elle n’a pas trouvé au lieu d’estimer ou d’inventer une source.</li>
+        <li>Sur un poste partagé, le compte suivant ne voit rien du précédent, et supprimer un compte supprime ses données.</li>
+      </ul>
     </div>
     </section>
 
@@ -525,7 +550,7 @@
             <li><strong>Ce qui fonctionne</strong> : ajouter un téléphone à un contact, ajouter une note à une affaire, modifier un contact, supprimer un temps passé.</li>
             <li><strong>Carte de confirmation</strong> : tout est nommé (affaire, contact, collaborateur), seule la modification demandée est montrée, ancien → nouveau.</li>
             <li><strong>Sécurité</strong> : un « oui » tapé dans le chat ne confirme rien, la carte en attente expire ; les droits Moduléo du compte s’appliquent et le droit manquant est nommé.</li>
-            <li><strong>Pas encore possible</strong> : modifier ou supprimer un élément déjà enregistré dans Moduléo, saisir un temps passé, créer une tâche à faire. Le texte du chat peut encore être trompeur : seul le statut de la carte fait foi. Repris en 1.8.1 et 1.8.2.</li>
+            <li><strong>Pas encore possible</strong> : modifier ou supprimer un élément déjà enregistré dans Moduléo, saisir un temps passé, créer une tâche à faire. Le texte du chat peut encore être trompeur : seul le statut de la carte fait foi. Repris en 1.10.1 et 1.10.2.</li>
           </ul>
         </div>
       </div>
@@ -599,23 +624,34 @@
         </div>
       </div>
 
-      <div class="version" id="version-1-8-0">
+      <div class="version" id="version-1-6-3">
         <div class="version-head">
-          <h3>V1.8.0 — Workflows n8n</h3>
-          <span class="prevu">Livraison prévue (feuille de route)</span>
+          <h3>V1.6.3 — Corriger les bugs existants</h3>
+          <span class="deploye">Déployé le 30/10/2026 à 14:35</span>
         </div>
         <div class="version-body">
-          <p>Intégrer n8n comme socle d’automatisation, branché sur ce que le chat sait déjà lire dans Moduléo, pour orchestrer des scénarios multi-étapes au-delà du simple échange de messages.</p>
+          <p>Les bugs connus hors écriture Moduléo sont corrigés. Numéro produit : 1.6.4.</p>
+          <ul>
+            <li><strong>Comptes</strong> : après une déconnexion, le compte suivant ne voit rien du précédent, même un instant. Supprimer un compte supprime ses données ; ses coûts restent visibles sous « Compte supprimé ».</li>
+            <li><strong>Réponses de l’IA</strong> : quand la recherche ou la pièce jointe ne contient pas l’information, la réponse le dit au lieu d’estimer ou de citer une source qui n’existe pas. Ce qui manque apparaît comme « [non trouvé] », avec une phrase de fin, et la réponse peut être relue à part pour rester lisible.</li>
+            <li><strong>Dates</strong> : les bornes de la semaine prochaine sont justes, et la recherche web ne contient que l’année.</li>
+            <li><strong>Affichage</strong> : la réponse est mise en forme pendant son animation, et le bandeau de mise à jour laisse le bouton « … » cliquable.</li>
+          </ul>
         </div>
       </div>
 
-      <div class="version" id="version-1-9-0">
+      <div class="version" id="version-1-6-4">
         <div class="version-head">
-          <h3>V1.9.0 — Analyse approfondie des pièces jointes</h3>
+          <h3>V1.6.4 — Corriger les bugs constatés après la V1.6.3</h3>
           <span class="prevu">Livraison prévue (feuille de route)</span>
         </div>
         <div class="version-body">
-          <p>Mieux exploiter une pièce jointe selon le contexte métier (plusieurs documents par message, traitement adapté au pôle), au-delà de l’extraction déjà livrée.</p>
+          <p>Trois problèmes trouvés à l’usage juste après les livraisons de la semaine sont corrigés, pour que le poste installé fasse ce que les dernières versions annoncent.</p>
+          <ul>
+            <li><strong>Mise à jour des postes</strong> : le bouton « Vérifier les mises à jour maintenant » vérifie à chaque clic et rouvre BBASS ; la mise à jour aboutit même avec un antivirus ; après un changement d’adresse du serveur, le poste propose de redémarrer pour se mettre à sa version.</li>
+            <li><strong>Changement de serveur</strong> : le poste ne montre plus que les conversations du serveur auquel il est relié.</li>
+            <li><strong>Écriture Moduléo depuis un poste installé</strong> : Confirmer et Annuler fonctionnent, et après une mise à jour le poste affiche bien l’interface de sa version.</li>
+          </ul>
         </div>
       </div>
     </section>

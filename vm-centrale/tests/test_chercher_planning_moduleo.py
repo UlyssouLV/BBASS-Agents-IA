@@ -539,8 +539,10 @@ def test_une_heure_lue_reste_une_heure_absente_est_retiree(
     )
 
     assert fin(reponse)["reponse"] == (
-        "Jean Martin borne le lot B le 12/10/2026 de 08:00 à 12:00.\n\n"
-        "Sources : Moduléo, tâche « Bornage lot B » du 12/10/2026"
+        "Jean Martin borne le lot B le 12/10/2026 de 08:00 à 12:00.\n"
+        "Il rentre à [non trouvé]:[non trouvé].\n\n"
+        "Sources : Moduléo, tâche « Bornage lot B » du 12/10/2026\n\n"
+        "Certaines informations n'ont pas été trouvées dans les sources consultées."
     )
 
 

@@ -47,6 +47,10 @@ class ContexteTour:
     # Noms des outils appelés pendant ce tour, dans l'ordre (#182) : après
     # un appel Moduléo, la phrase fixe parle de Moduléo.
     outils_appeles: list[str] = field(default_factory=list)
+    # Contenu renvoyé au modèle par chaque appel d'outil du tour, dans
+    # l'ordre : l'entrée de la relecture isolée après un retrait de
+    # garde-fou (spec 1.6.3, ADR-0024).
+    resultats_outils: list[str] = field(default_factory=list)
     # Écriture Moduléo (spec 1.5.2, #204) : le compte du tour, pour le
     # Journal des écritures, et l'événement `carte` de chaque écriture
     # proposée.

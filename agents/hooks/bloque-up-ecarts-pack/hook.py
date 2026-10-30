@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Refuse /up tant qu'une modification locale n'est pas reportée dans le pack.
 
-Claude Code (PreToolUse : Skill, Bash) et Cursor (preToolUse : Skill ;
+Claude Code (PreToolUse : Skill, Bash, PowerShell) et Cursor (preToolUse : Skill ;
 beforeShellExecution). Deny = exit 2.
 Lit agents/docs/ecarts-avec-le-pack.md : une ligne de tableau au statut
 « à reporter » bloque le skill mettre-a-jour-le-pack et les scripts
@@ -26,19 +26,26 @@ _ECARTS = Path(
 _SKILL_UP = "mettre-a-jour-le-pack"
 
 # Le script en position de commande : début de segment (après ; & | ( ou une
-# nouvelle ligne), éventuellement derrière bash / sh / env. Une simple mention
-# (grep, cat, texte d'un heredoc, chaîne entre guillemets) passe.
+# nouvelle ligne), éventuellement derrière bash / sh / env, avec ou sans chemin
+# (bash.exe sous Windows). Une simple mention (grep, cat, texte d'un heredoc,
+# argument entre guillemets) passe.
 _SCRIPTS_PACK = re.compile(
-    r"(?:^|[;&|(\n])\s*(?:(?:env|bash|sh|exec)\s+(?:-\S+\s+)*)*"
+    r"(?:^|[;&|(\n])\s*(?:(?:[^\s;&|()'\"]*[\\/])?(?:env|bash|sh|exec)(?:\.exe)?\s+(?:-\S+\s+)*)*"
     r"[^\s;&|()'\"]*(?:update-from-pack|adopter-le-pack)\.sh(?=$|[\s;&|)])"
 )
 _HEREDOC = re.compile(r"<<-?\s*['\"]?(\w+)['\"]?[^\n]*\n.*?\n\s*\1\s*(?:\n|$)", re.S)
 _GUILLEMETS = re.compile(r"'[^']*'|\"(?:\\.|[^\"\\])*\"")
+_SEPARATEURS = re.compile(r"[\s;&|()]")
+
+
+def _en_un_mot(guillemets: re.Match[str]) -> str:
+    """Une chaîne entre guillemets reste un seul mot : chemin à espaces, jamais une commande cachée."""
+    return _SEPARATEURS.sub("_", guillemets.group()[1:-1])
 
 
 def _sans_texte(commande: str) -> str:
-    """Retire corps de heredoc et chaînes entre guillemets : seules les commandes restent."""
-    return _GUILLEMETS.sub("''", _HEREDOC.sub("\n", commande))
+    """Retire les corps de heredoc et réduit chaque chaîne entre guillemets à un mot."""
+    return _GUILLEMETS.sub(_en_un_mot, _HEREDOC.sub("\n", commande))
 
 _STATUT_A_REPORTER = "à reporter"
 
@@ -145,6 +152,9 @@ def _autoriser(cursor: bool) -> int:
 
 
 def main() -> int:
+    # Sous Windows, la sortie par défaut n'est pas en UTF-8.
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
     payload = _charge()
     cursor = _est_cursor(payload)
     if lance_up(payload):

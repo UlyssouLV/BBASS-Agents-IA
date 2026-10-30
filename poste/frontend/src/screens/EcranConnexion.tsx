@@ -32,7 +32,7 @@ export function EcranConnexion({ connexion }: Readonly<EcranConnexionProps>) {
   const messageErreurConnexion = messageErreur(connexion.error, "La connexion a échoué. Réessayez plus tard.");
 
   return (
-    <main className="grid min-h-svh md:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
+    <main className="grid min-h-full md:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
       <section
         aria-label="BBASS"
         className="relative hidden flex-col justify-between overflow-hidden bg-primary p-10 text-primary-foreground md:flex"

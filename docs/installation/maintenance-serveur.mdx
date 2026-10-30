@@ -6,9 +6,17 @@ Le serveur porte deux Environnements, **Test** et **Production** (voir [Environn
 
 ## 1. Mettre à jour
 
-Le Test (étiquette `staging`) reçoit chaque nouvelle version dès sa sortie ; la Production (étiquette `prod`) ne reçoit que les versions promues. Le serveur ne se met pas à jour tout seul : elle le fait **au redémarrage** ou **à la commande**.
+Chaque nouvelle version est publiée sous l’étiquette `staging` dès sa sortie ; l’étiquette `prod` ne change qu’à la promotion. Publier ne met rien à jour : **le serveur ne se met jamais à jour tout seul**, ni le Test ni la Production. Il télécharge la version de son étiquette **au redémarrage** ou **à la commande**.
 
-À la commande :
+Un Poste suit le serveur auquel il est relié : à son prochain lancement, il passe à la version que ce serveur annonce.
+
+À la commande, pour le Test :
+
+```bash
+sudo docker run --rm --user root --privileged --pid=host --network host -v /:/hote ghcr.io/ulyssoulv/bbass-vm-centrale:staging mettre-a-jour staging
+```
+
+Pour la Production :
 
 ```bash
 sudo docker run --rm --user root --privileged --pid=host --network host -v /:/hote ghcr.io/ulyssoulv/bbass-vm-centrale:prod mettre-a-jour prod

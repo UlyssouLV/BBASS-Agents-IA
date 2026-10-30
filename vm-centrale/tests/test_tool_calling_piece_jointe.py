@@ -277,7 +277,10 @@ def test_url_inventee_retiree_de_la_reponse_finale_apres_un_appel_doutil(
     )
 
     assert reponse.status_code == 200
-    assert fin(reponse)["reponse"] == "Le plan est téléchargeable ici."
+    assert fin(reponse)["reponse"] == (
+        "Le plan est [non trouvé].\n\n"
+        "Certaines informations n'ont pas été trouvées dans les sources consultées."
+    )
 
 
 def test_apres_rechercher_web_lappel_principal_suivant_garde_la_piece_jointe_du_message(

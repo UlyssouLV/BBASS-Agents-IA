@@ -972,7 +972,7 @@ def test_consommation_comptes_reussit_triee_par_cout_decroissant_avec_detail_cha
     assert Decimal(leroy["cout_usd"]) == Decimal("5.00")
 
 
-def test_consommation_comptes_omet_un_compte_supprime_sans_affecter_les_autres_totaux(
+def test_consommation_comptes_range_un_compte_sans_ligne_sous_compte_supprime(
     client, seed_compte, db_session
 ):
     jeton = _jeton_admin(client, seed_compte, identifiant="a.martin")
@@ -996,10 +996,12 @@ def test_consommation_comptes_omet_un_compte_supprime_sans_affecter_les_autres_t
 
     assert reponse.status_code == 200
     corps = reponse.json()
-    identifiants = {compte["identifiant"] for compte in corps}
-    assert identifiants == {"j.dupont"}
-    dupont = next(compte for compte in corps if compte["identifiant"] == "j.dupont")
-    assert Decimal(dupont["cout_usd"]) == Decimal("1.00")
+    # Compte supprimé avant la 1.6.3, pas encore nettoyé au démarrage : sa
+    # consommation compte quand même, sous « Compte supprimé » (spec 1.6.3).
+    assert [(compte["prenom"], compte["nom"], Decimal(compte["cout_usd"])) for compte in corps] == [
+        ("Compte", "supprimé", Decimal("5.00")),
+        ("Jean", "Dupont", Decimal("1.00")),
+    ]
 
 
 def test_consommation_comptes_ne_renvoie_jamais_de_detail_par_conversation(

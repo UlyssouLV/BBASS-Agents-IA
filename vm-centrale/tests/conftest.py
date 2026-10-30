@@ -30,6 +30,7 @@ from vm_centrale.outils.lire_pages_web import CONSIGNE_LECTURE_PAGE, CONSIGNE_RE
 from vm_centrale.outils.piece_jointe import CONSIGNE_RELECTURE_PIECES_JOINTES
 from vm_centrale.outils.recherche_web import CONSIGNE_EXTRACTION
 from vm_centrale.questions_couvertes import CONSIGNE_QUESTIONS_PIECE_JOINTE
+from vm_centrale.relecture import CONSIGNE_RELECTURE
 from vm_centrale.security import hash_password
 from vm_centrale.telechargement_pages import PageIndisponible, PageTelechargee, get_telechargeur_pages
 from vm_centrale.jetons import JetonStore, get_jeton_store
@@ -170,6 +171,14 @@ class ClientMistralFactice:
         self.appels_relecture_pieces_jointes: list = []
         self._reponse_relecture_pieces_jointes = _LECTURE_PAGE_FACTICE
         self._exception_relecture_pieces_jointes: Exception | None = None
+        # Appels de relecture isolée après un retrait de garde-fou (spec
+        # 1.6.3, ADR-0024), reconnus à leur consigne fixe, et `tools` reçu
+        # par chacun. Sans réponse configurée, l'appel échoue : la réponse
+        # marquée et la phrase fixe restent, comme avant la relecture.
+        self.appels_relecture: list = []
+        self.tools_appels_relecture: list = []
+        self._reponse_relecture = ""
+        self._exception_relecture: Exception | None = RuntimeError("Relecture non configurée")
         # prompt_tokens des prochains appels de chat principaux (spec 1.4.2,
         # jauge de contexte), consommés dans l'ordre ; sans valeur, l'usage
         # factice habituel.
@@ -344,6 +353,13 @@ class ClientMistralFactice:
     def echouer_relecture_pieces_jointes(self, exception: Exception) -> None:
         self._exception_relecture_pieces_jointes = exception
 
+    def repondre_relecture(self, texte: str) -> None:
+        self._reponse_relecture = texte
+        self._exception_relecture = None
+
+    def echouer_relecture(self, exception: Exception) -> None:
+        self._exception_relecture = exception
+
     def echouer_extraction(self, exception: Exception) -> None:
         self._exception_extraction = exception
 
@@ -388,6 +404,11 @@ class ClientMistralFactice:
             self._exception_relecture_pieces_jointes,
         )
 
+    def _relire(self, messages, response_format, tools) -> ReponseChat:
+        self.appels_relecture.append(messages)
+        self.tools_appels_relecture.append(tools)
+        return self._repondre_canal(messages, response_format, self._reponse_relecture, self._exception_relecture)
+
     @staticmethod
     def _repondre_canal(messages, response_format, contenu: str, exception: Exception | None) -> ReponseChat:
         payload = {"model": "mistral-factice", "messages": messages, "response_format": response_format}
@@ -426,6 +447,8 @@ class ClientMistralFactice:
                 and messages[0]["content"] == CONSIGNE_RELECTURE_PIECES_JOINTES
             ):
                 return self._relire_pieces_jointes(messages, response_format)
+            if not isinstance(messages, str) and messages and messages[0]["content"] == CONSIGNE_RELECTURE:
+                return self._relire(messages, response_format, tools)
             self.messages_recus.append(messages)
             self.response_formats_recus.append(response_format)
             if response_format is not None:

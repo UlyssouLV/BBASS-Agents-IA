@@ -36,7 +36,7 @@ _PAGE_TROP_LONGUE = (
 # plafond : de quoi découvrir de quoi parle une page, pas la relire entière.
 _TEXTE_SANS_BESOIN_MAX = 8_000
 _TEXTE_COUPE = "[… texte coupé : relis avec un besoin pour une information précise]"
-_PAGE_DU_COMPTE_NON_LUE = "page non lue (PDF, page refusée ou délai dépassé)."
+_PAGE_DU_COMPTE_NON_LUE = "page non lue (PDF, page refusée, page vide ou délai dépassé)."
 # Relecture forcée en échec (#157) : seul cas où le modèle reçoit l'âge de
 # la copie de la conversation (spec 1.4.3, « Visibilité »). Suivie du
 # contenu habituel de cette copie.

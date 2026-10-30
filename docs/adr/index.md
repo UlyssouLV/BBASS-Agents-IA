@@ -31,3 +31,4 @@ Ce n’est ni une spec produit, ni un tutoriel. C’est le journal des choix str
 | [0021](./0021-cd-vm-centrale-staging-prod.md) | CD de la VM centrale (staging, prod) |
 | [0022](./0022-poste-application-windows-version-dictee-par-la-vm.md) | Poste en application Windows, version dictée par la VM |
 | [0023](./0023-ecriture-moduleo-confirmee-serveur-de-test.md) | Écriture Moduléo confirmée, serveur de test |
+| [0024](./0024-relecture-isolee-apres-garde-fou.md) | Relecture isolée après un retrait de garde-fou |

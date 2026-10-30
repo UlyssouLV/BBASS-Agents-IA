@@ -37,7 +37,7 @@ Target = that SHA (or the branch name while it still exists), **not** **base**. 
 
 `VX.Y.Z — <purpose>`
 
-Purpose = the rest of the user / caller message after the tag, else the PR title after `VD —`, else the parent spec’s one-job sentence. Tag ≠ **`D`** → the purpose ends with ` (développement D)` (keep it when the caller already wrote it). Do not use a commit-subject dump as the title. (Title keeps `VX.Y.Z` for humans; the Git tag may be `orchestrator-vX.Y.Z`.)
+Purpose = the rest of the user / caller message after the tag, else the PR title after `VD —`, else the parent spec’s one-job sentence. The title carries the **product** number only, never the development number: that one goes in the notes (`Développement : D`). Do not use a commit-subject dump as the title. (Title keeps `VX.Y.Z` for humans; the Git tag may be `orchestrator-vX.Y.Z`.)
 
 ## 4. Notes (body)
 
@@ -59,6 +59,8 @@ Always this layout (omit a section only if it would be empty **and** you said so
 - PR : https://github.com/<owner>/<repo>/pull/<n>
 - Commits : https://github.com/<owner>/<repo>/pull/<n>/commits
 
+Développement : <D> (#<parent>)
+
 Tickets (`Fixes`) : #<parent> #<enfant> …
 
 ## Hors périmètre
@@ -77,6 +79,8 @@ Issues laissées de côté (PR / spec hors périmètre) : #…
 `<full-tag>` = **tag(X.Y.Z)**. `<spec-path>` = parent spec under role **`spec`**. Always this one-line shape: `Spec : <url>`.
 
 `<adr-path>` = files under role **`adr`**.
+
+`<D>` = development number, always written, even when it equals the tag: the docs changelog finds the spec through this line.
 
 ### Fill order
 

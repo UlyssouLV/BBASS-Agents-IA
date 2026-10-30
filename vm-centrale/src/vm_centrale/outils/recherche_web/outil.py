@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 
 import trafilatura
 
-from vm_centrale.cache_pages import ecrire_copie, lire_copie
+from vm_centrale.cache_pages import CopieEnCache, ecrire_copie, lire_copie
 from vm_centrale.compte_tokens import compter_tokens
 from vm_centrale.config import FICHES_MODELES, MODELE_CHAT
 from vm_centrale.inspecteur import payload_depuis_erreur, reponse_depuis_erreur
@@ -22,6 +22,10 @@ from vm_centrale.telechargement_pages import PageIndisponible, TelechargeurPages
 _NOM = "rechercher_web"
 _NOMBRE_RESULTATS = 5
 _NOMBRE_PAGES_TELECHARGEES = 3
+# Sous ce nombre de caractères de texte nettoyé, une page est quasi vide
+# (#131 : « Loading × Sorry to interrupt CSS Error », page rendue en
+# JavaScript) : ni extraite, ni mise en cache, ni comptée comme lue.
+_TEXTE_MIN_CARACTERES = 200
 # Plafond global des pages nettoyées (spec 1.4.0, étape 4) : 80 % de la
 # fenêtre du modèle d'extraction (fiche MODELE_CHAT), en vrais tokens depuis
 # la 1.4.2 (tokenizer de la fiche, compte_tokens.py). Aussi celui d'une page
@@ -224,20 +228,28 @@ def _telecharger(url: str, telechargeur: TelechargeurPages) -> _Page:
     texte = (trafilatura.extract(page.corps) or "").strip()
     if not texte:
         return _Page(url, statut=page.statut, erreur="aucun texte principal")
+    if len(texte) < _TEXTE_MIN_CARACTERES:
+        return _Page(url, statut=page.statut, erreur=f"texte quasi vide ({len(texte)} caractères)")
     metadonnees = trafilatura.extract_metadata(page.corps)
     titre = ((metadonnees.title if metadonnees is not None else None) or "").strip()
     return _Page(url, statut=page.statut, texte=texte, titre=titre)
+
+
+def _copie_lisible(contexte: ContexteTour, url: str, maintenant: datetime) -> CopieEnCache | None:
+    copie = lire_copie(contexte.db, url, maintenant)
+    return copie if copie is not None and len(copie.texte) >= _TEXTE_MIN_CARACTERES else None
 
 
 def lire_pages(urls: list[str], contexte: ContexteTour, sans_cache: bool = False) -> list[_Page]:
     # Une _Page par URL, dans l'ordre. Cache commun d'abord (spec 1.4.3,
     # ADR-0015) : une copie valide remplace le téléchargement, sauf
     # `sans_cache` (relecture forcée de lire_pages_web, #157). Une page
-    # téléchargée et lue avec succès (200, HTML, texte principal non vide)
-    # est écrite dans le cache, avant tout plafond ; jamais un échec.
+    # téléchargée et lue avec succès (200, HTML, texte principal non quasi
+    # vide) est écrite dans le cache, avant tout plafond ; jamais un échec.
+    # Une copie quasi vide (écrite avant la 1.6.3) est ignorée.
     # Partagée avec lire_pages_web pour une URL écrite par le compte (#140).
     maintenant = datetime.now(timezone.utc)
-    copies = {url: None if sans_cache else lire_copie(contexte.db, url, maintenant) for url in urls}
+    copies = {url: None if sans_cache else _copie_lisible(contexte, url, maintenant) for url in urls}
     a_telecharger = [url for url, copie in copies.items() if copie is None]
     telechargees: dict[str, _Page] = {}
     if a_telecharger:

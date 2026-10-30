@@ -61,7 +61,9 @@ export function OngletConsommations() {
             {comptes.map((compte) => (
               <TableRow key={compte.identifiant}>
                 <TableCell>
-                  {compte.prenom} {compte.nom} ({compte.identifiant})
+                  {compte.prenom} {compte.nom}
+                  {/* Identifiant vide : « Compte supprimé » (spec 1.6.3). */}
+                  {compte.identifiant && ` (${compte.identifiant})`}
                 </TableCell>
                 <TableCell>{compte.cout_usd} $</TableCell>
                 <TableCell>{formaterDetail(compte.chat)}</TableCell>

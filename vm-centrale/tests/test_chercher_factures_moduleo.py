@@ -538,8 +538,10 @@ def test_un_reste_et_un_total_lus_restent_un_total_absent_est_retire(
     )
 
     assert fin(reponse)["reponse"] == (
-        "La facture F-2026-118 reste due pour 840 €. Les deux factures totalisent 1 560 € TTC.\n\n"
-        "Sources : Moduléo, factures (texte « Bornage »), Moduléo, facture F-2026-118"
+        "La facture F-2026-118 reste due pour 840 €. Les deux factures totalisent 1 560 € TTC.\n"
+        "Soit [non trouvé] € en tout.\n\n"
+        "Sources : Moduléo, factures (texte « Bornage »), Moduléo, facture F-2026-118\n\n"
+        "Certaines informations n'ont pas été trouvées dans les sources consultées."
     )
 
 

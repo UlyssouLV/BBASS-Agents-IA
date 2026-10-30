@@ -1,6 +1,8 @@
 /**
  * Extrait les prochaines versions de docs/dev/feuille-de-route/feuille-de-route-dev.md
- * → JSON accueil + pages docs/feuille-de-route/vX.Y.Z.md
+ * → JSON accueil + pages docs/feuille-de-route/<slug>.md
+ * Le site ne montre que des numéros produit : une version à venir n'en a pas
+ * encore, elle est donc présentée et adressée par son titre.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -46,6 +48,15 @@ function tronquer(texte, max = 180) {
   return `${coupe.slice(0, dernier > 80 ? dernier : max).trim()}…`;
 }
 
+function slugDuTitre(titre) {
+  return titre
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 function parserEnsuite(markdown) {
   const re = /^## (?:Prochaine|Ensuite) : (\d+\.\d+(?:\.\d+)?)\s*[—–\-]\s*(.+)$/gm;
   const indices = [];
@@ -69,9 +80,8 @@ function parserEnsuite(markdown) {
           ? plusTard
           : markdown.length;
     const corps = markdown.slice(courant.headerEnd, fin).trim();
-    const slug = `v${courant.version}`;
+    const slug = slugDuTitre(courant.titre);
     versions.push({
-      version: courant.version,
       titre: courant.titre,
       resume: tronquer(extraireObjectif(corps)),
       corps,
@@ -109,11 +119,11 @@ function ecrirePages(versions) {
   resetOutDir();
   versions.forEach((v, index) => {
     const content = `---
-sidebar_label: ${escapeYaml(v.version)}
+sidebar_label: ${escapeYaml(v.titre)}
 sidebar_position: ${index + 1}
 ---
 
-# ${v.version} — ${v.titre}
+# ${v.titre}
 
 > Extrait de la feuille de route.
 
@@ -137,8 +147,7 @@ function main() {
   const versions = parserEnsuite(markdown);
   ecrirePages(versions);
   const payload = {
-    versions: versions.map(({version, titre, resume, href, slug}) => ({
-      version,
+    versions: versions.map(({titre, resume, href, slug}) => ({
       titre,
       resume,
       href,

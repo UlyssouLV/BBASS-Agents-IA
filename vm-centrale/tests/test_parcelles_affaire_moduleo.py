@@ -156,8 +156,10 @@ def test_reference_et_contenance_lues_restent_une_contenance_absente_part(
     visible = fin(reponse)["reponse"]
     assert "AB 123" in visible
     assert "1 234 m²" in visible
-    assert "9 876" not in visible
-    assert visible.endswith("Sources : Moduléo, affaire 2024-123")
+    assert "La parcelle voisine fait [non trouvé] m²." in visible
+    assert visible.endswith(
+        "Sources : Moduléo, affaire 2024-123\n\nCertaines informations n'ont pas été trouvées dans les sources consultées."
+    )
 
 
 def test_sans_le_droit_de_consulter_les_contacts_proprietaires_retires_avec_une_mention(

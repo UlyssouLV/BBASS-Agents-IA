@@ -29,11 +29,14 @@ from vm_centrale.consommation import enregistrer_consommation
 from vm_centrale.database import FabriqueSession, get_db, get_fabrique_session
 from vm_centrale.dates import date_du_jour
 from vm_centrale.garde_fous import (
+    MARQUEUR_NON_TROUVE,
     PHRASE_CARTE_OUVERTE,
     PHRASE_CONTACT_NON_LU,
     PHRASE_ECRITURE_NON_PROPOSEE,
+    PHRASE_NON_TROUVE,
     LectureSource,
     PageSource,
+    Retrait,
     affirme_une_ecriture,
     ajouter_sources,
     annonce_une_carte,
@@ -63,9 +66,7 @@ from vm_centrale.mistral_client import (
 )
 from vm_centrale.models import (
     Compte,
-    Consommation,
     Conversation,
-    EchangeInspecteur,
     Message,
     PieceJointe,
     ProfilTravail,
@@ -76,13 +77,11 @@ from vm_centrale.lectures_outils import (
     LectureDeLaConversation,
     lectures_de_la_conversation,
     rattacher_lectures_au_message,
-    supprimer_lectures,
 )
 from vm_centrale.moduleo.ids import retirer_ids_moduleo
 from vm_centrale.moduleo.client import ClientModuleo, get_client_moduleo
 from vm_centrale.moduleo.ecritures import (
     cartes_par_message,
-    detacher_de_la_conversation,
     expirer,
     rattacher_ecritures_au_message,
     resultats_par_message,
@@ -96,6 +95,7 @@ from vm_centrale.questions_couvertes import (
     enregistrer_questions_piece_jointe,
 )
 from vm_centrale.outils import AppelMistralOutil, ContexteTour, executer_appel, outils_du_tour
+from vm_centrale.relecture import TYPE_APPEL as TYPE_APPEL_RELECTURE, relire
 from vm_centrale.outils.moduleo import affaires as outil_affaires, contacts as outil_contacts
 from vm_centrale.outils.moduleo.ecriture import OUTIL_ECRIRE
 from vm_centrale.statut_tour import (
@@ -123,6 +123,7 @@ from vm_centrale.schemas import (
     PieceJointeResume,
 )
 from vm_centrale.telechargement_pages import TelechargeurPages, get_telechargeur_pages
+from vm_centrale.suppression import supprimer_donnees_conversation, supprimer_fichiers
 
 _TAILLE_FENETRE_HISTORIQUE = 3
 # Fenêtre renvoyée avec la jauge de contexte (spec 1.4.2) : celle de la fiche
@@ -201,6 +202,10 @@ _SCHEMA_RESUME_ET_PROFIL = {
 # l'outil ou donnés par l'utilisateur peuvent être cités. Portée d'un fait
 # depuis la 1.4.3 (#160, conversation 103) : « en Savoie » devenait « en
 # France », même règle que les consignes qui lisent une page (REGLE_PORTEE).
+# « Non trouvé → le dire » depuis la 1.6.3 (#131, conversations 90 et 91) :
+# sans l'information dans les sources, le modèle écrivait quand même tarifs,
+# dates et « sourcé » / « confirmé par », et une généralité du web passait
+# avant la pièce jointe.
 _PROMPT_STYLE = (
     "Capacité réelle, avant toute autre consigne : tu peux chercher sur "
     "Internet avec l'outil rechercher_web ; tu cites les pages trouvées par "
@@ -211,7 +216,13 @@ _PROMPT_STYLE = (
     "explicitement d'inventer, d'imaginer ou de faire une hypothèse. Si tu "
     "n'es pas sûr qu'il faille inventer, pose la question de confirmation "
     "en tout début de réponse, et n'invente rien tant qu'il n'a pas "
-    "confirmé. Un fait tiré d'une page garde le lieu, la période et la "
+    "confirmé. Quand les résultats d'outils (de ce tour ou d'une recherche "
+    "précédente de la conversation) ou la pièce jointe ne contiennent pas "
+    "l'information, dis que tu ne l'as pas trouvée, au besoin avec les pages "
+    "consultées, plutôt que de la donner de mémoire. N'écris jamais "
+    "« sourcé », « confirmé par » ou « comme le confirme » sans un résultat "
+    "d'outil qui contient l'information. Le contenu de la pièce jointe prime "
+    "sur une généralité trouvée sur le web. Un fait tiré d'une page garde le lieu, la période et la "
     "population que la page lui donne (« en Savoie » ne devient jamais « en "
     "France ») ; tu n'ajoutes aucune conversion ni aucun calcul absent de la "
     "page.\n"
@@ -263,20 +274,27 @@ def _consigne_date_du_jour() -> str:
     # scénario 4) : avec la seule date ISO, « la semaine dernière » le lundi
     # 26/10/2026 devenait les sept derniers jours. Bornes de la semaine
     # dernière données toutes calculées (rejeu #195) : le modèle les
-    # calculait faux (« du lundi 20 au dimanche 26 octobre »).
+    # calculait faux (« du lundi 20 au dimanche 26 octobre »). Semaine
+    # prochaine depuis le test humain #274 (scénario 8) : même calcul faux
+    # (« lundi 3 novembre » pour le lundi 2).
+    # Date du jour sans ISO depuis la 1.6.3 (#131) : le modèle la recopiait
+    # dans la requête de rechercher_web. Les bornes gardent l'ISO, à
+    # recopier dans les filtres de date des outils Moduléo.
     aujourdhui = _date_du_jour()
     return (
-        f"Date du jour : {_en_lettres(aujourdhui)} ({aujourdhui.isoformat()}). "
+        f"Date du jour : {_en_lettres(aujourdhui)}. "
         f"Semaine en cours : {_bornes_en_lettres(*_semaine_en_cours())}. "
-        f"Semaine dernière : {_bornes_en_lettres(*_semaine_derniere())}. Une "
+        f"Semaine dernière : {_bornes_en_lettres(*_semaine_derniere())}. "
+        f"Semaine prochaine : {_bornes_en_lettres(*_semaine_prochaine())}. Une "
         "semaine va du lundi au dimanche : « cette semaine » est la semaine en "
-        "cours, « la semaine dernière » celle d'avant, avec ces dates exactes, "
+        "cours, « la semaine dernière » celle d'avant, « la semaine prochaine » "
+        "celle d'après, avec ces dates exactes, "
         "sans les recalculer, et un jour nommé seul (« mercredi ») celui de la "
-        "semaine en cours. Pour une actualité ou une "
-        "information récente, mets l'année "
-        f"{aujourdhui.year} dans la requête de rechercher_web, jamais une année "
-        "plus ancienne de ta mémoire ; pour un texte déjà nommé (article de "
-        "loi, document daté par l'utilisateur), ne l'ajoute pas d'office."
+        "semaine en cours. Dans une requête de rechercher_web, jamais de date "
+        f"complète : pour une actualité ou une information récente, seule l'année "
+        f"{aujourdhui.year}, jamais une année plus ancienne de ta mémoire ; pour "
+        "un texte déjà nommé (article de loi, document daté par l'utilisateur), "
+        "ne l'ajoute pas d'office."
     )
 
 
@@ -298,6 +316,11 @@ def _semaine_derniere() -> tuple[date, date]:
     return lundi - timedelta(days=7), dimanche - timedelta(days=7)
 
 
+def _semaine_prochaine() -> tuple[date, date]:
+    lundi, dimanche = _semaine_en_cours()
+    return lundi + timedelta(days=7), dimanche + timedelta(days=7)
+
+
 def _bornes_en_lettres(lundi: date, dimanche: date) -> str:
     return f"du {_en_lettres(lundi)} ({lundi.isoformat()}) au {_en_lettres(dimanche)} ({dimanche.isoformat()})"
 
@@ -316,12 +339,14 @@ def _annee_du_jour_source() -> str:
 
 
 def _dates_de_la_consigne_ecrites() -> list[re.Pattern[str]]:
-    # La date du jour et les bornes de la semaine en cours et de la semaine
-    # dernière (#200), écrites dans la réponse (« 15 octobre », « lundi 26 »,
+    # La date du jour et les bornes de la semaine en cours, de la semaine
+    # dernière (#200) et de la semaine prochaine (#275), écrites dans la
+    # réponse (« 15 octobre », « lundi 26 »,
     # « 1er novembre 2026 », « 26/10/2026 ») : leurs chiffres ne sont pas
     # contrôlés, le quantième seul l'est.
     return [
-        _date_ecrite(jour) for jour in {_date_du_jour(), *_semaine_en_cours(), *_semaine_derniere()}
+        _date_ecrite(jour)
+        for jour in {_date_du_jour(), *_semaine_en_cours(), *_semaine_derniere(), *_semaine_prochaine()}
     ]
 
 
@@ -693,7 +718,7 @@ def _demande_invention(message: str) -> bool:
 
 def _reponse_sans_url_inventee(
     db: Session, conversation_id: int, nouveau_message: str, reponse: str
-) -> str:
+) -> Retrait:
     # Textes du compte lus en base, pas seulement dans la fenêtre des
     # derniers messages (spec 1.3.1) : une URL que le compte a donnée il y a
     # longtemps reste légitime à redonner. De même pour les URL des résultats
@@ -785,6 +810,8 @@ def _reponse_visible(
     publier: Publier,
     outils_appeles: list[str],
     moduleo_configure: bool,
+    client: MistralClient,
+    resultats_outils: list[str],
     cartes_du_tour: list[int],
     refus_des_droits: list[str],
     ecriture_proposee: bool,
@@ -805,20 +832,35 @@ def _reponse_visible(
     contacts_lus = outil_contacts.OUTIL.nom in outils_appeles or any(
         lecture.citation.startswith(_CITATION_CONTACT) for lecture in lectures
     )
-    visible = _appliquer_garde_fous(
-        db,
-        conversation_id,
-        nouveau_message,
-        # Avant les garde-fous, qui ne changent pas (#203).
-        retirer_ids_moduleo(reponse),
-        piece_jointe,
-        lectures,
-        moduleo_appele,
-        # Sans Moduléo, la phrase fixe promettrait une recherche impossible.
-        contacts_lus or not moduleo_configure,
-        cartes_du_tour,
-        ecriture_proposee,
-    )
+    def garde_fous(texte: str) -> Retrait:
+        return _appliquer_garde_fous(
+            db,
+            conversation_id,
+            nouveau_message,
+            # Avant les garde-fous, qui ne changent pas (#203).
+            retirer_ids_moduleo(texte),
+            piece_jointe,
+            lectures,
+            moduleo_appele,
+            # Sans Moduléo, la phrase fixe promettrait une recherche impossible.
+            contacts_lus or not moduleo_configure,
+            cartes_du_tour,
+            ecriture_proposee,
+        )
+
+    visible, retire = garde_fous(reponse)
+    if retire and _relecture_possible(nouveau_message, visible, resultats_outils, piece_jointe):
+        visible, retire = _relecture_apres_retrait(
+            db,
+            identifiant_compte,
+            conversation_id,
+            client,
+            nouveau_message,
+            visible,
+            resultats_outils,
+            piece_jointe,
+            garde_fous,
+        )
     # Refus du garde des droits (#262) : sa phrase, telle quelle, nomme le
     # droit manquant ; elle remplace une phrase fixe de la VM, plus vague.
     if refus_des_droits and visible.startswith(_PHRASES_FIXES):
@@ -831,6 +873,10 @@ def _reponse_visible(
         _sources_de_la_conversation(db, conversation_id, lectures),
     )
     visible = mentionner_pages_trop_longues(visible, pages_trop_longues)
+    # Dès qu'un garde-fou a retiré quelque chose, la réponse le dit à la fin
+    # (spec 1.6.3, #131).
+    if retire:
+        visible = f"{visible.rstrip()}\n\n{PHRASE_NON_TROUVE}"
     enregistrer_echange_local(
         db,
         identifiant_compte=identifiant_compte,
@@ -841,6 +887,86 @@ def _reponse_visible(
         reponse_payload={"reponse_visible": visible},
     )
     return visible
+
+
+def _relecture_possible(
+    nouveau_message: str, reponse_marquee: str, resultats_outils: list[str], piece_jointe: PieceJointe | None
+) -> bool:
+    # La relecture ne voit que le tour (ADR-0024), alors que les garde-fous
+    # acceptent toute la conversation. Sa consigne lui fait retirer ce qu'elle
+    # ne voit pas : sans rien de ce tour, ou avec un chiffre gardé qui vient
+    # d'un tour précédent, elle effacerait du vrai. Une invention demandée
+    # n'a pas de source à retrouver.
+    if _demande_invention(nouveau_message):
+        return False
+    extrait = piece_jointe.contenu_extrait if piece_jointe is not None else None
+    sources_du_tour = [*resultats_outils, *([extrait] if extrait else [])]
+    if not sources_du_tour:
+        return False
+    return not retirer_chiffres_hors_source(
+        reponse_marquee,
+        [nouveau_message, _annee_du_jour_source(), *sources_du_tour],
+        _dates_de_la_consigne_ecrites(),
+    ).retire
+
+
+def _relecture_apres_retrait(
+    db: Session,
+    identifiant_compte: str,
+    conversation_id: int,
+    client: MistralClient,
+    nouveau_message: str,
+    reponse_marquee: str,
+    resultats_outils: list[str],
+    piece_jointe: PieceJointe | None,
+    garde_fous: Callable[[str], Retrait],
+) -> Retrait:
+    # Une seule relecture isolée par réponse, seulement après un retrait
+    # (spec 1.6.3, point 9, ADR-0024). Les garde-fous ont le dernier mot :
+    # elle n'est retenue que s'ils la rendent telle quelle. Sinon, ou si
+    # l'appel échoue, la réponse marquée reste, avec la phrase fixe.
+    relecture = relire(
+        client,
+        nouveau_message,
+        reponse_marquee,
+        resultats_outils,
+        piece_jointe.contenu_extrait if piece_jointe is not None else None,
+    )
+    if isinstance(relecture, Exception):
+        enregistrer_echange_echec(
+            db,
+            identifiant_compte=identifiant_compte,
+            conversation_id=conversation_id,
+            piece_jointe_id=None,
+            type_appel=TYPE_APPEL_RELECTURE,
+            modele=MODELE_CHAT,
+            requete_payload=payload_depuis_erreur(relecture),
+            reponse_payload={**(reponse_depuis_erreur(relecture) or {}), "relecture": "écartée"},
+            erreur=str(relecture),
+            commit=False,
+        )
+        return Retrait(reponse_marquee, True)
+    # Mistral peut rendre un contenu nul ou découpé : l'appel reste compté.
+    relue = relecture.contenu.strip() if isinstance(relecture.contenu, str) else ""
+    # Un marqueur recopié n'est pas un retrait, mais resterait sans la phrase
+    # fixe qui l'explique.
+    retenue = bool(relue) and MARQUEUR_NON_TROUVE not in relue and garde_fous(relue) == Retrait(relue, False)
+    enregistrer_consommation(
+        db, identifiant_compte, conversation_id, TYPE_APPEL_RELECTURE, MODELE_CHAT, usage=relecture.usage
+    )
+    enregistrer_echange_succes(
+        db,
+        identifiant_compte=identifiant_compte,
+        conversation_id=conversation_id,
+        piece_jointe_id=None,
+        type_appel=TYPE_APPEL_RELECTURE,
+        modele=MODELE_CHAT,
+        requete_payload=relecture.payload_envoye,
+        reponse_payload={**relecture.reponse_brute, "relecture": "retenue" if retenue else "écartée"},
+    )
+    if retenue:
+        return Retrait(relue, False)
+    return Retrait(reponse_marquee, True)
 
 
 def _appliquer_garde_fous(
@@ -854,24 +980,24 @@ def _appliquer_garde_fous(
     contacts_lus: bool = False,
     cartes_du_tour: list[int] | None = None,
     ecriture_proposee: bool = False,
-) -> str:
+) -> Retrait:
     # Écriture Moduléo annoncée sans carte, même après la relance (#252) :
     # toute la réponse devient la phrase fixe. Avec une carte, rien n'est
     # encore écrit : les phrases qui le disent partent.
     if cartes_du_tour:
         reponse = retirer_ecriture_affirmee(reponse)
     elif _annonce_une_ecriture(db, conversation_id, reponse, ecriture_proposee):
-        return PHRASE_ECRITURE_NON_PROPOSEE
+        return Retrait(PHRASE_ECRITURE_NON_PROPOSEE, False)
     # Une absence de coordonnées dans Moduléo sans lecture du contact dans
     # le tour (#183) : toute la réponse devient la phrase fixe, rien d'autre
     # à contrôler.
     if (sans_contact_non_lu := remplacer_contact_non_lu(reponse, contacts_lus)) != reponse:
-        return sans_contact_non_lu
+        return Retrait(sans_contact_non_lu, False)
     # URL d'abord : un chiffre qui ne vivait que dans une URL inventée
     # disparaît avec elle, et n'est pas relu comme une donnée.
-    reponse = _reponse_sans_url_inventee(db, conversation_id, nouveau_message, reponse)
+    reponse, url_retiree = _reponse_sans_url_inventee(db, conversation_id, nouveau_message, reponse)
     if _demande_invention(nouveau_message):
-        return reponse
+        return Retrait(reponse, url_retiree)
     extraits = _extraits_pieces_jointes(db, conversation_id, piece_jointe)
     # Un texte de recherche non vide compte comme un document.
     extraits += _textes_de_recherche(db, conversation_id)
@@ -879,18 +1005,16 @@ def _appliquer_garde_fous(
     extraits += [lecture.texte for lecture in lectures]
     textes_source = [*_messages_du_compte(db, conversation_id, nouveau_message), _annee_du_jour_source(), *extraits]
     sans_chiffre_invente = retirer_chiffres_hors_source(reponse, textes_source, _dates_de_la_consigne_ecrites())
-    if sans_chiffre_invente == reponse:
-        return reponse
-    # Un document, ou un chiffre déjà écrit dans le message du tour : on
-    # retire seulement le chiffre absent, avec sa phrase. Sans rien de tout
-    # ça, ou si plus rien ne reste, la réponse entière devient la phrase
-    # fixe — un rapport troué n'est pas une réponse.
-    message_apporte_une_donnee = (
-        retirer_chiffres_hors_source(nouveau_message, []) != nouveau_message
-    )
-    if (extraits or message_apporte_une_donnee) and sans_chiffre_invente:
+    if not sans_chiffre_invente.retire:
+        return Retrait(reponse, url_retiree)
+    # Un document, ou un chiffre déjà écrit dans le message du tour : seul
+    # le chiffre absent devient le marqueur. Sans rien de tout ça, la
+    # réponse entière devient la phrase fixe — un rapport sans aucune
+    # source n'est pas une réponse.
+    message_apporte_une_donnee = retirer_chiffres_hors_source(nouveau_message, []).retire
+    if extraits or message_apporte_une_donnee:
         return sans_chiffre_invente
-    return _REPONSE_SANS_DONNEES_MODULEO if moduleo_appele else _REPONSE_SANS_DONNEES
+    return Retrait(_REPONSE_SANS_DONNEES_MODULEO if moduleo_appele else _REPONSE_SANS_DONNEES, False)
 
 
 def _annonce_une_ecriture(db: Session, conversation_id: int, reponse: str, ecriture_proposee: bool) -> bool:
@@ -1289,6 +1413,8 @@ def _tour_creer_conversation(
         publier,
         contexte_outils.outils_appeles,
         contexte_outils.client_moduleo is not None,
+        client,
+        contexte_outils.resultats_outils,
         contexte_outils.cartes_du_tour,
         contexte_outils.refus_des_droits,
         _ecriture_proposee(tools),
@@ -1457,49 +1583,9 @@ def supprimer_conversation(
 ) -> None:
     conversation = _recuperer_conversation_du_compte(db, conversation_id, identifiant_compte)
 
-    # echanges_inspecteur disparaît avec sa conversation (FK ON DELETE
-    # CASCADE, spec 1.3.0) — contrairement à Consommation ci-dessous.
-    # Supprimé ici explicitement, comme Message/PieceJointe plus bas, pour un
-    # comportement identique quel que soit le moteur de base (la base de
-    # test SQLite n'applique pas les contraintes FK par défaut).
-    db.query(EchangeInspecteur).filter(EchangeInspecteur.conversation_id == conversation.id).delete()
-    # Même chose pour les questions couvertes (spec 1.4.1), avant les
-    # résultats de recherche et les pièces jointes qu'elles référencent, et
-    # pour les résultats de recherche (spec 1.4.0).
-    db.query(QuestionCouverte).filter(QuestionCouverte.conversation_id == conversation.id).delete()
-    db.query(ResultatRechercheWeb).filter(
-        ResultatRechercheWeb.conversation_id == conversation.id
-    ).delete()
-    supprimer_lectures(db, conversation.id)
-    # Le Journal des écritures survit à la conversation (spec 1.5.2).
-    detacher_de_la_conversation(db, conversation.id)
-
-    # Consommation n'a pas de cascade ORM déclarée sur Conversation (spec
-    # 1.1.3) : la ligne survit à la conversation qui l'a produite, seul le
-    # rattachement disparaît — jamais de suppression en cascade comme pour
-    # les messages/pièces jointes ci-dessous. Même transaction que le reste
-    # de la suppression.
-    db.query(Consommation).filter(Consommation.conversation_id == conversation.id).update(
-        {Consommation.conversation_id: None}
-    )
-
-    # Pièces jointes (base + fichier disque) supprimées avant les messages
-    # (spec 1.1.2) : PieceJointe.message_id référence Message, donc l'ordre
-    # inverse violerait l'intégrité référentielle. missing_ok=True car un
-    # fichier déjà absent ne doit jamais empêcher la suppression de la
-    # conversation elle-même.
-    pieces_jointes = db.query(PieceJointe).filter(PieceJointe.conversation_id == conversation.id).all()
-    for piece_jointe in pieces_jointes:
-        (Path(PIECES_JOINTES_DIR) / piece_jointe.chemin_fichier).unlink(missing_ok=True)
-    db.query(PieceJointe).filter(PieceJointe.conversation_id == conversation.id).delete()
-
-    # Message n'a pas de cascade ORM déclarée sur Conversation (même
-    # convention que Jeton/Compte, voir comptes.py) : la suppression des
-    # messages associés doit donc être explicite, avant celle de la
-    # conversation elle-même.
-    db.query(Message).filter(Message.conversation_id == conversation.id).delete()
-    db.delete(conversation)
+    fichiers = supprimer_donnees_conversation(db, conversation)
     db.commit()
+    supprimer_fichiers(fichiers, PIECES_JOINTES_DIR)
 
 
 def _creer_piece_jointe(
@@ -1717,6 +1803,7 @@ def _executer_appels_outils(
     for appel in demande.appels:
         contexte_outils.outils_appeles.append(appel.nom)
         resultat = executer_appel(appel, contexte_outils)
+        contexte_outils.resultats_outils.append(f"--- {appel.nom} ---\n{resultat.contenu}")
         enregistrer_echange_local(
             contexte_outils.db,
             identifiant_compte=identifiant_compte,
@@ -2232,6 +2319,8 @@ def _tour_envoyer_message(
         publier,
         contexte_outils.outils_appeles,
         contexte_outils.client_moduleo is not None,
+        client,
+        contexte_outils.resultats_outils,
         contexte_outils.cartes_du_tour,
         contexte_outils.refus_des_droits,
         _ecriture_proposee(tools),

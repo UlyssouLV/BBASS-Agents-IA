@@ -7,6 +7,7 @@ from vm_centrale.autorisation import (
     get_compte_admin,
     get_identifiant_compte_du_jeton,
 )
+from vm_centrale.config import PIECES_JOINTES_DIR
 from vm_centrale.consommation import TYPES_CHAT, accumuler, detail_vide
 from vm_centrale.database import get_db
 from vm_centrale.jetons import JetonStore, get_jeton_store
@@ -23,6 +24,7 @@ from vm_centrale.schemas import (
     StatutAdminRequest,
 )
 from vm_centrale.security import generer_mot_de_passe_aleatoire, hash_password
+from vm_centrale.suppression import IDENTIFIANT_COMPTE_SUPPRIME, supprimer_donnees_compte, supprimer_fichiers
 
 router = APIRouter(prefix="/comptes")
 
@@ -32,6 +34,8 @@ _DERNIER_ADMINISTRATEUR = "Impossible de retirer le dernier compte administrateu
 _DERNIER_ADMINISTRATEUR_SUPPRESSION = (
     "Impossible de supprimer le dernier compte administrateur restant"
 )
+# Prénom et nom affichés pour la consommation des comptes supprimés.
+_COMPTE_SUPPRIME = ("Compte", "supprimé")
 _ACCES_PROFIL_TRAVAIL_REFUSE = "Le profil de travail n'est consultable que par son propre compte"
 
 
@@ -70,41 +74,34 @@ def lister_consommation_comptes(
     # Même régime que GET /comptes ci-dessus (jeton est_admin=true, pas de clé
     # d'administration VM) : lecture seule (spec 1.1.3).
     lignes = db.query(Consommation).all()
+    noms = {
+        identifiant: (prenom, nom)
+        for identifiant, prenom, nom in db.query(Compte.identifiant, Compte.prenom, Compte.nom)
+    }
 
     # Détail agrégé par compte, jamais par conversation (confidentialité des
     # conversations, spec 1.1.3) — accumulé en mémoire, même style que
-    # routers/consommation.py.
+    # routers/consommation.py. Une ligne sans compte est celle d'un compte
+    # supprimé : toutes sous une seule ligne « Compte supprimé » (spec 1.6.3,
+    # #161), y compris celles d'un compte supprimé avant la 1.6.3 que le
+    # nettoyage au démarrage n'a pas encore détachées.
     par_compte: dict[str, dict[str, DetailConsommationCategorie]] = {}
     for ligne in lignes:
+        identifiant = ligne.identifiant_compte if ligne.identifiant_compte in noms else IDENTIFIANT_COMPTE_SUPPRIME
         categorie = "chat" if ligne.type_appel in TYPES_CHAT else "piece_jointe"
-        details = par_compte.setdefault(
-            ligne.identifiant_compte, {"chat": detail_vide(), "piece_jointe": detail_vide()}
-        )
+        details = par_compte.setdefault(identifiant, {"chat": detail_vide(), "piece_jointe": detail_vide()})
         details[categorie] = accumuler(details[categorie], ligne)
-
-    if not par_compte:
-        return []
-
-    # Jointure sur Compte : un compte supprimé n'a plus de ligne à joindre ici
-    # et disparaît donc naturellement de la liste, sans que ses anciennes
-    # lignes Consommation ci-dessus n'aient été touchées (spec 1.1.3).
-    comptes = (
-        db.query(Compte.identifiant, Compte.prenom, Compte.nom)
-        .filter(Compte.identifiant.in_(par_compte.keys()))
-        .all()
-    )
 
     resultats = [
         CompteConsommationResponse(
             identifiant=identifiant,
-            prenom=prenom,
-            nom=nom,
-            cout_usd=par_compte[identifiant]["chat"].cout_usd
-            + par_compte[identifiant]["piece_jointe"].cout_usd,
-            chat=par_compte[identifiant]["chat"],
-            piece_jointe=par_compte[identifiant]["piece_jointe"],
+            prenom=noms.get(identifiant, _COMPTE_SUPPRIME)[0],
+            nom=noms.get(identifiant, _COMPTE_SUPPRIME)[1],
+            cout_usd=details["chat"].cout_usd + details["piece_jointe"].cout_usd,
+            chat=details["chat"],
+            piece_jointe=details["piece_jointe"],
         )
-        for identifiant, prenom, nom in comptes
+        for identifiant, details in par_compte.items()
     ]
     resultats.sort(key=lambda compte: compte.cout_usd, reverse=True)
 
@@ -257,8 +254,12 @@ def supprimer_compte(
     # sur les jetons associés doit donc être explicite, avant la suppression
     # du compte lui-même. Aucune trace ni archive conservée (spec du ticket).
     jetons.revoquer_tous(identifiant)
+    # Ses données partent avec lui, dans la même transaction (spec 1.6.3,
+    # #161) : un compte recréé avec le même identifiant n'en hérite pas.
+    fichiers = supprimer_donnees_compte(db, identifiant)
     db.delete(compte)
     db.commit()
+    supprimer_fichiers(fichiers, PIECES_JOINTES_DIR)
 
 
 @router.patch(

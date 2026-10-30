@@ -1044,7 +1044,7 @@ def test_envoyer_message_echec_mistral_ne_revele_jamais_la_cle_api(
 # Garde-fou URL (spec 1.3.1) : le modèle n'a aucun accès à Internet, toute
 # URL que le compte n'a pas lui-même écrite dans la conversation est
 # inventée.
-def test_premier_message_url_inventee_ni_renvoyee_ni_persistee_texte_du_lien_conserve(
+def test_premier_message_url_inventee_ni_renvoyee_ni_persistee_texte_du_lien_remplace_par_le_marqueur(
     client, mistral_client_factice, jeton_valide
 ):
     mistral_client_factice.repondre(
@@ -1062,13 +1062,17 @@ def test_premier_message_url_inventee_ni_renvoyee_ni_persistee_texte_du_lien_con
     assert reponse.status_code == 200
     corps = fin(reponse)
     assert "http" not in corps["reponse"]
-    assert "rapport OCDE" in corps["reponse"]
+    # Depuis la 1.6.3 (#131), le texte d'un lien inventé ne passe plus pour
+    # une source.
+    assert corps["reponse"] == (
+        "Voir le [non trouvé] et [non trouvé] pour le détail.\n\n"
+        "Certaines informations n'ont pas été trouvées dans les sources consultées."
+    )
     detail = client.get(
         f"/conversations/{corps['conversation']['id']}", headers=_autorisation(jeton_valide)
     )
     contenu_assistant = detail.json()["messages"][-1]["contenu"]
-    assert "http" not in contenu_assistant
-    assert "rapport OCDE" in contenu_assistant
+    assert contenu_assistant == corps["reponse"]
 
 
 def test_premier_message_url_ecrite_par_le_compte_est_conservee(
@@ -1112,7 +1116,7 @@ def test_url_du_compte_sortie_de_la_fenetre_passe_et_url_inventee_est_retiree(
     contenu = fin(reponse)["reponse"]
     assert "https://bbass.fr/dossier/7" in contenu
     assert "invente.example" not in contenu
-    assert "étude" in contenu
+    assert "source : [non trouvé]." in contenu
     detail = client.get(f"/conversations/{conversation_id}", headers=_autorisation(jeton_valide))
     assert detail.json()["messages"][-1]["contenu"] == contenu
 

@@ -59,7 +59,7 @@ export function EcranCompte({ compte, deconnexion }: Readonly<EcranCompteProps>)
   }
 
   return (
-    <div className="flex h-screen">
+    <div className="flex h-full">
       <BarreLaterale
         compte={compte}
         conversationOuverteId={conversationOuverteId}
