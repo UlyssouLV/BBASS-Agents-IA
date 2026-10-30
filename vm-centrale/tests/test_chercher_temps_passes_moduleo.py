@@ -597,9 +597,11 @@ def test_un_total_lu_reste_un_total_absent_est_retire(client, faux_moduleo, mist
     )
 
     assert fin(reponse)["reponse"] == (
-        "7,5 heures ont été passées sur l'affaire 2024-123, dont 6 h par Jean Martin.\n\n"
+        "7,5 heures ont été passées sur l'affaire 2024-123, dont 6 h par Jean Martin.\n"
+        "Soit [non trouvé] heures facturables.\n\n"
         "Sources : Moduléo, temps passés (affaire 2024-123), "
-        "Moduléo, temps passé du 07/10/2026, Jean Martin, affaire 2024-123"
+        "Moduléo, temps passé du 07/10/2026, Jean Martin, affaire 2024-123\n\n"
+        "Certaines informations n'ont pas été trouvées dans les sources consultées."
     )
 
 

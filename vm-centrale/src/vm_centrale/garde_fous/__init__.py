@@ -5,14 +5,18 @@ from vm_centrale.garde_fous.chiffres import retirer_chiffres_hors_source
 from vm_centrale.garde_fous.contact_non_lu import PHRASE_CONTACT_NON_LU, remplacer_contact_non_lu
 from vm_centrale.garde_fous.longueur import plafonner
 from vm_centrale.garde_fous.pages_trop_longues import mentionner_pages_trop_longues
+from vm_centrale.garde_fous.retrait import MARQUEUR_NON_TROUVE, PHRASE_NON_TROUVE, Retrait
 from vm_centrale.garde_fous.sources import LectureSource, PageSource, ajouter_sources
 from vm_centrale.garde_fous.titre import nettoyer_titre
 from vm_centrale.garde_fous.urls import normaliser_url, retirer_urls_inventees, urls_ecrites
 
 __all__ = [
     "LectureSource",
+    "MARQUEUR_NON_TROUVE",
     "PHRASE_CONTACT_NON_LU",
+    "PHRASE_NON_TROUVE",
     "PageSource",
+    "Retrait",
     "ajouter_sources",
     "mentionner_pages_trop_longues",
     "nettoyer_titre",

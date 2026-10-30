@@ -399,8 +399,10 @@ def test_un_montant_et_un_total_lus_restent_un_total_absent_est_retire(
     )
 
     assert fin(reponse)["reponse"] == (
-        "Le devis D-2026-042 vaut 1 200 € HT. Les deux devis totalisent 1 800 € HT.\n\n"
-        "Sources : Moduléo, devis (texte « Bornage »), Moduléo, devis D-2026-042"
+        "Le devis D-2026-042 vaut 1 200 € HT. Les deux devis totalisent 1 800 € HT.\n"
+        "En tout [non trouvé] € TTC.\n\n"
+        "Sources : Moduléo, devis (texte « Bornage »), Moduléo, devis D-2026-042\n\n"
+        "Certaines informations n'ont pas été trouvées dans les sources consultées."
     )
 
 

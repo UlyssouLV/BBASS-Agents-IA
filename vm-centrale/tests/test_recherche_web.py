@@ -762,8 +762,11 @@ def test_un_chiffre_hors_source_dans_le_texte_dun_lien_markdown_est_retire(
         f"Le guide est en ligne. Voir le [Guide 2031]({_URL_DATEE}).",
     )
 
-    # Depuis la 1.4.3 (#160), la phrase du chiffre part entière, lien compris.
-    assert contenu == "Le guide est en ligne."
+    # Depuis la 1.6.3 (#131), seul le chiffre devient le marqueur.
+    assert contenu == (
+        f"Le guide est en ligne. Voir le [Guide [non trouvé]]({_URL_DATEE}).\n\n"
+        "Certaines informations n'ont pas été trouvées dans les sources consultées."
+    )
 
 
 def test_une_url_de_resultat_avec_parentheses_reste_entiere_une_url_inventee_avec_parentheses_part(
@@ -784,7 +787,10 @@ def test_une_url_de_resultat_avec_parentheses_reste_entiere_une_url_inventee_ave
     )
 
     assert reponse.status_code == 200
-    assert fin(reponse)["reponse"] == f"Voir [Loi]({url}) et {url}. (Source : {url}) Faux : fin"
+    assert fin(reponse)["reponse"] == (
+        f"Voir [Loi]({url}) et {url}. (Source : {url}) Faux : [non trouvé] fin\n\n"
+        "Certaines informations n'ont pas été trouvées dans les sources consultées."
+    )
 
 
 # Questions couvertes de l'appel d'extraction (spec 1.4.1, #136) : JSON
@@ -1059,7 +1065,7 @@ def test_la_ligne_sources_est_visible_dans_lechange_garde_fous_de_linspecteur(
     assert "Sources : " in contenu
 
 
-def test_un_chiffre_hors_source_entre_parentheses_emporte_sa_parenthese_pas_la_phrase(
+def test_un_chiffre_hors_source_entre_parentheses_devient_le_marqueur_sans_fragment_trompeur(
     client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide
 ):
     contenu = _reponse_sur_page_de_bornage(
@@ -1067,10 +1073,14 @@ def test_un_chiffre_hors_source_entre_parentheses_emporte_sa_parenthese_pas_la_p
         "Un bornage dure 6 à 12 semaines (soit 1,5 à 3 mois).",
     )
 
-    assert contenu.split("\n\nSources : ")[0] == "Un bornage dure 6 à 12 semaines."
+    # #160 : « (soit à 3 mois) » laissait croire à une durée ; le marqueur
+    # dit ce qui manque. « 3 mois » est contrôlé depuis la 1.6.3.
+    assert contenu.split("\n\nSources : ")[0] == (
+        "Un bornage dure 6 à 12 semaines (soit [non trouvé] à [non trouvé] mois)."
+    )
 
 
-def test_un_chiffre_hors_source_hors_parenthese_emporte_sa_phrase_la_voisine_reste(
+def test_un_chiffre_hors_source_devient_le_marqueur_sa_phrase_reste(
     client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide
 ):
     contenu = _reponse_sur_page_de_bornage(
@@ -1078,10 +1088,12 @@ def test_un_chiffre_hors_source_hors_parenthese_emporte_sa_phrase_la_voisine_res
         "Un bornage dure 6 à 12 semaines. Il coûte environ 1 500 € TTC. Le géomètre fixe les limites.",
     )
 
-    assert contenu.split("\n\nSources : ")[0] == "Un bornage dure 6 à 12 semaines. Le géomètre fixe les limites."
+    assert contenu.split("\n\nSources : ")[0] == (
+        "Un bornage dure 6 à 12 semaines. Il coûte environ [non trouvé] € TTC. Le géomètre fixe les limites."
+    )
 
 
-def test_une_reponse_dont_toutes_les_phrases_sont_retirees_devient_la_phrase_fixe(
+def test_une_reponse_dont_le_seul_chiffre_est_hors_source_garde_sa_phrase_avec_le_marqueur(
     client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide
 ):
     contenu = _reponse_sur_page_de_bornage(
@@ -1089,10 +1101,13 @@ def test_une_reponse_dont_toutes_les_phrases_sont_retirees_devient_la_phrase_fix
         "Un bornage coûte 1 500 €.",
     )
 
-    assert contenu == "Je n'ai trouvé ni page ni document pour appuyer une réponse chiffrée."
+    assert contenu == (
+        "Un bornage coûte [non trouvé] €.\n\n"
+        "Certaines informations n'ont pas été trouvées dans les sources consultées."
+    )
 
 
-def test_une_phrase_retiree_dans_une_puce_ou_un_tableau_ne_casse_pas_la_ligne(
+def test_un_chiffre_retire_dans_une_puce_ou_un_tableau_ne_casse_pas_la_ligne(
     client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide
 ):
     contenu = _reponse_sur_page_de_bornage(
@@ -1104,9 +1119,10 @@ def test_une_phrase_retiree_dans_une_puce_ou_un_tableau_ne_casse_pas_la_ligne(
     )
 
     assert contenu.split("\n\nSources : ")[0] == (
-        "- Délai : 6 à 12 semaines.\n"
+        "- Délai : 6 à 12 semaines. Coût : [non trouvé] €.\n"
+        "- Coût moyen : [non trouvé] €.\n"
         "- Acteur : le géomètre.\n\n"
-        "| Étape | Délai |\n| --- | --- |\n| Bornage | 6 à 12 semaines |\n| Recours | |"
+        "| Étape | Délai |\n| --- | --- |\n| Bornage | 6 à 12 semaines |\n| Recours | [non trouvé] mois |"
     )
 
 

@@ -28,8 +28,10 @@ from vm_centrale.database import FabriqueSession, get_db, get_fabrique_session
 from vm_centrale.dates import date_du_jour
 from vm_centrale.garde_fous import (
     PHRASE_CONTACT_NON_LU,
+    PHRASE_NON_TROUVE,
     LectureSource,
     PageSource,
+    Retrait,
     ajouter_sources,
     mentionner_pages_trop_longues,
     nettoyer_titre,
@@ -653,7 +655,7 @@ def _demande_invention(message: str) -> bool:
 
 def _reponse_sans_url_inventee(
     db: Session, conversation_id: int, nouveau_message: str, reponse: str
-) -> str:
+) -> Retrait:
     # Textes du compte lus en base, pas seulement dans la fenêtre des
     # derniers messages (spec 1.3.1) : une URL que le compte a donnée il y a
     # longtemps reste légitime à redonner. De même pour les URL des résultats
@@ -762,7 +764,7 @@ def _reponse_visible(
     contacts_lus = outil_contacts.OUTIL.nom in outils_appeles or any(
         lecture.citation.startswith(_CITATION_CONTACT) for lecture in lectures
     )
-    visible = _appliquer_garde_fous(
+    visible, retire = _appliquer_garde_fous(
         db,
         conversation_id,
         nouveau_message,
@@ -780,6 +782,10 @@ def _reponse_visible(
         _sources_de_la_conversation(db, conversation_id, lectures),
     )
     visible = mentionner_pages_trop_longues(visible, pages_trop_longues)
+    # Dès qu'un garde-fou a retiré quelque chose, la réponse le dit à la fin
+    # (spec 1.6.3, #131).
+    if retire:
+        visible = f"{visible.rstrip()}\n\n{PHRASE_NON_TROUVE}"
     enregistrer_echange_local(
         db,
         identifiant_compte=identifiant_compte,
@@ -801,17 +807,17 @@ def _appliquer_garde_fous(
     lectures: list[LectureDeLaConversation],
     moduleo_appele: bool = False,
     contacts_lus: bool = False,
-) -> str:
+) -> Retrait:
     # Une absence de coordonnées dans Moduléo sans lecture du contact dans
     # le tour (#183) : toute la réponse devient la phrase fixe, rien d'autre
     # à contrôler.
     if (sans_contact_non_lu := remplacer_contact_non_lu(reponse, contacts_lus)) != reponse:
-        return sans_contact_non_lu
+        return Retrait(sans_contact_non_lu, False)
     # URL d'abord : un chiffre qui ne vivait que dans une URL inventée
     # disparaît avec elle, et n'est pas relu comme une donnée.
-    reponse = _reponse_sans_url_inventee(db, conversation_id, nouveau_message, reponse)
+    reponse, url_retiree = _reponse_sans_url_inventee(db, conversation_id, nouveau_message, reponse)
     if _demande_invention(nouveau_message):
-        return reponse
+        return Retrait(reponse, url_retiree)
     extraits = _extraits_pieces_jointes(db, conversation_id, piece_jointe)
     # Un texte de recherche non vide compte comme un document.
     extraits += _textes_de_recherche(db, conversation_id)
@@ -819,18 +825,16 @@ def _appliquer_garde_fous(
     extraits += [lecture.texte for lecture in lectures]
     textes_source = [*_messages_du_compte(db, conversation_id, nouveau_message), _annee_du_jour_source(), *extraits]
     sans_chiffre_invente = retirer_chiffres_hors_source(reponse, textes_source, _dates_de_la_consigne_ecrites())
-    if sans_chiffre_invente == reponse:
-        return reponse
-    # Un document, ou un chiffre déjà écrit dans le message du tour : on
-    # retire seulement le chiffre absent, avec sa phrase. Sans rien de tout
-    # ça, ou si plus rien ne reste, la réponse entière devient la phrase
-    # fixe — un rapport troué n'est pas une réponse.
-    message_apporte_une_donnee = (
-        retirer_chiffres_hors_source(nouveau_message, []) != nouveau_message
-    )
-    if (extraits or message_apporte_une_donnee) and sans_chiffre_invente:
+    if not sans_chiffre_invente.retire:
+        return Retrait(reponse, url_retiree)
+    # Un document, ou un chiffre déjà écrit dans le message du tour : seul
+    # le chiffre absent devient le marqueur. Sans rien de tout ça, la
+    # réponse entière devient la phrase fixe — un rapport sans aucune
+    # source n'est pas une réponse.
+    message_apporte_une_donnee = retirer_chiffres_hors_source(nouveau_message, []).retire
+    if extraits or message_apporte_une_donnee:
         return sans_chiffre_invente
-    return _REPONSE_SANS_DONNEES_MODULEO if moduleo_appele else _REPONSE_SANS_DONNEES
+    return Retrait(_REPONSE_SANS_DONNEES_MODULEO if moduleo_appele else _REPONSE_SANS_DONNEES, False)
 
 
 def _identite_connue(compte: Compte | None) -> str:
