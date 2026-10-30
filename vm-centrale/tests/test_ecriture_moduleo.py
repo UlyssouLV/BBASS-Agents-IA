@@ -1251,7 +1251,9 @@ _FAUSSE_CARTE = (
     "Voici la carte de confirmation :\n```json\n{\"route\": \"POST moduleo/tacheafaire\", "
     "\"corps\": {\"Libelle\": \"Rappeler\"}}\n```\nValider pour appliquer."
 )
-_ECRIRE_IMPOSE = {"type": "function", "function": {"name": _ECRIRE}}
+# Troisième passage de #206 : la relance impose un outil quelconque, pas
+# ecrire_moduleo, pour que le modèle puisse d'abord lire la fiche visée.
+_ECRIRE_IMPOSE = "any"
 
 
 def _annoncer(client, mistral_client_factice, jeton: str, *reponses: str, force: dict | None = None):
@@ -1265,7 +1267,7 @@ def _annoncer(client, mistral_client_factice, jeton: str, *reponses: str, force:
     )
 
 
-def test_fausse_carte_en_texte_relance_le_tour_en_imposant_ecrire_moduleo(
+def test_fausse_carte_en_texte_relance_le_tour_en_imposant_un_outil(
     client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide
 ):
     _contact_et_affaire(faux_moduleo)
@@ -1279,6 +1281,40 @@ def test_fausse_carte_en_texte_relance_le_tour_en_imposant_ecrire_moduleo(
     assert carte["route"] == "moduleo/telephone"
     assert fin(reponse)["reponse"] == "Voici la carte."
     assert faux_moduleo.ecritures == []
+
+
+def test_la_relance_dit_au_modele_pourquoi_sans_l_enregistrer(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide, db_session
+):
+    # Troisième passage de #206 : relancé avec le même historique, le modèle
+    # ne savait pas que sa réponse avait été écartée.
+    _contact_et_affaire(faux_moduleo)
+
+    _annoncer(client, mistral_client_factice, jeton_valide, _FAUSSE_CARTE, "Voici la carte.", force=_telephone())
+
+    consigne = mistral_client_factice.appels_reponse[1][-1]
+    assert consigne["role"] == "system"
+    assert consigne["content"].startswith("Ta réponse précédente annonçait une carte de confirmation")
+    assert "lis d'abord sa fiche" in consigne["content"]
+    # Hors de l'appel imposé : ni aux tours suivants, ni dans la Conversation.
+    assert all(
+        consigne not in appel for appel in mistral_client_factice.appels_reponse[2:] if isinstance(appel, list)
+    )
+    assert not db_session.query(Message).filter(Message.contenu.startswith("Ta réponse précédente")).count()
+
+
+def test_relance_qui_lit_une_fiche_les_outils_restent_proposes_au_tour_suivant(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide
+):
+    # La relance peut d'abord lire l'élément visé ; l'écriture vient après.
+    _contact_et_affaire(faux_moduleo)
+    mistral_client_factice.repondre_a_l_outil_impose("chercher_contacts_moduleo", {"texte": "Dupont"})
+    mistral_client_factice.repondre(_FAUSSE_CARTE, "Je n'ai pas pu ouvrir la carte.", "Titre")
+
+    client.post("/conversations", json={"message": "Ajoute le téléphone"}, headers=_autorisation(jeton_valide))
+
+    assert mistral_client_factice.tool_choices_appels_reponse[:3] == [None, _ECRIRE_IMPOSE, None]
+    assert mistral_client_factice.tools_appels_reponse[2] is not None
 
 
 def _sans_droit_telephone(db_session) -> None:
@@ -1586,22 +1622,42 @@ def test_element_sans_id_fourni_pas_de_carte_phrase_fixe(
     assert echange.reponse_payload["ids_non_fournis"] == [element]
 
 
-def test_code_activite_d_un_temps_passe_refuse_omis_la_carte_est_proposee(
+# Troisième passage de #206, scénario 10 : depuis #257, aucun temps passé
+# ne pouvait être saisi, faute d'id de code activité. decrire les donne,
+# lus dans Moduléo, avec le collaborateur du compte.
+
+
+def test_decrire_un_temps_passe_donne_les_codes_activite_et_le_collaborateur_du_compte(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide, db_session
+):
+    rattacher(db_session, "j.dupont", GROUPE_DEV, GROUPE_DEV, 7)
+    db_session.commit()
+    faux_moduleo.ajouter_code_activite(3, "Bornage")
+    faux_moduleo.ajouter_code_activite(4, "Congés")
+    mistral_client_factice.repondre_avec_appel_outil(_DECRIRE, {"route": "POST cogeo/tempspasse"})
+    mistral_client_factice.repondre("Voici les champs.", "Titre")
+
+    client.post("/conversations", json={"message": "Quels champs ?"}, headers=_autorisation(jeton_valide))
+
+    resultat = _resultat_outil(mistral_client_factice)
+    assert "Codes activité Moduléo (IdCodeActivite) : Bornage [id Moduléo 3], Congés [id Moduléo 4]." in resultat
+    assert "Collaborateur du compte (IdUtilisateur) : [id Moduléo 7]." in resultat
+    assert "Champs dont aucune fiche" not in resultat
+    assert faux_moduleo.ecritures == []
+
+
+def test_code_activite_d_un_temps_passe_sur_la_carte_en_noms(
     client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide
 ):
-    # Scénario 10 : un code activité deviné. Omis (facultatif), la carte part.
     _contact_et_affaire(faux_moduleo)
     faux_moduleo.ajouter_code_activite(3, "Bornage")
     temps = {"Date": "2026-10-28T00:00:00", "NombreHeure": 3, "IdAffaire": 12, "IdUtilisateur": 7}
     avec_code = {"route": "POST cogeo/tempspasse", "parametres": {}, "corps": {**temps, "IdCodeActivite": 3}}
-    sans_code = {"route": "POST cogeo/tempspasse", "parametres": {}, "corps": {**temps, "IdCodeActivite": None}}
 
-    reponse = _proposer(client, mistral_client_factice, jeton_valide, avec_code, sans_code)
+    reponse = _proposer(client, mistral_client_factice, jeton_valide, avec_code)
 
     (carte,) = _cartes(reponse)
-    assert "CodeActivite" not in {ligne["champ"] for ligne in carte["lignes"]}
-    assert _resultat_outil(mistral_client_factice, rang=-2) == _PAS_ENCORE_POSSIBLE.format(element="le code activité")
-    assert _resultat_outil(mistral_client_factice).startswith(_PROPOSEE)
+    assert {ligne["champ"]: ligne["valeur"] for ligne in carte["lignes"]}["CodeActivite"] == "Bornage"
 
 
 def test_ecrire_consigne_de_ne_jamais_demander_un_id_au_collaborateur(
@@ -1615,12 +1671,27 @@ def test_ecrire_consigne_de_ne_jamais_demander_un_id_au_collaborateur(
     assert "ne devine jamais un id et n'en demande jamais au collaborateur" in ecrire["function"]["description"]
 
 
+def test_ecrire_consigne_de_lire_la_fiche_d_un_element_nomme_avant_d_ecrire(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide
+):
+    # Troisième passage de #206 : sans fiche lue, pas d'id ; le modèle
+    # demandait une confirmation en texte, demandait l'id ou envoyait
+    # IdAffaire null, au lieu de chercher le contact ou l'affaire nommés.
+    _demander(client, mistral_client_factice, jeton_valide)
+
+    (ecrire,) = [
+        outil for outil in mistral_client_factice.tools_appels_reponse[0] if outil["function"]["name"] == _ECRIRE
+    ]
+    description = ecrire["function"]["description"]
+    assert "lis d'abord sa fiche" in description
+    assert "chercher_contacts_moduleo" in description
+
+
 @pytest.mark.parametrize(
     ("route", "champs"),
     [
         (f"PUT {_TELEPHONE_EXISTANT}", "idTelephone, IdTelephone"),
         ("DELETE cogeo/note/{idNote}", "idNote"),
-        ("POST cogeo/tempspasse", "IdCodeActivite"),
     ],
 )
 def test_decrire_signale_les_champs_dont_aucune_fiche_ne_donne_l_id(

@@ -1,10 +1,11 @@
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
 from typing import Any
 
 from vm_centrale.lectures_outils import Fiche
 from vm_centrale.moduleo.client import LecteurModuleo, ModuleoIntrouvable
 from vm_centrale.moduleo.droits import DroitsModuleo
-from vm_centrale.moduleo.enumerations import TYPES_CONTACT, nom_api
+from vm_centrale.moduleo.enumerations import TYPES_CONTACT, Valeur, nom_api
 from vm_centrale.moduleo.fiches import DetailsContact, fiche_contact
 from vm_centrale.moduleo.resolution import NomNonResolu, chercher_qualifications, resoudre_communes
 from vm_centrale.moduleo.routes import ROUTES_GET
@@ -43,6 +44,7 @@ _LECTURES_PARALLELES = 16
 
 _AUCUN_CONTACT = "Aucun contact Moduléo ne correspond à cette recherche."
 _TROUVES = "{n} contacts trouvés, {m} affichés"
+_HORS_TYPE = "Aucun contact de type {type} ne correspond : contacts trouvés par le nom."
 # Ajoutée à toute phrase de l'outil qui n'a rien lu (#182).
 _SANS_LECTURE = (
     "Aucune lecture faite dans Moduléo : n'invente aucun contact, demande au collaborateur "
@@ -72,7 +74,10 @@ _SCHEMA = {
                 "type_contact": {
                     "type": "string",
                     "enum": ["personne", "société", "collectivité", "groupe de contacts"],
-                    "description": "Type du contact.",
+                    "description": (
+                        "Type du contact, seulement si le collaborateur le dit : un nom (« CLIENT … », "
+                        "« Étude … ») ne dit pas le type, et un mauvais type ne trouve rien."
+                    ),
                 },
                 "type_donneur_ordre": {
                     "type": "string",
@@ -99,15 +104,15 @@ def _declarer(contexte: ContexteTour) -> dict | None:
     return _SCHEMA if propose(contexte, _ROUTE_RECHERCHE) else None
 
 
-def _type_contact(valeur: str) -> str:
-    # Type dit par le modèle → nom de l'énumération en filtre
-    # (moduleo/enumerations.py, relevé #180).
+def _type_contact(valeur: str) -> Valeur:
+    # Type dit par le modèle → valeur de l'énumération (moduleo/
+    # enumerations.py, relevé #180).
     if (nom := nom_api(TYPES_CONTACT, valeur)) is None:
         raise NomNonResolu(
             f"Type de contact « {valeur} » inconnu : personne, société, collectivité ou groupe de contacts. "
             "Recherche non lancée."
         )
-    return nom
+    return next(type_contact for type_contact in TYPES_CONTACT if type_contact.api == nom)
 
 
 def _qualifications(arguments: dict) -> list[str]:
@@ -157,8 +162,23 @@ def _lire(lecteur: LecteurModuleo, id_contact: int, genre: str) -> Any:
         return [] if genre in _COORDONNEES else {role: [] for role in _AFFAIRES}
 
 
-def _fiches(lecteur: LecteurModuleo, ids: list[int], droits: DroitsModuleo) -> list[Fiche]:
-    contacts = {contact["IdContact"]: contact for contact in lecteur.lire(_ROUTE_CONTACTS, {"ids": liste_ids(ids)})}
+def _contacts(lecteur: LecteurModuleo, ids: list[int]) -> dict[int, dict]:
+    return {contact["IdContact"]: contact for contact in lecteur.lire(_ROUTE_CONTACTS, {"ids": liste_ids(ids)})}
+
+
+def _du_type(lecteur: LecteurModuleo, ids: list[int], type_contact: Valeur) -> tuple[list[int], dict[int, dict]]:
+    # Avec un nom (troisième passage de #206) : le type que le modèle déduit
+    # du nom (« CLIENT … » en société) ne doit pas perdre le contact. Il
+    # filtre les contacts trouvés par le nom, lus une fois ; aucun du type :
+    # tous restent, ids vides en premier élément.
+    contacts = _contacts(lecteur, ids)
+    return [i for i in ids if contacts.get(i, {}).get("TypeContact") == type_contact.json], contacts
+
+
+def _fiches(
+    lecteur: LecteurModuleo, ids: list[int], droits: DroitsModuleo, contacts: dict[int, dict] | None = None
+) -> list[Fiche]:
+    contacts = _contacts(lecteur, ids) if contacts is None else contacts
     trouves = [id_contact for id_contact in ids if id_contact in contacts]
     taches = [(id_contact, genre) for id_contact in trouves for genre in (*_COORDONNEES, "affaires")]
     # Une panne dans un thread remonte ici, à la lecture de son résultat.
@@ -183,24 +203,39 @@ def _executer(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
     donneur = lire_argument(arguments, "type_donneur_ordre")
     qualifications = _qualifications(arguments)
     try:
-        type_contact = _type_contact(valeur) if (valeur := lire_argument(arguments, "type_contact")) else ""
+        type_contact = _type_contact(valeur) if (valeur := lire_argument(arguments, "type_contact")) else None
     except NomNonResolu as erreur:
         return ResultatOutil(f"{erreur} {_SANS_LECTURE}", trace={"routes": [], "non_resolu": str(erreur)})
     if contexte.client_moduleo is None or not (texte or type_contact or donneur or qualifications):
         return ResultatOutil(_RIEN_A_CHERCHER)
+    # Le type part en filtre Moduléo seulement sans nom ; avec un nom, il
+    # filtre les contacts trouvés (`_du_type`).
+    filtre_type = type_contact.api if type_contact and not texte else ""
     parametres = {
         nom: valeur
-        for nom, valeur in (("texte", texte), ("typeContact", type_contact), ("typeDonneurOrdreGE", donneur))
+        for nom, valeur in (("texte", texte), ("typeContact", filtre_type), ("typeDonneurOrdreGE", donneur))
         if valeur
     }
+    hors_type: list[str] = []
 
     def lire(lecteur: LecteurModuleo) -> tuple[list[int], list[Fiche]]:
         ids = _chercher(lecteur, parametres, qualifications)
-        return ids, _fiches(lecteur, ids[: nb_max(arguments.get("nb_max"))], contexte.droits_moduleo) if ids else []
+        contacts = None
+        if ids and texte and type_contact:
+            du_type, contacts = _du_type(lecteur, ids, type_contact)
+            if du_type:
+                ids = du_type
+            else:
+                hors_type.append(_HORS_TYPE.format(type=type_contact.affiche))
+        nb = nb_max(arguments.get("nb_max"))
+        return ids, _fiches(lecteur, ids[:nb], contexte.droits_moduleo, contacts) if ids else []
 
-    return lire_fiches(
+    resultat = lire_fiches(
         contexte, contexte.client_moduleo, "contacts", lire, _AUCUN_CONTACT, _TROUVES, _SANS_LECTURE
     )
+    if hors_type and resultat.trace.get("fiches"):
+        return replace(resultat, contenu=f"{hors_type[0]}\n\n{resultat.contenu}")
+    return resultat
 
 
 OUTIL = Outil(nom=_NOM, declarer=_declarer, executer=_executer)

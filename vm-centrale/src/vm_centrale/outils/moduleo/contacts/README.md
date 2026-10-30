@@ -5,7 +5,7 @@ Retrouve des contacts Moduléo et leurs coordonnées quand le modèle le décide
 **Paramètres**, combinés en « et » :
 
 - `texte` : le nom du contact, ou un mot de son nom.
-- `type_contact` : personne, société, collectivité ou groupe de contacts (sans casse ni accent), transmis en `typeContact` par le nom de l'énumération Moduléo (`Personne`, `Societe`, `Collectivite`, `GroupeContacts`, `moduleo/enumerations.py`, relevé #180). Un autre type : une phrase au modèle, aucune lecture.
+- `type_contact` : personne, société, collectivité ou groupe de contacts (sans casse ni accent). Sans `texte`, transmis en `typeContact` par le nom de l'énumération Moduléo (`Personne`, `Societe`, `Collectivite`, `GroupeContacts`, `moduleo/enumerations.py`, relevé #180). Avec un `texte` (troisième passage de #206 : « CLIENT EXEMPLE 11 », une personne, cherché en société par le modèle, était dit introuvable) : la recherche se fait par le nom seul, puis le type filtre les contacts trouvés sur leur `TypeContact`, lus en une lecture `cogeo/contact/multi` réutilisée pour les fiches. Aucun du type : tous les contacts trouvés restent, sous « Aucun contact de type <Type> ne correspond : contacts trouvés par le nom. ». Un autre type : une phrase au modèle, aucune lecture.
 - `type_donneur_ordre` : transmis tel quel en `typeDonneurOrdreGE`.
 - `qualifications` : des noms (« Notaire »), résolus en ids par `chercher_qualifications` (`moduleo/resolution.py`, `cogeo/qualification/all`) : le libellé exact l'emporte, sinon le seul libellé qui contient le nom. Aucun libellé, ou plusieurs : une phrase au modèle (« Plusieurs qualifications Moduléo correspondent à « Expert » : Expert foncier, Géomètre-expert. Demande lequel… »), **aucune recherche**, trace `non_resolu`.
 
@@ -15,7 +15,7 @@ Retrouve des contacts Moduléo et leurs coordonnées quand le modèle le décide
 
 1. Qualifications → ids, s'il y en a.
 2. Recherche : `cogeo/contact?texte=…&nbMaxResultat=200` (les ids, pour compter les contacts trouvés au-delà de `nb_max`).
-3. Les `nb_max` premiers : `cogeo/contact/multi?ids=`.
+3. Les `nb_max` premiers : `cogeo/contact/multi?ids=` (avec un nom et un type, la lecture du filtre par type, sur tous les ids trouvés).
 4. Par contact, **en parallèle** (au plus 16 lectures à la fois) : téléphones (`cogeo/contact/{id}/telephones` puis `moduleo/telephone/{id}`), emails (`…/emails` puis `cogeo/email/{id}`), adresses (`…/adresses` puis `moduleo/adresse/{id}`), affaires (`…/affaires` pour client, `…/affaireintervenant` pour intervenant, puis une lecture `cogeo/affaire/multi?ids=` pour les numéros). Une coordonnée en 404 est sautée ; toute autre panne, dans n'importe quel thread, donne la phrase de panne.
 5. Communes des adresses, dédoublonnées sur l'appel (`moduleo/commune/multi`).
 6. Une Fiche Moduléo par contact (`fiche_contact`, `moduleo/fiches.py`) : type, nom, code de comptabilité (avec le sous-droit, sinon « Codes de comptabilité : non autorisés pour votre compte », #188), téléphones, emails et adresses avec leur lieu (« Bureau », « Siège »), numéros des affaires dont il est client puis intervenant (20 au plus par rôle, « et N autres »). Enregistrée dans `lectures_outils`, référence « contact <nom> » : un téléphone de la fiche reste dans la réponse et la ligne « Sources : » cite « Moduléo, contact <nom> ».

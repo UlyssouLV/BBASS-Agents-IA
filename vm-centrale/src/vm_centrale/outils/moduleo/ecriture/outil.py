@@ -15,7 +15,7 @@ from vm_centrale.moduleo.client import ErreurModuleo, LecteurModuleo, RequeteInt
 from vm_centrale.moduleo.droits import DroitManquant, DroitsModuleo, ecriture_possible, refus_d_ecriture
 from vm_centrale.moduleo.ecritures import REFUSEE, carte_de, ids_renvoyes, proposer
 from vm_centrale.moduleo.relecture import RELECTURES, ElementIntrouvable, relire
-from vm_centrale.moduleo.resolution import IDS_SANS_RECHERCHE_PAR_NOM
+from vm_centrale.moduleo.resolution import IDS_SANS_RECHERCHE_PAR_NOM, resoudre_codes_activite
 from vm_centrale.moduleo.routes import ROUTES_ECRITURE, RouteEcriture
 from vm_centrale.outils.base import ContexteTour, Outil, ResultatOutil
 from vm_centrale.outils.moduleo.commun import INDISPONIBLE, LecteurTrace
@@ -65,6 +65,10 @@ _NON_FOURNIS = (
     "([id Moduléo <n>]) est utilisable. Sinon, omets le champ s'il est facultatif ; s'il est requis, dis au "
     "collaborateur que cette écriture n'est pas encore possible depuis le chat."
 )
+# Troisième passage de #206, scénario 10 : aucune fiche ne donne l'id d'un
+# code activité ni celui du collaborateur ; decrire les lit dans Moduléo.
+_CODES_ACTIVITE = "Codes activité Moduléo (IdCodeActivite) : {codes}."
+_COLLABORATEUR = "Collaborateur du compte (IdUtilisateur) : [id Moduléo {id}]."
 _PAS_ENCORE_POSSIBLE = (
     "Cette écriture n'est pas encore possible depuis le chat : BBASS ne peut pas retrouver {elements} dans "
     "Moduléo. Rien n'a été écrit."
@@ -84,7 +88,6 @@ IDS_NON_FOURNIS: dict[str, tuple[str, tuple[str, ...]]] = {
     "idadresse": ("l'adresse", ("moduleo/adresse",)),
     "idnote": ("la note", ("cogeo/note",)),
     "idtacheafaire": ("la tâche à faire", ("moduleo/tacheafaire",)),
-    "idcodeactivite": ("le code activité", ()),
     "iddocument": ("le document", ("cogeo/elementged/document",)),
     "idplan": ("le plan", ("cogeo/elementged/plan",)),
     "idfrais": ("le frais", ("cogeo/frais",)),
@@ -96,6 +99,7 @@ IDS_NON_FOURNIS: dict[str, tuple[str, tuple[str, ...]]] = {
 }
 # Clé d'un objet de l'exemple de corps JSON.
 _CLE_JSON = re.compile(r'"(\w+)"\s*:')
+_ROUTE_CODES_ACTIVITE = "cogeo/codeactivite"
 _PROPRIETES_MODIFIEES = "ProprietesModifiees"
 _SANS_MOT = "Ne dis jamais que l'écriture est faite : seul le collaborateur la confirme, sur la carte."
 
@@ -178,7 +182,7 @@ def _declarer_decrire(contexte: ContexteTour) -> dict | None:
             "name": _DECRIRE,
             "description": (
                 "Donne les champs attendus par une route d'écriture Moduléo : paramètres de la route, "
-                "exemple de corps JSON et description. N'appelle pas Moduléo. À appeler avant "
+                "exemple de corps JSON et description. N'écrit rien dans Moduléo. À appeler avant "
                 "ecrire_moduleo pour connaître le corps à envoyer."
             ),
             "parameters": {
@@ -217,9 +221,22 @@ def _executer_decrire(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
         texte += "\n" + _SANS_RECHERCHE.format(champs=", ".join(sans_recherche))
     # Champs dont aucune fiche ne donne l'id (#257).
     non_fournis = [c for c in dict.fromkeys(champs) if _non_fourni(decrite, c)]
+    lecteur = LecteurTrace(contexte.client_moduleo, contexte.droits_moduleo)
+    if "IdCodeActivite" in champs:
+        try:
+            codes = resoudre_codes_activite(lecteur, lecteur.lire(_ROUTE_CODES_ACTIVITE))
+            texte += "\n" + _CODES_ACTIVITE.format(
+                codes=", ".join(f"{nom} [id Moduléo {id_code}]" for id_code, nom in codes.items())
+            )
+        except (DroitManquant, ErreurModuleo, RequeteInterdite, TypeError, ValueError) as erreur:
+            # Sans la liste, l'id reste un id qu'aucune fiche ne donne.
+            logger.warning("Codes activité Moduléo non lus : %s", erreur)
+            non_fournis.append("IdCodeActivite")
+    if "IdUtilisateur" in champs and contexte.droits_moduleo.id_utilisateur_moduleo is not None:
+        texte += "\n" + _COLLABORATEUR.format(id=contexte.droits_moduleo.id_utilisateur_moduleo)
     if non_fournis:
         texte += "\n" + _NON_FOURNIS.format(champs=", ".join(non_fournis))
-    return ResultatOutil(texte)
+    return ResultatOutil(texte, trace={"routes": lecteur.routes} if lecteur.routes else {})
 
 
 def _non_fourni(decrite: RouteEcriture, champ: str) -> bool:
@@ -268,6 +285,11 @@ def _declarer_ecrire(contexte: ContexteTour) -> dict | None:
                 "de confirmation en texte : la carte est la confirmation. "
                 "Désigne chaque élément par son id lu dans une fiche ([id Moduléo <n>]) ou renvoyé par "
                 "une écriture confirmée ; ne devine jamais un id et n'en demande jamais au collaborateur. "
+                # Troisième passage de #206 : sans fiche, le modèle doutait et
+                # posait une question au lieu de chercher l'élément nommé.
+                "Un élément nommé par le collaborateur (contact, affaire, devis, facture, temps passé, "
+                "tâche du planning) dont tu n'as pas l'id : lis d'abord sa fiche avec l'outil de lecture "
+                "(chercher_contacts_moduleo, chercher_affaires_moduleo…), sans rien demander, puis écris. "
                 "Demande d'abord les champs avec decrire_ecriture_moduleo. Une écriture par appel. "
                 f"Routes ouvertes :\n{liste}"
             ),

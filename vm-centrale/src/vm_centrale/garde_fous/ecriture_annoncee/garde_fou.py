@@ -87,6 +87,9 @@ _ELEMENTS = tuple(
 _PROPOSITION = re.compile(r"[^,;:]*$")
 _NEGATION = re.compile(r"\b(?:n['’]|ne\b|aucun|aucune|ni\b)", re.IGNORECASE)
 _CONSTAT = re.compile(r"\b(?:est|sont)\s+(?:bien\s+|déjà\s+|deja\s+)?$", re.IGNORECASE)
+# Sans Moduléo non plus (troisième passage de #206) : « L'affaire SCPT-0010
+# est enregistrée. » décrit la fiche lue ; « est supprimée. » reste affirmé.
+_ETAT_LU = re.compile(r"(?:est|sont)\s+enregistr", re.IGNORECASE)
 
 
 def annonce_une_carte(reponse: str) -> bool:
@@ -113,6 +116,8 @@ def _affirme(phrase: str) -> bool:
         if not _NEGATION.search(avant) and not _CONSTAT.search(avant):
             return True
     for faite in _FAITE_SANS_MODULEO.finditer(phrase):
+        if _ETAT_LU.match(faite.group()):
+            continue
         if not _NEGATION.search(_PROPOSITION.search(phrase[: faite.start()]).group()):
             return True
     return False

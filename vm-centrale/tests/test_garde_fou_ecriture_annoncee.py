@@ -98,6 +98,20 @@ def test_une_fiche_lue_avec_sa_date_de_creation_n_affirme_pas_d_ecriture():
     assert not affirme_une_ecriture("La tâche a été créée le 3 mars par Jean Martin.")
 
 
+# Troisième passage de #206 : « Cherche l'affaire SCPT-0010 » répondu
+# « L'affaire **SCPT-0010** est enregistrée. » finissait en phrase fixe.
+@pytest.mark.parametrize(
+    "reponse",
+    [
+        "L'affaire **SCPT-0010** est enregistrée.",
+        "Ses deux contacts sont enregistrés.",
+        "Le numéro est déjà enregistré.",
+    ],
+)
+def test_un_etat_lu_sans_nommer_moduleo_n_affirme_pas_d_ecriture(reponse):
+    assert not affirme_une_ecriture(reponse)
+
+
 def test_apres_une_confirmation_seul_le_resultat_de_son_element_peut_etre_redit():
     confirmees = ["moduleo/telephone"]
 

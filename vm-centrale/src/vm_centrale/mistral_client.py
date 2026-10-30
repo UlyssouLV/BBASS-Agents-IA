@@ -119,8 +119,9 @@ class MistralClient:
         messages: str | Sequence[Mapping[str, object]],
         response_format: dict | None = None,
         tools: Sequence[Mapping[str, object]] | None = None,
-        # Outil imposé (#252) : {"type": "function", "function": {"name": …}}.
-        tool_choice: Mapping[str, object] | None = None,
+        # Outil imposé (#252) : {"type": "function", "function": {"name": …}},
+        # ou "any" pour un outil quelconque (troisième passage de #206).
+        tool_choice: Mapping[str, object] | str | None = None,
         # Bornes d'un appel (#258) : tokens générés, et délai en secondes à
         # la place de MISTRAL_HTTP_TIMEOUT.
         max_tokens: int | None = None,

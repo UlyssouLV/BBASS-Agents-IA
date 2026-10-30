@@ -1788,8 +1788,22 @@ def _enregistrer_appel_principal(
     )
 
 
-# Choix d'outil imposé chez Mistral (#252).
-_ECRIRE_IMPOSE = {"type": "function", "function": {"name": OUTIL_ECRIRE.nom}}
+# Choix d'outil imposé chez Mistral (#252). Un outil quelconque, pas
+# ecrire_moduleo (troisième passage de #206) : forcé d'écrire sans l'id de
+# l'élément visé, le modèle fabriquait la requête ; libre, il lit d'abord sa
+# fiche. Les tours ordinaires qui suivent peuvent alors écrire.
+_OUTIL_IMPOSE = "any"
+_TOURS_APRES_RELANCE = 4
+# Ajoutée au seul appel de relance, jamais enregistrée : sans elle, le
+# modèle relancé ne savait pas que sa réponse avait été écartée.
+_CONSIGNE_RELANCE = (
+    "Ta réponse précédente annonçait une carte de confirmation ou une écriture Moduléo, mais aucune carte "
+    "n'a été ouverte : elle n'a pas été montrée au collaborateur. Seul l'outil ecrire_moduleo ouvre une "
+    "carte. Pour proposer l'écriture demandée : s'il te manque l'id d'un élément nommé (contact, "
+    "affaire…), lis d'abord sa fiche avec l'outil de lecture ; prends les champs avec "
+    "decrire_ecriture_moduleo ; puis appelle ecrire_moduleo. Ne devine jamais un id. Si l'écriture n'est "
+    "pas possible, dis-le sans annoncer de carte."
+)
 
 
 def _a_relancer(reponse: str, tools: list[dict] | None, contexte_outils: ContexteTour) -> bool:
@@ -1816,9 +1830,9 @@ def _relancer_en_imposant(
     # AppelOutilDemande, la carte attendue, remonte à la boucle.
     try:
         return client.chat(
-            messages,
+            [*messages, {"role": "system", "content": _CONSIGNE_RELANCE}],
             tools=tools,
-            tool_choice=_ECRIRE_IMPOSE,
+            tool_choice=_OUTIL_IMPOSE,
             max_tokens=MISTRAL_RELANCE_MAX_TOKENS,
             timeout=MISTRAL_RELANCE_TIMEOUT,
         )
@@ -1838,7 +1852,7 @@ def _relancer_en_imposant(
             reponse_payload=reponse_depuis_erreur(erreur),
             commit=False,
         )
-        logger.warning("Relance imposant ecrire_moduleo en échec : phrase fixe", exc_info=True)
+        logger.warning("Relance imposant un outil en échec : phrase fixe", exc_info=True)
         return None
 
 
@@ -1863,7 +1877,7 @@ def _resoudre_reponse_chat(
     # conversation flushée, l'échange d'échec ne peut ni la référencer ni
     # référencer la pièce jointe (voir creer_conversation).
     # Écriture annoncée sans carte (#252) : une seule relance par message,
-    # qui impose ecrire_moduleo, puis la réponse qui suit, en plus des tours
+    # qui impose un outil (_CONSIGNE_RELANCE), puis la réponse qui suit, en plus des tours
     # ordinaires si besoin.
     db = contexte_outils.db
     messages = list(messages_pour_mistral)
@@ -1906,7 +1920,9 @@ def _resoudre_reponse_chat(
                 # La réponse annoncée n'est jamais montrée : le même
                 # historique, avec l'outil imposé.
                 relance_faite = imposer = True
-                tours_max = max(tours_max, tour + 2)
+                # Relance, lecture, champs, écriture, puis la réponse sans
+                # outils.
+                tours_max = max(tours_max, tour + _TOURS_APRES_RELANCE)
                 continue
             return reponse
         # Ne devrait pas arriver : le dernier tour part sans `tools`.
