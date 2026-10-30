@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -601,7 +602,7 @@ def test_un_garde_fou_qui_retire_une_url_produit_une_ligne_garde_fous_brute_et_v
     echanges = client.get(
         f"/inspecteur/conversations/{conversation_id}/echanges", headers=entetes
     ).json()
-    # Pas de relecture isolée : ce tour n'a rien ramené à relire (ADR-0023).
+    # Pas de relecture isolée : ce tour n'a rien ramené à relire (ADR-0024).
     assert [(e["origine"], e["type_appel"]) for e in echanges] == [
         ("mistral", "chat"),
         ("local", "garde_fous"),
@@ -643,3 +644,34 @@ def test_message_suivant_place_la_ligne_garde_fous_apres_les_appels_mistral_du_t
     detail = client.get(f"/inspecteur/echanges/{echanges[-1]['id']}", headers=entetes).json()
     assert detail["requete_payload"] == {"reponse_brute": "Réponse sans rien à retirer"}
     assert detail["reponse_payload"] == {"reponse_visible": "Réponse sans rien à retirer"}
+
+
+def _en_utc(valeur: str):
+    moment = datetime.fromisoformat(valeur.replace("Z", "+00:00"))
+    assert moment.utcoffset() == timedelta(0), valeur
+    return moment
+
+
+def test_dates_servies_avec_leur_fuseau_utc(client, mistral_client_factice, jeton_valide, monkeypatch):
+    # Tests humains #206 (#256) : servies sans fuseau, les heures UTC étaient
+    # lues comme heures locales par le poste, une heure de moins à Paris.
+    monkeypatch.setenv("VM_ADMIN_KEY", "cle-admin-de-test")
+    avant = datetime.now(timezone.utc) - timedelta(minutes=1)
+    conversation_id = _creer_conversation(client, mistral_client_factice, jeton_valide)
+    entetes = _autorisation_admin(jeton_valide)
+
+    (conversation,) = client.get("/inspecteur/comptes/j.dupont/conversations", headers=entetes).json()
+    echanges = client.get(f"/inspecteur/conversations/{conversation_id}/echanges", headers=entetes).json()
+    detail = client.get(f"/inspecteur/echanges/{echanges[0]['id']}", headers=entetes).json()
+    chat = client.get(f"/conversations/{conversation_id}", headers=_autorisation(jeton_valide)).json()
+
+    dates = [
+        conversation["date_creation"],
+        conversation["date_derniere_activite"],
+        echanges[0]["date_creation"],
+        detail["date_creation"],
+        chat["date_creation"],
+        chat["date_derniere_activite"],
+        *(message["date_creation"] for message in chat["messages"]),
+    ]
+    assert all(_en_utc(date) >= avant for date in dates)

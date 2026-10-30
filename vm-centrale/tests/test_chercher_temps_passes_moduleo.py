@@ -340,7 +340,7 @@ def test_fiche_dun_temps_passe_et_synthese(client, faux_moduleo, mistral_client_
         "Le plus récent affiché, précise la recherche."
     )
     assert fiche == (
-        "Temps passé du 07/10/2026\n"
+        "Temps passé du 07/10/2026 [id Moduléo 901]\n"
         "Collaborateur : Jean Martin\n"
         "Affaire : 2024-123\n"
         "Code activité : Relevé terrain\n"

@@ -19,6 +19,8 @@ from vm_centrale.concurrence import cache_idempotence, verrous_comptes
 from vm_centrale.config import (
     FICHES_MODELES,
     INTERVALLE_STATUT_ATTENTE_SECONDES,
+    MISTRAL_RELANCE_MAX_TOKENS,
+    MISTRAL_RELANCE_TIMEOUT,
     MODELE_CHAT,
     MODELE_OCR,
     PIECES_JOINTES_DIR,
@@ -28,18 +30,24 @@ from vm_centrale.database import FabriqueSession, get_db, get_fabrique_session
 from vm_centrale.dates import date_du_jour
 from vm_centrale.garde_fous import (
     MARQUEUR_NON_TROUVE,
+    PHRASE_CARTE_OUVERTE,
     PHRASE_CONTACT_NON_LU,
+    PHRASE_ECRITURE_NON_PROPOSEE,
     PHRASE_NON_TROUVE,
     LectureSource,
     PageSource,
     Retrait,
+    affirme_une_ecriture,
     ajouter_sources,
+    annonce_une_carte,
     mentionner_pages_trop_longues,
+    montrer_refus_des_droits,
     nettoyer_titre,
     normaliser_url,
     plafonner,
     remplacer_contact_non_lu,
     retirer_chiffres_hors_source,
+    retirer_ecriture_affirmee,
     retirer_urls_inventees,
     urls_ecrites,
 )
@@ -70,7 +78,15 @@ from vm_centrale.lectures_outils import (
     lectures_de_la_conversation,
     rattacher_lectures_au_message,
 )
+from vm_centrale.moduleo.ids import retirer_ids_moduleo
 from vm_centrale.moduleo.client import ClientModuleo, get_client_moduleo
+from vm_centrale.moduleo.ecritures import (
+    cartes_par_message,
+    expirer,
+    rattacher_ecritures_au_message,
+    resultats_par_message,
+    routes_confirmees,
+)
 from vm_centrale.moduleo.droits import SANS_AUCUN_GROUPE, droits_du_compte
 from vm_centrale.moteur_recherche import MoteurRecherche, get_moteur_recherche
 from vm_centrale.questions_couvertes import (
@@ -81,16 +97,19 @@ from vm_centrale.questions_couvertes import (
 from vm_centrale.outils import AppelMistralOutil, ContexteTour, executer_appel, outils_du_tour
 from vm_centrale.relecture import TYPE_APPEL as TYPE_APPEL_RELECTURE, relire
 from vm_centrale.outils.moduleo import affaires as outil_affaires, contacts as outil_contacts
+from vm_centrale.outils.moduleo.ecriture import OUTIL_ECRIRE
 from vm_centrale.statut_tour import (
     ATTENTE,
     REFLEXION,
     TITRAGE,
     VERIFICATION,
     Publier,
+    PublierCarte,
     flux_de_la_fin,
     lancer_tour,
 )
 from vm_centrale.schemas import (
+    CarteEcriture,
     ConversationCreeRequest,
     ConversationCreeResponse,
     ConversationDetailResponse,
@@ -362,6 +381,30 @@ _MESSAGE_MODULEO_FERME = {
 }
 
 
+# Ids des fiches Moduléo (spec 1.5.2, #203) : lus par le modèle pour
+# désigner un élément, jamais cités. Garanti en plus dans le code par
+# moduleo.ids.retirer_ids_moduleo dans _reponse_visible.
+_MESSAGE_IDS_MODULEO = {
+    "role": "system",
+    "content": (
+        "Les fiches Moduléo portent l'id de chaque élément au format [id Moduléo <n>], "
+        "réservé à tes outils. Ne cite jamais un id Moduléo dans ta réponse, sous aucune "
+        "forme : nomme chaque élément par sa référence (numéro d'affaire, de devis ou de "
+        "facture, nom du contact, date du temps passé, libellé et date de la tâche). "
+        "N'annonce pas non plus l'id, ni « sous l'id … » ni « numéro … » : dis seulement "
+        "que l'élément est enregistré, sans tournure qui introduirait un id."
+    ),
+}
+
+
+def _avec_consigne_ids_moduleo(messages: list[dict[str, str]], tools: list[dict] | None) -> list[dict[str, str]]:
+    # Seulement quand un outil Moduléo est proposé au tour, juste après le
+    # style.
+    if any(outil["function"]["name"].endswith("_moduleo") for outil in tools or []):
+        return [messages[0], _MESSAGE_IDS_MODULEO, *messages[1:]]
+    return messages
+
+
 def _prompt_titrage(message_utilisateur: str, reponse_assistant: str) -> str:
     # Une phrase fixe n'est pas un échange à résumer (#182, conversation
     # 115 : titre construit sur la phrase fixe) : seul le message compte.
@@ -578,6 +621,7 @@ def _construire_messages_pour_mistral(
     piece_jointe: PieceJointe | None = None,
     memoire: str | None = None,
     moduleo_ferme: bool = False,
+    resultats_ecritures: dict[int, list[str]] | None = None,
 ) -> list[dict[str, str]]:
     # Historique borné (résumé glissant + fenêtre courte) plutôt que
     # l'intégralité de la conversation, pour maîtriser le coût en tokens
@@ -604,7 +648,13 @@ def _construire_messages_pour_mistral(
         messages.append({"role": "system", "content": memoire})
     if piece_jointe is not None:
         messages.append(_message_systeme_piece_jointe(piece_jointe))
-    messages.extend({"role": m.role, "content": m.contenu} for m in derniers_messages)
+    for m in derniers_messages:
+        messages.append({"role": m.role, "content": m.contenu})
+        # Cartes de confirmation décidées depuis ce tour (spec 1.5.2, #204) :
+        # le résultat de l'appel à ecrire_moduleo, juste après la réponse.
+        messages.extend(
+            {"role": "system", "content": resultat} for resultat in (resultats_ecritures or {}).get(m.id, [])
+        )
     if (
         derniers_messages
         and derniers_messages[-1].role == "assistant"
@@ -629,7 +679,7 @@ _REPONSE_SANS_DONNEES_MODULEO = (
 _PHRASES_CHIFFRES = (_REPONSE_SANS_DONNEES, _REPONSE_SANS_DONNEES_MODULEO)
 # Le contact non lu (#183) n'est pas un échange à titrer, mais sa phrase dit
 # déjà au modèle quoi faire : pas de note au tour suivant.
-_PHRASES_FIXES = (*_PHRASES_CHIFFRES, PHRASE_CONTACT_NON_LU)
+_PHRASES_FIXES = (*_PHRASES_CHIFFRES, PHRASE_CONTACT_NON_LU, PHRASE_ECRITURE_NON_PROPOSEE)
 _OUTILS_MODULEO = {outil_affaires.OUTIL.nom, outil_contacts.OUTIL.nom}
 # Citation d'une fiche de contact lue (moduleo/fiches.py).
 _CITATION_CONTACT = "Moduléo, contact "
@@ -762,6 +812,9 @@ def _reponse_visible(
     moduleo_configure: bool,
     client: MistralClient,
     resultats_outils: list[str],
+    cartes_du_tour: list[int],
+    refus_des_droits: list[str],
+    ecriture_proposee: bool,
 ) -> str:
     # Ligne garde_fous de l'inspecteur à chaque réponse de chat (spec 1.4.0,
     # décision 15), même sans retrait : sans elle, on ne voit pas pourquoi la
@@ -784,12 +837,15 @@ def _reponse_visible(
             db,
             conversation_id,
             nouveau_message,
-            texte,
+            # Avant les garde-fous, qui ne changent pas (#203).
+            retirer_ids_moduleo(texte),
             piece_jointe,
             lectures,
             moduleo_appele,
             # Sans Moduléo, la phrase fixe promettrait une recherche impossible.
             contacts_lus or not moduleo_configure,
+            cartes_du_tour,
+            ecriture_proposee,
         )
 
     visible, retire = garde_fous(reponse)
@@ -805,6 +861,11 @@ def _reponse_visible(
             piece_jointe,
             garde_fous,
         )
+    # Refus du garde des droits (#262) : sa phrase, telle quelle, nomme le
+    # droit manquant ; elle remplace une phrase fixe de la VM, plus vague.
+    if refus_des_droits and visible.startswith(_PHRASES_FIXES):
+        visible = ""
+    visible = montrer_refus_des_droits(visible, refus_des_droits)
     visible = ajouter_sources(
         visible,
         _messages_du_compte(db, conversation_id, nouveau_message)
@@ -831,7 +892,7 @@ def _reponse_visible(
 def _relecture_possible(
     nouveau_message: str, reponse_marquee: str, resultats_outils: list[str], piece_jointe: PieceJointe | None
 ) -> bool:
-    # La relecture ne voit que le tour (ADR-0023), alors que les garde-fous
+    # La relecture ne voit que le tour (ADR-0024), alors que les garde-fous
     # acceptent toute la conversation. Sa consigne lui fait retirer ce qu'elle
     # ne voit pas : sans rien de ce tour, ou avec un chiffre gardé qui vient
     # d'un tour précédent, elle effacerait du vrai. Une invention demandée
@@ -861,7 +922,7 @@ def _relecture_apres_retrait(
     garde_fous: Callable[[str], Retrait],
 ) -> Retrait:
     # Une seule relecture isolée par réponse, seulement après un retrait
-    # (spec 1.6.3, point 9, ADR-0023). Les garde-fous ont le dernier mot :
+    # (spec 1.6.3, point 9, ADR-0024). Les garde-fous ont le dernier mot :
     # elle n'est retenue que s'ils la rendent telle quelle. Sinon, ou si
     # l'appel échoue, la réponse marquée reste, avec la phrase fixe.
     relecture = relire(
@@ -917,7 +978,16 @@ def _appliquer_garde_fous(
     lectures: list[LectureDeLaConversation],
     moduleo_appele: bool = False,
     contacts_lus: bool = False,
+    cartes_du_tour: list[int] | None = None,
+    ecriture_proposee: bool = False,
 ) -> Retrait:
+    # Écriture Moduléo annoncée sans carte, même après la relance (#252) :
+    # toute la réponse devient la phrase fixe. Avec une carte, rien n'est
+    # encore écrit : les phrases qui le disent partent.
+    if cartes_du_tour:
+        reponse = retirer_ecriture_affirmee(reponse)
+    elif _annonce_une_ecriture(db, conversation_id, reponse, ecriture_proposee):
+        return Retrait(PHRASE_ECRITURE_NON_PROPOSEE, False)
     # Une absence de coordonnées dans Moduléo sans lecture du contact dans
     # le tour (#183) : toute la réponse devient la phrase fixe, rien d'autre
     # à contrôler.
@@ -945,6 +1015,21 @@ def _appliquer_garde_fous(
     if extraits or message_apporte_une_donnee:
         return sans_chiffre_invente
     return Retrait(_REPONSE_SANS_DONNEES_MODULEO if moduleo_appele else _REPONSE_SANS_DONNEES, False)
+
+
+def _annonce_une_ecriture(db: Session, conversation_id: int, reponse: str, ecriture_proposee: bool) -> bool:
+    # Une carte ou une confirmation écrite en texte, ou une écriture dite
+    # faite (#252). Après une confirmation, le modèle peut redire son
+    # résultat (« Écrit dans Moduléo »), pas en annoncer une autre (#259).
+    # Sans ecrire_moduleo au tour (prod, compte sans route ouverte), seule
+    # une écriture qui nomme Moduléo compte.
+    return annonce_une_carte(reponse) or affirme_une_ecriture(
+        reponse, routes_confirmees(db, conversation_id), sans_nommer_moduleo=ecriture_proposee
+    )
+
+
+def _ecriture_proposee(tools: list[dict] | None) -> bool:
+    return any(outil["function"]["name"] == OUTIL_ECRIRE.nom for outil in tools or [])
 
 
 def _identite_connue(compte: Compte | None) -> str:
@@ -1139,10 +1224,11 @@ def creer_conversation(
         with fabrique_session() as db:
             _recuperer_piece_jointe_du_compte(db, identifiant_compte, requete.piece_jointe_id, None)
 
-    def tour(db_tour: Session, publier: Publier) -> ConversationCreeResponse:
+    def tour(db_tour: Session, publier: Publier, publier_carte: PublierCarte) -> ConversationCreeResponse:
         return _tour_creer_conversation(
             db_tour,
             publier,
+            publier_carte,
             requete,
             identifiant_compte,
             client,
@@ -1188,7 +1274,7 @@ def _flux_du_tour(
     conversation_id: int | None,
     cle_idempotence: str | None,
     fabrique_session: FabriqueSession,
-    tour: Callable[[Session, Publier], BaseModel],
+    tour: Callable[[Session, Publier, PublierCarte], BaseModel],
 ) -> StreamingResponse:
     # Le tour, verrou par compte compris, s'exécute à part avec sa propre
     # session (ADR-0016) : il termine et commite même si personne ne lit
@@ -1196,7 +1282,7 @@ def _flux_du_tour(
     # le premier tour l'attend, puis ne renvoie que sa fin. Verrou déjà pris
     # (un tour du même compte) : le statut l'annonce, republié pendant
     # l'attente pour que le flux ne reste pas muet.
-    def executer(publier: Publier) -> BaseModel:
+    def executer(publier: Publier, publier_carte: PublierCarte) -> BaseModel:
         verrou = verrous_comptes.pour(identifiant_compte)
         if not verrou.acquire(blocking=False):
             statut = _statut_d_attente(identifiant_compte, conversation_id, cle_idempotence)
@@ -1209,7 +1295,7 @@ def _flux_du_tour(
             if reponse_en_cache is not None:
                 return reponse_en_cache
             with fabrique_session() as db:
-                resultat = tour(db, publier)
+                resultat = tour(db, publier, publier_carte)
             if cle_idempotence is not None:
                 cache_idempotence.enregistrer(identifiant_compte, cle_idempotence, resultat)
             return resultat
@@ -1223,6 +1309,7 @@ def _flux_du_tour(
 def _tour_creer_conversation(
     db: Session,
     publier: Publier,
+    publier_carte: PublierCarte,
     requete: ConversationCreeRequest,
     identifiant_compte: str,
     client: MistralClient,
@@ -1298,8 +1385,11 @@ def _tour_creer_conversation(
         publier=publier,
         client_moduleo=client_moduleo,
         droits_moduleo=droits_moduleo,
+        identifiant_compte=identifiant_compte,
+        publier_carte=publier_carte,
     )
     tools = outils_du_tour(contexte_outils)
+    message_pour_mistral = _avec_consigne_ids_moduleo(message_pour_mistral, tools)
     attendre_questions = _lancer_questions_piece_jointe(client, piece_jointe, requete.message)
     reponse_chat = _resoudre_reponse_chat(
         lambda: _appeler_reponse_chat(client, message_pour_mistral, tools),
@@ -1325,6 +1415,9 @@ def _tour_creer_conversation(
         contexte_outils.client_moduleo is not None,
         client,
         contexte_outils.resultats_outils,
+        contexte_outils.cartes_du_tour,
+        contexte_outils.refus_des_droits,
+        _ecriture_proposee(tools),
     )
 
     publier(TITRAGE)
@@ -1379,6 +1472,7 @@ def _tour_creer_conversation(
     db.add_all([message_utilisateur, message_assistant])
     _rattacher_recherches_au_message(db, message_assistant)
     rattacher_lectures_au_message(db, message_assistant)
+    rattacher_ecritures_au_message(db, message_assistant)
     if piece_jointe is not None:
         _lier_piece_jointe_a_la_conversation(piece_jointe, conversation)
         piece_jointe.message_id = message_utilisateur.id
@@ -1435,6 +1529,7 @@ def consulter_conversation(
     messages_page_desc = requete_messages.order_by(Message.id.desc()).limit(limite + 1).all()
     a_des_messages_plus_anciens = len(messages_page_desc) > limite
     messages = list(reversed(messages_page_desc[:limite]))
+    cartes = cartes_par_message(db, [message.id for message in messages])
 
     return ConversationDetailResponse(
         id=conversation.id,
@@ -1449,6 +1544,7 @@ def consulter_conversation(
                 date_creation=message.date_creation,
                 tokens_contexte=message.tokens_contexte,
                 fenetre_contexte=_FENETRE_CONTEXTE,
+                cartes=[CarteEcriture.model_validate(carte) for carte in cartes.get(message.id, [])],
             )
             for message in messages
         ],
@@ -1719,6 +1815,8 @@ def _executer_appels_outils(
         )
         for appel_mistral in resultat.appels_mistral:
             _enregistrer_appel_mistral_outil(contexte_outils, identifiant_compte, appel_mistral)
+        if "garde_des_droits" in resultat.trace:
+            contexte_outils.refus_des_droits.append(resultat.contenu)
         messages_outils.append(
             {"role": "tool", "tool_call_id": appel.id, "name": appel.nom, "content": resultat.contenu}
         )
@@ -1789,6 +1887,73 @@ def _enregistrer_appel_principal(
     )
 
 
+# Choix d'outil imposé chez Mistral (#252). Un outil quelconque, pas
+# ecrire_moduleo (troisième passage de #206) : forcé d'écrire sans l'id de
+# l'élément visé, le modèle fabriquait la requête ; libre, il lit d'abord sa
+# fiche. Les tours ordinaires qui suivent peuvent alors écrire.
+_OUTIL_IMPOSE = "any"
+_TOURS_APRES_RELANCE = 4
+# Ajoutée au seul appel de relance, jamais enregistrée : sans elle, le
+# modèle relancé ne savait pas que sa réponse avait été écartée.
+_CONSIGNE_RELANCE = (
+    "Ta réponse précédente annonçait une carte de confirmation ou une écriture Moduléo, mais aucune carte "
+    "n'a été ouverte : elle n'a pas été montrée au collaborateur. Seul l'outil ecrire_moduleo ouvre une "
+    "carte. Pour proposer l'écriture demandée : s'il te manque l'id d'un élément nommé (contact, "
+    "affaire…), lis d'abord sa fiche avec l'outil de lecture ; prends les champs avec "
+    "decrire_ecriture_moduleo ; puis appelle ecrire_moduleo. Ne devine jamais un id. Si l'écriture n'est "
+    "pas possible, dis-le sans annoncer de carte."
+)
+
+
+def _a_relancer(reponse: str, tools: list[dict] | None, contexte_outils: ContexteTour) -> bool:
+    # Seulement si ecrire_moduleo est proposé au tour : sinon, la phrase
+    # fixe de _appliquer_garde_fous.
+    return (
+        _ecriture_proposee(tools)
+        and not contexte_outils.cartes_du_tour
+        and _annonce_une_ecriture(contexte_outils.db, contexte_outils.conversation_id, reponse, True)
+    )
+
+
+def _relancer_en_imposant(
+    client: MistralClient,
+    messages: list[dict],
+    tools: list[dict] | None,
+    contexte_outils: ContexteTour,
+    identifiant_compte: str,
+    piece_jointe_id: int | None,
+) -> ReponseChat | None:
+    # Bornée en tokens et en délai (#258) ; un échec ou un délai dépassé
+    # rend None, et le tour aboutit : il ne fait pas tomber le message.
+    # AppelOutilDemande, la carte attendue, remonte à la boucle.
+    try:
+        return client.chat(
+            [*messages, {"role": "system", "content": _CONSIGNE_RELANCE}],
+            tools=tools,
+            tool_choice=_OUTIL_IMPOSE,
+            max_tokens=MISTRAL_RELANCE_MAX_TOKENS,
+            timeout=MISTRAL_RELANCE_TIMEOUT,
+        )
+    except AppelOutilDemande:
+        raise
+    except Exception as erreur:
+        # Sans commit : la ligne suit le tour, qui continue.
+        enregistrer_echange_echec(
+            contexte_outils.db,
+            identifiant_compte=identifiant_compte,
+            conversation_id=contexte_outils.conversation_id,
+            piece_jointe_id=piece_jointe_id,
+            type_appel="chat",
+            modele=MODELE_CHAT,
+            requete_payload=payload_depuis_erreur(erreur),
+            erreur=str(erreur),
+            reponse_payload=reponse_depuis_erreur(erreur),
+            commit=False,
+        )
+        logger.warning("Relance imposant un outil en échec : phrase fixe", exc_info=True)
+        return None
+
+
 def _resoudre_reponse_chat(
     obtenir_reponse: Callable[[], ReponseChat],
     client: MistralClient,
@@ -1809,16 +1974,34 @@ def _resoudre_reponse_chat(
     # False (creer_conversation) : le rollback d'un échec annule aussi la
     # conversation flushée, l'échange d'échec ne peut ni la référencer ni
     # référencer la pièce jointe (voir creer_conversation).
+    # Écriture annoncée sans carte (#252) : une seule relance par message,
+    # qui impose un outil (_CONSIGNE_RELANCE), puis la réponse qui suit, en plus des tours
+    # ordinaires si besoin.
     db = contexte_outils.db
     messages = list(messages_pour_mistral)
+    tours_max = _TOURS_MAX_PAR_MESSAGE
+    imposer = False
+    relance_faite = False
     try:
-        for tour in range(1, _TOURS_MAX_PAR_MESSAGE + 1):
+        tour = 0
+        while tour < tours_max:
+            tour += 1
             contexte_outils.publier(REFLEXION)
             try:
                 if tour == 1:
                     reponse = obtenir_reponse()
+                elif imposer:
+                    imposer = False
+                    relance = _relancer_en_imposant(
+                        client, messages, tools, contexte_outils, identifiant_compte, piece_jointe_id
+                    )
+                    if relance is None:
+                        # La réponse annoncée reste : _appliquer_garde_fous
+                        # en fait la phrase fixe, sans carte du tour.
+                        return reponse
+                    reponse = relance
                 else:
-                    dernier_tour = tour == _TOURS_MAX_PAR_MESSAGE
+                    dernier_tour = tour == tours_max
                     reponse = client.chat(messages, tools=None if dernier_tour else tools)
             except AppelOutilDemande as demande:
                 _enregistrer_appel_principal(contexte_outils, identifiant_compte, piece_jointe_id, demande)
@@ -1831,6 +2014,14 @@ def _resoudre_reponse_chat(
                 messages = [*messages, demande.message_assistant, *messages_outils]
                 continue
             _enregistrer_appel_principal(contexte_outils, identifiant_compte, piece_jointe_id, reponse)
+            if not relance_faite and _a_relancer(reponse.contenu, tools, contexte_outils):
+                # La réponse annoncée n'est jamais montrée : le même
+                # historique, avec l'outil imposé.
+                relance_faite = imposer = True
+                # Relance, lecture, champs, écriture, puis la réponse sans
+                # outils.
+                tours_max = max(tours_max, tour + _TOURS_APRES_RELANCE)
+                continue
             return reponse
         # Ne devrait pas arriver : le dernier tour part sans `tools`.
         raise RuntimeError("Demande d'outil sur le dernier tour, parti sans outils")
@@ -2006,10 +2197,11 @@ def envoyer_message(
         if requete.piece_jointe_id is not None:
             _recuperer_piece_jointe_du_compte(db, identifiant_compte, requete.piece_jointe_id, conversation_id)
 
-    def tour(db_tour: Session, publier: Publier) -> MessageEnvoyeResponse:
+    def tour(db_tour: Session, publier: Publier, publier_carte: PublierCarte) -> MessageEnvoyeResponse:
         return _tour_envoyer_message(
             db_tour,
             publier,
+            publier_carte,
             conversation_id,
             requete,
             identifiant_compte,
@@ -2025,6 +2217,7 @@ def envoyer_message(
 def _tour_envoyer_message(
     db: Session,
     publier: Publier,
+    publier_carte: PublierCarte,
     conversation_id: int,
     requete: MessageEnvoyeRequest,
     identifiant_compte: str,
@@ -2034,6 +2227,10 @@ def _tour_envoyer_message(
     client_moduleo: ClientModuleo | None,
 ) -> MessageEnvoyeResponse:
     conversation = _recuperer_conversation_du_compte(db, conversation_id, identifiant_compte)
+    # Un nouveau message fait expirer les cartes encore proposées (spec
+    # 1.5.2, #204) : commité tout de suite, même si le tour échoue ensuite.
+    expirer(db, conversation.id)
+    db.commit()
 
     # Revalidées dans la session du tour, comme pour creer_conversation.
     piece_jointe: PieceJointe | None = None
@@ -2068,6 +2265,7 @@ def _tour_envoyer_message(
         piece_jointe,
         _memoire_de_la_conversation(db, conversation.id, requete.message),
         moduleo_ferme=client_moduleo is not None and droits_moduleo.sans_groupe,
+        resultats_ecritures=resultats_par_message(db, [m.id for m in derniers_messages]),
     )
 
     # Un message sort de la fenêtre des 3 derniers dès que ce tour (2 nouveaux
@@ -2088,8 +2286,11 @@ def _tour_envoyer_message(
         publier=publier,
         client_moduleo=client_moduleo,
         droits_moduleo=droits_moduleo,
+        identifiant_compte=identifiant_compte,
+        publier_carte=publier_carte,
     )
     tools = outils_du_tour(contexte_outils)
+    messages_pour_mistral = _avec_consigne_ids_moduleo(messages_pour_mistral, tools)
 
     compte = db.query(Compte).filter(Compte.identifiant == identifiant_compte).first()
 
@@ -2120,6 +2321,9 @@ def _tour_envoyer_message(
         contexte_outils.client_moduleo is not None,
         client,
         contexte_outils.resultats_outils,
+        contexte_outils.cartes_du_tour,
+        contexte_outils.refus_des_droits,
+        _ecriture_proposee(tools),
     )
     _enregistrer_questions_du_tour(db, attendre_questions, identifiant_compte, conversation.id, piece_jointe)
 
@@ -2149,6 +2353,7 @@ def _tour_envoyer_message(
     db.add_all([message_utilisateur, message_assistant])
     _rattacher_recherches_au_message(db, message_assistant)
     rattacher_lectures_au_message(db, message_assistant)
+    rattacher_ecritures_au_message(db, message_assistant)
     if piece_jointe is not None:
         _lier_piece_jointe_a_la_conversation(piece_jointe, conversation)
         piece_jointe.message_id = message_utilisateur.id

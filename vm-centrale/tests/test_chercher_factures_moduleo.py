@@ -170,7 +170,7 @@ def test_fiche_dune_facture_avec_echeances_reglements_et_reste_a_payer(
     )
     fiche = contenu.split("\n\n", 1)[1]
     assert fiche == (
-        "Facture F-2026-118\n"
+        "Facture F-2026-118 [id Moduléo 601]\n"
         "Objet : Bornage du lot B\n"
         "Affaire : 2024-123\n"
         "Client : SCI Les Pins\n"

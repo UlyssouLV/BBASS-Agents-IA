@@ -3,7 +3,7 @@ import logging
 from vm_centrale.mistral_client import MistralClient, ReponseChat
 
 TYPE_APPEL = "relecture"
-# Consigne fixe de la relecture isolée (spec 1.6.3, point 9, ADR-0023) :
+# Consigne fixe de la relecture isolée (spec 1.6.3, point 9, ADR-0024) :
 # elle ne reçoit que la question, la réponse marquée et ce que les outils
 # ont ramené, jamais l'historique, le profil ni le résumé glissant (même
 # cadre que l'appel d'extraction, ADR-0014). Appel sans outils.

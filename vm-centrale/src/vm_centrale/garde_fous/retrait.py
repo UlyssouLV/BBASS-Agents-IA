@@ -10,6 +10,6 @@ PHRASE_NON_TROUVE = "Certaines informations n'ont pas été trouvées dans les s
 
 class Retrait(NamedTuple):
     # `retire` : le garde-fou a retiré quelque chose (phrase fixe, puis
-    # relecture isolée, ADR-0023).
+    # relecture isolée, ADR-0024).
     texte: str
     retire: bool

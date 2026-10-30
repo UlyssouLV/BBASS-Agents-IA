@@ -93,6 +93,10 @@ class VmCentraleClientFactice:
         self._exception_liste_conversations: Exception | None = None
         self._jetons_liste_conversations: list[str] = []
         self._detail_conversation: ConversationDetail | None = None
+        # Clic sur une Carte de confirmation Moduléo (#204) : (jeton, id, décision).
+        self._decisions_ecriture: list[tuple[str, int, str]] = []
+        self._carte_decidee: dict | None = None
+        self._exception_decision_ecriture: Exception | None = None
         self._exception_detail_conversation: Exception | None = None
         self._jetons_detail_conversation: list[str] = []
         self._ids_detail_conversation: list[int] = []
@@ -469,6 +473,20 @@ class VmCentraleClientFactice:
 
     def envoi_message_conversation_echoue(self, exception: Exception) -> None:
         self._exception_envoi_message_conversation = exception
+
+    def decision_ecriture_reussit(self, carte: dict) -> None:
+        self._carte_decidee = carte
+        self._exception_decision_ecriture = None
+
+    def decision_ecriture_echoue(self, exception: Exception) -> None:
+        self._exception_decision_ecriture = exception
+
+    def decider_ecriture(self, jeton: str, ecriture_id: int, decision: str) -> dict:
+        self._decisions_ecriture.append((jeton, ecriture_id, decision))
+        if self._exception_decision_ecriture is not None:
+            raise self._exception_decision_ecriture
+        assert self._carte_decidee is not None
+        return self._carte_decidee
 
     def envoyer_message(
         self,

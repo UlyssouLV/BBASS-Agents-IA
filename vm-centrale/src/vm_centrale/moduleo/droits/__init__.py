@@ -20,7 +20,10 @@ from vm_centrale.moduleo.droits.garde import (
     SANS_AUCUN_GROUPE,
     DroitManquant,
     autorise,
+    ecriture_possible,
+    refus_d_ecriture,
     verifier,
+    verifier_ecriture,
     verifier_reponse,
 )
 
@@ -39,7 +42,10 @@ __all__ = [
     "chemin",
     "creer_groupes_dev",
     "droits_du_compte",
+    "ecriture_possible",
     "rattacher",
+    "refus_d_ecriture",
     "verifier",
+    "verifier_ecriture",
     "verifier_reponse",
 ]

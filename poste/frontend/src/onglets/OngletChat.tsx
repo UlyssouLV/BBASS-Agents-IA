@@ -34,6 +34,7 @@ import grammairesPrismBrut from "prismjs/components.json";
 import Markdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
+import { CarteConfirmationEcriture } from "@/components/CarteConfirmationEcriture";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -965,9 +966,14 @@ export function OngletChat({ conversationOuverteId, envois }: Readonly<OngletCha
                   {message.contenu}
                 </p>
               ) : (
-                <div key={message.id} className="max-w-[70%] self-start rounded-md bg-muted px-3 py-1.5 text-sm">
-                  <ContenuMessageAssistant texte={message.contenu} />
-                </div>
+                <Fragment key={message.id}>
+                  <div className="max-w-[70%] self-start rounded-md bg-muted px-3 py-1.5 text-sm">
+                    <ContenuMessageAssistant texte={message.contenu} />
+                  </div>
+                  {message.cartes?.map((carte) => (
+                    <CarteConfirmationEcriture key={carte.id} carte={carte} conversationId={conversationOuverteId} />
+                  ))}
+                </Fragment>
               )
             )}
             {/* Clé par conversation (issue #166) : une bascule entre deux envois
@@ -989,6 +995,14 @@ export function OngletChat({ conversationOuverteId, envois }: Readonly<OngletCha
                     />
                   </div>
                 )}
+                {envoiOuvert.cartes.map((carte) => (
+                  <CarteConfirmationEcriture
+                    key={carte.id}
+                    carte={carte}
+                    conversationId={conversationOuverteId}
+                    desactivee={envoiOuvert.phase === "attente"}
+                  />
+                ))}
               </Fragment>
             )}
           </div>

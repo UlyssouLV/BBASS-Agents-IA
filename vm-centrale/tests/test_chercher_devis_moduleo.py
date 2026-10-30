@@ -160,7 +160,7 @@ def test_fiche_dun_devis_en_noms_avec_affaire_client_dates_et_montants(
     assert contenu.startswith("1 devis trouvé (texte « Bornage »), total 1 200,00 € HT, 1 440,00 € TTC.")
     fiche = contenu.split("\n\n", 1)[1]
     assert fiche == (
-        "Devis D-2026-042\n"
+        "Devis D-2026-042 [id Moduléo 501]\n"
         "Objet : Bornage du lot B\n"
         "Affaire : 2024-123\n"
         "Client : Étude Dupont\n"

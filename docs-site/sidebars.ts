@@ -34,6 +34,7 @@ const sidebars: SidebarsConfig = {
         'features/moduleo/factures',
         'features/moduleo/temps-passes',
         'features/moduleo/planning',
+        'features/moduleo/ecriture',
         'features/moduleo/sources-et-memoire',
         'features/moduleo/panne-et-refus',
       ],

@@ -19,6 +19,7 @@ from vm_centrale.models import (
     RattachementModuleo,
     ResultatRechercheWeb,
 )
+from vm_centrale.moduleo.ecritures import detacher_de_la_conversation
 
 # Valeur réservée de Consommation.identifiant_compte pour un compte supprimé
 # (spec 1.6.3, #161) : jamais un identifiant de compte (CompteCreeRequest
@@ -27,7 +28,8 @@ from vm_centrale.models import (
 IDENTIFIANT_COMPTE_SUPPRIME = ""
 
 # Tables qui portent des données d'un compte, par identifiant_compte. Le
-# journal Moduléo n'y est pas : trace d'audit, gardée telle quelle.
+# journal Moduléo et le Journal des écritures n'y sont pas : traces d'audit,
+# gardées telles quelles.
 _TABLES_DU_COMPTE = (Conversation, PieceJointe, ProfilTravail, EchangeInspecteur, RattachementModuleo)
 
 _NETTOYAGE_COMPTES_SUPPRIMES = "nettoyage-comptes-supprimes-1.6.3"
@@ -54,6 +56,8 @@ def supprimer_donnees_conversation(db: Session, conversation: Conversation) -> l
         ResultatRechercheWeb.conversation_id == conversation.id
     ).delete()
     supprimer_lectures(db, conversation.id)
+    # Le Journal des écritures survit à la conversation (spec 1.5.2).
+    detacher_de_la_conversation(db, conversation.id)
 
     # Consommation n'a pas de cascade ORM déclarée sur Conversation (spec
     # 1.1.3) : la ligne survit à la conversation qui l'a produite, seul le

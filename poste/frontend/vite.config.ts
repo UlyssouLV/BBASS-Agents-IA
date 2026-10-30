@@ -26,7 +26,7 @@ export default defineConfig({
   // sont relayées au poste.
   server: {
     proxy: {
-      "^/(connexion|deconnexion|mot-de-passe|compte|conversations|pieces-jointes|profil-travail|comptes|consommation|inspecteur/)":
+      "^/(connexion|deconnexion|mot-de-passe|compte|conversations|pieces-jointes|profil-travail|comptes|consommation|ecritures-moduleo|inspecteur/)":
         {
           target: "http://127.0.0.1:8100",
           changeOrigin: true,

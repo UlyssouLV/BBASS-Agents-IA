@@ -5,7 +5,7 @@ from flux_sse import fin
 from vm_centrale.models import Consommation
 
 # Relecture isolée après un retrait de garde-fou (#131, spec 1.6.3, point 9,
-# ADR-0023) : un appel Mistral à part, sans outils ni historique, réécrit la
+# ADR-0024) : un appel Mistral à part, sans outils ni historique, réécrit la
 # réponse marquée à partir des seuls résultats d'outils ; les garde-fous
 # repassent sur sa sortie, et elle n'est retenue que s'ils n'y retirent rien.
 

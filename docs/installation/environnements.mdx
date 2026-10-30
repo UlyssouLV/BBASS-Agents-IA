@@ -10,6 +10,7 @@ Le serveur du Copilote BBASS fait tourner **deux Environnements** côte à côte
 | Port | **`8000`** | **`8001`** |
 | Version | celle validée et promue | chaque nouvelle version, dès sa sortie |
 | Moduléo lu | serveur Moduléo du cabinet | serveur de test Kipaware |
+| Écriture Moduléo depuis le chat | **jamais** | oui, avec carte de confirmation (`MODULEO_ECRITURE=0` dans son `.env` pour la couper) |
 | Comptes et conversations | ceux de la prod | distincts, propres au test |
 
 Le poste n’a pas de bouton « prod / test » : il suit le serveur dont il a l’adresse. **Changer d’Environnement, c’est changer de port.** Au lancement suivant, le poste se met tout seul à la version de cet Environnement.

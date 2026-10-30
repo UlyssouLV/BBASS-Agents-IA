@@ -10,6 +10,7 @@ from vm_centrale.routers.auth import router as auth_router
 from vm_centrale.routers.comptes import router as comptes_router
 from vm_centrale.routers.consommation import router as consommation_router
 from vm_centrale.routers.conversations import router as conversations_router
+from vm_centrale.routers.ecritures_moduleo import router as ecritures_moduleo_router
 from vm_centrale.routers.inspecteur import router as inspecteur_router
 from vm_centrale.routers.moduleo import router as moduleo_router
 from vm_centrale.routers.sante import router as sante_router
@@ -33,6 +34,7 @@ app.include_router(auth_router)
 app.include_router(comptes_router)
 app.include_router(consommation_router)
 app.include_router(conversations_router)
+app.include_router(ecritures_moduleo_router)
 app.include_router(inspecteur_router)
 app.include_router(moduleo_router)
 app.include_router(sante_router)

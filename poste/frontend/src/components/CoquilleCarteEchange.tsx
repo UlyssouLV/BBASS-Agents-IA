@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { formaterDateHeure } from "@/lib/dates";
 
 interface CoquilleCarteEchangeProps {
   libelle: string;
@@ -51,7 +52,7 @@ export function CoquilleCarteEchange({
         <Badge variant="outline">{local ? "Local" : "Mistral"}</Badge>
         <Badge variant={enEchec ? "destructive" : "secondary"}>{enEchec ? "Échec" : "Succès"}</Badge>
         <span className="ml-auto text-xs text-muted-foreground">
-          <time dateTime={dateIso}>{new Date(dateIso).toLocaleString()}</time>
+          <time dateTime={dateIso}>{formaterDateHeure(dateIso)}</time>
         </span>
       </button>
       {deplie && <div className="flex flex-col gap-3 border-t px-3 py-3">{children}</div>}

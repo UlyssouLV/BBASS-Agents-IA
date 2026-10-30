@@ -182,7 +182,7 @@ def test_fiche_dune_tache_et_synthese(client, faux_moduleo, mistral_client_facti
         "La première affichée, précise la recherche."
     )
     assert fiche == (
-        "Tâche « Bornage lot B »\n"
+        "Tâche « Bornage lot B » [id Moduléo 501]\n"
         "Date : 12/10/2026, 08:00 – 12:00\n"
         "Participants : Jean Martin, Sophie Bernard\n"
         "Activité : Terrain\n"

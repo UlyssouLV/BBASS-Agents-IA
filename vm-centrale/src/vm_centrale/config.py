@@ -3,12 +3,16 @@ from dataclasses import dataclass
 from datetime import timedelta
 from decimal import Decimal
 from functools import cache
+from pathlib import Path
 
 from dotenv import load_dotenv
 
+from vm_centrale.cibles_dev import charger_cible_dev
 from vm_centrale.secrets_chiffres import SecretIndechiffrable, dechiffrer, lire_cle_maitre
 
 load_dotenv()
+# Poste de dev : .env.test ou .env.cabinet par-dessus (BBASS_CIBLE_DEV).
+CIBLE_DEV = charger_cible_dev(Path(__file__).resolve().parents[2])
 
 VM_CENTRALE_HOST = os.environ.get("VM_CENTRALE_HOST", "0.0.0.0")
 VM_CENTRALE_PORT = int(os.environ.get("VM_CENTRALE_PORT", "8000"))
@@ -20,6 +24,12 @@ PIECES_JOINTES_DIR = os.environ.get("VM_CENTRALE_PIECES_JOINTES_DIR", "./pieces_
 # le pire tour qui en découle, recherche web comprise : voir
 # poste/src/poste/config.py.
 MISTRAL_HTTP_TIMEOUT = float(os.environ.get("MISTRAL_HTTP_TIMEOUT", "30"))
+# Relance qui impose ecrire_moduleo (#252, #258) : un appel d'outil tient en
+# quelques centaines de tokens. Au second passage de #206, elle en a généré
+# 8 868 en 76 s. Au-delà de ces bornes, ou en cas d'échec, la phrase fixe
+# d'écriture non proposée, et le tour aboutit.
+MISTRAL_RELANCE_MAX_TOKENS = 1024
+MISTRAL_RELANCE_TIMEOUT = 20.0
 # SearXNG auto-hébergé du docker-compose.yml (spec 1.4.0, ADR-0013), publié
 # sur localhost seulement.
 SEARXNG_URL = os.environ.get("VM_CENTRALE_SEARXNG_URL", "http://localhost:8888")
@@ -176,6 +186,29 @@ class ConfigModuleoChiffree:
     api_key_chiffree: str | None
     security_code_chiffre: str | None
     fichier_cle_maitre: str | None
+
+
+def get_environnement() -> str:
+    # « staging » ou « prod » sur la VM de Castries (.env de l'installateur,
+    # ADR-0021) ; vide sur un poste de dev.
+    return (os.environ.get("BBASS_ENVIRONNEMENT") or "").strip().lower()
+
+
+def get_moduleo_ecriture() -> bool:
+    # Réglage MODULEO_ECRITURE (spec 1.5.2, ADR-0023), lu à l'appel : absent
+    # ou autre que « 1 », « true », « oui » = inactif. Seule une des deux
+    # barrières de l'écriture : MODULEO_URL doit aussi figurer dans la liste
+    # versionnée des serveurs de test (moduleo/serveurs_test.json).
+    # Troisième passage de #206 : la prod n'écrit jamais ; le staging écrit
+    # sans réglage (son .env installé n'en porte pas), sauf
+    # MODULEO_ECRITURE=0.
+    environnement = get_environnement()
+    if environnement == "prod":
+        return False
+    valeur = (os.environ.get("MODULEO_ECRITURE") or "").strip().lower()
+    if environnement == "staging" and not valeur:
+        return True
+    return valeur in {"1", "true", "oui"}
 
 
 def get_config_moduleo_chiffree() -> ConfigModuleoChiffree:
