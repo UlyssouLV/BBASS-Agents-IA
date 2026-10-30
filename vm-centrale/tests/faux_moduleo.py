@@ -76,6 +76,7 @@ class FauxModuleo:
         self._proprietaires: dict[int, dict] = {}
         # Notes, relues avant leur modification ou suppression (#208).
         self._notes: dict[int, dict] = {}
+        self._enveloppes: dict[int, dict] = {}
         # Personnes, relues avant leur modification (#260).
         self._personnes: dict[int, dict] = {}
         # Catégories lues seulement par id (#254) : `null`, et non 404,
@@ -413,6 +414,13 @@ class FauxModuleo:
         # IdAffaire, TypeNote, IdCategorieNote…
         self._notes[id_note] = {"IdNote": id_note, "Message": message, **champs}
 
+    def ajouter_enveloppe(self, id_enveloppe: int, id_affaire: int, montant: float) -> None:
+        self._enveloppes[id_enveloppe] = {
+            "IdEnveloppePrevisionnelle": id_enveloppe,
+            "IdAffaire": id_affaire,
+            "Montant": montant,
+        }
+
     def ajouter_personne(self, id_personne: int, nom: str, **champs: Any) -> None:
         # Réponse de GET cogeo/contact/personne/{idContact} : Nom, Prenom,
         # Commentaire…
@@ -530,6 +538,10 @@ class FauxModuleo:
             if parametres["idNote"] not in self._notes:
                 raise ModuleoIntrouvable(f"404 sur {route}")
             return self._notes[parametres["idNote"]]
+        if route == "cogeo/enveloppe/{idEnveloppePrevisionnelle}":
+            if parametres["idEnveloppePrevisionnelle"] not in self._enveloppes:
+                raise ModuleoIntrouvable(f"404 sur {route}")
+            return self._enveloppes[parametres["idEnveloppePrevisionnelle"]]
         if route == "cogeo/contact/personne/{idContact}":
             if parametres["idContact"] not in self._personnes:
                 raise ModuleoIntrouvable(f"404 sur {route}")

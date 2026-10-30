@@ -711,6 +711,7 @@ _CREATIONS = {
     "moduleo/telephone": _CORPS_TELEPHONE,
     "cogeo/note": {"Message": "Rappeler le client", "IdAffaire": 12},
     "moduleo/tacheafaire": {"Libelle": "Relancer"},
+    "cogeo/enveloppe": {"IdAffaire": 12, "Montant": 1500},
 }
 
 
@@ -1241,6 +1242,126 @@ def test_put_proprietes_modifiees_du_modele_remplacees_par_les_champs_de_la_cart
     ((_, _, _, envoye),) = faux_moduleo.ecritures
     assert envoye["ProprietesModifiees"] == ["Message"]
     assert faux_moduleo.note(5)["IdAffaire"] == 12
+
+
+# Revue de la 1.5.2.
+
+
+def test_un_id_illisible_ne_fait_pas_tomber_le_tour(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide
+):
+    _contact_et_affaire(faux_moduleo)
+
+    reponse = _proposer(client, mistral_client_factice, jeton_valide, _telephone(IdContact=["abc"]))
+
+    assert reponse.status_code == 200
+    (carte,) = _cartes(reponse)
+    assert {"avant": None, "champ": "Contact", "valeur": "abc (non résolu)"} in carte["lignes"]
+
+
+def test_ecriture_refusee_sans_carte_au_rechargement_ni_decision_pour_le_modele(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide, db_session
+):
+    # Une colonne JSON stocke None en `null` JSON, que `IS NOT NULL` laisse
+    # passer : une carte vide revenait, et une décision jamais prise.
+    _sans_droit_telephone(db_session)
+    conversation_id = fin(_proposer(client, mistral_client_factice, jeton_valide, _telephone()))["conversation"]["id"]
+
+    detail = client.get(f"/conversations/{conversation_id}", headers=_autorisation(jeton_valide)).json()
+
+    assert all(message["cartes"] == [] for message in detail["messages"])
+    mistral_client_factice.repondre("Bonjour.", resume_et_profil=_resume_et_profil())
+    client.post(
+        f"/conversations/{conversation_id}/messages", json={"message": "Et donc ?"}, headers=_autorisation(jeton_valide)
+    )
+    contenus = [message["content"] for message in mistral_client_factice.appels_reponse[-1]]
+    assert not any("après la décision du collaborateur" in contenu for contenu in contenus)
+
+
+_ENVELOPPE = "cogeo/enveloppe/{idAffaire}"
+
+
+def test_supprimer_une_enveloppe_avec_l_id_d_une_affaire_lue_refuse(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide
+):
+    # Le paramètre « idAffaire » porte en réalité l'id de l'enveloppe : l'id
+    # de l'affaire lue viserait l'enveloppe d'une autre affaire.
+    _contact_et_affaire(faux_moduleo)
+    faux_moduleo.ajouter_enveloppe(12, 99, 1500)
+
+    reponse = _proposer(client, mistral_client_factice, jeton_valide, _supprimer(_ENVELOPPE, idAffaire=12))
+
+    assert _cartes(reponse) == []
+    assert _resultat_outil(mistral_client_factice) == _PAS_ENCORE_POSSIBLE.format(
+        element="l'enveloppe prévisionnelle"
+    )
+
+
+def test_supprimer_une_enveloppe_creee_montre_son_affaire(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide
+):
+    _contact_et_affaire(faux_moduleo)
+    faux_moduleo.ajouter_enveloppe(30, 12, 1500)
+
+    reponse = _proposer_apres_creation(
+        client, faux_moduleo, mistral_client_factice, jeton_valide, "cogeo/enveloppe", 30,
+        _supprimer(_ENVELOPPE, idAffaire=30),
+    )
+
+    (carte,) = _cartes(reponse)
+    assert "Affaire" in [ligne["champ"] for ligne in carte["lignes"]]
+
+
+@pytest.mark.parametrize(
+    ("reponse_moduleo", "attendu"),
+    [
+        ({"IdContact": 5, "IdTelephone": 9}, "9"),
+        ({"IdContact": 5, "Id": 9}, "9"),
+        ({"IdContact": 5}, None),
+        ("OK", None),
+        ("456", "456"),
+    ],
+)
+def test_seul_l_id_de_l_element_cree_est_retenu(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide, db_session, reponse_moduleo, attendu
+):
+    _, ecriture_id = _une_carte(client, faux_moduleo, mistral_client_factice, jeton_valide)
+    faux_moduleo.reponse_ecriture = reponse_moduleo
+
+    _decider(client, jeton_valide, ecriture_id)
+
+    (ecriture,) = _journal(db_session)
+    assert ecriture.id_renvoye == attendu
+
+
+def test_put_d_une_meme_date_ecrite_avec_son_fuseau_ne_change_rien(
+    client, faux_moduleo, ecriture_active, mistral_client_factice, jeton_valide
+):
+    faux_moduleo.ajouter_tache(8, "Bornage", "2026-10-12T08:00:00", "2026-10-12T12:00:00")
+    tache = {
+        "route": "PUT planning/tacheplanning/{idTachePlanning}",
+        "parametres": {"idTachePlanning": 8},
+        "corps": {"IdTachePlanning": 8, "DateHeureDebut": "2026-10-12T08:00:00+02:00"},
+    }
+
+    reponse = _proposer(client, mistral_client_factice, jeton_valide, tache)
+
+    assert _cartes(reponse) == []
+    assert _resultat_outil(mistral_client_factice) == (
+        "Écriture non proposée : le corps ne change aucun champ de l'élément visé. Rien n'a été écrit."
+    )
+
+
+@pytest.mark.parametrize(
+    "texte",
+    ["Le fichier a été supprimé.", "**Méthode :** on calcule la surface", "Souhaitez-vous que je crée un modèle de courrier ?"],
+)
+def test_sans_outil_d_ecriture_une_reponse_ordinaire_reste_entiere(
+    client, faux_moduleo, mistral_client_factice, jeton_valide, texte
+):
+    reponse = _annoncer(client, mistral_client_factice, jeton_valide, texte)
+
+    assert fin(reponse)["reponse"] == texte
 
 
 # Écriture annoncée sans carte (#252, test humain #206) : le modèle écrivait

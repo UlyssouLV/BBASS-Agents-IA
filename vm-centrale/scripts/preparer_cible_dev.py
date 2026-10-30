@@ -20,7 +20,10 @@ DOSSIER = Path(__file__).resolve().parents[1]
 
 
 def creer_base(url: str) -> None:
-    # Meme serveur, base `postgres` pour la creer ; rien pour SQLite.
+    # Meme serveur, base `postgres` pour la creer ; rien pour SQLite ni sans
+    # URL (la VM garde sa base par defaut).
+    if not url:
+        return
     adresse = make_url(url)
     if not adresse.drivername.startswith("postgresql"):
         return

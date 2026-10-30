@@ -239,10 +239,19 @@ def _executer_decrire(arguments: dict, contexte: ContexteTour) -> ResultatOutil:
     return ResultatOutil(texte, trace={"routes": lecteur.routes} if lecteur.routes else {})
 
 
+def _cle_d_id(decrite: RouteEcriture, champ: str) -> str:
+    # Clé de IDS_NON_FOURNIS : l'« idAffaire » de `DELETE cogeo/enveloppe`
+    # désigne une enveloppe.
+    relecture = RELECTURES.get((decrite.methode, decrite.route))
+    if relecture is not None and relecture.source_trompeuse and champ == relecture.source:
+        return relecture.parametre.casefold()
+    return champ.casefold()
+
+
 def _non_fourni(decrite: RouteEcriture, champ: str) -> bool:
     # Hors l'id de l'élément qu'un POST crée (IdTelephone de
     # `POST moduleo/telephone`).
-    non_fourni = IDS_NON_FOURNIS.get(champ.casefold())
+    non_fourni = IDS_NON_FOURNIS.get(_cle_d_id(decrite, champ))
     return non_fourni is not None and not (decrite.methode == "POST" and decrite.route in non_fourni[1])
 
 
@@ -262,7 +271,7 @@ def _elements_sans_id(
     for champ, valeur in champs:
         if not _non_fourni(decrite, champ):
             continue
-        element, creations = IDS_NON_FOURNIS[champ.casefold()]
+        element, creations = IDS_NON_FOURNIS[_cle_d_id(decrite, champ)]
         if not all(any((route, v) in renvoyes for route in creations) for v in _valeurs_d_id(valeur)):
             elements.append(element)
     return list(dict.fromkeys(elements))

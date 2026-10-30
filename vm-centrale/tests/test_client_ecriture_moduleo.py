@@ -465,6 +465,16 @@ def test_donnees_refusees_par_moduleo_levent_son_message(ecriture_active, monkey
     assert erreur.value.message == "Le numéro de téléphone est obligatoire."
 
 
+def test_donnees_refusees_sans_cle_ni_code(ecriture_active, monkeypatch):
+    message = "Requête invalide (clé cle-api, code code-securite)"
+    client = _client_http(monkeypatch, lambda _: httpx.Response(400, json={"Message": message}))
+
+    with pytest.raises(ModuleoDonneesRefusees) as erreur:
+        client.ecrire("POST", "moduleo/telephone", {}, {"IdContact": 40}, _CONTACTS)
+
+    assert erreur.value.message == "Requête invalide (clé …, code …)"
+
+
 @pytest.mark.parametrize("statut", [401, 403])
 def test_refus_de_moduleo_sur_une_ecriture_levent_son_message_sans_cle_ni_code(ecriture_active, monkeypatch, statut):
     # #260 : la carte dit pourquoi Moduléo refuse ; la clé et le code, s'il

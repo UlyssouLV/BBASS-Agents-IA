@@ -1,7 +1,7 @@
 from collections.abc import Callable, Iterable
 from typing import Any
 
-from vm_centrale.dates import date_heure_en_lettres, jour_en_lettres
+from vm_centrale.dates import date_heure_en_lettres, instant, jour_en_lettres
 from vm_centrale.moduleo.client import ErreurModuleo, LecteurModuleo, RequeteInterdite
 from vm_centrale.moduleo.droits import DroitManquant, DroitsModuleo
 from vm_centrale.moduleo.fiches import NomsPlanning, NomsTempsPasses, fiche_tache, fiche_temps_passe
@@ -262,7 +262,8 @@ def _en_noms(champ: str, valeur: Any, noms: dict[str, dict[int, str]]) -> str:
         return VIDE
     if _est_un_id(feuille):
         connus = noms.get(feuille.casefold(), {})
-        ids = _ids(valeur) or [valeur]
+        # Sans id lisible : la valeur en texte, une liste n'étant pas une clé.
+        ids = _ids(valeur) or [_texte(valeur)]
         return ", ".join(connus.get(i) or f"{i} ({NON_RESOLU})" for i in ids)
     if feuille.casefold() in _DATES_SEULES and isinstance(valeur, str):
         return jour_en_lettres(valeur) or valeur
@@ -291,6 +292,8 @@ def lignes_en_noms(lecteur: LecteurModuleo, parametres: dict[str, Any], corps: A
 
 def _normal(champ: str, valeur: Any) -> Any:
     # Ce que compare la différence : vide, nombre, texte sans espaces autour.
+    # Une date compare son jour (`_DATES_SEULES`) ou son instant : le même,
+    # écrit avec ou sans fuseau, ne change rien.
     if _vide(champ, valeur):
         return None
     if isinstance(valeur, bool):
@@ -299,6 +302,10 @@ def _normal(champ: str, valeur: Any) -> Any:
         return float(valeur)
     if isinstance(valeur, list):
         return [_normal("", element) for element in valeur]
+    if isinstance(valeur, str):
+        date = (champ.casefold() in _DATES_SEULES and jour_en_lettres(valeur)) or instant(valeur)
+        if date:
+            return date
     return str(valeur).strip()
 
 

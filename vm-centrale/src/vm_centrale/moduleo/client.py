@@ -66,7 +66,7 @@ class ModuleoIntrouvable(ModuleoIndisponible):
 
 class ModuleoDonneesRefusees(ErreurModuleo):
     # 400 sur une écriture (#202) : Moduléo refuse les données envoyées ;
-    # `message` est le sien, tel quel.
+    # `message` est le sien, sans la clé ni le code.
     def __init__(self, message: str) -> None:
         super().__init__(message)
         self.message = message
@@ -193,7 +193,7 @@ class TransportHttp:
         except httpx.HTTPError as erreur:
             raise ModuleoIndisponible(str(erreur)) from erreur
         if reponse.status_code == 400 and methode != "GET":
-            raise ModuleoDonneesRefusees(_message_moduleo(reponse))
+            raise ModuleoDonneesRefusees(self._sans_secrets(_message_moduleo(reponse)))
         if reponse.status_code in (401, 403):
             message = self._sans_secrets(_message_moduleo(reponse)) if methode != "GET" else None
             raise ModuleoRefuse(f"{reponse.status_code} sur {route}", message or None)

@@ -38,11 +38,9 @@ def jour_en_lettres(valeur: str) -> str | None:
         return None
 
 
-def date_heure_en_lettres(valeur: str) -> str | None:
-    # Une date ISO de Moduléo, lisible et à l'heure de Paris (#256) :
-    # « 15 novembre 2026 », ou « 2 novembre 2026 à 14:30 » quand l'heure
-    # n'est pas minuit. Sans fuseau, l'heure est celle de Paris. None si ce
-    # n'est pas une date.
+def instant(valeur: str) -> datetime | None:
+    # Une date ISO de Moduléo, à l'heure de Paris. Sans fuseau, l'heure est
+    # celle de Paris. None si ce n'est pas une date.
     if not _DATE_HEURE_ISO.fullmatch(valeur.strip()):
         return None
     try:
@@ -51,7 +49,16 @@ def date_heure_en_lettres(valeur: str) -> str | None:
         return None
     if moment.tzinfo is None:
         moment = moment.replace(tzinfo=_FUSEAU_CABINET)
-    moment = moment.astimezone(_FUSEAU_CABINET)
+    return moment.astimezone(_FUSEAU_CABINET)
+
+
+def date_heure_en_lettres(valeur: str) -> str | None:
+    # Une date ISO de Moduléo, lisible et à l'heure de Paris (#256) :
+    # « 15 novembre 2026 », ou « 2 novembre 2026 à 14:30 » quand l'heure
+    # n'est pas minuit. None si ce n'est pas une date.
+    moment = instant(valeur)
+    if moment is None:
+        return None
     jour = _jour(moment.date())
     if (moment.hour, moment.minute) == (0, 0):
         return jour

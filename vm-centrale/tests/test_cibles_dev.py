@@ -3,7 +3,9 @@
 # de l'un à l'autre écrasait les clés. .env garde le commun ; .env.test et
 # .env.cabinet, chacun son Moduléo, sa base et son port, lus par-dessus.
 
+import importlib.util
 import os
+from pathlib import Path
 
 import pytest
 
@@ -124,3 +126,14 @@ def test_cible_inconnue_ou_fichier_absent_la_vm_ne_demarre_pas(tmp_path, monkeyp
 
     with pytest.raises(RuntimeError, match=attendu):
         charger_cible_dev(tmp_path)
+
+
+def test_preparer_une_cible_sans_url_de_base_ne_cree_rien():
+    # separer_env n'écrit pas de ligne de base sans VM_CENTRALE_DATABASE_URL :
+    # la VM garde sa base par défaut, le lanceur ne doit pas s'arrêter.
+    chemin = Path(__file__).resolve().parents[1] / "scripts" / "preparer_cible_dev.py"
+    spec = importlib.util.spec_from_file_location("preparer_cible_dev", chemin)
+    script = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(script)
+
+    assert script.creer_base("") is None

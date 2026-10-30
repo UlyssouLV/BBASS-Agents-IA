@@ -787,6 +787,7 @@ def _reponse_visible(
     moduleo_configure: bool,
     cartes_du_tour: list[int],
     refus_des_droits: list[str],
+    ecriture_proposee: bool,
 ) -> str:
     # Ligne garde_fous de l'inspecteur à chaque réponse de chat (spec 1.4.0,
     # décision 15), même sans retrait : sans elle, on ne voit pas pourquoi la
@@ -816,6 +817,7 @@ def _reponse_visible(
         # Sans Moduléo, la phrase fixe promettrait une recherche impossible.
         contacts_lus or not moduleo_configure,
         cartes_du_tour,
+        ecriture_proposee,
     )
     # Refus du garde des droits (#262) : sa phrase, telle quelle, nomme le
     # droit manquant ; elle remplace une phrase fixe de la VM, plus vague.
@@ -851,13 +853,14 @@ def _appliquer_garde_fous(
     moduleo_appele: bool = False,
     contacts_lus: bool = False,
     cartes_du_tour: list[int] | None = None,
+    ecriture_proposee: bool = False,
 ) -> str:
     # Écriture Moduléo annoncée sans carte, même après la relance (#252) :
     # toute la réponse devient la phrase fixe. Avec une carte, rien n'est
     # encore écrit : les phrases qui le disent partent.
     if cartes_du_tour:
         reponse = retirer_ecriture_affirmee(reponse)
-    elif _annonce_une_ecriture(db, conversation_id, reponse):
+    elif _annonce_une_ecriture(db, conversation_id, reponse, ecriture_proposee):
         return PHRASE_ECRITURE_NON_PROPOSEE
     # Une absence de coordonnées dans Moduléo sans lecture du contact dans
     # le tour (#183) : toute la réponse devient la phrase fixe, rien d'autre
@@ -890,11 +893,19 @@ def _appliquer_garde_fous(
     return _REPONSE_SANS_DONNEES_MODULEO if moduleo_appele else _REPONSE_SANS_DONNEES
 
 
-def _annonce_une_ecriture(db: Session, conversation_id: int, reponse: str) -> bool:
+def _annonce_une_ecriture(db: Session, conversation_id: int, reponse: str, ecriture_proposee: bool) -> bool:
     # Une carte ou une confirmation écrite en texte, ou une écriture dite
     # faite (#252). Après une confirmation, le modèle peut redire son
     # résultat (« Écrit dans Moduléo »), pas en annoncer une autre (#259).
-    return annonce_une_carte(reponse) or affirme_une_ecriture(reponse, routes_confirmees(db, conversation_id))
+    # Sans ecrire_moduleo au tour (prod, compte sans route ouverte), seule
+    # une écriture qui nomme Moduléo compte.
+    return annonce_une_carte(reponse) or affirme_une_ecriture(
+        reponse, routes_confirmees(db, conversation_id), sans_nommer_moduleo=ecriture_proposee
+    )
+
+
+def _ecriture_proposee(tools: list[dict] | None) -> bool:
+    return any(outil["function"]["name"] == OUTIL_ECRIRE.nom for outil in tools or [])
 
 
 def _identite_connue(compte: Compte | None) -> str:
@@ -1280,6 +1291,7 @@ def _tour_creer_conversation(
         contexte_outils.client_moduleo is not None,
         contexte_outils.cartes_du_tour,
         contexte_outils.refus_des_droits,
+        _ecriture_proposee(tools),
     )
 
     publier(TITRAGE)
@@ -1809,11 +1821,10 @@ _CONSIGNE_RELANCE = (
 def _a_relancer(reponse: str, tools: list[dict] | None, contexte_outils: ContexteTour) -> bool:
     # Seulement si ecrire_moduleo est proposé au tour : sinon, la phrase
     # fixe de _appliquer_garde_fous.
-    propose = any(outil["function"]["name"] == OUTIL_ECRIRE.nom for outil in tools or [])
     return (
-        propose
+        _ecriture_proposee(tools)
         and not contexte_outils.cartes_du_tour
-        and _annonce_une_ecriture(contexte_outils.db, contexte_outils.conversation_id, reponse)
+        and _annonce_une_ecriture(contexte_outils.db, contexte_outils.conversation_id, reponse, True)
     )
 
 
@@ -2223,6 +2234,7 @@ def _tour_envoyer_message(
         contexte_outils.client_moduleo is not None,
         contexte_outils.cartes_du_tour,
         contexte_outils.refus_des_droits,
+        _ecriture_proposee(tools),
     )
     _enregistrer_questions_du_tour(db, attendre_questions, identifiant_compte, conversation.id, piece_jointe)
 

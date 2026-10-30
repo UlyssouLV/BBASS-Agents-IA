@@ -121,6 +121,48 @@ def test_apres_une_confirmation_seul_le_resultat_de_son_element_peut_etre_redit(
     assert affirme_une_ecriture("La note Rappeler le client est supprimée.", confirmees)
 
 
+# Revue de la 1.5.2 : le garde-fou passe sur toutes les réponses du chat, un
+# texte ordinaire ne doit pas y ressembler à une requête ou à une question
+# d'écriture.
+@pytest.mark.parametrize(
+    "reponse",
+    [
+        "**Méthode :** on calcule la surface",
+        "Paramètres : a et b",
+        "Route : D613 depuis Castries",
+        "Corps : le texte du courrier",
+        "Souhaitez-vous que je crée un modèle de courrier ?",
+    ],
+)
+def test_un_texte_ordinaire_n_annonce_pas_de_carte(reponse):
+    assert not annonce_une_carte(reponse)
+
+
+@pytest.mark.parametrize(
+    "reponse",
+    [
+        "**Méthode :** POST",
+        "- **Corps :** {\"Numero\": \"04\"}",
+        "Paramètre : idTelephone = 152",
+        "Souhaitez-vous que je procède ?",
+        "Voulez-vous que je crée cet élément dans Moduléo ?",
+    ],
+)
+def test_une_requete_ou_une_confirmation_reste_annoncee(reponse):
+    assert annonce_une_carte(reponse)
+
+
+def test_sans_outil_d_ecriture_seule_la_phrase_qui_nomme_moduleo_affirme():
+    assert not affirme_une_ecriture("Le fichier a été supprimé.", sans_nommer_moduleo=False)
+    assert affirme_une_ecriture("Le fichier a été supprimé.")
+    assert affirme_une_ecriture("La tâche a été créée dans Moduléo.", sans_nommer_moduleo=False)
+
+
+def test_apres_une_confirmation_le_segment_final_de_la_route_nomme_l_element():
+    assert not affirme_une_ecriture("L'e-mail a été ajouté.", ["cogeo/elementged/email"])
+    assert affirme_une_ecriture("La note a été ajoutée.", ["cogeo/elementged/email"])
+
+
 def test_avec_une_carte_ouverte_les_phrases_de_route_de_parametres_ou_de_corps_partent():
     reponse = (
         "Voici la modification du numéro.\n"

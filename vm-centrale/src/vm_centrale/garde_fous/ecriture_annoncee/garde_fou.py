@@ -42,9 +42,11 @@ _BOUTON = re.compile(
 # requête (« "route": … », « "corps": … »).
 _ROUTE = re.compile(r"\b(?:POST|PUT|DELETE)\s+[a-z]+/\w|\"(?:route|methode|corps)\"\s*:", re.IGNORECASE)
 # Une fausse carte en lignes (#259) : « Route : PUT … », « Paramètre :
-# idTelephone = 152 », « Corps : … ».
+# idTelephone = 152 », « Corps : … ». Suivie d'une méthode, d'une route ou
+# d'une valeur : « Méthode : on calcule » ou « Route : D613 » sont du texte.
 _LIGNE_REQUETE = re.compile(
-    r"^[ \t]*(?:[-*][ \t]*)?\**[ \t]*(?:route|m[ée]thode|param[èe]tres?|corps)[ \t]*\**[ \t]*:",
+    r"^[ \t]*(?:[-*][ \t]*)?\**[ \t]*(?:route|m[ée]thode|param[èe]tres?|corps)[ \t]*\**[ \t]*:[ \t]*\**[ \t]*"
+    r"(?:(?-i:POST|PUT|DELETE)\b|(?-i:[a-z]+/\w)|\w+[ \t]*=|[{\[])",
     re.IGNORECASE | re.MULTILINE,
 )
 _FAITE = re.compile(
@@ -90,31 +92,51 @@ _CONSTAT = re.compile(r"\b(?:est|sont)\s+(?:bien\s+|déjà\s+|deja\s+)?$", re.IG
 # Sans Moduléo non plus (troisième passage de #206) : « L'affaire SCPT-0010
 # est enregistrée. » décrit la fiche lue ; « est supprimée. » reste affirmé.
 _ETAT_LU = re.compile(r"(?:est|sont)\s+enregistr", re.IGNORECASE)
+# Une question sur Moduléo ou l'un de ses éléments : « Voulez-vous que je
+# crée un modèle de courrier ? » n'attend aucune carte. « … que je procède ? »,
+# sans objet, reste une confirmation.
+_MODULEO = re.compile(r"\bmodul[eé]o\b", re.IGNORECASE)
+_PROCEDE_SEUL = re.compile(r"\bproc[èe]de\s*\?", re.IGNORECASE)
 
 
 def annonce_une_carte(reponse: str) -> bool:
     # Une carte, un bouton, une requête d'écriture ou une confirmation
     # demandée, écrits par le modèle.
-    motifs = (_CARTE, _CARTE_AUTREMENT, _QUESTION, _BOUTON, _ROUTE, _LIGNE_REQUETE)
-    return any(motif.search(reponse) for motif in motifs)
+    motifs = (_CARTE, _CARTE_AUTREMENT, _BOUTON, _ROUTE, _LIGNE_REQUETE)
+    return any(motif.search(reponse) for motif in motifs) or any(
+        _QUESTION.search(phrase) and _vise_moduleo(phrase) for phrase in _PHRASES.findall(reponse)
+    )
 
 
-def affirme_une_ecriture(reponse: str, routes_confirmees: Iterable[str] = ()) -> bool:
+def _vise_moduleo(phrase: str) -> bool:
+    return bool(_MODULEO.search(phrase) or _PROCEDE_SEUL.search(phrase)) or any(
+        motif.search(phrase) for _, motif in _ELEMENTS
+    )
+
+
+def affirme_une_ecriture(
+    reponse: str, routes_confirmees: Iterable[str] = (), sans_nommer_moduleo: bool = True
+) -> bool:
     # « créé / écrit / modifié / supprimé dans Moduléo », ou « est
     # supprimée. », hors lecture. `routes_confirmees` : celles des écritures
     # confirmées de la Conversation, dont le résultat peut être redit.
+    # `sans_nommer_moduleo` faux : seule la phrase qui nomme Moduléo compte.
+    # Sans outil d'écriture au tour, « Le fichier a été supprimé. » parle
+    # d'autre chose.
     routes = list(routes_confirmees)
     return any(
-        _affirme(phrase) and not (routes and _redit_un_resultat(phrase, routes))
+        _affirme(phrase, sans_nommer_moduleo) and not (routes and _redit_un_resultat(phrase, routes))
         for phrase in _PHRASES.findall(reponse)
     )
 
 
-def _affirme(phrase: str) -> bool:
+def _affirme(phrase: str, sans_nommer_moduleo: bool = True) -> bool:
     for faite in _FAITE.finditer(phrase):
         avant = _PROPOSITION.search(phrase[: faite.start()]).group()
         if not _NEGATION.search(avant) and not _CONSTAT.search(avant):
             return True
+    if not sans_nommer_moduleo:
+        return False
     for faite in _FAITE_SANS_MODULEO.finditer(phrase):
         if _ETAT_LU.match(faite.group()):
             continue
@@ -127,7 +149,8 @@ def _redit_un_resultat(phrase: str, routes_confirmees: list[str]) -> bool:
     # Sans élément nommé (« Écrit dans Moduléo. »), ou l'élément d'une
     # écriture confirmée (« le numéro est enregistré » après un téléphone).
     nommes = [segment for segment, motif in _ELEMENTS if motif.search(phrase)]
-    segments = [route.split("/")[1] if "/" in route else route for route in routes_confirmees]
+    # Tous les segments : l'e-mail de `cogeo/elementged/email`.
+    segments = [segment for route in routes_confirmees for segment in route.partition("?")[0].split("/")]
     return not nommes or any(segment.startswith(nomme) for nomme in nommes for segment in segments)
 
 

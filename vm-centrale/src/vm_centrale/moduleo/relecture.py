@@ -20,20 +20,24 @@ class ElementIntrouvable(Exception):
 class Relecture:
     # `route` : gabarit de ROUTES_GET à un seul paramètre, `parametre` ;
     # `source` : nom du paramètre de la route d'écriture, ou « corps.<champ> ».
+    # `source_trompeuse` : ce nom est celui d'un autre élément ; seul
+    # `parametre` dit ce que l'id désigne.
     route: str
     parametre: str
     source: str
+    source_trompeuse: bool = False
 
     @property
     def identites(self) -> set[str]:
         # Champs (casse indifférente) qui portent l'id de l'élément lui-même,
         # jamais montrés sur la carte : « Id », « IdTelephone »…
-        return {"id", self.parametre.casefold(), self.source.removeprefix("corps.").casefold()}
+        identites = {"id", self.parametre.casefold()}
+        return identites if self.source_trompeuse else identites | {self.source.removeprefix("corps.").casefold()}
 
 
-def _par_id(route: str, source: str) -> Relecture:
+def _par_id(route: str, source: str, source_trompeuse: bool = False) -> Relecture:
     parametre = route[route.index("{") + 1 : route.index("}")]
-    return Relecture(route, parametre, source)
+    return Relecture(route, parametre, source, source_trompeuse)
 
 
 _MULTI_TEMPS = "cogeo/tempspasse/multi?ids={ids}"
@@ -48,9 +52,9 @@ RELECTURES: dict[tuple[str, str], Relecture | None] = {
     ("DELETE", "cogeo/elementged/plan/{idPlan}"): _par_id("cogeo/elementged/plan/{idPlan}", "idPlan"),
     ("DELETE", "cogeo/email/{idEmail}"): _par_id("cogeo/email/{idEmail}", "idEmail"),
     # Le WADL nomme « idAffaire » l'id de l'enveloppe (« en fonction de son
-    # identifiant unique »).
+    # identifiant unique ») : l'IdAffaire de l'enveloppe relue reste montré.
     ("DELETE", "cogeo/enveloppe/{idAffaire}"): _par_id(
-        "cogeo/enveloppe/{idEnveloppePrevisionnelle}", "idAffaire"
+        "cogeo/enveloppe/{idEnveloppePrevisionnelle}", "idAffaire", source_trompeuse=True
     ),
     ("DELETE", "cogeo/frais/{IdFrais}"): _par_id("cogeo/frais/{idFrais}", "IdFrais"),
     ("DELETE", "cogeo/note/{idNote}"): _par_id("cogeo/note/{idNote}", "idNote"),

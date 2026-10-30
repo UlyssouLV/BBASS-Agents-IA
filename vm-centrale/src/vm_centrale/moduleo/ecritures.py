@@ -185,15 +185,21 @@ def cartes_par_message(db: Session, message_ids: list[int]) -> dict[int, list[di
         return {}
     ecritures = (
         db.query(EcritureModuleo)
-        .filter(EcritureModuleo.message_id.in_(message_ids), EcritureModuleo.carte.is_not(None))
+        .filter(EcritureModuleo.message_id.in_(message_ids))
         .order_by(EcritureModuleo.id)
         .all()
     )
     cartes: dict[int, list[dict[str, Any]]] = {}
-    for ecriture in ecritures:
+    for ecriture in _avec_carte(ecritures):
         assert ecriture.message_id is not None
         cartes.setdefault(ecriture.message_id, []).append(carte_de(ecriture))
     return cartes
+
+
+def _avec_carte(ecritures: list[EcritureModuleo]) -> list[EcritureModuleo]:
+    # Filtré ici, pas en SQL : une colonne JSON stocke None en `null` JSON,
+    # que `IS NOT NULL` laisse passer.
+    return [ecriture for ecriture in ecritures if ecriture.carte is not None]
 
 
 def resultats_par_message(db: Session, message_ids: list[int]) -> dict[int, list[str]]:
@@ -203,16 +209,12 @@ def resultats_par_message(db: Session, message_ids: list[int]) -> dict[int, list
         return {}
     ecritures = (
         db.query(EcritureModuleo)
-        .filter(
-            EcritureModuleo.message_id.in_(message_ids),
-            EcritureModuleo.carte.is_not(None),
-            EcritureModuleo.statut != PROPOSEE,
-        )
+        .filter(EcritureModuleo.message_id.in_(message_ids), EcritureModuleo.statut != PROPOSEE)
         .order_by(EcritureModuleo.id)
         .all()
     )
     resultats: dict[int, list[str]] = {}
-    for ecriture in ecritures:
+    for ecriture in _avec_carte(ecritures):
         assert ecriture.message_id is not None
         resultats.setdefault(ecriture.message_id, []).append(_resultat_pour_le_modele(ecriture))
     return resultats
@@ -273,7 +275,7 @@ def decider(
     except ModuleoIndisponible as erreur:
         return _echec(ecriture, EN_ECHEC, _PANNE, str(erreur))
     ecriture.statut = CONFIRMEE
-    ecriture.id_renvoye = _id_renvoye(reponse)
+    ecriture.id_renvoye = _id_renvoye(reponse, ecriture.route)
     return Decision(ecriture, reponse)
 
 
@@ -284,14 +286,24 @@ def _echec(ecriture: EcritureModuleo, statut: str, phrase: str, detail: str) -> 
     return Decision(ecriture, detail=detail)
 
 
-def _id_renvoye(reponse: Any) -> str | None:
-    # Moduléo renvoie l'id créé, seul ou dans l'élément (« Id… »).
+def _id_renvoye(reponse: Any, route: str) -> str | None:
+    # Moduléo renvoie l'id créé, seul ou dans l'élément : « Id », ou le
+    # champ du dernier segment de la route (« IdTelephone » de
+    # `moduleo/telephone`). Un autre champ (« IdContact ») ou un texte
+    # (« OK ») n'est pas cet id : il autoriserait un autre élément (#257).
     if isinstance(reponse, bool) or reponse is None:
         return None
-    if isinstance(reponse, (int, str)):
-        return str(reponse).strip() or None
+    if isinstance(reponse, int):
+        return str(reponse)
+    if isinstance(reponse, str):
+        return reponse.strip() if reponse.strip().isdigit() else None
     if isinstance(reponse, dict):
+        element = route.partition("?")[0].rsplit("/", 1)[-1].casefold()
         for cle, valeur in reponse.items():
-            if cle.startswith("Id") and isinstance(valeur, int) and not isinstance(valeur, bool):
+            if (cle == "Id" or cle.casefold().startswith(f"id{element}")) and _est_un_entier(valeur):
                 return str(valeur)
     return None
+
+
+def _est_un_entier(valeur: Any) -> bool:
+    return isinstance(valeur, int) and not isinstance(valeur, bool)
