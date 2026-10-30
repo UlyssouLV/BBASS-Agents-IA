@@ -33,12 +33,13 @@ export function App() {
   useRaccourciInspecteur();
 
   return (
-    <>
+    <div className="flex h-svh flex-col">
       <BandeauMiseAJour />
       <AProposApresVerification />
-      {_ecran()}
+      {/* Les écrans se mesurent à cette zone, pas à la fenêtre : le bandeau retire sa hauteur, le fermer la rend. */}
+      <div className="relative min-h-0 flex-1 overflow-y-auto">{_ecran()}</div>
       <Toaster />
-    </>
+    </div>
   );
 
   // Le temps de savoir si une session existe déjà (restauration via
@@ -58,7 +59,7 @@ export function App() {
       return (
         <main className="mx-auto mt-24 w-full max-w-sm text-center">
           {/* Menu « … » : régler l'adresse du Serveur BBASS sans session (spec 1.6.2, point 9). */}
-          <MenuConfiguration ouvrirSiAdresseInconnue className="fixed top-4 right-4" />
+          <MenuConfiguration ouvrirSiAdresseInconnue className="absolute top-4 right-4" />
           <p role="alert" className="mb-4 text-sm text-destructive">
             Impossible de vérifier la session en cours. Vérifiez la connexion au serveur puis réessayez.
           </p>
