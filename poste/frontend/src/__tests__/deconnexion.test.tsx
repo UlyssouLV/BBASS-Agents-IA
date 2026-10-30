@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "@/App";
+import { CLE_SESSION } from "@/hooks/useSession";
 
 // Issue #268 (spec 1.6.3, point 1) : le compte qui se connecte après un autre
 // sur le même poste ne voit rien du précédent, même un instant. La liste de
@@ -18,6 +19,8 @@ type Identifiant = keyof typeof COMPTES;
 
 let compteConnecte: Identifiant | null;
 let jetonRevoque: boolean;
+// Réponse de /compte retenue par le test, pour une relecture encore en vol.
+let reponseCompteRetenue: Promise<Response> | null;
 
 function reponseJson(corps: unknown, status = 200): Response {
   return new Response(JSON.stringify(corps), { status, headers: { "Content-Type": "application/json" } });
@@ -31,6 +34,9 @@ function posteSimule(entree: RequestInfo | URL, init?: RequestInit): Promise<Res
   const chemin = typeof entree === "string" ? entree : entree.toString();
   const methode = init?.method ?? "GET";
 
+  if (chemin === "/compte" && reponseCompteRetenue !== null) {
+    return reponseCompteRetenue;
+  }
   if (chemin === "/connexion" && methode === "POST") {
     const { identifiant } = JSON.parse(String(init?.body)) as { identifiant: Identifiant };
     compteConnecte = identifiant;
@@ -66,6 +72,7 @@ function rendreApp() {
       <App />
     </QueryClientProvider>
   );
+  return queryClient;
 }
 
 async function seConnecter(identifiant: Identifiant) {
@@ -79,6 +86,7 @@ describe("changement de compte sur le même poste", () => {
   beforeEach(() => {
     compteConnecte = null;
     jetonRevoque = false;
+    reponseCompteRetenue = null;
     vi.stubGlobal("fetch", vi.fn(posteSimule));
   });
 
@@ -126,5 +134,28 @@ describe("changement de compte sur le même poste", () => {
     fireEvent.click(screen.getByRole("button", { name: "Profil" }));
     await screen.findByRole("button", { name: "Se déconnecter" });
     expect(screen.queryByText("Alice suit le dossier Dupont.")).toBeNull();
+  });
+
+  it("une relecture de /compte en vol ne ramène pas le compte après la déconnexion", async () => {
+    const queryClient = rendreApp();
+    await seConnecter("alice");
+
+    let repondre: (reponse: Response) => void = () => {};
+    reponseCompteRetenue = new Promise((resolve) => {
+      repondre = resolve;
+    });
+    void queryClient.invalidateQueries({ queryKey: CLE_SESSION });
+    fireEvent.click(screen.getByRole("button", { name: "Profil" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Se déconnecter" }));
+    await screen.findByLabelText("Identifiant");
+
+    // Relevé à chaque changement du cache : un 401 viendrait vider la session
+    // juste après, et l'état final ne montrerait rien.
+    const sessions: unknown[] = [];
+    queryClient.getQueryCache().subscribe(() => sessions.push(queryClient.getQueryData(CLE_SESSION)));
+    repondre(reponseJson(COMPTES.alice));
+    await act(() => new Promise((resolve) => setTimeout(resolve, 20)));
+
+    expect(sessions.filter((session) => session !== null)).toEqual([]);
   });
 });

@@ -38,6 +38,7 @@ def _autorisation(jeton: str) -> dict[str, str]:
 def _preparer_recherche(mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice) -> None:
     moteur_recherche_factice.repondre(("Tarifs", _URL_PAGE, "Les options de mise en avant."))
     telechargeur_pages_factice.servir(_URL_PAGE, _PAGE)
+    mistral_client_factice.repondre_extraction([("La remontée en tête de liste coûte 5 € pour 7 jours.", _URL_PAGE)])
     mistral_client_factice.repondre_avec_appel_outil(
         "rechercher_web", {"requete": "tarif mise en avant", "besoin": "Prix des options"}
     )
@@ -146,6 +147,101 @@ def test_une_relecture_en_erreur_laisse_la_reponse_marquee_et_la_phrase_fixe(
 
     assert contenu.startswith(_REPONSE_MARQUEE)
     assert contenu.endswith(f"\n\n{_PHRASE_FIXE}")
+
+
+def test_une_relecture_qui_recopie_le_marqueur_est_ecartee(
+    client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide
+):
+    mistral_client_factice.repondre_relecture("Le pack urgent coûte [non trouvé] €.")
+
+    _, contenu = _premier_tour(
+        client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide,
+        _REPONSE_INVENTEE,
+    )
+
+    assert contenu.startswith(_REPONSE_MARQUEE)
+    assert contenu.endswith(f"\n\n{_PHRASE_FIXE}")
+
+
+def test_une_relecture_sans_contenu_texte_laisse_la_reponse_marquee_et_reste_comptee(
+    client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide, db_session
+):
+    mistral_client_factice.repondre_relecture(None)
+
+    _, contenu = _premier_tour(
+        client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide,
+        _REPONSE_INVENTEE,
+    )
+
+    assert contenu.startswith(_REPONSE_MARQUEE)
+    assert contenu.endswith(f"\n\n{_PHRASE_FIXE}")
+    assert db_session.query(Consommation).filter_by(type_appel="relecture").count() == 1
+
+
+def test_sans_outil_ni_piece_jointe_dans_le_tour_aucune_relecture(
+    client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide
+):
+    # La relecture ne verrait pas la recherche du tour 1 : elle retirerait
+    # les 5 €, pourtant sourcés.
+    conversation_id, _ = _premier_tour(
+        client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide,
+        "La remontée en tête de liste coûte 5 € pour 7 jours.",
+    )
+    mistral_client_factice.repondre(_REPONSE_INVENTEE, resume_et_profil=_RESUME_ET_PROFIL)
+
+    corps = fin(
+        client.post(
+            f"/conversations/{conversation_id}/messages",
+            json={"message": "Mets ça en tableau"},
+            headers=_autorisation(jeton_valide),
+        )
+    )
+
+    assert mistral_client_factice.appels_relecture == []
+    assert corps["reponse"].startswith(_REPONSE_MARQUEE)
+    assert corps["reponse"].endswith(f"\n\n{_PHRASE_FIXE}")
+
+
+def test_un_chiffre_d_un_tour_precedent_garde_la_reponse_marquee_sans_relecture(
+    client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide
+):
+    mistral_client_factice.repondre("Bien noté.", "Titre")
+    conversation_id = fin(
+        client.post("/conversations", json={"message": "Mon budget est de 1250 €"}, headers=_autorisation(jeton_valide))
+    )["conversation"]["id"]
+    _preparer_recherche(mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice)
+    mistral_client_factice.repondre(f"Pour vos 1250 € : {_REPONSE_INVENTEE}", resume_et_profil=_RESUME_ET_PROFIL)
+
+    corps = fin(
+        client.post(
+            f"/conversations/{conversation_id}/messages",
+            json={"message": _QUESTION},
+            headers=_autorisation(jeton_valide),
+        )
+    )
+
+    assert mistral_client_factice.appels_relecture == []
+    assert "1250 €" in corps["reponse"]
+    assert corps["reponse"].endswith(f"\n\n{_PHRASE_FIXE}")
+
+
+def test_une_invention_demandee_n_est_pas_relue(
+    client, mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice, jeton_valide
+):
+    _preparer_recherche(mistral_client_factice, moteur_recherche_factice, telechargeur_pages_factice)
+    mistral_client_factice.repondre("Devis fictif de 900 € : voir https://exemple-invente.fr/devis", "Titre")
+
+    corps = fin(
+        client.post(
+            "/conversations",
+            json={"message": "Invente un exemple de devis avec un lien de démonstration"},
+            headers=_autorisation(jeton_valide),
+        )
+    )
+
+    assert mistral_client_factice.appels_relecture == []
+    assert "Devis fictif de 900 €" in corps["reponse"]
+    assert "exemple-invente.fr" not in corps["reponse"]
 
 
 def _ligne_relecture(client, jeton: str, conversation_id: int, monkeypatch) -> dict:

@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "@/App";
+import { markdownEnCoursDeFrappe } from "@/lib/markdownEnCoursDeFrappe";
 
 // Issue #272 (spec 1.6.3, point 10) : pendant la frappe, la réponse s'affiche
 // déjà mise en forme. Chaque état du fil est relevé pendant l'animation ; aucun
@@ -176,5 +177,11 @@ describe("réponse mise en forme pendant la frappe", () => {
     await waitFor(() => expect(fil.children.length).toBe(2));
 
     expect(sansStyleVide(fil.lastElementChild?.innerHTML ?? "")).toBe(renduFinal);
+  });
+
+  it("du code en ligne à trois accents graves n'ouvre pas de bloc de code", () => {
+    const texte = "```npm install```\n\nLa suite reste du texte";
+
+    expect(markdownEnCoursDeFrappe(texte)).toBe(texte);
   });
 });

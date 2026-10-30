@@ -379,3 +379,12 @@ class EvenementJournalModuleo(Base):
     identifiant_admin: Mapped[str] = mapped_column(String)
     action: Mapped[str] = mapped_column(String)
     cible: Mapped[str] = mapped_column(String)
+
+
+class MigrationUnique(Base):
+    # Une ligne par traitement de données à ne jouer qu'une fois par base
+    # (pas de framework de migration, voir database.py).
+    __tablename__ = "migrations_uniques"
+
+    nom: Mapped[str] = mapped_column(String, primary_key=True)
+    date_application: Mapped[datetime] = mapped_column(DateTime)

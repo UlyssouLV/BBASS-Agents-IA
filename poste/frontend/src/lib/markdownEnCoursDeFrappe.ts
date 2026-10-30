@@ -7,7 +7,9 @@
 // retenus jusqu'à leur fin. Le texte stocké n'est jamais modifié, et un
 // texte complet n'est pas passé ici (rendu final identique).
 
-const _BARRIERE_BLOC_CODE = /^ {0,3}(`{3,}|~{3,})/;
+// Une barrière en accents graves n'a aucun autre accent grave sur sa ligne :
+// « ```npm install``` » est du code en ligne (CommonMark).
+const _BARRIERE_BLOC_CODE = /^ {0,3}(`{3,}(?=[^`]*$)|~{3,})/;
 // Préfixe de bloc d'une ligne (puce, numéro, titre, citation) : ses `*` ne
 // sont pas des marqueurs d'emphase.
 const _PREFIXE_DE_BLOC = /^\s*(?:(?:[-*+]|\d+[.)])\s+|#{1,6}\s+|>\s*)*/;

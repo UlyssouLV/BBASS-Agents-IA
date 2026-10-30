@@ -27,6 +27,7 @@ from vm_centrale.consommation import enregistrer_consommation
 from vm_centrale.database import FabriqueSession, get_db, get_fabrique_session
 from vm_centrale.dates import date_du_jour
 from vm_centrale.garde_fous import (
+    MARQUEUR_NON_TROUVE,
     PHRASE_CONTACT_NON_LU,
     PHRASE_NON_TROUVE,
     LectureSource,
@@ -103,7 +104,7 @@ from vm_centrale.schemas import (
     PieceJointeResume,
 )
 from vm_centrale.telechargement_pages import TelechargeurPages, get_telechargeur_pages
-from vm_centrale.suppression import supprimer_donnees_conversation
+from vm_centrale.suppression import supprimer_donnees_conversation, supprimer_fichiers
 
 _TAILLE_FENETRE_HISTORIQUE = 3
 # Fenêtre renvoyée avec la jauge de contexte (spec 1.4.2) : celle de la fiche
@@ -792,7 +793,7 @@ def _reponse_visible(
         )
 
     visible, retire = garde_fous(reponse)
-    if retire:
+    if retire and _relecture_possible(nouveau_message, visible, resultats_outils, piece_jointe):
         visible, retire = _relecture_apres_retrait(
             db,
             identifiant_compte,
@@ -825,6 +826,27 @@ def _reponse_visible(
         reponse_payload={"reponse_visible": visible},
     )
     return visible
+
+
+def _relecture_possible(
+    nouveau_message: str, reponse_marquee: str, resultats_outils: list[str], piece_jointe: PieceJointe | None
+) -> bool:
+    # La relecture ne voit que le tour (ADR-0023), alors que les garde-fous
+    # acceptent toute la conversation. Sa consigne lui fait retirer ce qu'elle
+    # ne voit pas : sans rien de ce tour, ou avec un chiffre gardé qui vient
+    # d'un tour précédent, elle effacerait du vrai. Une invention demandée
+    # n'a pas de source à retrouver.
+    if _demande_invention(nouveau_message):
+        return False
+    extrait = piece_jointe.contenu_extrait if piece_jointe is not None else None
+    sources_du_tour = [*resultats_outils, *([extrait] if extrait else [])]
+    if not sources_du_tour:
+        return False
+    return not retirer_chiffres_hors_source(
+        reponse_marquee,
+        [nouveau_message, _annee_du_jour_source(), *sources_du_tour],
+        _dates_de_la_consigne_ecrites(),
+    ).retire
 
 
 def _relecture_apres_retrait(
@@ -863,8 +885,11 @@ def _relecture_apres_retrait(
             commit=False,
         )
         return Retrait(reponse_marquee, True)
-    relue = relecture.contenu.strip()
-    retenue = bool(relue) and garde_fous(relue) == Retrait(relue, False)
+    # Mistral peut rendre un contenu nul ou découpé : l'appel reste compté.
+    relue = relecture.contenu.strip() if isinstance(relecture.contenu, str) else ""
+    # Un marqueur recopié n'est pas un retrait, mais resterait sans la phrase
+    # fixe qui l'explique.
+    retenue = bool(relue) and MARQUEUR_NON_TROUVE not in relue and garde_fous(relue) == Retrait(relue, False)
     enregistrer_consommation(
         db, identifiant_compte, conversation_id, TYPE_APPEL_RELECTURE, MODELE_CHAT, usage=relecture.usage
     )
@@ -1462,8 +1487,9 @@ def supprimer_conversation(
 ) -> None:
     conversation = _recuperer_conversation_du_compte(db, conversation_id, identifiant_compte)
 
-    supprimer_donnees_conversation(db, conversation, PIECES_JOINTES_DIR)
+    fichiers = supprimer_donnees_conversation(db, conversation)
     db.commit()
+    supprimer_fichiers(fichiers, PIECES_JOINTES_DIR)
 
 
 def _creer_piece_jointe(

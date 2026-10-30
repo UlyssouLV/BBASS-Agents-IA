@@ -26,11 +26,12 @@ export const CLE_SESSION = ["session", "compte"] as const;
 // consommation, inspecteur, administration…), sans liste de clés à tenir à
 // jour, pour que le compte suivant sur ce poste ne voie rien du précédent.
 // Seule la query de session est gardée, à null : son observateur dans App
-// reste monté et bascule sur l'écran de connexion.
+// reste monté et bascule sur l'écran de connexion. Elle est annulée comme les
+// autres : une lecture de /compte encore en vol ramènerait le compte précédent
+// par-dessus ce null.
 export function marquerSessionExpiree(queryClient: QueryClient): void {
-  const horsSession = { predicate: (query: Query) => query.queryHash !== hashKey(CLE_SESSION) };
-  void queryClient.cancelQueries(horsSession);
-  queryClient.removeQueries(horsSession);
+  void queryClient.cancelQueries();
+  queryClient.removeQueries({ predicate: (query: Query) => query.queryHash !== hashKey(CLE_SESSION) });
   queryClient.getMutationCache().clear();
   queryClient.setQueryData(CLE_SESSION, null);
 }

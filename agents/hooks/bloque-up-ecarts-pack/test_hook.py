@@ -42,11 +42,29 @@ class TestBloqueUpEcartsPack(unittest.TestCase):
         payload = {"tool_name": "Bash", "tool_input": {"command": "cd /depot && ./agents/scripts/update-from-pack.sh"}}
         self.assertTrue(lance_up(payload))
 
+    def test_reconnait_le_script_au_chemin_entre_guillemets(self) -> None:
+        commandes = [
+            'bash "$PACK/agents/scripts/update-from-pack.sh" --with-docs',
+            'bash "H:/Dossiers individuels/pack/agents/scripts/update-from-pack.sh"',
+            '"$PACK"/agents/scripts/update-from-pack.sh',
+            "cd /depot; 'chemin avec espaces/adopter-le-pack.sh'",
+            '& "C:/Program Files/Git/bin/bash.exe" agents/scripts/update-from-pack.sh',
+        ]
+        for commande in commandes:
+            with self.subTest(commande=commande):
+                self.assertTrue(lance_up({"tool_name": "Bash", "tool_input": {"command": commande}}))
+
+    def test_reconnait_le_script_dans_powershell(self) -> None:
+        payload = {"tool_name": "PowerShell", "tool_input": {"command": "bash agents/scripts/update-from-pack.sh"}}
+        self.assertTrue(lance_up(payload))
+
     def test_ignore_une_simple_mention_du_script(self) -> None:
         mentions = [
             "grep -n update-from-pack.sh agents/README.md",
             "cat >> guide.md <<'EOF'\nscripts update-from-pack.sh / adopter-le-pack.sh\nEOF\ntail -2 guide.md",
             'git commit -m "Bloque update-from-pack.sh tant que le pack est en retard"',
+            'echo "bash update-from-pack.sh"',
+            "grep 'a; update-from-pack.sh' guide.md",
         ]
         for commande in mentions:
             with self.subTest(commande=commande):

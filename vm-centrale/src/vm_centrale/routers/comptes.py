@@ -24,7 +24,7 @@ from vm_centrale.schemas import (
     StatutAdminRequest,
 )
 from vm_centrale.security import generer_mot_de_passe_aleatoire, hash_password
-from vm_centrale.suppression import IDENTIFIANT_COMPTE_SUPPRIME, supprimer_donnees_compte
+from vm_centrale.suppression import IDENTIFIANT_COMPTE_SUPPRIME, supprimer_donnees_compte, supprimer_fichiers
 
 router = APIRouter(prefix="/comptes")
 
@@ -256,9 +256,10 @@ def supprimer_compte(
     jetons.revoquer_tous(identifiant)
     # Ses données partent avec lui, dans la même transaction (spec 1.6.3,
     # #161) : un compte recréé avec le même identifiant n'en hérite pas.
-    supprimer_donnees_compte(db, identifiant, PIECES_JOINTES_DIR)
+    fichiers = supprimer_donnees_compte(db, identifiant)
     db.delete(compte)
     db.commit()
+    supprimer_fichiers(fichiers, PIECES_JOINTES_DIR)
 
 
 @router.patch(

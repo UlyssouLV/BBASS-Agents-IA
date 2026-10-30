@@ -39,14 +39,15 @@ def init_db(bind: Engine = engine) -> None:
     # catalogue.json, ensuite plus rien n'est réécrit au démarrage (spec
     # 1.5.3, ADR-0019). Import ici : models importe Base.
     from vm_centrale.moduleo.droits import charger_catalogue
-    from vm_centrale.suppression import nettoyer_comptes_supprimes
+    from vm_centrale.suppression import nettoyer_comptes_supprimes, supprimer_fichiers
 
     with Session(bind=bind) as db:
         charger_catalogue(db)
-        # Données des comptes supprimés avant la 1.6.3 (#161) : à chaque
-        # démarrage, sans effet une fois nettoyées.
-        nettoyer_comptes_supprimes(db, PIECES_JOINTES_DIR)
+        # Données des comptes supprimés avant la 1.6.3 (#161) : migration
+        # unique, comme le catalogue.
+        fichiers = nettoyer_comptes_supprimes(db)
         db.commit()
+    supprimer_fichiers(fichiers, PIECES_JOINTES_DIR)
 
 
 def get_db() -> Generator[Session, None, None]:

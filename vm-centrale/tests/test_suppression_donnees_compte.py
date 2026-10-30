@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 from sqlalchemy import create_engine, func, select
@@ -7,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from flux_sse import fin
 
-from vm_centrale.database import init_db
+from vm_centrale.database import Base, init_db
 from vm_centrale.models import (
     Compte,
     Consommation,
@@ -20,6 +21,7 @@ from vm_centrale.models import (
     RattachementModuleo,
 )
 from vm_centrale.moduleo.droits import charger_catalogue
+from vm_centrale.suppression import supprimer_donnees_compte
 
 # Supprimer un compte supprime ses données (spec 1.6.3, #161) : un compte
 # recréé avec le même identifiant repart de zéro. La consommation reste,
@@ -182,6 +184,34 @@ def test_le_refus_de_supprimer_le_dernier_administrateur_ne_supprime_aucune_donn
     assert all((repertoire_pieces_jointes / chemin).exists() for chemin in fichiers.values())
 
 
+def test_une_suppression_annulee_laisse_les_fichiers_des_pieces_jointes(
+    client, mistral_client_factice, jeton_store, seed_compte, db_session, admin, repertoire_pieces_jointes
+):
+    seed_compte("n.durand", "secret", "Castries", ["Foncier"], "Nadia", "Durand")
+    fichiers = _remplir_compte(client, mistral_client_factice, jeton_store, db_session, admin, "n.durand")
+
+    supprimer_donnees_compte(db_session, "n.durand")
+    db_session.rollback()
+
+    assert _compter(db_session, PieceJointe, "n.durand") == 2
+    assert all((repertoire_pieces_jointes / chemin).exists() for chemin in fichiers.values())
+
+
+def test_un_fichier_impossible_a_supprimer_ne_bloque_pas_la_suppression_du_compte(
+    client, mistral_client_factice, jeton_store, seed_compte, db_session, admin, repertoire_pieces_jointes, monkeypatch
+):
+    seed_compte("n.durand", "secret", "Castries", ["Foncier"], "Nadia", "Durand")
+    _remplir_compte(client, mistral_client_factice, jeton_store, db_session, admin, "n.durand")
+
+    def _refuser(_chemin, missing_ok=False):
+        raise PermissionError("fichier verrouillé")
+
+    monkeypatch.setattr(Path, "unlink", _refuser)
+
+    assert client.delete("/comptes/n.durand", headers=admin).status_code == 204
+    assert _compter(db_session, PieceJointe, "n.durand") == 0
+
+
 # --- Nettoyage au démarrage --------------------------------------------------
 
 
@@ -192,7 +222,8 @@ def test_le_demarrage_nettoie_les_donnees_orphelines_et_un_second_demarrage_n_a_
     dossier.mkdir()
     monkeypatch.setattr("vm_centrale.database.PIECES_JOINTES_DIR", str(dossier))
     engine = create_engine(f"sqlite:///{tmp_path / 'vm.db'}")
-    init_db(engine)
+    # Base d'avant la 1.6.3 : le nettoyage n'y a pas encore tourné.
+    Base.metadata.create_all(engine)
     maintenant = datetime.now(timezone.utc)
     with Session(engine) as db:
         db.add(Compte(identifiant="p.leroy", mot_de_passe_hash="x", prenom="Paul", nom="Leroy", agence="Castries"))
@@ -259,3 +290,74 @@ def test_le_demarrage_nettoie_les_donnees_orphelines_et_un_second_demarrage_n_a_
     init_db(engine)
 
     assert etat() == apres_premier
+
+
+@pytest.mark.parametrize("premier_demarrage_sur_base_vide", [True, False])
+def test_une_base_sans_compte_garde_ses_donnees_meme_apres_la_creation_d_un_compte(
+    tmp_path, monkeypatch, premier_demarrage_sur_base_vide
+):
+    # Restauration partielle : les conversations reviennent sans les comptes.
+    # Le compte créé ensuite (creer-admin) ne doit pas les rendre orphelines.
+    dossier = tmp_path / "pieces_jointes"
+    dossier.mkdir()
+    monkeypatch.setattr("vm_centrale.database.PIECES_JOINTES_DIR", str(dossier))
+    engine = create_engine(f"sqlite:///{tmp_path / 'vm.db'}")
+    Base.metadata.create_all(engine)
+    if premier_demarrage_sur_base_vide:
+        init_db(engine)
+    maintenant = datetime.now(timezone.utc)
+    (dossier / "n.durand.pdf").write_bytes(b"%PDF")
+    with Session(engine) as db:
+        db.add(
+            Conversation(
+                identifiant_compte="n.durand", titre="T", date_creation=maintenant, date_derniere_activite=maintenant
+            )
+        )
+        db.add(
+            PieceJointe(
+                identifiant_compte="n.durand", conversation_id=None, nom_fichier="a.pdf",
+                type_mime="application/pdf", taille_octets=4, chemin_fichier="n.durand.pdf",
+                date_creation=maintenant,
+            )
+        )
+        db.commit()
+
+    init_db(engine)
+    with Session(engine) as db:
+        db.add(Compte(identifiant="admin", mot_de_passe_hash="x", prenom="A", nom="D", agence="Castries"))
+        db.commit()
+    init_db(engine)
+
+    with Session(engine) as db:
+        assert db.query(Conversation).filter_by(identifiant_compte="n.durand").count() == 1
+        assert db.query(PieceJointe).filter_by(identifiant_compte="n.durand").count() == 1
+    assert (dossier / "n.durand.pdf").exists()
+
+
+def test_un_fichier_impossible_a_supprimer_ne_bloque_pas_le_demarrage(tmp_path, monkeypatch):
+    dossier = tmp_path / "pieces_jointes"
+    dossier.mkdir()
+    monkeypatch.setattr("vm_centrale.database.PIECES_JOINTES_DIR", str(dossier))
+    engine = create_engine(f"sqlite:///{tmp_path / 'vm.db'}")
+    Base.metadata.create_all(engine)
+    maintenant = datetime.now(timezone.utc)
+    with Session(engine) as db:
+        db.add(Compte(identifiant="p.leroy", mot_de_passe_hash="x", prenom="Paul", nom="Leroy", agence="Castries"))
+        db.add(
+            PieceJointe(
+                identifiant_compte="n.durand", conversation_id=None, nom_fichier="a.pdf",
+                type_mime="application/pdf", taille_octets=4, chemin_fichier="n.durand.pdf",
+                date_creation=maintenant,
+            )
+        )
+        db.commit()
+
+    def _refuser(_chemin, missing_ok=False):
+        raise PermissionError("fichier verrouillé")
+
+    monkeypatch.setattr(Path, "unlink", _refuser)
+
+    init_db(engine)
+
+    with Session(engine) as db:
+        assert db.query(PieceJointe).count() == 0

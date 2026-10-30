@@ -12,7 +12,7 @@ CONSIGNE_RELECTURE = (
     "sources, ont été remplacées par « [non trouvé] ». Réécris-la pour le "
     "collaborateur en ne gardant que ce que les résultats d'outils et la pièce "
     "jointe ci-dessous contiennent. Dis clairement ce qui n'a pas été trouvé et "
-    "où on a cherché. N'ajoute aucun chiffre, aucune source, aucun lien ni "
+    "où on a cherché, sans jamais recopier « [non trouvé] ». N'ajoute aucun chiffre, aucune source, aucun lien ni "
     "aucun fait qui ne soit pas écrit dans ces résultats. Garde la mise en "
     "forme Markdown utile (listes, tableaux). Réponds seulement par la "
     "réponse réécrite."
