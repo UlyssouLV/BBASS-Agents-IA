@@ -254,7 +254,9 @@ def _consigne_date_du_jour() -> str:
     # scénario 4) : avec la seule date ISO, « la semaine dernière » le lundi
     # 26/10/2026 devenait les sept derniers jours. Bornes de la semaine
     # dernière données toutes calculées (rejeu #195) : le modèle les
-    # calculait faux (« du lundi 20 au dimanche 26 octobre »).
+    # calculait faux (« du lundi 20 au dimanche 26 octobre »). Semaine
+    # prochaine depuis le test humain #274 (scénario 8) : même calcul faux
+    # (« lundi 3 novembre » pour le lundi 2).
     # Date du jour sans ISO depuis la 1.6.3 (#131) : le modèle la recopiait
     # dans la requête de rechercher_web. Les bornes gardent l'ISO, à
     # recopier dans les filtres de date des outils Moduléo.
@@ -262,9 +264,11 @@ def _consigne_date_du_jour() -> str:
     return (
         f"Date du jour : {_en_lettres(aujourdhui)}. "
         f"Semaine en cours : {_bornes_en_lettres(*_semaine_en_cours())}. "
-        f"Semaine dernière : {_bornes_en_lettres(*_semaine_derniere())}. Une "
+        f"Semaine dernière : {_bornes_en_lettres(*_semaine_derniere())}. "
+        f"Semaine prochaine : {_bornes_en_lettres(*_semaine_prochaine())}. Une "
         "semaine va du lundi au dimanche : « cette semaine » est la semaine en "
-        "cours, « la semaine dernière » celle d'avant, avec ces dates exactes, "
+        "cours, « la semaine dernière » celle d'avant, « la semaine prochaine » "
+        "celle d'après, avec ces dates exactes, "
         "sans les recalculer, et un jour nommé seul (« mercredi ») celui de la "
         "semaine en cours. Dans une requête de rechercher_web, jamais de date "
         f"complète : pour une actualité ou une information récente, seule l'année "
@@ -292,6 +296,11 @@ def _semaine_derniere() -> tuple[date, date]:
     return lundi - timedelta(days=7), dimanche - timedelta(days=7)
 
 
+def _semaine_prochaine() -> tuple[date, date]:
+    lundi, dimanche = _semaine_en_cours()
+    return lundi + timedelta(days=7), dimanche + timedelta(days=7)
+
+
 def _bornes_en_lettres(lundi: date, dimanche: date) -> str:
     return f"du {_en_lettres(lundi)} ({lundi.isoformat()}) au {_en_lettres(dimanche)} ({dimanche.isoformat()})"
 
@@ -310,12 +319,14 @@ def _annee_du_jour_source() -> str:
 
 
 def _dates_de_la_consigne_ecrites() -> list[re.Pattern[str]]:
-    # La date du jour et les bornes de la semaine en cours et de la semaine
-    # dernière (#200), écrites dans la réponse (« 15 octobre », « lundi 26 »,
+    # La date du jour et les bornes de la semaine en cours, de la semaine
+    # dernière (#200) et de la semaine prochaine (#275), écrites dans la
+    # réponse (« 15 octobre », « lundi 26 »,
     # « 1er novembre 2026 », « 26/10/2026 ») : leurs chiffres ne sont pas
     # contrôlés, le quantième seul l'est.
     return [
-        _date_ecrite(jour) for jour in {_date_du_jour(), *_semaine_en_cours(), *_semaine_derniere()}
+        _date_ecrite(jour)
+        for jour in {_date_du_jour(), *_semaine_en_cours(), *_semaine_derniere(), *_semaine_prochaine()}
     ]
 
 

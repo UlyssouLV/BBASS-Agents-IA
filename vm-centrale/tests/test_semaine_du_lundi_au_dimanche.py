@@ -77,9 +77,7 @@ def test_un_dimanche_la_semaine_en_cours_commence_le_lundi_precedent(
     consigne = _consigne(client, mistral_client_factice, jeton_valide)
 
     assert "dimanche 25 octobre 2026" in consigne
-    assert "lundi 19 octobre 2026" in consigne
-    assert "2026-10-19" in consigne
-    assert "lundi 26" not in consigne
+    assert "Semaine en cours : du lundi 19 octobre 2026 (2026-10-19)" in consigne
 
 
 @pytest.mark.parametrize("outil", ["chercher_temps_passes_moduleo", "chercher_planning_moduleo"])
@@ -121,3 +119,37 @@ def test_un_autre_jour_hors_des_bornes_reste_controle(client, mistral_client_fac
     reponse = _repondre(client, mistral_client_factice, jeton_valide, "Rendez-vous le mardi 27 octobre 2026.")
 
     assert reponse == _PHRASE_SANS_DONNEES
+
+
+def test_la_consigne_donne_les_bornes_de_la_semaine_prochaine_toutes_calculees(
+    client, mistral_client_factice, jeton_valide, monkeypatch
+):
+    # Test humain #274 (scénario 8) : sans ces bornes, le vendredi 30/10/2026,
+    # le modèle calculait « lundi 3 novembre » au lieu du lundi 2, alors que
+    # la page lue donnait la bonne date.
+    monkeypatch.setattr(conversations, "_date_du_jour", lambda: date(2026, 10, 30))
+
+    consigne = _consigne(client, mistral_client_factice, jeton_valide)
+
+    assert "Semaine prochaine : du lundi 2 novembre 2026 (2026-11-02) au dimanche 8 novembre 2026 (2026-11-08)" in consigne
+    assert "« la semaine prochaine »" in consigne
+
+
+def test_un_dimanche_la_semaine_prochaine_commence_le_lendemain(
+    client, mistral_client_factice, jeton_valide, monkeypatch
+):
+    monkeypatch.setattr(conversations, "_date_du_jour", lambda: date(2026, 11, 1))
+
+    consigne = _consigne(client, mistral_client_factice, jeton_valide)
+
+    assert "Semaine prochaine : du lundi 2 novembre 2026 (2026-11-02) au dimanche 8 novembre 2026 (2026-11-08)" in consigne
+
+
+def test_le_garde_fou_chiffres_laisse_les_bornes_de_la_semaine_prochaine(
+    client, mistral_client_factice, jeton_valide, monkeypatch
+):
+    monkeypatch.setattr(conversations, "_date_du_jour", lambda: date(2026, 11, 11))
+
+    reponse = "La semaine prochaine va du lundi 16 au dimanche 22 novembre 2026."
+
+    assert _repondre(client, mistral_client_factice, jeton_valide, reponse) == reponse
