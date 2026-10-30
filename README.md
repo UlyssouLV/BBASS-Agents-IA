@@ -169,15 +169,15 @@ class node_database,node_collaborator,node_mistral,node_searxng toneIndigo
 
 ## Semaine du 26 au 30 octobre 2026
 
-**V1.6.3 livrée** (développement 1.5.2 : écrire dans Moduléo depuis le chat, chaque écriture confirmée par le collaborateur sur une carte, sur le serveur de test seulement : staging et poste de dev, jamais la prod, [ADR-0023](docs/adr/0023-ecriture-moduleo-confirmee-serveur-de-test.md) ; périmètre réduit, limites reportées en 1.8.1 et 1.8.2). Avant elle, **V1.6.2** (le poste devient une application Windows : `BBASS-Setup-vX.Y.Z.exe` joint à chaque Release l’installe sans git ni droits administrateur, et chaque lancement met le poste à la version du Serveur BBASS, [ADR-0022](docs/adr/0022-poste-application-windows-version-dictee-par-la-vm.md)), **V1.6.1** (CD : la VM centrale livrée en images Docker sur GHCR, staging et prod, [ADR-0021](docs/adr/0021-cd-vm-centrale-staging-prod.md)), **V1.6.0** (CI : chaque version vérifiée automatiquement avant d’entrer sur `main`, [ADR-0020](docs/adr/0020-ci-argos-compartimentee.md)) et **V1.5.3** (administration des groupes et droits Moduléo depuis le Panel). Suite sur la feuille de route : **1.6.3** (bugs existants, produit 1.6.4), série **1.7.x** (documentation), série **1.8.x** (serveur MCP Moduléo), **1.9.0** (workflows n8n), **1.10.0** (pièces jointes approfondies).
+**V1.6.4 livrée** (développement 1.6.3 : un compte ne voit jamais les données d’un autre, l’IA dit ce qu’elle n’a pas trouvé au lieu d’inventer, relue à part après un retrait de garde-fou, [ADR-0024](docs/adr/0024-relecture-isolee-apres-garde-fou.md), réponse mise en forme pendant la frappe, bandeau de mise à jour qui ne recouvre plus le bouton **…**). Avant elle, **V1.6.3** (développement 1.5.2 : écrire dans Moduléo depuis le chat, chaque écriture confirmée par le collaborateur sur une carte, sur le serveur de test seulement : staging et poste de dev, jamais la prod, [ADR-0023](docs/adr/0023-ecriture-moduleo-confirmee-serveur-de-test.md) ; périmètre réduit, limites reportées en 1.8.1 et 1.8.2), **V1.6.2** (le poste devient une application Windows : `BBASS-Setup-vX.Y.Z.exe` joint à chaque Release l’installe sans git ni droits administrateur, et chaque lancement met le poste à la version du Serveur BBASS, [ADR-0022](docs/adr/0022-poste-application-windows-version-dictee-par-la-vm.md)), **V1.6.1** (CD : la VM centrale livrée en images Docker sur GHCR, staging et prod, [ADR-0021](docs/adr/0021-cd-vm-centrale-staging-prod.md)), **V1.6.0** (CI : chaque version vérifiée automatiquement avant d’entrer sur `main`, [ADR-0020](docs/adr/0020-ci-argos-compartimentee.md)) et **V1.5.3** (administration des groupes et droits Moduléo depuis le Panel). Suite sur la feuille de route : série **1.7.x** (documentation), série **1.8.x** (serveur MCP Moduléo), **1.9.0** (workflows n8n), **1.10.0** (pièces jointes approfondies).
 
 ```mermaid
 flowchart LR
   V160["V1.6.0<br/>CI versions vérifiées<br/>livrée"] --> V161["V1.6.1<br/>CD de la VM centrale<br/>livrée"]
   V161 --> V162["V1.6.2<br/>installation des postes<br/>livrée"]
   V162 --> V163["V1.6.3 (dév. 1.5.2)<br/>écriture Moduléo<br/>livrée"]
-  V163 --> D163["1.6.3 (produit 1.6.4)<br/>bugs existants"]
-  D163 --> V170["1.7.x<br/>documentation"]
+  V163 --> V164["V1.6.4 (dév. 1.6.3)<br/>bugs existants<br/>livrée"]
+  V164 --> V170["1.7.x<br/>documentation"]
   V170 --> V180["1.8.x<br/>serveur MCP Moduléo"]
   V180 --> V190["1.9.0<br/>workflows n8n"]
   V190 --> V1100["1.10.0<br/>pièces jointes approfondies"]

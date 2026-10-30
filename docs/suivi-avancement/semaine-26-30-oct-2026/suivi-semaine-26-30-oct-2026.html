@@ -420,6 +420,7 @@
               <li><a href="#version-1-6-0">V1.6.0 — Versions vérifiées et prêtes à livrer</a></li>
               <li><a href="#version-1-6-1">V1.6.1 — Installer et mettre à jour le serveur central sans l’alternant</a></li>
               <li><a href="#version-1-6-2">V1.6.2 — Installer et mettre à jour les postes sans l’alternant</a></li>
+              <li><a href="#version-1-6-3">V1.6.3 — Corriger les bugs existants</a></li>
               <li><a href="#version-1-8-0">V1.8.0 — Workflows n8n</a></li>
               <li><a href="#version-1-9-0">V1.9.0 — Analyse approfondie des pièces jointes</a></li>
             </ol>
@@ -470,6 +471,7 @@
       <h3>Vendredi 30 octobre</h3>
       <ul>
         <li>V1.5.2 livrée (numéro produit 1.6.3) : le chat prépare une écriture dans Moduléo et le collaborateur la confirme d’un clic sur une carte, sur le serveur de test seulement ; le serveur du cabinet n’est jamais modifié ; ajouter un téléphone ou une note, modifier un contact et supprimer un temps passé fonctionnent ; les limites constatées aux trois passages de tests humains sont reportées en 1.8.1 et 1.8.2.</li>
+        <li>V1.6.3 livrée (numéro produit 1.6.4) : un compte ne voit plus rien du précédent sur un poste partagé, supprimer un compte supprime ses données, l’IA dit ce qu’elle n’a pas trouvé au lieu d’inventer, la réponse est mise en forme pendant son affichage, et le bandeau de mise à jour ne recouvre plus le bouton « … ».</li>
       </ul>
     </div>
     </section>
@@ -486,8 +488,8 @@
     <section class="bloc" id="livre-pour">
     <h2>Livré pour le 30/10/2026</h2>
     <div class="recap">
-      <p><strong>Point vendredi 30 octobre — visé : V1.5.1 · livré : V1.5.1 (lundi 26 octobre), V1.5.3 et V1.6.0 (mardi 27 octobre), V1.6.1 (mercredi 28 octobre), V1.6.2 (jeudi 29 octobre), V1.5.2 (vendredi 30 octobre, numéro produit 1.6.3)</strong></p>
-      <p>V1.5.2 livrée en dernier : les identifiants du serveur de test Moduléo sont arrivés le 29 octobre, d’où la livraison de la 1.5.3, de la 1.6.0, de la 1.6.1 et de la 1.6.2 avant elle. Elle sort sous le numéro produit 1.6.3.</p>
+      <p><strong>Point vendredi 30 octobre — visé : V1.5.1 · livré : V1.5.1 (lundi 26 octobre), V1.5.3 et V1.6.0 (mardi 27 octobre), V1.6.1 (mercredi 28 octobre), V1.6.2 (jeudi 29 octobre), V1.5.2 (vendredi 30 octobre, numéro produit 1.6.3), V1.6.3 (vendredi 30 octobre, numéro produit 1.6.4)</strong></p>
+      <p>V1.5.2 livrée en dernier : les identifiants du serveur de test Moduléo sont arrivés le 29 octobre, d’où la livraison de la 1.5.3, de la 1.6.0, de la 1.6.1 et de la 1.6.2 avant elle. Elle sort sous le numéro produit 1.6.3. La 1.6.3, corrections de bugs, la suit le même jour sous le numéro produit 1.6.4.</p>
     </div>
     </section>
 
@@ -595,6 +597,22 @@
             <li><strong>Écran de connexion revu</strong> : état de la connexion au serveur visible d’un coup d’œil ; menu « … » pour changer de serveur sans réinstaller, ouvrir le dossier de configuration, voir la version (« À propos ») et vérifier les mises à jour.</li>
             <li><strong>Guides</strong> : installation, dépannage et administration des postes décrits pas à pas sur le site de documentation.</li>
             <li><strong>Tests humains</strong> : joués juste après la livraison, le programme d’installation n’existant qu’une fois la version publiée ; un problème trouvé donnera une version de correction.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="version" id="version-1-6-3">
+        <div class="version-head">
+          <h3>V1.6.3 — Corriger les bugs existants</h3>
+          <span class="deploye">Déployé le 30/10/2026 à 14:35</span>
+        </div>
+        <div class="version-body">
+          <p>Les bugs connus hors écriture Moduléo sont corrigés. Numéro produit : 1.6.4.</p>
+          <ul>
+            <li><strong>Comptes</strong> : après une déconnexion, le compte suivant ne voit rien du précédent, même un instant. Supprimer un compte supprime ses données ; ses coûts restent visibles sous « Compte supprimé ».</li>
+            <li><strong>Réponses de l’IA</strong> : quand la recherche ou la pièce jointe ne contient pas l’information, la réponse le dit au lieu d’estimer ou de citer une source qui n’existe pas. Ce qui manque apparaît comme « [non trouvé] », avec une phrase de fin, et la réponse peut être relue à part pour rester lisible.</li>
+            <li><strong>Dates</strong> : les bornes de la semaine prochaine sont justes, et la recherche web ne contient que l’année.</li>
+            <li><strong>Affichage</strong> : la réponse est mise en forme pendant son animation, et le bandeau de mise à jour laisse le bouton « … » cliquable.</li>
           </ul>
         </div>
       </div>
