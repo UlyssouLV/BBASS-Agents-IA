@@ -6,10 +6,10 @@ import feuille from '../data/feuille-de-route.json';
 import styles from './feuilleDeRoute.module.css';
 
 type Version = {
-  version: string;
   titre: string;
   resume: string;
   href: string;
+  slug: string;
 };
 
 type Donnees = {
@@ -33,14 +33,15 @@ export default function FeuilleDeRouteAccueil(): ReactNode {
     <div className={styles.bloc}>
       <ol className={styles.liste}>
         {donnees.versions.map((v, index) => (
-          <li key={v.version}>
+          <li key={v.slug}>
             <Link
               className={clsx(styles.carte, index === 0 && styles.carteProchaine)}
               to={v.href}>
-              <div className={styles.bandeau}>
-                <span className={styles.badge}>{v.version}</span>
-                {index === 0 && <span className={styles.prochaine}>Prochaine</span>}
-              </div>
+              {index === 0 && (
+                <div className={styles.bandeau}>
+                  <span className={styles.prochaine}>Prochaine</span>
+                </div>
+              )}
               <h3 className={styles.titre}>{v.titre}</h3>
               {v.resume ? <p className={styles.resume}>{v.resume}</p> : null}
               <span className={styles.lire}>Lire la proposition →</span>

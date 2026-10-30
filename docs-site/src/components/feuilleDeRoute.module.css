@@ -53,22 +53,6 @@
   margin-bottom: 0.4rem;
 }
 
-.badge {
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  font-variant-numeric: tabular-nums;
-  color: var(--bbass-anthracite);
-  background: var(--bbass-muted);
-  padding: 0.2rem 0.5rem;
-  border-radius: 999px;
-}
-
-.carteProchaine .badge {
-  color: white;
-  background: var(--bbass-rouge);
-}
-
 .lire {
   display: inline-block;
   margin-top: 0.65rem;
