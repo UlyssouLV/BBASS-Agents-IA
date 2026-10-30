@@ -161,6 +161,12 @@ def _dechiffrer_cle_mistral(valeur_chiffree: str, fichier_cle_maitre: str) -> st
         ) from None
 
 
+def get_version() -> str:
+    # Posée par l'image (ARG VERSION du Dockerfile, spec 1.6.1) ; « dev »
+    # hors image (lancer-vm.*).
+    return os.environ.get("VM_CENTRALE_VERSION") or "dev"
+
+
 def get_vm_admin_key() -> str | None:
     # None (jamais une levée d'exception) quand la clé n'est pas configurée :
     # l'endpoint de révocation forcée doit alors refuser toute requête (401),
@@ -179,7 +185,7 @@ class ConfigModuleoChiffree:
 
 
 def get_moduleo_ecriture() -> bool:
-    # Réglage MODULEO_ECRITURE (spec 1.5.2, ADR-0019), lu à l'appel : absent
+    # Réglage MODULEO_ECRITURE (spec 1.5.2, ADR-0023), lu à l'appel : absent
     # ou autre que « 1 », « true », « oui » = inactif. Seule une des deux
     # barrières de l'écriture : MODULEO_URL doit aussi figurer dans la liste
     # versionnée des serveurs de test (moduleo/serveurs_test.json).
@@ -191,7 +197,8 @@ def get_config_moduleo_chiffree() -> ConfigModuleoChiffree:
     # SecurityCode sont chiffrés (Fernet, spec 1.5.0, ADR-0017) avec la clé
     # maître du fichier VM_CLE_MAITRE_FICHIER, hors du dépôt. Le
     # déchiffrement est dans vm_centrale/moduleo/configuration.py ;
-    # scripts/chiffrer_secret.py produit les valeurs chiffrées.
+    # scripts/chiffrer_secret.py (dev), `installer` et `configurer-secret`
+    # (image, spec 1.6.1) produisent les valeurs chiffrées.
     return ConfigModuleoChiffree(
         url=os.environ.get("MODULEO_URL", MODULEO_URL) or None,
         api_key_chiffree=os.environ.get("MODULEO_API_KEY_CHIFFREE") or None,

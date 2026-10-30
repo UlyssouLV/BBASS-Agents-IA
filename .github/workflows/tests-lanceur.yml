@@ -1,0 +1,60 @@
+name: Tests lanceur
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  # Path filter en job (pas au niveau workflow) : un skip par `if` compte
+  # Success pour le ruleset (skip→vert). Un `paths:` sur `on:` laisserait le
+  # check required en Pending.
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      lanceur: ${{ steps.filter.outputs.lanceur }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad # v3.0.4
+        id: filter
+        with:
+          filters: |
+            lanceur:
+              - 'lanceur/**'
+              - '.github/workflows/tests-lanceur.yml'
+
+  tests-lanceur:
+    name: tests-lanceur
+    needs: changes
+    if: needs.changes.outputs.lanceur == 'true'
+    # Le Lanceur cible Windows (WebView2, Job Object) : ses tests aussi.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
+          components: clippy
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: lanceur
+
+      - name: cargo test
+        working-directory: lanceur
+        run: cargo test --workspace --locked
+
+      - name: cargo clippy
+        working-directory: lanceur
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings

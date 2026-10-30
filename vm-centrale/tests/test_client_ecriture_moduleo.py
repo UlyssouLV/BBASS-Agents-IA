@@ -21,7 +21,7 @@ from vm_centrale.moduleo.droits import GROUPE_DEV, DroitManquant, DroitsModuleo,
 from vm_centrale.moduleo.droits import garde
 from vm_centrale.moduleo.routes import ROUTES_ECRITURE
 
-# Client d'écriture Moduléo (spec 1.5.2, #202, ADR-0019) : `ecrire()`
+# Client d'écriture Moduléo (spec 1.5.2, #202, ADR-0023) : `ecrire()`
 # n'envoie que vers un serveur de test listé, `MODULEO_ECRITURE` actif,
 # après le garde des droits. Aucun accès réseau.
 

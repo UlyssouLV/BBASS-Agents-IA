@@ -23,5 +23,5 @@ Alternatives écartées :
 
 - Une page de moins de 24 h n'est plus retéléchargée : réponse plus rapide, aucun gain de facture (un téléchargement ne coûte rien chez Mistral).
 - Une page peut être servie dans une version vieille de 24 h au plus ; le collaborateur peut demander une relecture à jour (`lire_pages_web` avec `retelecharger`).
-- Aucune purge pendant une requête : un script `purger_cache_pages.py` supprime les copies expirées, à brancher sur une crontab au déploiement.
+- Aucune purge pendant une requête : une tâche planifiée supprime les copies expirées (`tache purger-cache-pages`, timer systemd horaire depuis la 1.6.1, [ADR-0021](./0021-cd-vm-centrale-staging-prod.md)).
 - Supprimer une Conversation ne supprime pas les pages qu'elle a mises en cache.

@@ -7,7 +7,8 @@ from vm_centrale.models import DroitModuleo, GroupeModuleo, GroupeModuleoDroit
 
 # Catalogue des Droits Moduléo et groupes recopiés de Moduléo (spec 1.5.1,
 # ADR-0018) : fichier versionné, transcrit des captures de
-# moduleo/docs/droits/, chargé en base à chaque démarrage. Règles :
+# moduleo/docs/droits/. Depuis la 1.5.3 (ADR-0019), source d'une migration
+# unique : cases et groupes vivent ensuite en base. Règles :
 # moduleo/README.md.
 
 FICHIER_CATALOGUE = Path(__file__).parent / "catalogue.json"
@@ -28,22 +29,24 @@ def chemin(*parties: str) -> str:
 
 
 def charger_catalogue(db: Session, fichier: Path = FICHIER_CATALOGUE) -> None:
-    # Idempotent : un droit est retrouvé par son chemin, un groupe par
-    # (application, nom) ; les droits d'un groupe du fichier sont remplacés
-    # par ceux du fichier. Les groupes de dev existants reçoivent les droits
-    # ajoutés au catalogue. Un droit sorti du fichier est retiré de la base
-    # et des groupes qui l'accordaient. Ne valide pas : l'appelant committe.
+    # Migration unique (spec 1.5.3, #210) : les cases du fichier seulement
+    # si la base n'en a aucune, le groupe Admin seulement si la base n'a
+    # aucun groupe. Sinon rien : ni les cases ni les droits des groupes ne
+    # sont réécrits. Ne valide pas : l'appelant committe.
+    sans_cases = db.query(DroitModuleo).first() is None
+    sans_groupe = db.query(GroupeModuleo).first() is None
+    if not (sans_cases or sans_groupe):
+        return
     donnees = json.loads(fichier.read_text(encoding="utf-8"))
     droits = {droit.chemin: droit for droit in db.query(DroitModuleo)}
-    for application in APPLICATIONS:
-        ordre = 0
-        for categorie in donnees["catalogue"][application]:
-            ordre = _inscrire(db, droits, application, categorie["categorie"], categorie["droits"], [], None, ordre)
-    _retirer_sortis(db, droits, _chemins_du_fichier(donnees))
-    for groupe in donnees["groupes"]:
-        _accorder(db, _groupe(db, groupe["application"], groupe["nom"]), droits, groupe["droits"])
-    for groupe in db.query(GroupeModuleo).filter(GroupeModuleo.nom == GROUPE_DEV):
-        _accorder_tout(db, groupe)
+    if sans_cases:
+        for application in APPLICATIONS:
+            ordre = 0
+            for categorie in donnees["catalogue"][application]:
+                ordre = _inscrire(db, droits, application, categorie["categorie"], categorie["droits"], [], None, ordre)
+    if sans_groupe:
+        for groupe in donnees["groupes"]:
+            _accorder(db, _groupe(db, groupe["application"], groupe["nom"]), droits, groupe["droits"])
     db.flush()
 
 
@@ -91,32 +94,6 @@ def _inscrire(
     return ordre
 
 
-def _chemins_du_fichier(donnees: dict) -> set[str]:
-    def parcourir(categorie: str, entrees: list[dict], parents: list[str]) -> list[str]:
-        trouves = []
-        for entree in entrees:
-            trouves.append(chemin(categorie, *parents, entree["libelle"]))
-            trouves += parcourir(categorie, entree.get("sous_droits", []), [*parents, entree["libelle"]])
-        return trouves
-
-    return {
-        cle
-        for application in APPLICATIONS
-        for categorie in donnees["catalogue"][application]
-        for cle in parcourir(categorie["categorie"], categorie["droits"], [])
-    }
-
-
-def _retirer_sortis(db: Session, droits: dict[str, DroitModuleo], gardes: set[str]) -> None:
-    # Sinon un droit renommé ou retiré resterait accordé (droit fantôme).
-    sortis = [droits.pop(cle).id for cle in list(droits) if cle not in gardes]
-    if not sortis:
-        return
-    db.query(GroupeModuleoDroit).filter(GroupeModuleoDroit.droit_id.in_(sortis)).delete(synchronize_session=False)
-    db.query(DroitModuleo).filter(DroitModuleo.id.in_(sortis)).delete(synchronize_session=False)
-    db.flush()
-
-
 def _groupe(db: Session, application: str, nom: str) -> GroupeModuleo:
     groupe = db.query(GroupeModuleo).filter_by(application=application, nom=nom).one_or_none()
     if groupe is None:
@@ -128,13 +105,13 @@ def _groupe(db: Session, application: str, nom: str) -> GroupeModuleo:
 
 def _accorder(db: Session, groupe: GroupeModuleo, droits: dict[str, DroitModuleo], entrees: list) -> None:
     # Une entrée : le chemin du droit (liste), ou {"chemin", "conditions"}.
-    db.query(GroupeModuleoDroit).filter_by(groupe_id=groupe.id).delete()
+    # Seules les cases en base sont accordées : une case retirée par une
+    # migration ne fait pas échouer le démarrage.
     for entree in entrees:
         parties, conditions = (entree["chemin"], entree.get("conditions")) if isinstance(entree, dict) else (entree, None)
-        cle = chemin(*parties)
-        if cle not in droits or droits[cle].application != groupe.application:
-            raise ValueError(f"Groupe {groupe.application} « {groupe.nom} » : droit absent du catalogue : {cle}")
-        db.add(GroupeModuleoDroit(groupe_id=groupe.id, droit_id=droits[cle].id, conditions=conditions))
+        droit = droits.get(chemin(*parties))
+        if droit is not None and droit.application == groupe.application:
+            db.add(GroupeModuleoDroit(groupe_id=groupe.id, droit_id=droit.id, conditions=conditions))
 
 
 def _accorder_tout(db: Session, groupe: GroupeModuleo) -> None:

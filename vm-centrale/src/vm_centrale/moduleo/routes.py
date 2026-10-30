@@ -229,7 +229,7 @@ class RouteEcriture:
     description: str
 
 
-# Toutes les routes POST / PUT / DELETE de l'API Moduléo (ADR-0019), par
+# Toutes les routes POST / PUT / DELETE de l'API Moduléo (ADR-0023), par
 # (méthode, gabarit) : ClientModuleo.ecrire refuse toute autre route.
 ROUTES_ECRITURE = {
     ("POST", "cogeo/affaire"): RouteEcriture(

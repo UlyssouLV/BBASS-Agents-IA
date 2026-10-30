@@ -16,7 +16,7 @@ Le système IA destiné à traiter les demandes d'un pôle donné. Non construit
 
 ## Compte {#compte}
 
-L'identité de connexion d'un collaborateur : un login, un prénom et un nom (obligatoires, affichés dans l'interface), rattaché à exactement une agence et à un ou plusieurs pôles ([ADR-0006](./adr/0006-compte-rattache-plusieurs-poles.md)). Un email est optionnel. Créé et modifié par un compte administrateur ; le tout premier compte administrateur reste créé manuellement en base, comme tous les comptes en V1. Jamais par auto-inscription.
+L'identité de connexion d'un collaborateur : un login, un prénom et un nom (obligatoires, affichés dans l'interface), rattaché à exactement une agence et à un ou plusieurs pôles ([ADR-0006](./adr/0006-compte-rattache-plusieurs-poles.md)). Un email est optionnel. Créé et modifié par un compte administrateur ; en production, le tout premier compte administrateur est créé à l'installation de la VM (`creer-admin`, [ADR-0021](./adr/0021-cd-vm-centrale-staging-prod.md)). Jamais par auto-inscription.
 
 À éviter : utilisateur, profil.
 
@@ -194,9 +194,15 @@ Ce qu'un Outil a lu dans un logiciel pour une Conversation (en 1.5.0 : une Fiche
 
 ## Groupe Moduléo {#groupe-moduleo}
 
-Un groupe d'utilisateurs de Moduléo (Cogeo ou Planning : Admin, Production, Stagiaire…) recopié dans BBASS avec ses Droits Moduléo. Un Compte est rattaché à au plus un groupe Cogeo et un groupe Planning, et à son utilisateur Moduléo, toujours explicitement : être Compte administrateur n'en donne aucun. Sans groupe, aucun Outil Moduléo ne lui est proposé ([ADR-0018](./adr/0018-droits-moduleo-appliques-par-bbass.md)). En 1.5.1, seul le groupe Admin est recopié ; « Tous droits (dev) » est un groupe local, pour le dev et les tests, jamais dans Moduléo.
+Un groupe d'utilisateurs de Moduléo (Cogeo ou Planning : Admin, Production, Stagiaire…) recopié dans BBASS avec ses Droits Moduléo. Un Compte est rattaché à au plus un groupe Cogeo et un groupe Planning, et à son utilisateur Moduléo, toujours explicitement : être Compte administrateur n'en donne aucun. Sans groupe, aucun Outil Moduléo ne lui est proposé ([ADR-0018](./adr/0018-droits-moduleo-appliques-par-bbass.md)). Depuis la 1.5.3, catalogue des cases et groupes vivent en base ([ADR-0019](./adr/0019-groupes-moduleo-administres-en-base.md)) : un Compte administrateur crée et règle les groupes dans le Panel (Outils → Moduléo) en cochant des cases déjà présentes ; il n'édite pas le catalogue des cases. « Tous droits (dev) » est un groupe local, pour le dev et les tests, jamais dans Moduléo ni créé depuis le Panel.
 
 À éviter : rôle, profil, pôle (le Pôle est un domaine métier du cabinet).
+
+## Journal des droits Moduléo {#journal-des-droits-moduleo}
+
+Liste minimale des changements d'administration Moduléo faits dans le Panel (date, Compte administrateur, action, cible : groupe ou Compte). Consultable sous Outils → Moduléo ; pas d'export en 1.5.3.
+
+À éviter : audit trail, logs VM, Journal des écritures (écritures Moduléo confirmées, autre sujet).
 
 ## Droit Moduléo {#droit-moduleo}
 
@@ -212,7 +218,7 @@ Le contrôle que la VM centrale fait avant tout appel à l'API Moduléo : la rou
 
 ## Écriture Moduléo {#ecriture-moduleo}
 
-Une création, une modification ou une suppression (POST, PUT, DELETE) envoyée à l'API Moduléo par la VM centrale, seulement après le clic du collaborateur sur une Carte de confirmation, et seulement vers un Serveur Moduléo de test ([ADR-0019](./adr/0019-ecriture-moduleo-confirmee-serveur-de-test.md)). Proposée par le modèle (`ecrire_moduleo`), jamais envoyée par lui.
+Une création, une modification ou une suppression (POST, PUT, DELETE) envoyée à l'API Moduléo par la VM centrale, seulement après le clic du collaborateur sur une Carte de confirmation, et seulement vers un Serveur Moduléo de test ([ADR-0023](./adr/0023-ecriture-moduleo-confirmee-serveur-de-test.md)). Proposée par le modèle (`ecrire_moduleo`), jamais envoyée par lui.
 
 À éviter : action, mise à jour, synchronisation.
 
@@ -233,3 +239,33 @@ Le serveur Moduléo que Kipaware dédie aux essais de l'API (compte pseudonymis�
 L'enregistrement en base de chaque Écriture Moduléo proposée, avec son sort (confirmée, annulée, expirée, refusée, en échec) : Compte, heure, route, contenu envoyé, id renvoyé par Moduléo. Lu dans l'inspecteur.
 
 À éviter : log, historique, audit (pas d'écran d'administration en 1.5.2).
+
+## Environnement {#environnement}
+
+Une installation complète de la VM centrale sur la machine de Castries : sa base, ses fichiers, sa clé maître, son port ([ADR-0021](./adr/0021-cd-vm-centrale-staging-prod.md)). Deux Environnements : **staging** (essais, serveur de test Moduléo, port 8001) et **prod** (les collaborateurs, port 8000). Chacun suit son étiquette d'images et se met à jour seul.
+
+À éviter : instance, serveur (la machine porte les deux Environnements), recette.
+
+## Promotion {#promotion}
+
+Le geste qui fait passer en prod une version déjà essayée en staging : l'étiquette `prod` est posée sur les mêmes images, sans reconstruction, par un workflow GitHub manuel et tracé ([ADR-0021](./adr/0021-cd-vm-centrale-staging-prod.md)). Refusée pour une version jamais passée par le staging. Revenir en arrière, c'est promouvoir l'ancienne version.
+
+À éviter : déploiement (la prod se met à jour ensuite, à la commande ou au redémarrage), release (la Release crée la version et l'envoie au staging).
+
+## Lanceur {#lanceur}
+
+Le programme `BBASS.exe` installé sur le Poste ([ADR-0022](./adr/0022-poste-application-windows-version-dictee-par-la-vm.md)) : il installe et désinstalle BBASS, met le Poste à la version du Serveur BBASS à chaque lancement, ouvre la fenêtre, garde l'icône dans la zone de notification et démarre le backend du Poste. Il se met à jour avec le Paquet poste.
+
+À éviter : updater, installateur (l'installateur n'est qu'un mode du Lanceur), launcher.
+
+## Paquet poste {#paquet-poste}
+
+Le fichier signé `bbass-poste-vX.Y.Z-windows-x64.zip`, joint à chaque GitHub Release : Lanceur, backend du Poste et front, d'une même version ([ADR-0022](./adr/0022-poste-application-windows-version-dictee-par-la-vm.md)). Le Lanceur ne l'installe que si sa signature est valide, et garde la version précédente pour revenir en arrière.
+
+À éviter : image (les images sont celles de la VM centrale), build, setup.
+
+## Serveur BBASS {#serveur-bbass}
+
+L'adresse (hôte et port) de la VM centrale à laquelle un Poste est relié, saisie à l'installation et modifiable dans le menu « … » de l'écran de connexion. Par défaut, l'Environnement prod. Sa version, lue sur `/sante`, décide de la version du Poste : changer le Serveur BBASS vers le staging fait passer le Poste à la version du staging au lancement suivant.
+
+À éviter : URL de la VM, environnement (le Poste ne choisit pas d'Environnement, il suit une adresse).

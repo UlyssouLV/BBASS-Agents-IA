@@ -4,7 +4,7 @@ Copie le WADL (`wadl.xml`) et la page de documentation (`documentation.html`)
 du serveur de MODULEO_URL dans `vm_centrale/moduleo/docs/`, puis regenere
 `vm_centrale/moduleo/routes.py` (`ROUTES_GET` : toutes les routes GET du WADL,
 ADR-0017 ; `ROUTES_ECRITURE` : toutes les routes POST / PUT / DELETE, avec
-parametres, exemple de corps JSON et description, ADR-0019) et
+parametres, exemple de corps JSON et description, ADR-0023) et
 `docs/index-routes.md` (une ligne par route GET : parametres, description
 tiree de la page HTML). Aucune cle n'est necessaire : la doc du serveur est
 publique.
@@ -50,7 +50,7 @@ class RouteGet:
 
 @dataclass(frozen=True)
 class RouteEcriture:
-    # Une route POST / PUT / DELETE du WADL (ADR-0019). Un même gabarit
+    # Une route POST / PUT / DELETE du WADL (ADR-0023). Un même gabarit
     # peut porter plusieurs méthodes (« webhook » : POST et DELETE).
     methode: str
     route: str
@@ -160,7 +160,7 @@ def generer_routes(routes: list[RouteGet], ecritures: list[RouteEcriture], telec
         f"    description: str\n"
         f"\n"
         f"\n"
-        f"# Toutes les routes POST / PUT / DELETE de l'API Moduléo (ADR-0019), par\n"
+        f"# Toutes les routes POST / PUT / DELETE de l'API Moduléo (ADR-0023), par\n"
         f"# (méthode, gabarit) : ClientModuleo.ecrire refuse toute autre route.\n"
         f"ROUTES_ECRITURE = {{\n"
         f"{lignes_ecriture}"

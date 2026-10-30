@@ -1,3 +1,7 @@
+# Scan SonarCloud CI-only (ADR-0020 — désactiver Automatic Analysis). Le job
+# relance lui-même pytest avec couverture, sans needs sur les workflows de tests :
+# sans coverage-*.xml, la condition « couverture du nouveau code ≥ 80 % » du
+# quality gate tombe à 0 % dès qu'une version ajoute du code.
 name: SonarQube Cloud
 
 on:

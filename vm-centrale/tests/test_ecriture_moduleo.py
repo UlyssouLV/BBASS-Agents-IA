@@ -16,7 +16,7 @@ from vm_centrale.moduleo.client import (
 )
 from vm_centrale.moduleo.droits import GROUPE_DEV, PLANNING, rattacher
 
-# Écrire dans Moduléo depuis le chat (spec 1.5.2, #204, ADR-0019) : le
+# Écrire dans Moduléo depuis le chat (spec 1.5.2, #204, ADR-0023) : le
 # modèle propose une écriture (`ecrire_moduleo`), rien ne part ; le
 # collaborateur la confirme ou l'annule par la Carte de confirmation, hors
 # du modèle, et la VM l'envoie alors une seule fois au serveur de test.

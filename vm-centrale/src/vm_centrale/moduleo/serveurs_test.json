@@ -1,5 +1,5 @@
 {
-  "regle": "Serveurs Moduléo de test (spec 1.5.2, ADR-0019) : ClientModuleo.ecrire n'envoie que vers une MODULEO_URL de cette liste, MODULEO_ECRITURE actif. Jamais le serveur du cabinet. Ajouter une URL : procédure du README du module.",
+  "regle": "Serveurs Moduléo de test (spec 1.5.2, ADR-0023) : ClientModuleo.ecrire n'envoie que vers une MODULEO_URL de cette liste, MODULEO_ECRITURE actif. Jamais le serveur du cabinet. Ajouter une URL : procédure du README du module.",
   "serveurs": [
     {
       "url": "https://mwa-kpw-api.kipaware.fr/api",

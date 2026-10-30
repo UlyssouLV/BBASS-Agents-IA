@@ -10,7 +10,7 @@ from vm_centrale.moduleo.droits import droits_du_compte
 from vm_centrale.moduleo.ecritures import EcritureDejaDecidee, EcritureIntrouvable, carte_de, decider
 from vm_centrale.schemas import CarteEcriture, DecisionEcritureRequest
 
-# Confirmation d'une écriture Moduléo (spec 1.5.2, #204, ADR-0019) : le
+# Confirmation d'une écriture Moduléo (spec 1.5.2, #204, ADR-0023) : le
 # clic du collaborateur sur la Carte de confirmation, hors du modèle. Seul
 # chemin par lequel une écriture part vers Moduléo. Règles :
 # moduleo/README.md, section **Carte de confirmation**.

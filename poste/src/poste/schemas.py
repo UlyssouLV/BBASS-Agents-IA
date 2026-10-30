@@ -235,3 +235,41 @@ class InspecteurEchangeDetailResponse(BaseModel):
     statut: str
     erreur: str | None
     date_creation: datetime
+
+
+class DerniereVerificationResponse(BaseModel):
+    # Fichier d'état du Lanceur (lanceur/coeur/src/mise_a_jour.rs, DerniereVerification).
+    date: str
+    version_poste: str
+    version_serveur: str | None
+    resultat: str
+    detail: str
+    bandeau: str | None
+
+
+class AProposResponse(BaseModel):
+    # version_poste nulle en dev (pas de Lanceur) ; version_serveur nulle si
+    # le Serveur BBASS est injoignable.
+    version_poste: str | None
+    version_serveur: str | None
+    derniere_verification: DerniereVerificationResponse | None
+    verification_possible: bool
+
+
+class ServeurBbassRequest(BaseModel):
+    # Hôte (nom ou IPv4, sans schéma ni port) et port du Serveur BBASS.
+    hote: str = Field(min_length=1, max_length=253, pattern=r"^\s*[A-Za-z0-9.\-]+\s*$")
+    port: int = Field(ge=1, le=65535)
+
+
+class ConfigurationResponse(BaseModel):
+    # hote vide : adresse inconnue, le front ouvre la Configuration.
+    # modifiable faux en dev : l'adresse vient du `.env` du clone.
+    hote: str
+    port: int
+    modifiable: bool
+
+
+class EtatServeurBbassResponse(BaseModel):
+    joignable: bool
+    version: str | None

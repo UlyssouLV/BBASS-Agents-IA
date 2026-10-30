@@ -7,7 +7,8 @@ from urllib.parse import quote
 
 import httpx
 
-from poste.config import POSTE_HTTP_TIMEOUT, VM_CENTRALE_BASE_URL
+from poste import config
+from poste.config import POSTE_HTTP_TIMEOUT
 
 _http_client = httpx.Client(timeout=POSTE_HTTP_TIMEOUT)
 
@@ -97,6 +98,21 @@ class DernierAdministrateurError(Exception):
     # exception plutôt que redupliqué ici, pour que le poste affiche le bon
     # verbe (rétrograder vs supprimer) sans connaître les deux textes.
     pass
+
+
+class RefusModuleoError(Exception):
+    # Refus métier de l'administration Moduléo de la VM (groupe introuvable
+    # ou encore rattaché, nom déjà pris, case hors catalogue, utilisateur
+    # Moduléo inconnu, Moduléo injoignable...) : statut et texte relayés tels
+    # quels au Panel.
+    def __init__(self, status_code: int, detail: object) -> None:
+        super().__init__(detail)
+        self.status_code = status_code
+        self.detail = detail
+
+
+# 502/503 : Moduléo (et non la VM) injoignable ou non configuré.
+_REFUS_MODULEO = {404, 409, 422, 502, 503}
 
 
 @dataclass
@@ -522,7 +538,7 @@ def _octets_du_flux(reponse: httpx.Response) -> Iterator[bytes]:
 class VmCentraleClient:
     def authentifier(self, identifiant: str, mot_de_passe: str) -> AuthentificationReussie | None:
         reponse = _http_client.post(
-            f"{VM_CENTRALE_BASE_URL}/auth",
+            f"{config.adresse_serveur_bbass()}/auth",
             json={"identifiant": identifiant, "mot_de_passe": mot_de_passe},
         )
         if reponse.status_code == 401:
@@ -547,14 +563,14 @@ class VmCentraleClient:
         piece_jointe_id: int | None = None,
     ) -> Iterator[bytes]:
         return _ouvrir_flux_du_tour(
-            f"{VM_CENTRALE_BASE_URL}/conversations",
+            f"{config.adresse_serveur_bbass()}/conversations",
             {"message": message, "cle_idempotence": cle_idempotence, "piece_jointe_id": piece_jointe_id},
             jeton,
         )
 
     def lister_conversations(self, jeton: str) -> list[Conversation]:
         reponse = _http_client.get(
-            f"{VM_CENTRALE_BASE_URL}/conversations",
+            f"{config.adresse_serveur_bbass()}/conversations",
             headers={"Authorization": f"Bearer {jeton}"},
         )
         _lever_si_jeton_invalide(reponse)
@@ -579,7 +595,7 @@ class VmCentraleClient:
             parametres["limite"] = limite
 
         reponse = _http_client.get(
-            f"{VM_CENTRALE_BASE_URL}/conversations/{conversation_id}",
+            f"{config.adresse_serveur_bbass()}/conversations/{conversation_id}",
             params=parametres,
             headers={"Authorization": f"Bearer {jeton}"},
         )
@@ -598,7 +614,7 @@ class VmCentraleClient:
 
     def renommer_conversation(self, jeton: str, conversation_id: int, titre: str) -> Conversation:
         reponse = _http_client.patch(
-            f"{VM_CENTRALE_BASE_URL}/conversations/{conversation_id}",
+            f"{config.adresse_serveur_bbass()}/conversations/{conversation_id}",
             json={"titre": titre},
             headers={"Authorization": f"Bearer {jeton}"},
         )
@@ -609,7 +625,7 @@ class VmCentraleClient:
 
     def supprimer_conversation(self, jeton: str, conversation_id: int) -> None:
         reponse = _http_client.delete(
-            f"{VM_CENTRALE_BASE_URL}/conversations/{conversation_id}",
+            f"{config.adresse_serveur_bbass()}/conversations/{conversation_id}",
             headers={"Authorization": f"Bearer {jeton}"},
         )
         _lever_si_jeton_invalide(reponse)
@@ -625,7 +641,7 @@ class VmCentraleClient:
         piece_jointe_id: int | None = None,
     ) -> Iterator[bytes]:
         return _ouvrir_flux_du_tour(
-            f"{VM_CENTRALE_BASE_URL}/conversations/{conversation_id}/messages",
+            f"{config.adresse_serveur_bbass()}/conversations/{conversation_id}/messages",
             {"message": message, "cle_idempotence": cle_idempotence, "piece_jointe_id": piece_jointe_id},
             jeton,
         )
@@ -655,7 +671,7 @@ class VmCentraleClient:
         type_mime: str,
     ) -> PieceJointeCreee:
         reponse = _http_client.post(
-            f"{VM_CENTRALE_BASE_URL}/conversations/{conversation_id}/pieces-jointes",
+            f"{config.adresse_serveur_bbass()}/conversations/{conversation_id}/pieces-jointes",
             files={"fichier": (nom_fichier, contenu, type_mime)},
             headers={"Authorization": f"Bearer {jeton}"},
         )
@@ -669,7 +685,7 @@ class VmCentraleClient:
         self, jeton: str, nom_fichier: str, contenu: bytes, type_mime: str
     ) -> PieceJointeCreee:
         reponse = _http_client.post(
-            f"{VM_CENTRALE_BASE_URL}/pieces-jointes",
+            f"{config.adresse_serveur_bbass()}/pieces-jointes",
             files={"fichier": (nom_fichier, contenu, type_mime)},
             headers={"Authorization": f"Bearer {jeton}"},
         )
@@ -684,7 +700,7 @@ class VmCentraleClient:
         # pour un identifiant différent (spec V1.1.1) n'est donc jamais
         # attendu ici, et retombe sur l'erreur générique via raise_for_status.
         reponse = _http_client.get(
-            f"{VM_CENTRALE_BASE_URL}/comptes/{quote(identifiant, safe='')}/profil-travail",
+            f"{config.adresse_serveur_bbass()}/comptes/{quote(identifiant, safe='')}/profil-travail",
             headers={"Authorization": f"Bearer {jeton}"},
         )
         _lever_si_jeton_invalide(reponse)
@@ -697,7 +713,7 @@ class VmCentraleClient:
         # pas de paramètre identifiant ici, contrairement à
         # consulter_profil_travail.
         reponse = _http_client.get(
-            f"{VM_CENTRALE_BASE_URL}/consommation",
+            f"{config.adresse_serveur_bbass()}/consommation",
             headers={"Authorization": f"Bearer {jeton}"},
         )
         _lever_si_jeton_invalide(reponse)
@@ -706,7 +722,7 @@ class VmCentraleClient:
 
     def changer_mot_de_passe(self, jeton: str, nouveau_mot_de_passe: str) -> None:
         reponse = _http_client.post(
-            f"{VM_CENTRALE_BASE_URL}/auth/mot-de-passe",
+            f"{config.adresse_serveur_bbass()}/auth/mot-de-passe",
             json={"nouveau_mot_de_passe": nouveau_mot_de_passe},
             headers={"Authorization": f"Bearer {jeton}"},
         )
@@ -716,7 +732,7 @@ class VmCentraleClient:
 
     def verifier(self, jeton: str) -> VerificationReussie | None:
         reponse = _http_client.get(
-            f"{VM_CENTRALE_BASE_URL}/auth/verifier",
+            f"{config.adresse_serveur_bbass()}/auth/verifier",
             headers={"Authorization": f"Bearer {jeton}"},
         )
         if reponse.status_code == 401:
@@ -727,14 +743,14 @@ class VmCentraleClient:
 
     def revoquer(self, jeton: str) -> None:
         reponse = _http_client.delete(
-            f"{VM_CENTRALE_BASE_URL}/auth/jeton",
+            f"{config.adresse_serveur_bbass()}/auth/jeton",
             headers={"Authorization": f"Bearer {jeton}"},
         )
         reponse.raise_for_status()
 
     def lister_comptes(self, jeton: str) -> list[CompteAdmin]:
         reponse = _http_client.get(
-            f"{VM_CENTRALE_BASE_URL}/comptes",
+            f"{config.adresse_serveur_bbass()}/comptes",
             headers={"Authorization": f"Bearer {jeton}"},
         )
         _lever_si_jeton_ou_droits_refuses(reponse)
@@ -746,7 +762,7 @@ class VmCentraleClient:
         # jamais de détail par conversation individuelle, voir
         # vm_centrale.routers.comptes.lister_consommation_comptes.
         reponse = _http_client.get(
-            f"{VM_CENTRALE_BASE_URL}/comptes/consommation",
+            f"{config.adresse_serveur_bbass()}/comptes/consommation",
             headers={"Authorization": f"Bearer {jeton}"},
         )
         _lever_si_jeton_ou_droits_refuses(reponse)
@@ -764,7 +780,7 @@ class VmCentraleClient:
         email: str | None = None,
     ) -> CompteCree:
         reponse = _http_client.post(
-            f"{VM_CENTRALE_BASE_URL}/comptes",
+            f"{config.adresse_serveur_bbass()}/comptes",
             json={
                 "identifiant": identifiant,
                 "prenom": prenom,
@@ -793,7 +809,7 @@ class VmCentraleClient:
         email: str | None = None,
     ) -> CompteAdmin:
         reponse = _http_client.patch(
-            f"{VM_CENTRALE_BASE_URL}/comptes/{quote(identifiant, safe='')}",
+            f"{config.adresse_serveur_bbass()}/comptes/{quote(identifiant, safe='')}",
             json={
                 "prenom": prenom,
                 "nom": nom,
@@ -811,7 +827,7 @@ class VmCentraleClient:
 
     def reinitialiser_mot_de_passe(self, jeton: str, identifiant: str) -> str:
         reponse = _http_client.post(
-            f"{VM_CENTRALE_BASE_URL}/comptes/{quote(identifiant, safe='')}/reinitialiser-mot-de-passe",
+            f"{config.adresse_serveur_bbass()}/comptes/{quote(identifiant, safe='')}/reinitialiser-mot-de-passe",
             headers={"Authorization": f"Bearer {jeton}"},
         )
         _lever_si_jeton_ou_droits_refuses(reponse)
@@ -822,7 +838,7 @@ class VmCentraleClient:
 
     def deconnexion_forcee(self, jeton: str, identifiant: str) -> None:
         reponse = _http_client.post(
-            f"{VM_CENTRALE_BASE_URL}/comptes/{quote(identifiant, safe='')}/deconnexion-forcee",
+            f"{config.adresse_serveur_bbass()}/comptes/{quote(identifiant, safe='')}/deconnexion-forcee",
             headers={"Authorization": f"Bearer {jeton}"},
         )
         _lever_si_jeton_ou_droits_refuses(reponse)
@@ -834,7 +850,7 @@ class VmCentraleClient:
         self, jeton: str, identifiant: str, est_admin: bool, cle_admin_vm: str
     ) -> CompteAdmin:
         reponse = _http_client.patch(
-            f"{VM_CENTRALE_BASE_URL}/comptes/{quote(identifiant, safe='')}/est-admin",
+            f"{config.adresse_serveur_bbass()}/comptes/{quote(identifiant, safe='')}/est-admin",
             json={"est_admin": est_admin},
             headers={"Authorization": f"Bearer {jeton}", "X-Admin-Key": cle_admin_vm},
         )
@@ -846,7 +862,7 @@ class VmCentraleClient:
 
     def supprimer_compte(self, jeton: str, identifiant: str, cle_admin_vm: str) -> None:
         reponse = _http_client.delete(
-            f"{VM_CENTRALE_BASE_URL}/comptes/{quote(identifiant, safe='')}",
+            f"{config.adresse_serveur_bbass()}/comptes/{quote(identifiant, safe='')}",
             headers={"Authorization": f"Bearer {jeton}", "X-Admin-Key": cle_admin_vm},
         )
         _lever_si_action_avec_cle_admin_refusee(reponse)
@@ -856,7 +872,7 @@ class VmCentraleClient:
 
     def lister_comptes_inspecteur(self, jeton: str, cle_admin_vm: str) -> list[InspecteurCompte]:
         reponse = _http_client.get(
-            f"{VM_CENTRALE_BASE_URL}/inspecteur/comptes",
+            f"{config.adresse_serveur_bbass()}/inspecteur/comptes",
             headers={"Authorization": f"Bearer {jeton}", "X-Admin-Key": cle_admin_vm},
         )
         _lever_si_inspecteur_refuse(reponse)
@@ -867,7 +883,7 @@ class VmCentraleClient:
         self, jeton: str, identifiant_compte: str, cle_admin_vm: str
     ) -> list[InspecteurConversation]:
         reponse = _http_client.get(
-            f"{VM_CENTRALE_BASE_URL}/inspecteur/comptes/{quote(identifiant_compte, safe='')}/conversations",
+            f"{config.adresse_serveur_bbass()}/inspecteur/comptes/{quote(identifiant_compte, safe='')}/conversations",
             headers={"Authorization": f"Bearer {jeton}", "X-Admin-Key": cle_admin_vm},
         )
         _lever_si_inspecteur_refuse(reponse)
@@ -878,7 +894,7 @@ class VmCentraleClient:
         self, jeton: str, conversation_id: int, cle_admin_vm: str
     ) -> list[InspecteurEchangeResume]:
         reponse = _http_client.get(
-            f"{VM_CENTRALE_BASE_URL}/inspecteur/conversations/{conversation_id}/echanges",
+            f"{config.adresse_serveur_bbass()}/inspecteur/conversations/{conversation_id}/echanges",
             headers={"Authorization": f"Bearer {jeton}", "X-Admin-Key": cle_admin_vm},
         )
         _lever_si_inspecteur_refuse(reponse)
@@ -889,13 +905,29 @@ class VmCentraleClient:
         self, jeton: str, echange_id: int, cle_admin_vm: str
     ) -> InspecteurEchangeDetail:
         reponse = _http_client.get(
-            f"{VM_CENTRALE_BASE_URL}/inspecteur/echanges/{echange_id}",
+            f"{config.adresse_serveur_bbass()}/inspecteur/echanges/{echange_id}",
             headers={"Authorization": f"Bearer {jeton}", "X-Admin-Key": cle_admin_vm},
         )
         _lever_si_inspecteur_refuse(reponse)
         _lever_si_echange_introuvable(reponse)
         reponse.raise_for_status()
         return _vers_inspecteur_echange_detail(reponse.json())
+
+    def relayer_moduleo(self, jeton: str, methode: str, chemin: str, corps: object = None) -> object:
+        # Administration Moduléo du Panel (spec 1.5.3, #213) : simple relais,
+        # la VM valide tout (droits admin, catalogue, noms Moduléo). Un refus
+        # métier remonte tel quel (RefusModuleoError) ; None pour un 204.
+        reponse = _http_client.request(
+            methode,
+            f"{config.adresse_serveur_bbass()}/moduleo/{chemin}",
+            json=corps,
+            headers={"Authorization": f"Bearer {jeton}"},
+        )
+        _lever_si_jeton_ou_droits_refuses(reponse)
+        if reponse.status_code in _REFUS_MODULEO:
+            raise RefusModuleoError(reponse.status_code, reponse.json().get("detail"))
+        reponse.raise_for_status()
+        return None if reponse.status_code == 204 else reponse.json()
 
 
 def get_vm_centrale_client() -> VmCentraleClient:

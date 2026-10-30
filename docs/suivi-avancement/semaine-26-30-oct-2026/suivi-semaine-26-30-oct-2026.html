@@ -397,7 +397,7 @@
             <div class="toc-row">
               <a href="#reste-a-implementer">Reste à implémenter</a>
               <span class="toc-dots" aria-hidden="true"></span>
-              <span class="toc-ref">V1.5.1 → …</span>
+              <span class="toc-ref">V1.5.2 → …</span>
             </div>
           </li>
           <li>
@@ -417,7 +417,9 @@
               <li><a href="#version-1-5-1">V1.5.1 — Lire plus de données Moduléo depuis le chat</a></li>
               <li><a href="#version-1-5-2">V1.5.2 — Écrire dans Moduléo depuis le chat</a></li>
               <li><a href="#version-1-5-3">V1.5.3 — Administration des groupes et droits Moduléo</a></li>
-              <li><a href="#version-1-6-0">V1.6.0 — Déploiement postes</a></li>
+              <li><a href="#version-1-6-0">V1.6.0 — Versions vérifiées et prêtes à livrer</a></li>
+              <li><a href="#version-1-6-1">V1.6.1 — Installer et mettre à jour le serveur central sans l’alternant</a></li>
+              <li><a href="#version-1-6-2">V1.6.2 — Installer et mettre à jour les postes sans l’alternant</a></li>
               <li><a href="#version-1-8-0">V1.8.0 — Workflows n8n</a></li>
               <li><a href="#version-1-9-0">V1.9.0 — Analyse approfondie des pièces jointes</a></li>
             </ol>
@@ -445,19 +447,23 @@
     <div class="jour">
       <h3>Mardi 27 octobre</h3>
       <ul>
-        <li>À compléter.</li>
+        <li>V1.5.3 livrée : le compte administrateur gère les droits Moduléo depuis le Panel d’administration (onglet Outils → Moduléo) — groupes Cogeo et Planning, droits cochés comme dans Moduléo, rattachement de chaque compte et journal des changements ; plus de fichier ni de script à manipuler ; tests humains validés.</li>
+        <li>V1.6.0 livrée : chaque nouvelle version est désormais vérifiée automatiquement avant d’être acceptée (tests du serveur central et des postes, contrôle qualité du code, construction de l’interface et de la documentation) ; la version publiée n’est plus modifiée après coup ; tests humains validés.</li>
+        <li>V1.5.2 toujours en attente : les identifiants du serveur de test Moduléo (accès à l’API) ne sont pas encore reçus, et aucune écriture n’est essayée sur le serveur Moduléo réel du cabinet ; finalisation visée mercredi 28 octobre — c’est pourquoi la 1.5.3 et la 1.6.0 ont été livrées avant elle.</li>
       </ul>
     </div>
     <div class="jour">
       <h3>Mercredi 28 octobre</h3>
       <ul>
-        <li>À compléter.</li>
+        <li>V1.6.1 livrée : le serveur central de Castries s’installe en une commande et se met à jour par une commande ou un simple redémarrage, sans le code source ni l’alternant ; une version est d’abord essayée sur un environnement de test, puis passée en production quand elle est validée ; sauvegarde avant chaque changement de version et retour automatique à l’ancienne version en cas de problème ; tests humains validés.</li>
+        <li>V1.5.2 toujours en attente des identifiants du serveur de test Moduléo — c’est pourquoi la 1.6.1 a été livrée avant elle.</li>
       </ul>
     </div>
     <div class="jour">
       <h3>Jeudi 29 octobre</h3>
       <ul>
-        <li>À compléter.</li>
+        <li>V1.6.2 livrée : BBASS s’installe sur un poste Windows avec un simple programme d’installation, sans droits administrateur ni intervention de l’alternant, et se met à jour seul à chaque lancement sur la version du serveur central ; retour automatique à la version précédente si la nouvelle ne démarre pas ; écran de connexion revu avec réglage du serveur et « À propos » ; tests humains joués juste après la livraison, puisque le programme d’installation n’existe qu’une fois la version publiée.</li>
+        <li>V1.5.2 toujours en attente des identifiants du serveur de test Moduléo — c’est pourquoi la 1.6.2 a été livrée avant elle.</li>
       </ul>
     </div>
     <div class="jour">
@@ -471,9 +477,7 @@
     <section class="bloc" id="reste-a-implementer">
     <h2>Reste à implémenter</h2>
     <ul>
-      <li><strong>V1.5.2</strong> — écrire dans Moduléo depuis le chat, essayé sur le serveur de test fourni par Kipaware.</li>
-      <li><strong>V1.5.3</strong> — administrer groupes et droits Moduléo depuis le Panel d’administration.</li>
-      <li><strong>V1.6.0</strong> — déployer et mettre à jour le logiciel sur les postes du cabinet.</li>
+      <li><strong>V1.5.2</strong> — écrire dans Moduléo depuis le chat, essayé sur le serveur de test fourni par Kipaware. Bloquée tant que les identifiants de ce serveur de test (accès à l’API) ne sont pas reçus : aucune écriture n’est essayée sur le serveur réel du cabinet. Finalisation visée mercredi 28 octobre.</li>
       <li><strong>V1.8.0</strong> — automatisations n8n branchées sur Moduléo.</li>
       <li><strong>V1.9.0</strong> — analyse et traitement approfondis des pièces jointes.</li>
       <li>Suite « Plus tard » de la feuille de route (documentation mémoire / souveraineté, agents par pôle, bugs connus, etc.).</li>
@@ -483,7 +487,8 @@
     <section class="bloc" id="livre-pour">
     <h2>Livré pour le 29/10/2026</h2>
     <div class="recap">
-      <p><strong>Point jeudi 29 octobre — visé : V1.5.1 · livré : V1.5.1 (lundi 26 octobre)</strong></p>
+      <p><strong>Point jeudi 29 octobre — visé : V1.5.1 · livré : V1.5.1 (lundi 26 octobre), V1.5.3 et V1.6.0 (mardi 27 octobre), V1.6.1 (mercredi 28 octobre), V1.6.2 (jeudi 29 octobre)</strong></p>
+      <p>V1.5.2 reportée : identifiants du serveur de test Moduléo non reçus, pas d’essai d’écriture sur le serveur réel ; d’où la livraison de la 1.5.3, de la 1.6.0, de la 1.6.1 et de la 1.6.2 avant elle.</p>
     </div>
     </section>
 
@@ -513,30 +518,80 @@
       <div class="version" id="version-1-5-2">
         <div class="version-head">
           <h3>V1.5.2 — Écrire dans Moduléo depuis le chat</h3>
-          <span class="prevu">Livraison prévue (sous réserve serveur de test)</span>
+          <span class="prevu">En attente des identifiants du serveur de test — finalisation visée le 28/10/2026</span>
         </div>
         <div class="version-body">
           <p>Premiers outils d’écriture Moduléo depuis le chat, essayés uniquement sur un serveur de test. Chaque écriture est confirmée explicitement par le collaborateur avant d’être envoyée.</p>
+          <p>Pas encore finalisable : les identifiants du serveur de test pour l’accès à l’API Moduléo n’ont pas encore été reçus, et aucune écriture n’est essayée sur le serveur Moduléo réel du cabinet. Finalisation visée mercredi 28 octobre ; c’est pourquoi les versions 1.5.3, 1.6.0 et 1.6.1 ont été livrées avant elle.</p>
         </div>
       </div>
 
       <div class="version" id="version-1-5-3">
         <div class="version-head">
           <h3>V1.5.3 — Administration des groupes et droits Moduléo</h3>
-          <span class="prevu">Livraison prévue (feuille de route)</span>
+          <span class="deploye">Déployé le 27/10/2026 à 09:56</span>
         </div>
         <div class="version-body">
-          <p>Le compte administrateur gère depuis le Panel d’administration les groupes Cogeo et Planning, leurs droits, et le rattachement de chaque compte à son groupe et à son utilisateur Moduléo.</p>
+          <p>Le compte administrateur gère les droits Moduléo depuis le Panel d’administration, dans un nouvel onglet Outils → Moduléo, sans intervention technique. Les droits restent ceux recopiés en 1.5.1 et s’appliquent dès la question suivante dans le chat.</p>
+          <ul>
+            <li><strong>Groupes</strong> : créer un groupe Cogeo ou Planning, le renommer, cocher ses droits dans une arborescence comme dans Moduléo (avec les conditions du Planning : participation, activité, créateur) ; un groupe encore utilisé par un compte ne peut pas être supprimé.</li>
+            <li><strong>Rattachements</strong> : pour chaque compte, son groupe Cogeo, son groupe Planning et son utilisateur Moduléo, retrouvé par son nom.</li>
+            <li><strong>Journal</strong> : qui a changé quoi et quand, consultable dans le même onglet.</li>
+            <li><strong>Conservation</strong> : groupes et droits sont gardés tels quels au redémarrage ; la liste des droits disponibles reste celle de Moduléo, en lecture seule.</li>
+            <li><strong>Accès</strong> : seuls les comptes administrateurs peuvent modifier ces réglages.</li>
+          </ul>
         </div>
       </div>
 
       <div class="version" id="version-1-6-0">
         <div class="version-head">
-          <h3>V1.6.0 — Déploiement postes</h3>
-          <span class="prevu">Livraison prévue (feuille de route)</span>
+          <h3>V1.6.0 — Versions vérifiées et prêtes à livrer</h3>
+          <span class="deploye">Déployé le 27/10/2026 à 14:23</span>
         </div>
         <div class="version-body">
-          <p>Une chaîne de déploiement pour installer et mettre à jour le logiciel sur les postes du cabinet de façon reproductible, afin que les collaborateurs puissent utiliser le chat (dont Moduléo) sans dépendre d’une installation manuelle fragile.</p>
+          <p>Chaque version du logiciel est vérifiée automatiquement avant d’être acceptée, sans dépendre d’une validation faite à la main sur le poste de l’alternant. C’est la référence sur laquelle s’appuieront l’installation du serveur central et des postes (1.6.1 / 1.6.2).</p>
+          <ul>
+            <li><strong>Vérifications séparées</strong> : serveur central, postes, interface, documentation et qualité du code sont contrôlés chacun de leur côté ; on voit tout de suite ce qui casse.</li>
+            <li><strong>Signal rapide</strong> : le contrôle qualité démarre en premier, sans attendre la fin des tests.</li>
+            <li><strong>Seulement ce qui change</strong> : une partie non touchée par la version n’est pas revérifiée, sans bloquer l’acceptation.</li>
+            <li><strong>Interface à jour</strong> : la vérification échoue si l’interface livrée ne correspond pas à son code source.</li>
+            <li><strong>Version figée</strong> : une version n’entre dans le logiciel que si toutes les vérifications sont vertes, et plus rien ne la modifie après sa publication.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="version" id="version-1-6-1">
+        <div class="version-head">
+          <h3>V1.6.1 — Installer et mettre à jour le serveur central sans l’alternant</h3>
+          <span class="deploye">Déployé le 28/10/2026 à 12:55</span>
+        </div>
+        <div class="version-body">
+          <p>Le serveur central de Castries ne dépend plus du poste de l’alternant : l’administrateur du cabinet l’installe et le met à jour lui-même, à partir des versions vérifiées automatiquement depuis la 1.6.0. Rien ne change pour le collaborateur dans le chat.</p>
+          <ul>
+            <li><strong>Installation en une commande</strong> : les mots de passe techniques sont générés et affichés une seule fois, à ranger dans le coffre du cabinet ; les clés de l’IA et de Moduléo sont saisies puis chiffrées aussitôt ; le premier compte administrateur est créé à l’installation.</li>
+            <li><strong>Test puis production</strong> : deux environnements séparés sur le même serveur ; une nouvelle version arrive d’abord sur l’environnement de test (branché sur le serveur de test Moduléo), puis passe en production d’un clic, exactement la même ; revenir en arrière, c’est repasser l’ancienne version.</li>
+            <li><strong>Mise à jour sans risque</strong> : une commande ou un redémarrage du serveur ; sauvegarde des données avant chaque changement de version ; si le logiciel ne répond pas correctement après la mise à jour, l’ancienne version est remise automatiquement et le problème est signalé ; sans Internet, le serveur redémarre sur la version déjà installée.</li>
+            <li><strong>Entretien automatique</strong> : les tâches régulières du serveur sont planifiées au même endroit ; le cache des pages web est purgé toutes les heures.</li>
+            <li><strong>Guide administrateur</strong> : installation et mise à jour décrites pas à pas sur le site de documentation.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="version" id="version-1-6-2">
+        <div class="version-head">
+          <h3>V1.6.2 — Installer et mettre à jour les postes sans l’alternant</h3>
+          <span class="deploye">Déployé le 29/10/2026 à 08:55</span>
+        </div>
+        <div class="version-body">
+          <p>BBASS devient un vrai logiciel Windows sur le poste du collaborateur : il s’installe sans le code source, sans droits administrateur et sans l’alternant, puis reste toujours à la même version que le serveur central auquel il est relié.</p>
+          <ul>
+            <li><strong>Installation simple</strong> : un programme d’installation joint à chaque version, en quatre étapes (bienvenue, adresse du serveur avec test de connexion, options, installation) ; raccourcis menu Démarrer et Bureau ; la désinstallation garde la configuration.</li>
+            <li><strong>Mise à jour automatique</strong> : à chaque lancement, le poste se met à la version du serveur central ; seules les versions signées par le cabinet sont installées ; si la nouvelle version ne démarre pas, l’ancienne est remise automatiquement ; sans Internet ou sans serveur, le logiciel démarre quand même, avec un message.</li>
+            <li><strong>Toujours disponible</strong> : fermer la fenêtre laisse BBASS dans la zone de notification ; il peut aussi s’ouvrir dans le navigateur, ne se lance qu’une fois, et démarre avec Windows.</li>
+            <li><strong>Écran de connexion revu</strong> : état de la connexion au serveur visible d’un coup d’œil ; menu « … » pour changer de serveur sans réinstaller, ouvrir le dossier de configuration, voir la version (« À propos ») et vérifier les mises à jour.</li>
+            <li><strong>Guides</strong> : installation, dépannage et administration des postes décrits pas à pas sur le site de documentation.</li>
+            <li><strong>Tests humains</strong> : joués juste après la livraison, le programme d’installation n’existant qu’une fois la version publiée ; un problème trouvé donnera une version de correction.</li>
+          </ul>
         </div>
       </div>
 
@@ -563,12 +618,7 @@
 
     <section class="bloc agenda" id="agenda-quotidien">
       <h2>Emploi du temps quotidien</h2>
-      <div class="agenda-placeholder">
-        <strong>Emploi du temps quotidien</strong>
-        Synchronisé depuis le dossier Suivi (Excel) via
-        <code>node docs/suivi-avancement/sync-agenda.mjs</code>
-        (aussi lancé par <code>generer-pdf.mjs</code>).
-      </div>
+      <img src="agenda-quotidien-tableau.png" alt="Emploi du temps quotidien — semaine du 26 au 30 octobre 2026" />
     </section>
   </div>
 </body>

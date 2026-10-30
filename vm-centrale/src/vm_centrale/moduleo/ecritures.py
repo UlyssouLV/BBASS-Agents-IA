@@ -17,7 +17,7 @@ from vm_centrale.moduleo.client import (
 from vm_centrale.moduleo.droits import DroitManquant, DroitsModuleo
 
 # Écritures Moduléo proposées et Journal des écritures (spec 1.5.2, #204,
-# ADR-0019) : une ligne `ecritures_moduleo` par écriture que le modèle
+# ADR-0023) : une ligne `ecritures_moduleo` par écriture que le modèle
 # propose. La Carte de confirmation la montre tant qu'elle est « proposee » ;
 # seul le clic du collaborateur (decider) l'envoie, une fois. Règles :
 # moduleo/README.md, section **Carte de confirmation**.

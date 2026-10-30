@@ -21,7 +21,7 @@ from vm_centrale.outils.base import ContexteTour, Outil, ResultatOutil
 from vm_centrale.outils.moduleo.commun import INDISPONIBLE, LecteurTrace
 from vm_centrale.statut_tour import consultation_moduleo
 
-# Écriture Moduléo (spec 1.5.2, #204, ADR-0019) : deux outils génériques.
+# Écriture Moduléo (spec 1.5.2, #204, ADR-0023) : deux outils génériques.
 # `decrire_ecriture_moduleo` donne les champs d'une route sans appeler
 # Moduléo ; `ecrire_moduleo` propose l'écriture (Carte de confirmation),
 # n'envoie rien. PUT et DELETE (#205) : l'élément visé est relu avant la

@@ -46,6 +46,12 @@ const config: Config = {
                 '@': path.resolve(siteDir, '../poste/frontend/src'),
                 react: reactDir,
                 'react-dom': path.resolve(siteDir, 'node_modules/react-dom'),
+                // Les composants du poste (menu « … ») lisent react-query :
+                // une seule copie, celle du poste, pour partager le contexte.
+                '@tanstack/react-query': path.resolve(
+                  siteDir,
+                  '../poste/frontend/node_modules/@tanstack/react-query',
+                ),
               },
             },
             watchOptions: {
@@ -110,7 +116,13 @@ const config: Config = {
           type: 'docSidebar',
           sidebarId: 'featuresSidebar',
           position: 'left',
-          label: 'Features',
+          label: 'Fonctionnalités',
+        },
+        {
+          type: 'docSidebar',
+          sidebarId: 'installationSidebar',
+          position: 'left',
+          label: 'Installation',
         },
         {
           type: 'docSidebar',

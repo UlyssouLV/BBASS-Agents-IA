@@ -9,7 +9,8 @@ class SecretIndechiffrable(Exception):
 
 def lire_cle_maitre(chemin: str) -> bytes:
     # Fichier hors du dépôt (spec 1.5.0, ADR-0017), écrit par
-    # scripts/chiffrer_secret.py. Lève OSError s'il est absent ou illisible.
+    # scripts/chiffrer_secret.py (dev) ou par `installer` (image, spec 1.6.1).
+    # Lève OSError s'il est absent ou illisible.
     with open(chemin, "rb") as fichier:
         return fichier.read().strip()
 

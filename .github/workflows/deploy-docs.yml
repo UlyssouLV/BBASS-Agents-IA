@@ -2,14 +2,14 @@ name: Deploy docs
 
 # À chaque push sur main (pas seulement la doc) : le site publie aussi les
 # compteurs de commits lus par les badges du README (static/stats/).
-# Aucun commit de bot : aperçus README régénérés dans le commit docs
-# (Finalise / /msa), comme ArgOS.
+# Aperçus README : produits sur la branche de version (skill finaliser-la-version),
+# jamais par un commit/push bot ici (ADR-0020 / V1.6.0).
+# Pas de déclencheur release : Finalise crée la release avant le squash-merge,
+# donc le push du merge redéploie déjà avec le changelog à jour.
 on:
   push:
     branches:
       - main
-  release:
-    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -20,63 +20,13 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # L'environnement github-pages n'accepte que main : un run déclenché par le tag
-  # d'une release ne peut pas déployer. On relance donc le même workflow sur main,
-  # pour que le changelog du site affiche la nouvelle release.
-  relancer-sur-main:
-    if: github.event_name == 'release'
-    runs-on: ubuntu-latest
-    permissions:
-      actions: write
-    steps:
-      - name: Relancer Deploy docs sur main
-        run: gh workflow run deploy-docs.yml --ref main --repo "$GITHUB_REPOSITORY"
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
   build:
-    if: github.event_name != 'release'
-    runs-on: ubuntu-latest
+    uses: ./.github/workflows/build-docs.yml
     permissions:
       contents: read
-      pages: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: docs-site/package-lock.json
-
-      - name: Install dependencies
-        working-directory: docs-site
-        run: npm ci --ignore-scripts
-
-      - name: Install poste frontend
-        working-directory: poste/frontend
-        run: npm ci --ignore-scripts
-
-      - name: Compteurs de commits
-        working-directory: docs-site
-        run: node scripts/generer-stats-commits.mjs
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-
-      - name: Build
-        working-directory: docs-site
-        run: npm run build
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: docs-site/build
+      pull-requests: read
+    with:
+      upload-pages: true
 
   deploy:
     if: github.event_name != 'release'

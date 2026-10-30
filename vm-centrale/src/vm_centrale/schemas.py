@@ -4,6 +4,7 @@ from typing import Annotated, Literal
 
 from pydantic import AfterValidator, BaseModel, Field, field_validator
 
+from vm_centrale.moduleo.droits.catalogue import GROUPE_DEV
 from vm_centrale.poles import POLES_VALIDES
 
 
@@ -303,3 +304,82 @@ class InspecteurEchangeDetailResponse(BaseModel):
     statut: str
     erreur: str | None
     date_creation: DateUtc
+
+
+class DroitModuleoResponse(BaseModel):
+    # Une case du catalogue (spec 1.5.3, #211), avec ses sous-droits :
+    # l'arborescence de Moduléo. Lecture seule.
+    chemin: str
+    libelle: str
+    conditions: dict | None
+    sous_droits: list["DroitModuleoResponse"]
+
+
+class CategorieDroitsModuleoResponse(BaseModel):
+    categorie: str
+    droits: list[DroitModuleoResponse]
+
+
+class CatalogueModuleoResponse(BaseModel):
+    cogeo: list[CategorieDroitsModuleoResponse]
+    planning: list[CategorieDroitsModuleoResponse]
+
+
+class GroupeModuleoRenommeRequest(BaseModel):
+    nom: str = Field(min_length=1)
+
+    @field_validator("nom")
+    @classmethod
+    def _nom_hors_groupe_de_dev(cls, nom: str) -> str:
+        # Sans espaces autour, comme le Panel : « Admin » et « Admin » suivi
+        # d'un espace sont un seul nom. « Tous droits (dev) » reste hors Panel
+        # (ADR-0019).
+        nom = nom.strip()
+        if not nom:
+            raise ValueError("Le nom du groupe est vide")
+        if nom == GROUPE_DEV:
+            raise ValueError(f"« {GROUPE_DEV} » est réservé au groupe de dev")
+        return nom
+
+
+class GroupeModuleoRequest(GroupeModuleoRenommeRequest):
+    application: Literal["cogeo", "planning"]
+
+
+class GroupeModuleoResponse(BaseModel):
+    id: int
+    application: str
+    nom: str
+
+
+class DroitAccordeModuleo(BaseModel):
+    # Une case cochée sur un groupe, désignée par son chemin, avec les
+    # conditions Planning que le groupe pose sur l'action.
+    chemin: str
+    conditions: dict | None = None
+
+
+class RattachementModuleoResponse(BaseModel):
+    # Un compte et ses groupes Moduléo (ids de GET /moduleo/groupes) et son
+    # utilisateur Moduléo, chacun facultatif (spec 1.5.3, #212).
+    identifiant: str
+    groupe_cogeo_id: int | None
+    groupe_planning_id: int | None
+    id_utilisateur_moduleo: int | None
+
+
+class RattachementModuleoRequest(BaseModel):
+    # Un champ absent garde sa valeur, null la retire (comme l'ancien script
+    # affecter_groupes_moduleo.py, « aucun »).
+    groupe_cogeo_id: int | None = None
+    groupe_planning_id: int | None = None
+    # Nom de l'utilisateur Moduléo (« Durand », « Nadia Durand »), résolu
+    # en id par une lecture Moduléo.
+    utilisateur_moduleo: str | None = None
+
+
+class EvenementJournalModuleoResponse(BaseModel):
+    date: DateUtc
+    admin: str
+    action: str
+    cible: str

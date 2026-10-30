@@ -308,8 +308,8 @@ class ProfilTravail(Base):
 
 class DroitModuleo(Base):
     # Une case du catalogue des droits de Moduléo, Cogeo ou Planning (spec
-    # 1.5.1, ADR-0018), recopiée de moduleo/droits/catalogue.json au
-    # démarrage. `chemin` : catégorie puis libellés des droits parents, un
+    # 1.5.1, ADR-0018), importée une fois de moduleo/droits/catalogue.json
+    # puis tenue en base (spec 1.5.3, ADR-0019). `chemin` : catégorie puis libellés des droits parents, un
     # même libellé pouvant revenir sous deux parents (« Émettre à la fin du
     # mois précédent » des devis et des factures).
     __tablename__ = "droits_moduleo"
@@ -387,9 +387,9 @@ class EcritureModuleo(Base):
 
 class RattachementModuleo(Base):
     # Rattachement d'un compte à ses groupes Moduléo et à son utilisateur
-    # Moduléo (spec 1.5.1), toujours explicite (scripts/
-    # affecter_groupes_moduleo.py) : être compte administrateur n'en donne
-    # aucun. Pas de ForeignKey vers comptes.identifiant : même convention
+    # Moduléo (spec 1.5.1), toujours explicite (Panel, PATCH
+    # /moduleo/rattachements depuis 1.5.3) : être compte administrateur
+    # n'en donne aucun. Pas de ForeignKey vers comptes.identifiant : même convention
     # que Conversation/Jeton ci-dessus.
     __tablename__ = "rattachements_moduleo"
 
@@ -398,3 +398,18 @@ class RattachementModuleo(Base):
     groupe_planning_id: Mapped[int | None] = mapped_column(ForeignKey("groupes_moduleo.id"), nullable=True)
     # Id de l'utilisateur Moduléo du compte (ses temps passés), ou NULL.
     id_utilisateur_moduleo: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
+class EvenementJournalModuleo(Base):
+    # Journal des droits Moduléo (Glossaire, spec 1.5.3, #212) : une ligne
+    # par action d'administration réussie sur les groupes, leurs droits ou
+    # les rattachements, écrite dans la même transaction que l'action. Pas
+    # de ForeignKey vers comptes.identifiant : même convention que
+    # Conversation/Jeton ci-dessus.
+    __tablename__ = "journal_moduleo"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    date: Mapped[datetime] = mapped_column(DateTime)
+    identifiant_admin: Mapped[str] = mapped_column(String)
+    action: Mapped[str] = mapped_column(String)
+    cible: Mapped[str] = mapped_column(String)

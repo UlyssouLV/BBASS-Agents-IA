@@ -1,0 +1,147 @@
+# Installer et utiliser le Copilote BBASS sur son poste
+
+Le Copilote BBASS est l’assistant IA du cabinet, installé sur votre poste Windows 10 ou 11. Il s’installe en quelques minutes, sans droits administrateur, puis se met à jour tout seul. À l’écran, il s’appelle simplement « BBASS ».
+
+:::tip En bref
+
+1. Lancer le fichier d’installation `BBASS-Setup-vX.Y.Z.exe` et suivre l’assistant.
+2. Se connecter avec son identifiant BBASS.
+3. Fermer la fenêtre quand on veut : le Copilote reste disponible près de l’horloge.
+
+:::
+
+## 1. Installer
+
+### Récupérer le fichier
+
+L’admin du cabinet vous transmet **`BBASS-Setup-vX.Y.Z.exe`**, ou vous le téléchargez sur [la page des versions](https://github.com/UlyssouLV/BBASS-Agents-IA/releases), dans **Assets** de la version la plus récente. Peu importe sa version : au premier lancement, le Copilote se met à la version du cabinet.
+
+<details>
+<summary>Le navigateur bloque le téléchargement ?</summary>
+
+S’il parle d’un fichier « peu téléchargé », choisir **Conserver** (dans Edge : menu **…** du téléchargement → **Conserver** → **Conserver quand même**).
+
+</details>
+
+### Passer l’alerte Windows (une seule fois)
+
+Le fichier n’est pas signé par un certificat Microsoft payant : Windows affiche **« Windows a protégé votre ordinateur »**. Cliquer sur **Informations complémentaires**, vérifier que l’application est bien `BBASS-Setup-vX.Y.Z.exe`, puis **Exécuter quand même**.
+
+<img src={require("../img/installation/poste-collaborateur/alerte-windows.png").default} alt="Alerte Windows : Exécuter quand même" width="420" style={{border: "1px solid #ddd", borderRadius: 6}} />
+
+Les mises à jour ne déclenchent plus cette alerte : le Copilote vérifie lui-même que chaque version vient bien du cabinet.
+
+### Suivre l’assistant
+
+| Étape | À faire |
+| --- | --- |
+| **Bienvenue** | rien : l’installation se fait dans votre compte Windows (`%LOCALAPPDATA%\BBASS`) |
+| **Serveur BBASS** | saisir l’**hôte** et le **port** donnés par l’admin (`8000` en général) |
+| **Options** | laisser cochés **Démarrer avec Windows** et **Raccourci sur le Bureau** |
+| **Installation** | quelques secondes, puis **Lancer BBASS** |
+
+<img src={require("../img/installation/poste-collaborateur/assistant-serveur.png").default} alt="Étape Serveur BBASS : pastille verte" width="420" style={{border: "1px solid #ddd", borderRadius: 6}} />
+
+:::warning Hôte : le nom seul
+
+Saisir `serveur-bbass`, et non `http://serveur-bbass` : avec `http://`, le serveur est jugé injoignable.
+
+:::
+
+Pastille **verte** : l’adresse est bonne. Pastille **orange** : l’adresse est fausse ou le serveur est éteint ; vous pouvez continuer et [corriger plus tard](#changer-ladresse-du-serveur).
+
+## 2. Au quotidien
+
+### Se connecter
+
+Le Copilote s’ouvre dans sa propre fenêtre, sur l’écran de connexion. La **pastille** sous le formulaire dit si le serveur répond :
+
+- **verte** « Connecté à BBASS vX.Y.Z » : tout va bien ;
+- **orange** « Serveur BBASS injoignable, nouvel essai… » : le problème ne vient **pas** de votre mot de passe (voir [En cas de problème](#en-cas-de-probleme)).
+
+<img src={require("../img/installation/poste-collaborateur/connexion-pastille-orange.png").default} alt="Pastille orange : serveur injoignable" width="320" style={{border: "1px solid #ddd", borderRadius: 6}} />
+
+### Fermer la fenêtre ne l’arrête pas
+
+Le Copilote reste dans la **zone de notification**, à droite de la barre des tâches (parfois derrière la flèche **^**). Un clic sur son icône rouvre la fenêtre ; un clic droit ouvre son menu :
+
+<img src={require("../img/installation/poste-collaborateur/menu-icone.png").default} alt="Menu de l’icône" width="220" style={{border: "1px solid #ddd", borderRadius: 6}} />
+
+| Entrée | Effet |
+| --- | --- |
+| **Ouvrir BBASS** | rouvre la fenêtre |
+| **Ouvrir dans le navigateur** | ouvre le Copilote dans votre navigateur habituel (`http://127.0.0.1:8100`) |
+| **Quitter** | arrête vraiment le Copilote |
+
+Avec **Démarrer avec Windows**, le Copilote démarre en fond à l’ouverture de session et se met à jour à ce moment-là. Le relancer depuis le menu Démarrer alors qu’il tourne rouvre simplement sa fenêtre.
+
+## 3. Le menu « … »
+
+Le bouton **…** en haut à droite de l’écran de connexion marche **sans être connecté**. Une fois connecté, on le retrouve dans **Profil**, à côté de **Se déconnecter**.
+
+<img src={require("../img/installation/poste-collaborateur/menu-trois-points.png").default} alt="Menu « … »" width="380" style={{border: "1px solid #ddd", borderRadius: 6}} />
+
+| Entrée | Sert à |
+| --- | --- |
+| **Configuration** | changer l’adresse du serveur |
+| **Ouvrir le dossier de configuration** | retrouver ses journaux pour l’admin |
+| **À propos** | voir les versions et vérifier les mises à jour |
+
+### Configuration {#changer-ladresse-du-serveur}
+
+Saisir l’**hôte** et le **port**, **Tester la connexion** (vert ou orange), puis **Enregistrer**. **Annuler** ne change rien. Si aucune adresse n’est encore réglée, cette fenêtre s’ouvre d’elle-même.
+
+<img src={require("../img/installation/poste-collaborateur/configuration.png").default} alt="Configuration" width="420" style={{border: "1px solid #ddd", borderRadius: 6}} />
+
+### Ouvrir le dossier de configuration
+
+Ouvre `%LOCALAPPDATA%\BBASS` dans l’Explorateur. Le dossier **`journaux`** est celui que l’admin peut vous demander : il ne contient **ni mot de passe ni jeton**.
+
+### À propos
+
+Montre la version du poste, celle du serveur (« VM ») et la dernière vérification de mise à jour. **Vérifier les mises à jour maintenant** redémarre le Copilote, refait la vérification, puis rouvre « À propos » avec le résultat.
+
+<img src={require("../img/installation/poste-collaborateur/a-propos.png").default} alt="À propos" width="420" style={{border: "1px solid #ddd", borderRadius: 6}} />
+
+## 4. En cas de problème {#en-cas-de-probleme}
+
+Quand la mise à jour échoue, le Copilote **démarre quand même** sur la version installée et affiche un bandeau rouge. Le chat marche en général ; certaines fonctions récentes peuvent manquer.
+
+<img src={require("../img/installation/poste-collaborateur/bandeau-mise-a-jour.png").default} alt="Bandeau « Mise à jour impossible »" style={{border: "1px solid #ddd", borderRadius: 6}} />
+
+| Ce que vous voyez | Que faire |
+| --- | --- |
+| Bandeau rouge « Mise à jour impossible… » | continuer à travailler ; fermer le bandeau (**×**) pour atteindre le bouton **…**, puis vérifier l’adresse dans **Configuration** ; réessayer par **À propos** → **Vérifier les mises à jour maintenant**. S’il revient, prévenir l’admin |
+| Pastille orange | vérifier que le poste est sur le réseau du cabinet, puis l’adresse dans **Configuration** |
+| « BBASS ne répond pas. Quittez BBASS depuis la zone de notification puis relancez-le. » | faire ce qu’il dit : **Quitter** par l’icône, puis relancer |
+| Un message qui finit par « Réinstallez BBASS. » | [réinstaller](#reinstaller) ; l’adresse du serveur est gardée |
+| La fenêtre ne revient pas après **Vérifier les mises à jour maintenant** | relancer le Copilote depuis le menu Démarrer |
+| L’admin demande les journaux | **…** → **Ouvrir le dossier de configuration** → lui envoyer le dossier `journaux` |
+
+<details>
+<summary>Ce que fait le Copilote à chaque lancement</summary>
+
+Une petite fenêtre montre où il en est, sans rien demander :
+
+- **Vérification…** : il demande sa version au serveur du cabinet ;
+- **Mise à jour vers vX.Y.Z…**, avec une barre de progression : il télécharge et installe la nouvelle version, puis redémarre tout seul ;
+- **Démarrage…** : l’écran de connexion arrive.
+
+Le bandeau dit « Mise à jour vers vX.Y.Z impossible » quand une version précise n’a pas pu s’installer, et « Mise à jour impossible » sans numéro quand le serveur ne répond pas. Si une nouvelle version s’installe mais ne démarre pas, le Copilote remet tout seul la précédente et affiche ce même bandeau.
+
+</details>
+
+## 5. Désinstaller ou réinstaller {#reinstaller}
+
+**Paramètres** Windows → **Applications** → **Applications installées** → **BBASS** → **…** → **Désinstaller**, puis confirmer.
+
+Pour **réinstaller** (par exemple pour changer les options), désinstaller puis relancer le fichier d’installation : l’assistant repropose l’adresse du serveur. Lancé alors que le Copilote est encore installé, le fichier d’installation ouvre simplement le Copilote.
+
+<details>
+<summary>Ce qui est retiré, ce qui est gardé</summary>
+
+- **Retirés** : le programme et ses versions, le démarrage avec Windows, les raccourcis et votre Session (il faudra vous reconnecter).
+- **Gardés** : la configuration (adresse du serveur) et les journaux.
+- Vos conversations ne sont pas sur le poste : elles restent sur le serveur du cabinet.
+
+</details>

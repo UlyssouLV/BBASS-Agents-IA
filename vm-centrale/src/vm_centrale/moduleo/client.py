@@ -21,7 +21,7 @@ def _sans_barre_finale(url: str) -> str:
     return url.strip().rstrip("/").lower()
 
 
-# Serveurs Moduléo de test (spec 1.5.2, ADR-0019) : liste versionnée, seconde
+# Serveurs Moduléo de test (spec 1.5.2, ADR-0023) : liste versionnée, seconde
 # barrière de l'écriture après MODULEO_ECRITURE. Lue une fois par processus.
 SERVEURS_DE_TEST = frozenset(
     _sans_barre_finale(serveur["url"])
@@ -32,7 +32,7 @@ SERVEURS_DE_TEST = frozenset(
 
 
 class RequeteInterdite(Exception):
-    # Levée avant tout envoi (ADR-0017, ADR-0019) : méthode autre que GET en
+    # Levée avant tout envoi (ADR-0017, ADR-0023) : méthode autre que GET en
     # lecture, route hors de ROUTES_GET / ROUTES_ECRITURE, route mal remplie,
     # corps incohérent, écriture inactive ou serveur hors de la liste des
     # serveurs de test. Une erreur du code ou de la config de la VM, pas de
@@ -92,7 +92,7 @@ class ClientModuleo:
     # barrière après la clé Moduléo réglée en lecture. Depuis 1.5.1 (#188,
     # ADR-0018), il exige les droits du compte : le garde des droits passe
     # avant tout envoi, quel que soit le transport. Depuis 1.5.2 (#202,
-    # ADR-0019), `ecrire()` envoie POST / PUT / DELETE, seulement vers un
+    # ADR-0023), `ecrire()` envoie POST / PUT / DELETE, seulement vers un
     # serveur de test listé, MODULEO_ECRITURE actif.
     def __init__(self, transport: TransportModuleo) -> None:
         self._transport = transport

@@ -1,6 +1,6 @@
 # decrire_ecriture_moduleo, ecrire_moduleo
 
-Les deux outils génériques de l'écriture Moduléo (spec 1.5.2, #204, [ADR-0019](../../../../../../docs/adr/0019-ecriture-moduleo-confirmee-serveur-de-test.md)) : pas un outil par route. Règles communes (statut, panne, inspecteur) : [`../README.md`](../README.md) ; client, garde, Carte de confirmation et Journal des écritures : [`vm_centrale/moduleo/README.md`](../../../moduleo/README.md).
+Les deux outils génériques de l'écriture Moduléo (spec 1.5.2, #204, [ADR-0023](../../../../../../docs/adr/0023-ecriture-moduleo-confirmee-serveur-de-test.md)) : pas un outil par route. Règles communes (statut, panne, inspecteur) : [`../README.md`](../README.md) ; client, garde, Carte de confirmation et Journal des écritures : [`vm_centrale/moduleo/README.md`](../../../moduleo/README.md).
 
 **Éligibilité.** Les deux outils sont proposés ensemble, seulement si `ClientModuleo.ecriture_ouverte()` (`MODULEO_ECRITURE` actif, `MODULEO_URL` dans `serveurs_test.json`) et si au moins une route d'écriture peut s'ouvrir au compte (`ecriture_possible`, garde des droits : route classée, non fermée, groupe ou droit présent, ou `siens_ecriture` avec un utilisateur Moduléo lié). POST depuis #204 ; PUT et DELETE depuis #205, avec leur carte détaillée.
 

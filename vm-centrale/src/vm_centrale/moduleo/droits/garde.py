@@ -10,7 +10,7 @@ from vm_centrale.moduleo.routes import ROUTES_ECRITURE
 
 # Garde des droits (spec 1.5.1, ADR-0018) : point de passage unique, fermé
 # par défaut, avant tout envoi à Moduléo. Chaque route GET, et depuis 1.5.2
-# chaque route d'écriture (#202, ADR-0019), est classée dans routes.json ;
+# chaque route d'écriture (#202, ADR-0023), est classée dans routes.json ;
 # une route non classée est refusée. Règles : moduleo/README.md.
 
 FICHIER_CLASSEMENT = Path(__file__).parent / "routes.json"
