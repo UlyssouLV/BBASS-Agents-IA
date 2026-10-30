@@ -3,12 +3,16 @@ from dataclasses import dataclass
 from datetime import timedelta
 from decimal import Decimal
 from functools import cache
+from pathlib import Path
 
 from dotenv import load_dotenv
 
+from vm_centrale.cibles_dev import charger_cible_dev
 from vm_centrale.secrets_chiffres import SecretIndechiffrable, dechiffrer, lire_cle_maitre
 
 load_dotenv()
+# Poste de dev : .env.test ou .env.cabinet par-dessus (BBASS_CIBLE_DEV).
+CIBLE_DEV = charger_cible_dev(Path(__file__).resolve().parents[2])
 
 VM_CENTRALE_HOST = os.environ.get("VM_CENTRALE_HOST", "0.0.0.0")
 VM_CENTRALE_PORT = int(os.environ.get("VM_CENTRALE_PORT", "8000"))

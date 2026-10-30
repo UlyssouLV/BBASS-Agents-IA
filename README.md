@@ -203,6 +203,7 @@ Après avoir installé les prérequis ci-dessus (Python 3.11, Docker Desktop ins
 
 - `lancer-vm.bat` : démarre PostgreSQL et SearXNG puis la VM centrale seule (2 fenêtres : logs Postgres, VM centrale) — utile pour développer/tester la VM seule.
 - `lancer-logiciel.bat` : démarre PostgreSQL, SearXNG, la VM centrale et le poste (2 fenêtres : VM centrale, poste), puis ouvre le navigateur sur l'interface.
+- **Cible de dev** (les quatre scripts) : `test` par défaut (serveur Moduléo de test, écriture possible, VM sur le port **8001**), ou `cabinet` en argument (`lancer-logiciel.bat cabinet` : serveur du cabinet, lecture seule, port **8000**) — même partage que staging / prod. Chaque cible a ses clés Moduléo, sa base et son port (`vm-centrale/.env.test`, `vm-centrale/.env.cabinet`, `.env` pour le commun) : changer de cible ne touche plus aux clés de l'autre. Le premier lancement sépare l'ancien `.env` (gardé en `.env.avant-cibles`).
 
 **macOS** (`.command`, équivalents des `.bat` ci-dessus) :
 
