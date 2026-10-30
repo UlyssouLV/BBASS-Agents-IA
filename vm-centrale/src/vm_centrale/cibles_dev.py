@@ -21,7 +21,6 @@ _CIBLES = {
 }
 _PAR_CIBLE = ("MODULEO_URL", "MODULEO_API_KEY_CHIFFREE", "MODULEO_SECURITY_CODE_CHIFFRE", "MODULEO_ECRITURE")
 _BASE = "VM_CENTRALE_DATABASE_URL"
-_BASE_PAR_DEFAUT = "postgresql+psycopg://vm_centrale:vm_centrale@localhost:5432/vm_centrale"
 _SAUVEGARDE = ".env.avant-cibles"
 
 
@@ -50,13 +49,16 @@ def separer_env(dossier: Path) -> bool:
         return False
     valeurs = {nom: valeur or "" for nom, valeur in dotenv_values(env).items()} if env.is_file() else {}
     actuelle = "cabinet" if valeurs.get("MODULEO_URL", URL_CABINET).rstrip("/") == URL_CABINET else "test"
-    base = valeurs.get(_BASE) or _BASE_PAR_DEFAUT
+    # Sans base dans le .env, aucune n'est inventée (pas d'URL à mot de
+    # passe dans le code) : la VM garde sa base par défaut.
+    base = valeurs.get(_BASE)
     for cible, reglages in _CIBLES.items():
         lignes = {**reglages, "MODULEO_API_KEY_CHIFFREE": "", "MODULEO_SECURITY_CODE_CHIFFRE": ""}
         if cible == actuelle:
             lignes.update({nom: valeurs[nom] for nom in _PAR_CIBLE if valeurs.get(nom)})
             lignes["MODULEO_ECRITURE"] = reglages["MODULEO_ECRITURE"]
-        lignes[_BASE] = base if cible == actuelle else f"{base.rsplit('/', 1)[0]}/vm_centrale_{cible}"
+        if base:
+            lignes[_BASE] = base if cible == actuelle else f"{base.rsplit('/', 1)[0]}/vm_centrale_{cible}"
         _ecrire(dossier / f".env.{cible}", f"Cible de dev « {cible} » (cibles_dev.py), lue par-dessus .env.", lignes)
     if env.is_file():
         shutil.copyfile(env, dossier / _SAUVEGARDE)

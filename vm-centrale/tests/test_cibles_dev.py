@@ -77,6 +77,17 @@ def test_separer_un_env_du_cabinet_le_range_au_cabinet(tmp_path):
     assert test["VM_CENTRALE_DATABASE_URL"].endswith("/vm_centrale_test")
 
 
+def test_separer_sans_base_dans_le_env_n_en_invente_pas(tmp_path):
+    # Pas d'URL de base par défaut dans le code (mot de passe en clair, Sonar
+    # S6698) : la VM garde sa base par défaut, la même pour les deux cibles.
+    (tmp_path / ".env").write_text(_ENV.split("\n", 2)[0] + "\n" + _ENV.split("\n", 2)[2], encoding="utf-8")
+
+    assert separer_env(tmp_path) is True
+
+    for nom in (".env.test", ".env.cabinet"):
+        assert "VM_CENTRALE_DATABASE_URL" not in _lire(tmp_path / nom)
+
+
 def test_separer_une_seconde_fois_ne_touche_a_rien(tmp_path):
     (tmp_path / ".env").write_text(_ENV, encoding="utf-8")
     separer_env(tmp_path)

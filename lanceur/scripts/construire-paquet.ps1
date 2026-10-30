@@ -38,9 +38,26 @@ Executer "Front du poste et assistant d'installation (npm run build, build:insta
 $venv = Join-Path $cible "venv-sidecar"
 $pythonVenv = Join-Path $venv "Scripts\python.exe"
 Executer "Environnement Python du sidecar" { & $Python -m venv $venv }
+# Versions de poste\uv.lock, pas les dernières publiées : sans le lock, pip
+# a pris pydantic 2.14 le 2026-10-30, que PyInstaller ne sait pas figer
+# (« pydantic:compiled has been removed in V2 »).
+$exigences = Join-Path $cible "exigences-sidecar.txt"
+Executer "Versions verrouillées du sidecar (uv export)" {
+    & $pythonVenv -m pip install --disable-pip-version-check --quiet "uv>=0.5,<1"
+    if ($LASTEXITCODE -eq 0) {
+        & $pythonVenv -m uv export --frozen --no-dev --no-emit-project --no-hashes --quiet `
+            --project (Join-Path $racine "poste") --output-file $exigences
+    }
+}
 # Installation non éditable : PyInstaller doit trouver poste\static dans le paquet installé.
 Executer "Dépendances du sidecar" {
-    & $pythonVenv -m pip install --disable-pip-version-check --quiet (Join-Path $racine "poste") "pyinstaller>=6.10,<7"
+    & $pythonVenv -m pip install --disable-pip-version-check --quiet --requirement $exigences
+    if ($LASTEXITCODE -eq 0) {
+        & $pythonVenv -m pip install --disable-pip-version-check --quiet --no-deps (Join-Path $racine "poste")
+    }
+    if ($LASTEXITCODE -eq 0) {
+        & $pythonVenv -m pip install --disable-pip-version-check --quiet "pyinstaller>=6.10,<7"
+    }
 }
 
 $travailPyInstaller = Join-Path $cible "pyinstaller"
