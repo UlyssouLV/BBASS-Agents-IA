@@ -41,6 +41,7 @@ import { useConversationQuery, type Message } from "@/hooks/useConversations";
 import { cleEnvoi, type CleEnvoi, type EnvoisEnCours } from "@/hooks/useEnvoisEnCours";
 import { messageErreur } from "@/lib/api";
 import { usePerfChargementParCle } from "@/lib/instrumentationTemps";
+import { markdownEnCoursDeFrappe } from "@/lib/markdownEnCoursDeFrappe";
 import { cn } from "@/lib/utils";
 
 // Mêmes extensions/types qu'app.js (formulaireNouvelleConversation /
@@ -721,17 +722,12 @@ function TexteAnimeReponse({
     return () => window.clearTimeout(delai);
   }, [longueurAffichee, texte, caracteresParEtape, onTermine]);
 
-  // Tant que le texte révélé est tronqué, affiche du texte brut plutôt que
-  // de le repasser par le pipeline Markdown/remark-gfm/Prism à chaque étape
-  // (#99) : une syntaxe encore incomplète (lien, tableau, bloc de code non
-  // refermé) s'y afficherait brute ou cassée pendant plusieurs frames avant
-  // de « sauter » dans sa forme stylée une fois close. Le rendu Markdown
-  // complet n'intervient donc qu'une seule fois, à la toute fin de
-  // l'animation, plutôt qu'à chaque étape.
-  const texteAffiche = texte.slice(0, longueurAffichee);
-  if (longueurAffichee < texte.length) {
-    return <p className="whitespace-pre-wrap">{texteAffiche}</p>;
-  }
+  // Issue #272 : le texte révélé passe par le rendu Markdown à chaque étape,
+  // après avoir été complété pour l'affichage (voir markdownEnCoursDeFrappe :
+  // une syntaxe incomplète n'y est jamais affichée brute ni cassée). Le texte
+  // complet, lui, est rendu tel quel : même rendu qu'une réponse enregistrée.
+  const texteAffiche =
+    longueurAffichee < texte.length ? markdownEnCoursDeFrappe(texte.slice(0, longueurAffichee)) : texte;
   return <ContenuMessageAssistant texte={texteAffiche} />;
 }
 
