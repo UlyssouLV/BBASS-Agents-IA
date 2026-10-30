@@ -34,7 +34,7 @@ Le paquet est dans `lanceur\target\paquet\BBASS\` ; il tourne sans Python ni git
 - `versions\installation.json` : version précédente gardée (une seule) et bascule en cours. Les autres versions, `BBASS.old.exe` et `BBASS.echec.exe` sont supprimés au lancement suivant.
 - `%LOCALAPPDATA%\BBASS\mise-a-jour.json` : résultat de la dernière vérification (date, versions, résultat, détail, bandeau), servi par le backend sur `GET /mise-a-jour`.
 - Le paquet construit en local (`target\paquet\BBASS\`) se met à jour lui aussi s'il trouve un Serveur BBASS d'une autre version publiée.
-- « Vérifier les mises à jour maintenant » (menu « … », À propos, `GET /a-propos`) : le backend lance `BBASS.exe --verifier-mise-a-jour` (`BBASS_LANCEUR`, donné au sidecar avec `BBASS_VERSION`) ; l'instance unique le transmet au Lanceur en cours, qui redémarre avec cet argument : même parcours qu'au lancement, puis la fenêtre s'ouvre sur À propos avec le résultat (`/?a-propos`).
+- « Vérifier les mises à jour maintenant » (menu « … », À propos, `GET /a-propos`) : le backend lance `BBASS.exe --verifier-mise-a-jour` (`BBASS_LANCEUR`, donné au sidecar avec `BBASS_VERSION`) ; l'instance unique le transmet au Lanceur en cours, qui redémarre avec cet argument : même parcours qu'au lancement, puis la fenêtre s'ouvre sur À propos avec le résultat (`/?a-propos&v=X.Y.Z`). L'adresse ouverte porte toujours la version (`/?v=X.Y.Z`), pour passer outre une ancienne page en cache après une mise à jour ; **Ouvrir dans le navigateur** ne s'appuie que sur l'en-tête `Cache-Control: no-cache` du backend.
 
 ## Setup et désinstallation
 

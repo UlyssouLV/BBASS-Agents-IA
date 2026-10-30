@@ -18,7 +18,7 @@ use std::time::Duration;
 use bbass_lanceur_coeur::attente::attendre_reponse;
 use bbass_lanceur_coeur::configuration::url_de_la_sante;
 use bbass_lanceur_coeur::journal::Journal;
-use bbass_lanceur_coeur::lancement::{demande_d_arret, demande_de_verification, processus_a_attendre, Lancement};
+use bbass_lanceur_coeur::lancement::{adresse_ouverte, demande_d_arret, demande_de_verification, processus_a_attendre, Lancement};
 use bbass_lanceur_coeur::mise_a_jour::{Etape, MiseAJour, Suite};
 use bbass_lanceur_coeur::setup::lire_paquet_embarque;
 use bbass_lanceur_coeur::signature::ClePublique;
@@ -32,8 +32,6 @@ use tauri_plugin_opener::OpenerExt;
 /// Port local du backend poste, inchangé depuis la V1 (`POSTE_PORT`).
 const PORT_POSTE: u16 = 8100;
 const URL_POSTE: &str = "http://127.0.0.1:8100/";
-/// Après « Vérifier les mises à jour maintenant » : le front ouvre À propos sur le résultat.
-const URL_A_PROPOS: &str = "http://127.0.0.1:8100/?a-propos";
 /// Premier démarrage d'un backend PyInstaller : antivirus et disque froid compris.
 const DELAI_DEMARRAGE: Duration = Duration::from_secs(90);
 /// 3 fichiers de 1 Mo au plus, comme le journal du backend.
@@ -272,8 +270,9 @@ fn demarrer_le_poste(fenetre: WebviewWindow, lancement: Lancement) {
                     return;
                 }
             }
-            let url = if lancement == Lancement::Verification { URL_A_PROPOS } else { URL_POSTE };
-            let _ = fenetre.navigate(Url::parse(url).expect("URL locale valide"));
+            let version = fenetre.package_info().version.to_string();
+            let url = adresse_ouverte(URL_POSTE, lancement, &version);
+            let _ = fenetre.navigate(Url::parse(&url).expect("URL locale valide"));
         }
         Err(_) if essai => {
             arreter_le_backend(&fenetre);

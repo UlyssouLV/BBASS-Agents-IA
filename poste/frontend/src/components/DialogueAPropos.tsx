@@ -14,8 +14,8 @@ import type { DerniereVerification } from "@/hooks/useMiseAJour";
 import { messageErreur } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-// Le Lanceur rouvre la fenêtre sur /?a-propos après « Vérifier les mises à
-// jour maintenant » (lanceur/src/main.rs, URL_A_PROPOS).
+// Le Lanceur rouvre la fenêtre sur /?a-propos&v=X.Y.Z après « Vérifier les mises
+// à jour maintenant » (lanceur/coeur/src/lancement.rs, adresse_ouverte).
 const _PARAMETRE_APRES_VERIFICATION = "a-propos";
 
 const _RESULTATS: Record<DerniereVerification["resultat"], string> = {
