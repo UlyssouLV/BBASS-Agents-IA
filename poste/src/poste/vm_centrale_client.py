@@ -650,7 +650,7 @@ class VmCentraleClient:
         # Clic Confirmer / Annuler d'une Carte de confirmation (spec 1.5.2,
         # #204) : la carte à jour, relayée telle quelle.
         reponse = _http_client.post(
-            f"{VM_CENTRALE_BASE_URL}/ecritures-moduleo/{ecriture_id}",
+            f"{config.adresse_serveur_bbass()}/ecritures-moduleo/{ecriture_id}",
             json={"decision": decision},
             headers={"Authorization": f"Bearer {jeton}"},
         )

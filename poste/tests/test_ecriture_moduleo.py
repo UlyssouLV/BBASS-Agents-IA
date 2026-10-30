@@ -1,14 +1,21 @@
+import json
 from datetime import datetime, timezone
+from pathlib import Path
 
 import httpx
+import pytest
 from flux_sse import evenements
 
+from poste import config, vm_centrale_client
+from poste.main import app
 from poste.vm_centrale_client import (
     ConversationDetail,
     EcritureDejaDecideeError,
     EcritureIntrouvableError,
     JetonInvalideError,
     Message,
+    VmCentraleClient,
+    get_vm_centrale_client,
 )
 
 # Carte de confirmation d'une écriture Moduléo (spec 1.5.2, #204) : le
@@ -161,3 +168,55 @@ def test_decision_vm_indisponible_retourne_502(client, vm_centrale_client_factic
     vm_centrale_client_factice.decision_ecriture_echoue(httpx.ConnectError("refus"))
 
     assert client.post("/ecritures-moduleo/7", json={"decision": "confirmer"}).status_code == 502
+
+
+@pytest.mark.parametrize("decision", ["confirmer", "annuler"])
+def test_poste_installe_la_decision_atteint_le_serveur_relie(client, monkeypatch, tmp_path, decision):
+    # Vrai client de la VM centrale, réseau simulé (#279) : le faux client des
+    # tests ci-dessus ne voit ni l'adresse ni l'appel HTTP.
+    appels: list[tuple[str, str, dict, str | None]] = []
+    decidee = {**_CARTE, "statut": "annulee" if decision == "annuler" else "confirmee"}
+
+    def repondre(requete: httpx.Request) -> httpx.Response:
+        if requete.url.path == "/auth":
+            return httpx.Response(
+                200,
+                json={
+                    "prenom": "Jean",
+                    "nom": "Dupont",
+                    "jeton": "jeton-reel",
+                    "agence": "Montpellier",
+                    "poles": [],
+                    "est_admin": False,
+                    "doit_changer_mot_de_passe": False,
+                },
+            )
+        appels.append(
+            (requete.method, str(requete.url), json.loads(requete.content), requete.headers.get("Authorization"))
+        )
+        return httpx.Response(200, json=decidee)
+
+    fichier = tmp_path / "BBASS" / "configuration.json"
+    fichier.parent.mkdir()
+    fichier.write_text(json.dumps({"serveur_bbass": {"hote": "10.0.0.5", "port": 8001}}), encoding="utf-8")
+    monkeypatch.setattr(config, "EN_MODE_PAQUET", True)
+    monkeypatch.setattr(config, "FICHIER_CONFIGURATION", fichier)
+    monkeypatch.setattr(vm_centrale_client, "_http_client", httpx.Client(transport=httpx.MockTransport(repondre)))
+    app.dependency_overrides[get_vm_centrale_client] = VmCentraleClient
+    client.post("/connexion", json={"identifiant": "j.dupont", "mot_de_passe": "x"})
+
+    reponse = client.post("/ecritures-moduleo/7", json={"decision": decision})
+
+    assert reponse.status_code == 200
+    assert reponse.json() == decidee
+    assert appels == [
+        ("POST", "http://10.0.0.5:8001/ecritures-moduleo/7", {"decision": decision}, "Bearer jeton-reel")
+    ]
+
+
+def test_le_client_n_utilise_jamais_l_adresse_reservee_au_developpement():
+    # Garde-fou (#279) : hors de config.adresse_serveur_bbass(), cette adresse
+    # ne vaut rien sur un poste installé.
+    source = Path(vm_centrale_client.__file__).read_text(encoding="utf-8")
+
+    assert "VM_CENTRALE_BASE_URL" not in source
