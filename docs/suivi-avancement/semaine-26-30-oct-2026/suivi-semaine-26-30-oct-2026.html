@@ -397,14 +397,14 @@
             <div class="toc-row">
               <a href="#reste-a-implementer">Reste à implémenter</a>
               <span class="toc-dots" aria-hidden="true"></span>
-              <span class="toc-ref">V1.5.2 → …</span>
+              <span class="toc-ref">V1.8.0 → …</span>
             </div>
           </li>
           <li>
             <div class="toc-row">
-              <a href="#livre-pour">Livré pour le 29/10/2026</a>
+              <a href="#livre-pour">Livré pour le 30/10/2026</a>
               <span class="toc-dots" aria-hidden="true"></span>
-              <span class="toc-ref">jeudi 29 oct.</span>
+              <span class="toc-ref">vendredi 30 oct.</span>
             </div>
           </li>
           <li>
@@ -469,7 +469,7 @@
     <div class="jour">
       <h3>Vendredi 30 octobre</h3>
       <ul>
-        <li>À compléter.</li>
+        <li>V1.5.2 livrée (numéro produit 1.6.3) : le chat prépare une écriture dans Moduléo et le collaborateur la confirme d’un clic sur une carte, sur le serveur de test seulement ; le serveur du cabinet n’est jamais modifié ; ajouter un téléphone ou une note, modifier un contact et supprimer un temps passé fonctionnent ; les limites constatées aux trois passages de tests humains sont reportées en 1.8.1 et 1.8.2.</li>
       </ul>
     </div>
     </section>
@@ -477,7 +477,6 @@
     <section class="bloc" id="reste-a-implementer">
     <h2>Reste à implémenter</h2>
     <ul>
-      <li><strong>V1.5.2</strong> — écrire dans Moduléo depuis le chat, essayé sur le serveur de test fourni par Kipaware. Bloquée tant que les identifiants de ce serveur de test (accès à l’API) ne sont pas reçus : aucune écriture n’est essayée sur le serveur réel du cabinet. Finalisation visée mercredi 28 octobre.</li>
       <li><strong>V1.8.0</strong> — automatisations n8n branchées sur Moduléo.</li>
       <li><strong>V1.9.0</strong> — analyse et traitement approfondis des pièces jointes.</li>
       <li>Suite « Plus tard » de la feuille de route (documentation mémoire / souveraineté, agents par pôle, bugs connus, etc.).</li>
@@ -485,10 +484,10 @@
     </section>
 
     <section class="bloc" id="livre-pour">
-    <h2>Livré pour le 29/10/2026</h2>
+    <h2>Livré pour le 30/10/2026</h2>
     <div class="recap">
-      <p><strong>Point jeudi 29 octobre — visé : V1.5.1 · livré : V1.5.1 (lundi 26 octobre), V1.5.3 et V1.6.0 (mardi 27 octobre), V1.6.1 (mercredi 28 octobre), V1.6.2 (jeudi 29 octobre)</strong></p>
-      <p>V1.5.2 reportée : identifiants du serveur de test Moduléo non reçus, pas d’essai d’écriture sur le serveur réel ; d’où la livraison de la 1.5.3, de la 1.6.0, de la 1.6.1 et de la 1.6.2 avant elle.</p>
+      <p><strong>Point vendredi 30 octobre — visé : V1.5.1 · livré : V1.5.1 (lundi 26 octobre), V1.5.3 et V1.6.0 (mardi 27 octobre), V1.6.1 (mercredi 28 octobre), V1.6.2 (jeudi 29 octobre), V1.5.2 (vendredi 30 octobre, numéro produit 1.6.3)</strong></p>
+      <p>V1.5.2 livrée en dernier : les identifiants du serveur de test Moduléo sont arrivés le 29 octobre, d’où la livraison de la 1.5.3, de la 1.6.0, de la 1.6.1 et de la 1.6.2 avant elle. Elle sort sous le numéro produit 1.6.3.</p>
     </div>
     </section>
 
@@ -518,11 +517,16 @@
       <div class="version" id="version-1-5-2">
         <div class="version-head">
           <h3>V1.5.2 — Écrire dans Moduléo depuis le chat</h3>
-          <span class="prevu">En attente des identifiants du serveur de test — finalisation visée le 28/10/2026</span>
+          <span class="deploye">Déployé le 30/10/2026 à 13:28</span>
         </div>
         <div class="version-body">
-          <p>Premiers outils d’écriture Moduléo depuis le chat, essayés uniquement sur un serveur de test. Chaque écriture est confirmée explicitement par le collaborateur avant d’être envoyée.</p>
-          <p>Pas encore finalisable : les identifiants du serveur de test pour l’accès à l’API Moduléo n’ont pas encore été reçus, et aucune écriture n’est essayée sur le serveur Moduléo réel du cabinet. Finalisation visée mercredi 28 octobre ; c’est pourquoi les versions 1.5.3, 1.6.0 et 1.6.1 ont été livrées avant elle.</p>
+          <p>Le collaborateur peut demander au chat d’écrire dans Moduléo : le chat prépare l’écriture, une carte montre ce qui sera fait, et rien ne part avant le clic sur Confirmer. Cette version sert à l’essai sur le serveur de test : la production n’écrit jamais dans Moduléo. Numéro produit : 1.6.3.</p>
+          <ul>
+            <li><strong>Ce qui fonctionne</strong> : ajouter un téléphone à un contact, ajouter une note à une affaire, modifier un contact, supprimer un temps passé.</li>
+            <li><strong>Carte de confirmation</strong> : tout est nommé (affaire, contact, collaborateur), seule la modification demandée est montrée, ancien → nouveau.</li>
+            <li><strong>Sécurité</strong> : un « oui » tapé dans le chat ne confirme rien, la carte en attente expire ; les droits Moduléo du compte s’appliquent et le droit manquant est nommé.</li>
+            <li><strong>Pas encore possible</strong> : modifier ou supprimer un élément déjà enregistré dans Moduléo, saisir un temps passé, créer une tâche à faire. Le texte du chat peut encore être trompeur : seul le statut de la carte fait foi. Repris en 1.8.1 et 1.8.2.</li>
+          </ul>
         </div>
       </div>
 
