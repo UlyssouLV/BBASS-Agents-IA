@@ -601,13 +601,16 @@ def test_un_garde_fou_qui_retire_une_url_produit_une_ligne_garde_fous_brute_et_v
     echanges = client.get(
         f"/inspecteur/conversations/{conversation_id}/echanges", headers=entetes
     ).json()
+    # Un retrait déclenche la relecture isolée (spec 1.6.3, ADR-0023),
+    # tracée avant la ligne garde_fous qui montre la réponse finale.
     assert [(e["origine"], e["type_appel"]) for e in echanges] == [
         ("mistral", "chat"),
+        ("mistral", "relecture"),
         ("local", "garde_fous"),
         ("mistral", "titrage"),
     ]
 
-    detail = client.get(f"/inspecteur/echanges/{echanges[1]['id']}", headers=entetes).json()
+    detail = client.get(f"/inspecteur/echanges/{echanges[2]['id']}", headers=entetes).json()
     assert detail["origine"] == "local"
     assert detail["statut"] == "succes"
     assert detail["requete_payload"] == {"reponse_brute": reponse_brute}

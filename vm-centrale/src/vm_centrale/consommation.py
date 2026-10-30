@@ -12,7 +12,15 @@ from vm_centrale.schemas import DetailConsommationCategorie
 # stockée comme colonne dérivée sur Consommation. Partagée par les deux
 # endpoints de lecture (vue collaborateur et vue administrateur).
 TYPES_CHAT = frozenset(
-    {"chat", "titrage", "resume_et_profil", "extraction_web", "questions_piece_jointe", "extraction_piece_jointe"}
+    {
+        "chat",
+        "titrage",
+        "resume_et_profil",
+        "extraction_web",
+        "questions_piece_jointe",
+        "extraction_piece_jointe",
+        "relecture",
+    }
 )
 
 

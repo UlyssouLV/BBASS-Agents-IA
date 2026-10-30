@@ -78,6 +78,7 @@ from vm_centrale.questions_couvertes import (
     enregistrer_questions_piece_jointe,
 )
 from vm_centrale.outils import AppelMistralOutil, ContexteTour, executer_appel, outils_du_tour
+from vm_centrale.relecture import TYPE_APPEL as TYPE_APPEL_RELECTURE, relire
 from vm_centrale.outils.moduleo import affaires as outil_affaires, contacts as outil_contacts
 from vm_centrale.statut_tour import (
     ATTENTE,
@@ -747,6 +748,8 @@ def _reponse_visible(
     publier: Publier,
     outils_appeles: list[str],
     moduleo_configure: bool,
+    client: MistralClient,
+    resultats_outils: list[str],
 ) -> str:
     # Ligne garde_fous de l'inspecteur à chaque réponse de chat (spec 1.4.0,
     # décision 15), même sans retrait : sans elle, on ne voit pas pourquoi la
@@ -764,17 +767,32 @@ def _reponse_visible(
     contacts_lus = outil_contacts.OUTIL.nom in outils_appeles or any(
         lecture.citation.startswith(_CITATION_CONTACT) for lecture in lectures
     )
-    visible, retire = _appliquer_garde_fous(
-        db,
-        conversation_id,
-        nouveau_message,
-        reponse,
-        piece_jointe,
-        lectures,
-        moduleo_appele,
-        # Sans Moduléo, la phrase fixe promettrait une recherche impossible.
-        contacts_lus or not moduleo_configure,
-    )
+    def garde_fous(texte: str) -> Retrait:
+        return _appliquer_garde_fous(
+            db,
+            conversation_id,
+            nouveau_message,
+            texte,
+            piece_jointe,
+            lectures,
+            moduleo_appele,
+            # Sans Moduléo, la phrase fixe promettrait une recherche impossible.
+            contacts_lus or not moduleo_configure,
+        )
+
+    visible, retire = garde_fous(reponse)
+    if retire:
+        visible, retire = _relecture_apres_retrait(
+            db,
+            identifiant_compte,
+            conversation_id,
+            client,
+            nouveau_message,
+            visible,
+            resultats_outils,
+            piece_jointe,
+            garde_fous,
+        )
     visible = ajouter_sources(
         visible,
         _messages_du_compte(db, conversation_id, nouveau_message)
@@ -796,6 +814,62 @@ def _reponse_visible(
         reponse_payload={"reponse_visible": visible},
     )
     return visible
+
+
+def _relecture_apres_retrait(
+    db: Session,
+    identifiant_compte: str,
+    conversation_id: int,
+    client: MistralClient,
+    nouveau_message: str,
+    reponse_marquee: str,
+    resultats_outils: list[str],
+    piece_jointe: PieceJointe | None,
+    garde_fous: Callable[[str], Retrait],
+) -> Retrait:
+    # Une seule relecture isolée par réponse, seulement après un retrait
+    # (spec 1.6.3, point 9, ADR-0023). Les garde-fous ont le dernier mot :
+    # elle n'est retenue que s'ils la rendent telle quelle. Sinon, ou si
+    # l'appel échoue, la réponse marquée reste, avec la phrase fixe.
+    relecture = relire(
+        client,
+        nouveau_message,
+        reponse_marquee,
+        resultats_outils,
+        piece_jointe.contenu_extrait if piece_jointe is not None else None,
+    )
+    if isinstance(relecture, Exception):
+        enregistrer_echange_echec(
+            db,
+            identifiant_compte=identifiant_compte,
+            conversation_id=conversation_id,
+            piece_jointe_id=None,
+            type_appel=TYPE_APPEL_RELECTURE,
+            modele=MODELE_CHAT,
+            requete_payload=payload_depuis_erreur(relecture),
+            reponse_payload={**(reponse_depuis_erreur(relecture) or {}), "relecture": "écartée"},
+            erreur=str(relecture),
+            commit=False,
+        )
+        return Retrait(reponse_marquee, True)
+    relue = relecture.contenu.strip()
+    retenue = bool(relue) and garde_fous(relue) == Retrait(relue, False)
+    enregistrer_consommation(
+        db, identifiant_compte, conversation_id, TYPE_APPEL_RELECTURE, MODELE_CHAT, usage=relecture.usage
+    )
+    enregistrer_echange_succes(
+        db,
+        identifiant_compte=identifiant_compte,
+        conversation_id=conversation_id,
+        piece_jointe_id=None,
+        type_appel=TYPE_APPEL_RELECTURE,
+        modele=MODELE_CHAT,
+        requete_payload=relecture.payload_envoye,
+        reponse_payload={**relecture.reponse_brute, "relecture": "retenue" if retenue else "écartée"},
+    )
+    if retenue:
+        return Retrait(relue, False)
+    return Retrait(reponse_marquee, True)
 
 
 def _appliquer_garde_fous(
@@ -1213,6 +1287,8 @@ def _tour_creer_conversation(
         publier,
         contexte_outils.outils_appeles,
         contexte_outils.client_moduleo is not None,
+        client,
+        contexte_outils.resultats_outils,
     )
 
     publier(TITRAGE)
@@ -1594,6 +1670,7 @@ def _executer_appels_outils(
     for appel in demande.appels:
         contexte_outils.outils_appeles.append(appel.nom)
         resultat = executer_appel(appel, contexte_outils)
+        contexte_outils.resultats_outils.append(f"--- {appel.nom} ---\n{resultat.contenu}")
         enregistrer_echange_local(
             contexte_outils.db,
             identifiant_compte=identifiant_compte,
@@ -2004,6 +2081,8 @@ def _tour_envoyer_message(
         publier,
         contexte_outils.outils_appeles,
         contexte_outils.client_moduleo is not None,
+        client,
+        contexte_outils.resultats_outils,
     )
     _enregistrer_questions_du_tour(db, attendre_questions, identifiant_compte, conversation.id, piece_jointe)
 
