@@ -1,6 +1,6 @@
 use bbass_lanceur_coeur::lancement::{
-    demande_d_arret, demande_de_verification, processus_a_attendre, Lancement, ARGUMENT_ARRET, ARGUMENT_ATTENDRE_FIN,
-    ARGUMENT_DEMARRAGE_WINDOWS, ARGUMENT_DESINSTALLATION, ARGUMENT_VERIFICATION,
+    adresse_ouverte, demande_d_arret, demande_de_verification, processus_a_attendre, Lancement, ARGUMENT_ARRET,
+    ARGUMENT_ATTENDRE_FIN, ARGUMENT_DEMARRAGE_WINDOWS, ARGUMENT_DESINSTALLATION, ARGUMENT_VERIFICATION,
 };
 
 fn lancement(arguments: &[&str]) -> Lancement {
@@ -61,6 +61,18 @@ fn le_backend_demande_une_verification_par_l_instance_unique() {
     assert!(demande_de_verification(arguments(&[r"C:\BBASS\BBASS.exe", ARGUMENT_VERIFICATION])));
     assert!(!demande_de_verification(arguments(&[r"C:\BBASS\BBASS.exe"])));
     assert!(!demande_de_verification(arguments(&[ARGUMENT_VERIFICATION])));
+}
+
+#[test]
+fn l_adresse_ouverte_porte_la_version_du_poste() {
+    let adresse = adresse_ouverte("http://127.0.0.1:8100/", Lancement::AvecFenetre, "1.6.5");
+    assert_eq!(adresse, "http://127.0.0.1:8100/?v=1.6.5");
+}
+
+#[test]
+fn apres_une_verification_l_adresse_ouvre_a_propos_et_porte_la_version() {
+    let adresse = adresse_ouverte("http://127.0.0.1:8100/", Lancement::Verification, "1.6.5");
+    assert_eq!(adresse, "http://127.0.0.1:8100/?a-propos&v=1.6.5");
 }
 
 #[test]

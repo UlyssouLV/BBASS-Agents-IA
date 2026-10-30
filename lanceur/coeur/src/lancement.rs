@@ -35,6 +35,13 @@ pub enum Lancement {
     Arret,
 }
 
+/// Adresse ouverte dans la fenêtre : la version y figure pour qu'une ancienne page déjà en cache
+/// ne soit pas réutilisée après une mise à jour ; À propos s'ouvre après une vérification.
+pub fn adresse_ouverte(racine: &str, lancement: Lancement, version: &str) -> String {
+    let a_propos = if lancement == Lancement::Verification { "a-propos&" } else { "" };
+    format!("{racine}?{a_propos}v={version}")
+}
+
 /// Arguments reçus par l'instance unique (le premier est l'exe) : le backend demande une vérification.
 pub fn demande_de_verification(arguments: impl IntoIterator<Item = String>) -> bool {
     arguments.into_iter().skip(1).any(|a| a == ARGUMENT_VERIFICATION)

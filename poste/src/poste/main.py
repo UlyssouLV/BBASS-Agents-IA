@@ -80,9 +80,16 @@ async def journaliser_la_requete(request: Request, call_next):
     return reponse
 
 
+def _page_de_l_interface() -> FileResponse:
+    # index.html désigne le code de l'interface, propre à chaque version : après
+    # une mise à jour, le moteur web ne doit pas réutiliser l'ancienne page
+    # (spec 1.6.4, point 9). Les fichiers de /static portent un hachage.
+    return FileResponse(_STATIC_DIR / "index.html", headers={"Cache-Control": "no-cache"})
+
+
 @app.get("/")
 def index() -> FileResponse:
-    return FileResponse(_STATIC_DIR / "index.html")
+    return _page_de_l_interface()
 
 
 # Mode développeur (spec 1.3.0) : point d'entrée séparé ouvert dans un nouvel
@@ -91,7 +98,7 @@ def index() -> FileResponse:
 # /inspecteur/* (routers/inspecteur.py).
 @app.get("/inspecteur")
 def inspecteur() -> FileResponse:
-    return FileResponse(_STATIC_DIR / "index.html")
+    return _page_de_l_interface()
 
 
 def run() -> None:
