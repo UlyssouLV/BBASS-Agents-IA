@@ -52,7 +52,7 @@ Deux suivis, un seul nom de version côté développement :
 Sens des chiffres (communs aux deux suivis) :
 
 - **majeur** — rupture qui demande un geste à tous (réinstaller les postes, migrer des données à la main, mise en production définitive) ; décidé dans ce fichier, jamais calculé ;
-- **mineur** — une **série** = un grand thème (1.4 recherche web, 1.5 Moduléo, 1.6 déploiement, 1.7 documentation, 1.8 serveur MCP Moduléo…) ;
+- **mineur** — une **série** = un grand thème (1.4 recherche web, 1.5 Moduléo, 1.6 déploiement, 1.7 documentation, 1.8 cartographie des usages, 1.9 Agents métier, 1.10 serveur MCP Moduléo…) ;
 - **correctif** — une étape de plus dans la série, une correction, ou une version arrivée après une série plus récente.
 
 À « Finalise la version », le numéro produit se calcule ainsi :

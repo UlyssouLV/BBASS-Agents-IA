@@ -1,6 +1,6 @@
 # moduleo
 
-Intégration Moduléo de la VM centrale, commune à tous les outils (et plus tard à n8n, 1.8.0). Spec 1.5.0, [ADR-0017](../../../../docs/adr/0017-lecture-moduleo-par-outil.md) ; écriture : spec 1.5.2, [ADR-0023](../../../../docs/adr/0023-ecriture-moduleo-confirmee-serveur-de-test.md).
+Intégration Moduléo de la VM centrale, commune à tous les outils (et plus tard à n8n, 1.12.0). Spec 1.5.0, [ADR-0017](../../../../docs/adr/0017-lecture-moduleo-par-outil.md) ; écriture : spec 1.5.2, [ADR-0023](../../../../docs/adr/0023-ecriture-moduleo-confirmee-serveur-de-test.md).
 
 **Lecture seule en production.** Les droits d'une clé d'API Moduléo se règlent par catégorie (Affaire, Contact…), chacune en lecture ou en lecture et écriture : la clé du cabinet ne coche que la lecture. `lire()` est la seconde barrière : GET seul, même avec une clé mal réglée. **L'écriture** (`ecrire()`, 1.5.2, #202) ne part que vers un **serveur Moduléo de test** listé dans `serveurs_test.json`, `MODULEO_ECRITURE` actif (section **Écriture** ci-dessous) : jamais vers le serveur du cabinet, même avec un réglage erroné.
 

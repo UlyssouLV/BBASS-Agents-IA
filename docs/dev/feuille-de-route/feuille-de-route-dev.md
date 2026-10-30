@@ -4,7 +4,7 @@ Ordre des **prochaines versions** produit, plus les sujets encore sans numéro.
 
 Ce n’est **pas** une spec (ça vient après « Ouvre la version »).
 
-**Numéro de développement, numéro produit.** Les numéros de ce fichier sont des numéros de **développement** : une série par numéro mineur (1.7.x documentation, 1.8.x serveur MCP Moduléo…), et deux séries peuvent arriver sur `main` en alternance. Le collaborateur ne voit que le **numéro produit** (tag de la Release, `/sante`, « À propos » du poste), toujours croissant. Règle : [README](https://github.com/UlyssouLV/BBASS-Agents-IA/blob/main/docs/dev/feuille-de-route/README.md#numéro-de-développement-et-numéro-produit).
+**Numéro de développement, numéro produit.** Les numéros de ce fichier sont des numéros de **développement** : une série par numéro mineur (1.7.x documentation, 1.8.x cartographie des usages, 1.9.x Agents métier, 1.10.x serveur MCP Moduléo…), et deux séries peuvent arriver sur `main` en alternance. Le collaborateur ne voit que le **numéro produit** (tag de la Release, `/sante`, « À propos » du poste), toujours croissant. Règle : [README](https://github.com/UlyssouLV/BBASS-Agents-IA/blob/main/docs/dev/feuille-de-route/README.md#numéro-de-développement-et-numéro-produit).
 
 ## Déjà livré
 
@@ -30,12 +30,41 @@ Ce n’est **pas** une spec (ça vient après « Ouvre la version »).
 - **1.6.0** — CI : versions vérifiées et prêtes à livrer ([#216](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/216), [spec](../../specs/v1.6.0-ci-versions-verifiees.md), [ADR-0020](../../adr/0020-ci-argos-compartimentee.md)) : CI GitHub Actions compartimentée façon ArgOS, un workflow par compartiment — `tests-vm-centrale`, `tests-poste`, `build-front` (build Vite + contrôle de dérive du dist committé, [ADR-0010](../../adr/0010-front-poste-react-typescript-vite.md) inchangé), `build-docs` (build Docusaurus sur PR, sans déploiement), Sonar lancé en premier en analyse CI-only sans attendre la couverture ; path filters avec skip→vert ; ruleset `main` : squash-merge seul + checks requis ; `deploy-docs.yml` réduit au build + GitHub Pages, plus aucun commit `github-actions[bot]` sur `main` après « Finalise la version » (aperçus README produits sur la branche de version, dans le squash). Référence d’une version = tag + GitHub Release. Livrée avant la 1.5.2, en parallèle depuis `main`. Pas de changement du code produit ni du contrat HTTP.
 - **1.6.1** — CD : packaging, conteneurs et mise à jour de la VM Castries sans l’alternant ([#229](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/229), [spec](../../specs/v1.6.1-cd-vm-castries.md), [ADR-0021](../../adr/0021-cd-vm-centrale-staging-prod.md)) : VM centrale livrée en conteneurs sur une VM Ubuntu Server 26.04 LTS + Docker Compose, sans cloner le dépôt ; images `vm-centrale` et `searxng` construites à chaque Release et publiques sur GHCR (aucun secret dedans), nouveau check CI `build-image-vm` (stack démarrée, `/sante` 200) ; deux Environnements séparés sur la même VM, **staging** (port 8001, serveur de test Kipaware) et **prod** (port 8000), Postgres et SearXNG sur le réseau Docker interne, pas de HTTPS (LAN) ; une Release pose l’étiquette `staging`, le workflow manuel « Promouvoir en prod » pose `prod` sur les mêmes images sans rebuild, refusé pour une version jamais passée en staging ; installation en une commande par Environnement (secrets générés et affichés une fois, clés Mistral et Moduléo saisies en clair et chiffrées par l’installateur, premier compte administrateur par `creer-admin`) ; mise à jour par `mettre-a-jour <env>` ou au redémarrage (service systemd), sauvegarde `pg_dump` avant changement de version, retour aux images précédentes si `/sante` échoue, démarrage sur les images présentes sans Internet, refus de GHCR distingué d’une coupure réseau ; fichiers de déploiement embarqués dans l’image, `.env` jamais écrasé ; convention unique des tâches planifiées (`taches-planifiees.conf`, timers systemd), purge horaire du cache des pages web (1.4.3) branchée ; guide admin sur le site de doc. Livrée avant la 1.5.2, en parallèle depuis `main`. Dev (`lancer-vm.*`) inchangé ; pas de changement du contrat HTTP du poste.
 - **1.6.2** — Installateur et mise à jour automatique des postes ([#238](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/238), [spec](../../specs/v1.6.2-installateur-mise-a-jour-postes.md), [ADR-0022](../../adr/0022-poste-application-windows-version-dictee-par-la-vm.md)) : le poste devient une application Windows 10/11 x64 sans git, Python ni Docker ; Lanceur Rust / Tauri v2 (fenêtre WebView2, icône et titre BBASS) autour du backend poste Python inchangé, figé par PyInstaller ; `BBASS-Setup-vX.Y.Z.exe` joint à chaque Release, installateur maison en quatre étapes (Bienvenue, Serveur BBASS avec pastille de test, Options, Installation), par utilisateur et sans droits administrateur dans `%LOCALAPPDATA%\BBASS`, raccourcis et entrée de désinstallation `HKCU`, désinstallation qui garde la configuration ; à chaque lancement le poste se met à la version du Serveur BBASS (`/sante`) : Paquet poste signé ed25519 téléchargé depuis la Release, une version précédente gardée, retour arrière automatique si la nouvelle ne démarre pas, démarrage sur la version installée avec bandeau si la VM ou Internet manque ; zone de notification (Ouvrir BBASS, Ouvrir dans le navigateur sur `http://127.0.0.1:8100`, Quitter), instance unique, démarrage avec Windows en fond ; écran de connexion revu en deux panneaux avec pastille d’état et menu « … » (Configuration du Serveur BBASS sans réinstaller, dossier de configuration, À propos, « Vérifier les mises à jour maintenant ») ; guides collaborateur et admin sur le site de doc (menu Exploitation). Tests humains (#247) joués après la publication de la Release, puisque le Setup n’existe qu’une fois la Release publiée. Livrée avant la 1.5.2, en parallèle depuis `main`. Dev (`lancer-logiciel.*`) inchangé.
-- **1.5.2** — Écrire dans Moduléo depuis le chat ([#201](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/201), [spec](../../specs/v1.5.2-ecrire-dans-moduleo-depuis-le-chat.md), [ADR-0023](../../adr/0023-ecriture-moduleo-confirmee-serveur-de-test.md)) : deux outils génériques, `decrire_ecriture_moduleo` et `ecrire_moduleo` ; le modèle propose, le collaborateur confirme chaque écriture sur une Carte de confirmation en noms (ce qui change champ par champ pour une modification, fiche « Sera supprimé » pour une suppression), boutons traités par la VM, hors du modèle ; un « oui » tapé ne confirme rien, la carte expire au message suivant. Droits Moduléo appliqués à l’écriture, journal des écritures, id dans les fiches pour le modèle et retiré de la réponse affichée, écriture annoncée en texte sans carte relancée puis remplacée par une phrase fixe, refus de droit montré tel quel. Écriture réservée au serveur de test : staging (port 8001) et poste de dev, jamais la prod (port 8000), par `BBASS_ENVIRONNEMENT`. Cibles de dev `test` et `cabinet` (`lancer-vm.bat` / `lancer-logiciel.bat [test|cabinet]`, `.env.test` / `.env.cabinet`), Paquet poste construit depuis `poste/uv.lock`. [#256](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/256) corrigé. Périmètre réduit après trois passages de tests humains ([#206](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/206)) : limites reportées en **1.8.1** et **1.8.2**. Bugs connus livrés avec la version, reportés en **Plus tard** : [#263](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/263), [#264](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/264). Livrée en **1.6.3**.
-- **1.6.3** — Corriger les bugs existants ([#266](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/266), [spec](../../specs/v1.6.3-corriger-les-bugs-existants.md), [ADR-0024](../../adr/0024-relecture-isolee-apres-garde-fou.md)) : la déconnexion vide toute la mémoire du compte sur le poste ; supprimer un compte supprime ses données, sa consommation reste sous « Compte supprimé », et un nettoyage unique reprend celles des comptes déjà supprimés ; sans source, l’IA dit ce qu’elle n’a pas trouvé (consigne, date en toutes lettres, bornes de la semaine prochaine données par le code, pages quasi vides écartées, marqueur « [non trouvé] », phrase fixe, relecture isolée après un retrait de garde-fou) ; la réponse est mise en forme pendant l’animation de frappe ; le bandeau de mise à jour pousse le contenu au lieu de recouvrir le bouton **…**. Embarque aussi la séparation numéro de développement / numéro produit et la planification des séries 1.7.x et 1.8.x. Livrée en **1.6.4**.
+- **1.5.2** — Écrire dans Moduléo depuis le chat ([#201](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/201), [spec](../../specs/v1.5.2-ecrire-dans-moduleo-depuis-le-chat.md), [ADR-0023](../../adr/0023-ecriture-moduleo-confirmee-serveur-de-test.md)) : deux outils génériques, `decrire_ecriture_moduleo` et `ecrire_moduleo` ; le modèle propose, le collaborateur confirme chaque écriture sur une Carte de confirmation en noms (ce qui change champ par champ pour une modification, fiche « Sera supprimé » pour une suppression), boutons traités par la VM, hors du modèle ; un « oui » tapé ne confirme rien, la carte expire au message suivant. Droits Moduléo appliqués à l’écriture, journal des écritures, id dans les fiches pour le modèle et retiré de la réponse affichée, écriture annoncée en texte sans carte relancée puis remplacée par une phrase fixe, refus de droit montré tel quel. Écriture réservée au serveur de test : staging (port 8001) et poste de dev, jamais la prod (port 8000), par `BBASS_ENVIRONNEMENT`. Cibles de dev `test` et `cabinet` (`lancer-vm.bat` / `lancer-logiciel.bat [test|cabinet]`, `.env.test` / `.env.cabinet`), Paquet poste construit depuis `poste/uv.lock`. [#256](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/256) corrigé. Périmètre réduit après trois passages de tests humains ([#206](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/206)) : limites reportées en **1.10.1** et **1.10.2**. Bugs connus livrés avec la version, reportés en **Plus tard** : [#263](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/263), [#264](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/264). Livrée en **1.6.3**.
+- **1.6.3** — Corriger les bugs existants ([#266](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/266), [spec](../../specs/v1.6.3-corriger-les-bugs-existants.md), [ADR-0024](../../adr/0024-relecture-isolee-apres-garde-fou.md)) : la déconnexion vide toute la mémoire du compte sur le poste ; supprimer un compte supprime ses données, sa consommation reste sous « Compte supprimé », et un nettoyage unique reprend celles des comptes déjà supprimés ; sans source, l’IA dit ce qu’elle n’a pas trouvé (consigne, date en toutes lettres, bornes de la semaine prochaine données par le code, pages quasi vides écartées, marqueur « [non trouvé] », phrase fixe, relecture isolée après un retrait de garde-fou) ; la réponse est mise en forme pendant l’animation de frappe ; le bandeau de mise à jour pousse le contenu au lieu de recouvrir le bouton **…**. Embarque aussi la séparation numéro de développement / numéro produit et la planification des séries 1.7.x et 1.10.x. Livrée en **1.6.4**.
 
-## Prochaine : 1.7.0 — Site de documentation à trois lectures : Collaborateur, Administrateur, Développeur
+## Prochaine : 1.6.4 — Corriger les bugs constatés après la 1.6.3
 
-*(Série **1.7.x** : documentation seule, menée en parallèle de la série **1.8.x**. Aucune Release produit : le site se publie à chaque fusion sur `main` ([numéro produit](https://github.com/UlyssouLV/BBASS-Agents-IA/blob/main/docs/dev/feuille-de-route/README.md#numéro-de-développement-et-numéro-produit)). Les anciennes 1.7.0 à 1.7.3 deviennent **1.7.4** à **1.7.7**.)*
+**Objectif.** Les trois problèmes trouvés à l’usage juste après la finalisation de la 1.6.3 sont corrigés, pour que le poste installé fasse ce que les dernières versions annoncent :
+
+- **Le poste se met à la version du serveur** ([#277](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/277)) : « Vérifier les mises à jour maintenant » vérifie à chaque clic et rouvre BBASS sur le résultat, sans jamais le laisser fermé ; la mise à jour aboutit sur un poste équipé d’un antivirus, sans intervention du collaborateur ; après l’enregistrement d’une nouvelle adresse de serveur, le poste propose de redémarrer pour se mettre à la version de ce serveur ; le tout début du lanceur est journalisé pour qu’un échec se voie.
+- **Une conversation de l’ancien Environnement ne reste plus visible** ([#278](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/278)) : après un changement de serveur, le poste ne montre que les conversations du serveur auquel il est relié.
+- **L’écriture Moduléo fonctionne depuis un poste installé** ([#279](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/279)) : **Confirmer** et **Annuler** atteignent le serveur auquel le poste est relié, et après une mise à jour le poste montre l’interface de sa version, sans manipulation du collaborateur.
+
+**Contrainte.** Le chemin de mise à jour d’un poste est porté par le Lanceur déjà installé : les postes en place gardent l’ancien comportement jusqu’à ce qu’ils aient reçu le nouveau.
+
+**Hors périmètre.** Mise à jour pendant que BBASS tourne en fond ([ADR-0022](../../adr/0022-poste-application-windows-version-dictee-par-la-vm.md)). Sélecteur d’Environnement sur le poste. Texte du modèle qui annonce une carte inexistante.
+
+## Ensuite : 1.7.0 — Suivi de l’alternance
+
+*(Série **1.7.x** : documentation seule, menée en parallèle de la série **1.8.x**. Aucune Release produit ([numéro produit](https://github.com/UlyssouLV/BBASS-Agents-IA/blob/main/docs/dev/feuille-de-route/README.md#numéro-de-développement-et-numéro-produit)). Les anciennes 1.7.0 à 1.7.8 deviennent **1.7.1** à **1.7.9**.)*
+
+**Objectif.** Un supérieur hiérarchique qui n’est pas du métier voit sur le site de documentation, dans un espace **Suivi de l’alternance**, où en est réellement la mission, preuves à l’appui, sans explication orale. L’espace mesure l’avancement sur les critères de la feuille de route de BBASS et de la note de cadrage, pas sur le volume de développement :
+
+- **Critères de réussite** : objectifs des phases 1 et 2, jalons J1 et J2, livrables L1 à L11, chacun avec son état (à faire, en cours, atteint) et sa preuve ; ce qui n’est pas atteint se voit ;
+- **Semaines** : semaines passées, semaine en cours et semaines à venir, avec les objectifs de chacune et le travail fait ou prévu, en langage purement fonctionnel ;
+- **Vidéo de démonstration** par semaine, hébergée sur YouTube en non répertorié et visible depuis le site ; un **skill** dit concrètement quoi filmer pour montrer les nouveautés de la semaine ;
+- **Documents** : feuille de route de déploiement tenue à jour, note de cadrage, feuille de route initiale, documents de suivi hebdomadaires ;
+- **Échanges** : mails, messages Moduléo et autres échanges avec les prestataires externes, les collaborateurs et les supérieurs ;
+- **En dehors de la mission** : tâches supplémentaires demandées par BBASS. L’alternant crée lui-même les tâches ; cette version livre la rubrique vide.
+
+Le site est public et les documents comme les échanges y sont publiés : décision du 2026-10-30, risque accepté, passage éventuel en privé en **Plus tard**. Le site se republie à chaque commit pour rester à jour ; la semaine en cours se déduit de la date.
+
+**À trancher au grilling.** Format des données d’une semaine et d’un critère. Branche qui déclenche la publication à chaque commit, `main` n’acceptant que des fusions de PR. Forme des échanges publiés. Place des semaines déjà écoulées. Format du skill de démonstration.
+
+**Hors périmètre.** Envoi de fichiers depuis le site : un document s’ajoute par commit. Choix de lecture Collaborateur / Administrateur / Développeur (→ **1.7.1**) : le Suivi a son propre onglet. Saisie des tâches « En dehors de la mission ». Refonte du document de suivi hebdomadaire.
+
+## Ensuite : 1.7.1 — Site de documentation à trois lectures : Collaborateur, Administrateur, Développeur
 
 **Objectif.** Toute personne qui ouvre le site de documentation choisit sa lecture d’un bouton : **Collaborateur** (utiliser le Copilote au quotidien), **Administrateur** (gérer les comptes, installer et maintenir), **Développeur** (comprendre et faire évoluer le système). Le choix est mémorisé ; l’accueil, le menu et la recherche montrent d’abord les pages de cette lecture, et une page commune adapte ses parties. La version livre aussi :
 
@@ -49,29 +78,27 @@ Ce n’est **pas** une spec (ça vient après « Ouvre la version »).
 
 **À trancher au grilling.** Page par lecture ou page commune à parties adaptées. Lecture par défaut à la première visite. Rendu de la bascule sur mobile. Outil de vérification de l’accessibilité.
 
-**Hors périmètre.** Nouveau contenu (→ **1.7.1** à **1.7.8**). Contrôle d’accès : le site reste public, la bascule ne cache rien. Traduction.
+**Hors périmètre.** Nouveau contenu (→ **1.7.2** à **1.7.9**). Suivi de l’alternance (→ **1.7.0**). Contrôle d’accès : le site reste public, la bascule ne cache rien. Traduction.
 
-## Ensuite : 1.7.1 — Documentation : utiliser le chat au quotidien
+## Ensuite : 1.7.2 — Documentation : utiliser le chat au quotidien
 
-**Objectif.** Lecture **Collaborateur**, avec captures : tout ce qu’on fait dans le chat. Conversations (créer, reprendre, renommer, supprimer, changer de conversation pendant une réponse), envoi et statut d’attente, pièces jointes, recherche web et sources, ce que l’IA retient d’une conversation et ce qu’elle relit, jauge de contexte, Profil, Consommation. Ce que l’IA refuse ou remplace, expliqué simplement (chiffre sans source, lien non fourni, « pas trouvé », la relecture : réponse réécrite qui dit ce qui n’a pas été trouvé et où on a cherché, le marqueur « [non trouvé] » et la phrase fixe). Lecture Développeur : renvois courts vers **1.7.4** et **1.7.5**.
+**Objectif.** Lecture **Collaborateur**, avec captures : tout ce qu’on fait dans le chat. Conversations (créer, reprendre, renommer, supprimer, changer de conversation pendant une réponse), envoi et statut d’attente, pièces jointes, recherche web et sources, ce que l’IA retient d’une conversation et ce qu’elle relit, jauge de contexte, Profil, Consommation. Ce que l’IA refuse ou remplace, expliqué simplement (chiffre sans source, lien non fourni, « pas trouvé », la relecture : réponse réécrite qui dit ce qui n’a pas été trouvé et où on a cherché, le marqueur « [non trouvé] » et la phrase fixe). Lecture Développeur : renvois courts vers **1.7.5** et **1.7.6**.
 
-**Hors périmètre.** Moduléo (→ **1.7.2**). Panel d’administration (→ **1.7.3**). Détail des flux (→ **1.7.4**, **1.7.5**).
+**Hors périmètre.** Moduléo (→ **1.7.3**). Panel d’administration (→ **1.7.4**). Détail des flux (→ **1.7.5**, **1.7.6**).
 
-## Ensuite : 1.7.2 — Documentation : Moduléo depuis le chat
+## Ensuite : 1.7.3 — Documentation : Moduléo depuis le chat
 
 **Objectif.** Les pages « Branchement Moduléo » reprises dans la convention et complétées de l’écriture livrée en 1.5.2 : ce qu’on peut lire et écrire, la carte de confirmation (création, modification, suppression), ce que veut dire chaque statut de carte, les refus faute de droit, le serveur de test. Lecture **Collaborateur** : demandes types et ce qu’on voit. Lecture **Administrateur** : configuration, droits, groupes. Lecture **Développeur** : garde des droits, routes classées, ADR.
 
-**Hors périmètre.** Serveur MCP Moduléo (série **1.8.x**, qui met ces pages à jour). Gestion des groupes dans le Panel (→ **1.7.3**).
+**Hors périmètre.** Serveur MCP Moduléo (série **1.10.x**, qui met ces pages à jour). Gestion des groupes dans le Panel (→ **1.7.4**).
 
-## Ensuite : 1.7.3 — Documentation : administrer BBASS
+## Ensuite : 1.7.4 — Documentation : administrer BBASS
 
 **Objectif.** Lecture **Administrateur** : tout le Panel d’administration — comptes (création, mot de passe généré, changement forcé, révocation, pôle et agence), consommations, groupes et droits Moduléo (reprend l’ancienne entrée Plus tard « Doc-site : administration des groupes et droits Moduléo ») — et les guides d’installation et de maintenance du serveur et du poste (1.6.1, 1.6.2), rangés sous cette lecture, avec staging / prod et la promotion d’une version.
 
-**Hors périmètre.** Fonctionnement interne (→ **1.7.6**, **1.7.7**). Inspecteur (lecture Développeur, rangé en **1.7.0**).
+**Hors périmètre.** Fonctionnement interne (→ **1.7.7**, **1.7.8**). Inspecteur (lecture Développeur, rangé en **1.7.1**).
 
-## Ensuite : 1.7.4 — Documentation : mémoire et souveraineté des données
-
-*(Ancienne 1.7.0.)*
+## Ensuite : 1.7.5 — Documentation : mémoire et souveraineté des données
 
 **Objectif.** Deux documents, chacun en deux lectures : **Collaborateur** (« où vont mes données, qui les voit », en une page simple) et **Développeur** (détail ci-dessous).
 
@@ -81,55 +108,97 @@ Ce n’est **pas** une spec (ça vient après « Ouvre la version »).
 
 La souveraineté dit aussi que la relecture isolée est un appel Mistral de plus : ce qu’il reçoit (question, réponse, résultats d’outils) et ce qu’il ne reçoit pas (historique).
 
-**Hors périmètre.** Détail par outil de ce qui part / revient (→ **1.7.5**). Doc détaillée du tool calling recherche web (→ **Optimisation de la recherche web**, Plus tard). Implémentation de nouvelles capacités mémoire ou cache.
+**Hors périmètre.** Détail par outil de ce qui part / revient (→ **1.7.6**). Doc détaillée du tool calling recherche web (→ **Optimisation de la recherche web**, Plus tard). Implémentation de nouvelles capacités mémoire ou cache.
 
-## Ensuite : 1.7.5 — Documentation : outils du modèle et flux par outil
+## Ensuite : 1.7.6 — Documentation : outils du modèle et flux par outil
 
-*(Ancienne 1.7.1.)*
+**Objectif.** Lecture **Développeur** : inventaire de **tous les outils** exposés au modèle — recherche web, relecture de pièces jointes / pages, Moduléo, etc. Pour chaque outil : à quoi il sert, paramètres utiles en langage produit, **ce qu’il envoie / reçoit / persiste**, ce qui reste sur la VM, lien avec l’inspecteur. Complète la carte de souveraineté de la **1.7.5** sans la réécrire.
 
-**Objectif.** Lecture **Développeur** : inventaire de **tous les outils** exposés au modèle — recherche web, relecture de pièces jointes / pages, Moduléo, etc. Pour chaque outil : à quoi il sert, paramètres utiles en langage produit, **ce qu’il envoie / reçoit / persiste**, ce qui reste sur la VM, lien avec l’inspecteur. Complète la carte de souveraineté de la **1.7.4** sans la réécrire.
+**Hors périmètre.** Doc ultra-détaillée du tool calling recherche web (→ **Optimisation de la recherche web**, Plus tard). Outils Moduléo passés par le serveur MCP (mis à jour par la série **1.10.x**).
 
-**Hors périmètre.** Doc ultra-détaillée du tool calling recherche web (→ **Optimisation de la recherche web**, Plus tard). Outils Moduléo passés par le serveur MCP (mis à jour par la série **1.8.x**).
-
-## Ensuite : 1.7.6 — Documentation : base de données
-
-*(Ancienne 1.7.2.)*
+## Ensuite : 1.7.7 — Documentation : base de données
 
 **Objectif.** Lecture **Développeur** : toute la base de la VM centrale **documentée et visualisée** — un schéma lisible (tables et relations), puis chaque table, chaque colonne, son rôle en langage clair, qui l’écrit, qui la lit, combien de temps les lignes vivent. Une personne qui découvre le projet comprend où vit chaque donnée sans lire le code.
 
-**Hors périmètre.** Relations entre les services (→ **1.7.7**). Système de migration de schéma (→ **Alembic**, Plus tard). Carte de souveraineté (→ **1.7.4**, non réécrite).
+**Hors périmètre.** Relations entre les services (→ **1.7.8**). Système de migration de schéma (→ **Alembic**, Plus tard). Carte de souveraineté (→ **1.7.5**, non réécrite).
 
-## Ensuite : 1.7.7 — Documentation : relations entre les services
-
-*(Ancienne 1.7.3.)*
+## Ensuite : 1.7.8 — Documentation : relations entre les services
 
 **Objectif.** Lectures **Développeur** et **Administrateur** : une carte claire de **qui parle à qui** — poste, VM centrale, Postgres, SearXNG, Mistral, Moduléo, et les deux Environnements staging / prod de la **1.6.1** : ports, sens des appels, ce qui reste sur le LAN et ce qui sort, ce qui se passe quand un service manque.
 
-**Hors périmètre.** Détail par outil du modèle (→ **1.7.5**). Tables et colonnes (→ **1.7.6**). Procédure d’installation (→ **1.7.3**). Serveur MCP Moduléo (ajouté à la carte par la série **1.8.x**).
+**Hors périmètre.** Détail par outil du modèle (→ **1.7.6**). Tables et colonnes (→ **1.7.7**). Procédure d’installation (→ **1.7.4**). Serveur MCP Moduléo (ajouté à la carte par la série **1.10.x**).
 
-## Ensuite : 1.7.8 — Documentation : que faire si…
+## Ensuite : 1.7.9 — Documentation : que faire si…
 
-**Objectif.** Toutes lectures : une entrée par situation que l’on peut rencontrer, retrouvable depuis le message vu à l’écran — bandeaux du poste (Serveur BBASS injoignable, mise à jour, retour arrière), phrases fixes de la VM (Moduléo en panne ou refusé, droit manquant, page trop longue, réponse remplacée par un garde-fou, « Certaines informations n’ont pas été trouvées dans les sources consultées »…), statuts de carte Moduléo, erreurs de connexion. Pour chacune : ce que ça veut dire, si c’est grave, quoi faire, qui prévenir. En fin de version, le tableau de couverture de la **1.7.0** est vide.
+**Objectif.** Toutes lectures : une entrée par situation que l’on peut rencontrer, retrouvable depuis le message vu à l’écran — bandeaux du poste (Serveur BBASS injoignable, mise à jour, retour arrière), phrases fixes de la VM (Moduléo en panne ou refusé, droit manquant, page trop longue, réponse remplacée par un garde-fou, « Certaines informations n’ont pas été trouvées dans les sources consultées »…), statuts de carte Moduléo, erreurs de connexion. Pour chacune : ce que ça veut dire, si c’est grave, quoi faire, qui prévenir. En fin de version, le tableau de couverture de la **1.7.1** est vide.
 
 **Hors périmètre.** Corriger ces situations (bugs → Plus tard).
 
-## Ensuite : 1.8.0 — Serveur MCP Moduléo : lire Moduléo par un serveur standard
+## Ensuite : 1.8.0 — Filmer une tâche depuis le poste
 
-*(Série **1.8.x** : reprend l’entrée Plus tard « Serveur MCP Moduléo » (spec 1.5.2, tests humains [#206](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/206)), menée en parallèle de la série **1.7.x**. Les workflows n8n passent en **1.9.0**.)*
+*(Série **1.8.x** : cartographie des usages, menée en parallèle de la série **1.7.x**, avant le serveur MCP Moduléo. Les anciennes 1.8.x deviennent **1.10.x**, les workflows n8n **1.12.0**, les pièces jointes approfondies **1.13.0**.)*
 
-**Objectif.** Les lectures Moduléo du chat passent par un **serveur MCP** (Model Context Protocol) Moduléo, sans changement visible pour le collaborateur : mêmes fiches en noms, mêmes droits par groupe, mêmes phrases fixes, mêmes sources des garde-fous. La VM centrale devient l’**hôte** MCP : elle garde la boucle Mistral et présente au modèle les outils du serveur. À « Qu’est-ce que tu sais faire avec Moduléo ? », le chat répond avec ce que le compte peut réellement lire, tiré de la liste d’outils du serveur filtrée par ses droits, et non de ce que le modèle imagine (tests humains [#206](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/206) : réponse inventée, puis avalée par le garde-fou des chiffres). Socle des **1.8.1** et **1.8.2**.
+**Objectif.** Depuis le logiciel, le collaborateur filme son écran quand il estime qu’une tâche mérite d’être montrée : une tâche répétitive, un comportement à signaler, un besoin. C’est lui qui déclenche et arrête la capture ; rien n’est filmé sans son geste, et ce n’est pas un outil de surveillance. La vidéo est rattachée à son compte et à son pôle, et il décrit la tâche en quelques mots. L’alternant les retrouve toutes au même endroit, pôle par pôle : il voit le travail réel des pôles sans être présent, y compris pendant les semaines d’école.
+
+**Pourquoi avant le serveur MCP.** La feuille de route de BBASS et la note de cadrage demandent une cartographie des besoins et une mesure de la réussite ; rien n’est fait aujourd’hui. Une tâche doit être observée avant qu’une solution la change, sinon aucun gain ne pourra être mesuré.
+
+**Contraintes.** Les écrans montrent des données clients : les vidéos restent sur la VM, ne vont ni chez Mistral ni sur YouTube, et leur accès est restreint. Les postes concernés seront installés à la sortie de la version.
+
+**À trancher au grilling.** Micro pour commenter pendant la capture. Écran, fenêtre ou onglet partagé. Durée maximale. Place sur le disque de la VM et durée de conservation. Qui peut voir une vidéo. Ce qui est demandé au collaborateur à la fin de la capture. Information des collaborateurs avant le premier essai réel.
+
+**Hors périmètre.** Toute capture non déclenchée par le collaborateur. Analyse automatique d’une vidéo. Cartographie et priorisation (→ **1.8.1**).
+
+## Ensuite : 1.8.1 — Cartographie des usages et priorisation
+
+**Objectif.** Chaque vidéo devient une fiche de tâche : pôle, tâche, logiciels et données utilisés, fréquence, temps réellement passé. La durée d’une vidéo ne suffit pas : le temps et la fréquence se demandent au collaborateur. Les fiches forment la **cartographie des besoins** des six pôles et la liste de **cas d’usage**, classée selon les critères de la feuille de route de BBASS : gain de temps potentiel, fréquence, intérêt pour BBASS, faisabilité technique, données disponibles, niveau de risque, besoin de validation humaine. Le temps noté devient la **référence avant solution**. La cartographie et la liste alimentent le **Suivi de l’alternance** (livrable L1) et servent à arrêter l’ordre des cinq autres pôles.
+
+**À trancher au grilling.** Barème de priorisation. Saisie des fiches : Panel d’administration ou document. Entretiens en complément des vidéos.
+
+**Hors périmètre.** Réaliser les cas d’usage. Comparer avant et après (→ **Mesure du gain de temps**, Plus tard).
+
+## Ensuite : 1.9.0 — Agent Administration
+
+*(Brouillon : à partir de la 1.9.0, le contenu et l’ordre changeront très probablement.)*
+
+*(Reprend l’entrée Plus tard « Agents métier par pôle », sortie de la 1.5.0 pour la garder petite.)*
+
+**Objectif.** Le premier Agent métier : le pôle Administration a sa consigne et sa liste de capacités autorisées, nourries par les cas d’usage priorisés de la **1.8.1**. Il exécute des tâches administratives depuis le chat (suivi des affaires, devis, factures, temps passés, planning), testé avec les collaborateurs du pôle, et il pose le cadre commun aux Agents suivants. Jalon J1 de la note de cadrage (fin décembre 2026), à réévaluer avec le tuteur : les courriels et les documents arrivent en **1.11.0** et **1.11.1**.
+
+**Déjà tranché.** Un **Agent** sert un pôle : sa consigne, et la liste des capacités qu’il a le droit d’utiliser. Les **outils restent communs** (`vm_centrale/outils/`, dont Moduléo depuis la 1.5.0) : ce n’est pas un « Agent Moduléo ». Le code d’un Agent (consigne, liste des outils autorisés, éventuels traitements propres au pôle) vit dans un dossier par Agent ; un petit registre choisit les outils du tour selon l’Agent, sans `if` par pôle dans `routers/conversations.py`. Le pack `agents/` à la racine du dépôt reste un outil de développement (skills, hooks), distinct des Agents métier. Un Agent est une configuration dans le flux chat de la VM centrale, **pas un conteneur Docker par Agent / par pôle** (pas de runtime propre, ops inutiles alors que peu de tech sera sur place). Si l’indépendance de déploiement devient un besoin : config rechargeable d’abord, et ne conteneuriser que ce qui a un vrai cycle de vie (adaptateur Moduléo en écriture, bac à sable d’exécution, n8n).
+
+**À trancher à l’ouverture.** Comment un tour choisit son Agent (pôle du compte, choix explicite, plusieurs pôles), quelles capacités pour le pôle Administration, lien avec le traitement des pièces jointes par pôle (**1.13.0**).
+
+**Hors périmètre.** Agents des cinq autres pôles (→ Plus tard). Messagerie et serveurs de fichiers (→ **1.11.0**, **1.11.1**).
+
+## Ensuite : 1.9.1 — Jeu de cas de test et taux de réponses correctes
+
+*(Brouillon : à partir de la 1.9.0, le contenu et l’ordre changeront très probablement.)*
+
+**Objectif.** Chaque Agent a un jeu de cas de test métier, rejouable, qui donne son **taux de réponses correctes**, ses erreurs et les situations où une validation humaine reste nécessaire, comme le demandent la note de cadrage (livrable L8) et la feuille de route de BBASS. Les résultats sont publiés dans le **Suivi de l’alternance**. Le premier jeu porte sur l’Agent Administration.
+
+**Hors périmètre.** Mesure du gain de temps (→ Plus tard).
+
+## Ensuite : 1.10.0 — Serveur MCP Moduléo : lire Moduléo par un serveur standard
+
+*(Brouillon : à partir de la 1.9.0, le contenu et l’ordre changeront très probablement.)*
+
+*(Série **1.10.x** : reprend l’entrée Plus tard « Serveur MCP Moduléo » (spec 1.5.2, tests humains [#206](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/206)).)*
+
+**Objectif.** Les lectures Moduléo du chat passent par un **serveur MCP** (Model Context Protocol) Moduléo, sans changement visible pour le collaborateur : mêmes fiches en noms, mêmes droits par groupe, mêmes phrases fixes, mêmes sources des garde-fous. La VM centrale devient l’**hôte** MCP : elle garde la boucle Mistral et présente au modèle les outils du serveur. À « Qu’est-ce que tu sais faire avec Moduléo ? », le chat répond avec ce que le compte peut réellement lire, tiré de la liste d’outils du serveur filtrée par ses droits, et non de ce que le modèle imagine (tests humains [#206](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/206) : réponse inventée, puis avalée par le garde-fou des chiffres). Socle des **1.10.1** et **1.10.2**.
 
 **Recherche** (dans `docs/dev/recherches/`, avant d’ouvrir la version). Partir de la doc officielle : [Getting started](https://modelcontextprotocol.io/docs/2026-07-28/getting-started/intro), [Architecture](https://modelcontextprotocol.io/docs/2026-07-28/learn/architecture), [Server concepts](https://modelcontextprotocol.io/docs/2026-07-28/learn/server-concepts), [Build servers](https://modelcontextprotocol.io/docs/2026-07-28/develop/build-server), [Security best practices](https://modelcontextprotocol.io/docs/2026-07-28/tutorials/security/security_best_practices). Trancher :
 
 - où tourne le serveur : processus lancé par la VM (transport stdio) ou conteneur à côté sur le réseau Docker interne (Streamable HTTP) ;
 - comment le compte et ses droits Moduléo atteignent le serveur sans en faire un « adjoint confus » (un seul compte de service pour tous) et sans transmettre à Moduléo un jeton émis pour le serveur ;
 - ce qui reste un outil, ce qui devient une ressource (listes de référence) ;
-- la granularité des outils : génériques (une route et son corps JSON, comme l’écriture de la 1.5.2) ou métier (un outil par geste, qui prend des noms) — décidée ici, elle conditionne les **1.8.1** et **1.8.2** ;
+- la granularité des outils : génériques (une route et son corps JSON, comme l’écriture de la 1.5.2) ou métier (un outil par geste, qui prend des noms) — décidée ici, elle conditionne les **1.10.1** et **1.10.2** ;
 - SDK Python `mcp` (version 2 ou plus), tests à la frontière avec un client MCP de test, place du serveur dans l’inspecteur.
 
-**Hors périmètre.** Retrouver un élément par son nom (→ **1.8.1**). Écriture (→ **1.8.2**). Ouvrir le serveur à des clients hors BBASS.
+**Hors périmètre.** Retrouver un élément par son nom (→ **1.10.1**). Écriture (→ **1.10.2**). Ouvrir le serveur à des clients hors BBASS.
 
-## Ensuite : 1.8.1 — Serveur MCP Moduléo : retrouver par son nom ce que l’API ne lit que par id
+## Ensuite : 1.10.1 — Serveur MCP Moduléo : retrouver par son nom ce que l’API ne lit que par id
+
+*(Brouillon : à partir de la 1.9.0, le contenu et l’ordre changeront très probablement.)*
 
 **Objectif.** Le collaborateur peut dire « catégorie Terrain » : le serveur construit et tient à jour la correspondance nom → id des éléments que l’API Moduléo ne lit que par id (catégories de tâche à faire `moduleo/categorietacheafaire/{id}`, de note `cogeo/categorienote/{id}`…), en lisant les ids un à un et en les mettant en cache faute de route de liste, ou par une route de liste si Kipaware en ouvre une. Le serveur donne aussi au modèle l’id des éléments que les fiches de la 1.5.2 ne portent pas (téléphones, e-mails et adresses d’un contact, notes, tâches à faire), pour pouvoir les modifier ou les supprimer, et les valeurs de référence qu’une écriture exige sans moyen de les retrouver (lieux d’un temps passé, catégories et utilisateurs affectés d’une tâche à faire). Lève les limites de la 1.5.2 (« pas de moyen de retrouver l’élément à partir de son nom », écritures refusées faute d’id, [#257](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/257)). Les codes activité et le collaborateur du compte sont déjà donnés en 1.5.2 (`decrire_ecriture_moduleo`).
 
@@ -142,11 +211,13 @@ La souveraineté dit aussi que la relecture isolée est un appel Mistral de plus
 
 **À trancher au grilling.** Durée de vie du cache et rafraîchissement. Borne de lecture des ids. Exposition des listes comme ressources du serveur.
 
-**Hors périmètre.** Demander une route de liste à Kipaware (démarche à mener en parallèle, sans bloquer). Écriture (→ **1.8.2**).
+**Hors périmètre.** Demander une route de liste à Kipaware (démarche à mener en parallèle, sans bloquer). Écriture (→ **1.10.2**).
 
-## Ensuite : 1.8.2 — Serveur MCP Moduléo : écrire par le serveur
+## Ensuite : 1.10.2 — Serveur MCP Moduléo : écrire par le serveur
 
-**Objectif.** Les écritures Moduléo de la 1.5.2 passent par le serveur MCP avec toutes leurs garanties : garde des droits appliqué par le serveur pour le compte authentifié, carte de confirmation dans le poste et confirmation hors du modèle, identifiant de carte lié au compte (le posséder ne suffit pas à confirmer), serveur de test seulement, ids jamais à l’écran. Le serveur refuse une écriture non confirmée, quel que soit l’hôte qui l’appelle. La réponse à « Qu’est-ce que tu sais faire avec Moduléo ? » (1.8.0) couvre alors les écritures : celles que le compte peut proposer, d’après les outils d’écriture du serveur et ses droits.
+*(Brouillon : à partir de la 1.9.0, le contenu et l’ordre changeront très probablement.)*
+
+**Objectif.** Les écritures Moduléo de la 1.5.2 passent par le serveur MCP avec toutes leurs garanties : garde des droits appliqué par le serveur pour le compte authentifié, carte de confirmation dans le poste et confirmation hors du modèle, identifiant de carte lié au compte (le posséder ne suffit pas à confirmer), serveur de test seulement, ids jamais à l’écran. Le serveur refuse une écriture non confirmée, quel que soit l’hôte qui l’appelle. La réponse à « Qu’est-ce que tu sais faire avec Moduléo ? » (1.10.0) couvre alors les écritures : celles que le compte peut proposer, d’après les outils d’écriture du serveur et ses droits.
 
 **Constaté en 1.5.2** (troisième passage des tests humains, [#206](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/206), captures au commit `59f6142`) :
 
@@ -159,9 +230,29 @@ La souveraineté dit aussi que la relecture isolée est un appel Mistral de plus
 
 **Hors périmètre.** Écriture sur le serveur Moduléo du cabinet (décision à part). Ouvrir le serveur à des clients hors BBASS.
 
-## Ensuite : 1.9.0 — Workflows n8n (socle d’automatisation), branchés sur Moduléo 1.5.0
+## Ensuite : 1.11.0 — Messagerie : préparer et envoyer un courriel depuis le chat
 
-*(Anciennement 1.6.0 / 1.7.0 / 1.8.0 — passé en 1.9.0 ; 1.7.x documentation, 1.8.x serveur MCP Moduléo.)*
+*(Brouillon : à partir de la 1.9.0, le contenu et l’ordre changeront très probablement.)*
+
+**Objectif.** Le collaborateur prépare un courriel depuis le chat : brouillon, confirmation dans l’interface, puis envoi, comme une écriture Moduléo. Aucun envoi sans confirmation. Demandé par la note de cadrage (composant P2, livrable L4).
+
+**Recherche.** Messagerie utilisée par le cabinet et moyens d’y accéder, droits de chaque compte.
+
+**Hors périmètre.** Envoi automatique sans confirmation. Serveurs de fichiers (→ **1.11.1**).
+
+## Ensuite : 1.11.1 — Retrouver un document sur les serveurs de fichiers
+
+*(Brouillon : à partir de la 1.9.0, le contenu et l’ordre changeront très probablement.)*
+
+**Objectif.** Le collaborateur retrouve et consulte un document des dossiers du cabinet depuis le chat, dans le respect de ses droits d’accès. Demandé par la note de cadrage (composant P2, livrable L4).
+
+**Recherche.** Accès aux serveurs de fichiers depuis la VM, reprise des droits existants, données qui sortent vers Mistral.
+
+**Hors périmètre.** Écriture et classement sur les serveurs de fichiers.
+
+## Ensuite : 1.12.0 — Workflows n8n (socle d’automatisation), branchés sur Moduléo 1.5.0
+
+*(Brouillon : à partir de la 1.9.0, le contenu et l’ordre changeront très probablement.)*
 
 S’appuie sur les **outils / client Moduléo lecture** livrés en 1.5.0. n8n devient le **runtime d’automatisation** (scénarios multi-étapes, plus tard d’autres logiciels), pas un miroir 1:1 de chaque route API.
 
@@ -177,13 +268,13 @@ S’appuie sur les **outils / client Moduléo lecture** livrés en 1.5.0. n8n de
 - Self-host Docker vs autre ; où tourne n8n par rapport à la VM.
 - Contrat outils chat ↔ n8n (webhook vs API execute).
 - Gouvernance : qui active un workflow ; audit des exécutions.
-- Comment réexposer ou appeler la stack Moduléo 1.5.0 depuis n8n (HTTP Request vers Moduléo vs rappel d’un service VM vs serveur MCP Moduléo de la série **1.8.x**).
+- Comment réexposer ou appeler la stack Moduléo 1.5.0 depuis n8n (HTTP Request vers Moduléo vs rappel d’un service VM vs serveur MCP Moduléo de la série **1.10.x**).
 
-## Ensuite : 1.10.0 — Analyse et traitement des pièces jointes, approfondis
+## Ensuite : 1.13.0 — Analyse et traitement des pièces jointes, approfondis
 
-*(Anciennement 1.5.0 → 1.9.0 selon les décalages ; passé en 1.10.0 après l’arrivée du serveur MCP Moduléo en 1.8.x.)*
+*(Brouillon : à partir de la 1.9.0, le contenu et l’ordre changeront très probablement.)*
 
-S’appuie sur la [1.1.2](../../specs/v1.1.2-pieces-jointes.md) (pipeline d’extraction, une pièce jointe par message). Le traitement par pôle suppose les **Agents métier par pôle** (Plus tard) : à livrer avant, ou à faire entrer ici. Deux limites actées volontairement en 1.1.2 sont à lever ici, pas avant : **plusieurs pièces jointes par message**, et un **traitement spécifique par pôle** (un agent Foncier ne traite pas un document comme un agent Urbanisme) — demande explicite du cabinet dès le grilling de 1.1.2, remise à plus tard faute d’Agent réel pour la justifier.
+S’appuie sur la [1.1.2](../../specs/v1.1.2-pieces-jointes.md) (pipeline d’extraction, une pièce jointe par message). Le traitement par pôle suppose les Agents métier : l’Agent Administration (**1.9.0**), puis ceux des cinq autres pôles (Plus tard). Deux limites actées volontairement en 1.1.2 sont à lever ici, pas avant : **plusieurs pièces jointes par message**, et un **traitement spécifique par pôle** (un agent Foncier ne traite pas un document comme un agent Urbanisme) — demande explicite du cabinet dès le grilling de 1.1.2, remise à plus tard faute d’Agent réel pour la justifier.
 
 **Objectif.** Une pièce jointe mieux exploitée selon qui la reçoit (le pôle de l’Agent destinataire). Le rappel d’une pièce jointe dans la durée de la conversation est livré par la 1.4.1 (Mémoire de la conversation, questions couvertes, `relire_pieces_jointes`).
 
@@ -196,13 +287,17 @@ S’appuie sur la [1.1.2](../../specs/v1.1.2-pieces-jointes.md) (pipeline d’ex
 
 ## Plus tard (pas encore numéroté)
 
-### Agents métier par pôle (consigne et capacités par pôle)
+### Agents des cinq autres pôles
 
-Sorti de la 1.5.0 pour la garder petite. Un **Agent** sert un pôle : sa consigne, et la liste des capacités qu’il a le droit d’utiliser. Les **outils restent communs** (`vm_centrale/outils/`, dont Moduléo depuis la 1.5.0) : ce n’est pas un « Agent Moduléo ». L’Agent Administration aura simplement des capacités Moduléo autorisées que les autres Agents n’ont pas. Le code d’un Agent (consigne, liste des outils autorisés, éventuels traitements propres au pôle) vit dans un dossier par Agent ; un petit registre choisit les outils du tour selon l’Agent, sans `if` par pôle dans `routers/conversations.py`. Le pack `agents/` à la racine du dépôt reste un outil de développement (skills, hooks), distinct des Agents métier.
+Appels d’offres, Foncier, DAO, Urbanisme et Détection de réseaux : même cadre que l’Agent Administration (**1.9.0**), un à la fois, chacun testé avec les collaborateurs de son pôle. L’ordre est arrêté à partir de la cartographie (**1.8.1**) ; numérotation à ce moment-là.
 
-Déjà tranché : un Agent est une configuration dans le flux chat de la VM centrale, **pas un conteneur Docker par Agent / par pôle** (pas de runtime propre, ops inutiles alors que peu de tech sera sur place). Si l’indépendance de déploiement devient un besoin : config rechargeable d’abord, et ne conteneuriser que ce qui a un vrai cycle de vie (adaptateur Moduléo en écriture, bac à sable d’exécution, n8n).
+### Mesure du gain de temps
 
-À trancher à l’ouverture : comment un tour choisit son Agent (pôle du compte, choix explicite, plusieurs pôles), quelles capacités pour chaque pôle, lien avec le traitement des pièces jointes par pôle (1.10.0).
+Compare le temps d’une tâche après la mise en service d’une solution à sa référence avant solution (**1.8.1**), pour montrer si les tâches chronophages ont réellement diminué. **Déclencheur** : un premier cas d’usage en service.
+
+### Rendre le site de documentation privé
+
+Le site est public par choix ; il publie notamment les échanges et les documents du Suivi de l’alternance (**1.7.0**). Le rendre privé protégerait ces contenus, sans couper l’accès du tuteur pédagogique, extérieur au cabinet.
 
 ### Bug — lien de source peu visible (#99)
 
@@ -257,7 +352,7 @@ Ce n’est **pas** le même objet que la 1.1.1 (résumé glissant de conversatio
 
 À creuser seulement si le besoin métier le justifie (doc Moduléo / Agents, corpus par pôle, multi-providers, etc.) :
 - Mémoire inter-conversationnelle plus fine que le seul profil de travail synthétique.
-- RAG sur un corpus cabinet, distinct des pièces jointes du fil courant (1.1.2 / 1.10.0).
+- RAG sur un corpus cabinet, distinct des pièces jointes du fil courant (1.1.2 / 1.13.0).
 - **Optimisation du résumé+profil actuel (1.1.1)** — **dans la même version** que le reste de ce chantier mémoire, pas une version à part. Distinct de la **1.3.1**, qui corrige le contenu figé (inventions reprises comme des faits, [#110](https://github.com/UlyssouLV/BBASS-Agents-IA/issues/110)), pas la fréquence des appels ni un RAG. Aujourd’hui, dès qu’il y a des messages sortants, chaque tour fait **1 chat + 1 appel résumé/profil** (agrégés tous les deux en « Chat » côté conso) : fiable, mais ~2× les requêtes après le premier message. Pistes à trancher alors : résumé moins fréquent (tous les N tours / seuil de tokens), résumé en arrière-plan après la réponse affichée (façon *Dreaming*), ou mémoire à la demande (outil / notes) — en gardant éventuellement le combo résumé léger + embeddings pour le long terme.
 
 ### Éléments de réponse visuels plus riches dans le chat (graphiques, documents générés)
