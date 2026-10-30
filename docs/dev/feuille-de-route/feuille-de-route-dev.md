@@ -53,7 +53,7 @@ Ce n’est **pas** une spec (ça vient après « Ouvre la version »).
 
 ## Ensuite : 1.7.1 — Documentation : utiliser le chat au quotidien
 
-**Objectif.** Lecture **Collaborateur**, avec captures : tout ce qu’on fait dans le chat. Conversations (créer, reprendre, renommer, supprimer, changer de conversation pendant une réponse), envoi et statut d’attente, pièces jointes, recherche web et sources, ce que l’IA retient d’une conversation et ce qu’elle relit, jauge de contexte, Profil, Consommation. Ce que l’IA refuse ou remplace, expliqué simplement (chiffre sans source, lien non fourni, « pas trouvé »). Lecture Développeur : renvois courts vers **1.7.4** et **1.7.5**.
+**Objectif.** Lecture **Collaborateur**, avec captures : tout ce qu’on fait dans le chat. Conversations (créer, reprendre, renommer, supprimer, changer de conversation pendant une réponse), envoi et statut d’attente, pièces jointes, recherche web et sources, ce que l’IA retient d’une conversation et ce qu’elle relit, jauge de contexte, Profil, Consommation. Ce que l’IA refuse ou remplace, expliqué simplement (chiffre sans source, lien non fourni, « pas trouvé », la relecture : réponse réécrite qui dit ce qui n’a pas été trouvé et où on a cherché, le marqueur « [non trouvé] » et la phrase fixe). Lecture Développeur : renvois courts vers **1.7.4** et **1.7.5**.
 
 **Hors périmètre.** Moduléo (→ **1.7.2**). Panel d’administration (→ **1.7.3**). Détail des flux (→ **1.7.4**, **1.7.5**).
 
@@ -78,6 +78,8 @@ Ce n’est **pas** une spec (ça vient après « Ouvre la version »).
 1. **Persistance de la mémoire.** Schéma compréhensible (conversations, messages, résumé glissant, profil de travail, pièces jointes, résultats de recherche web, etc.), flux tour par tour (ce qui entre, ce qui sort de la fenêtre de 3, ce qui est plafonné, ce que le modèle relit via outils), choix déjà pris et **pourquoi** (persistance VM vs API Conversations Mistral, séparation identité / profil, etc.). Exemples concrets (inspecteur, états) et renvois aux tests HTTP-boundary en annexe courte. Inclut la Mémoire de la conversation et les questions couvertes (1.4.1), le cache des pages web (1.4.3).
 
 2. **Souveraineté des données.** Cartographie de tous les choix qui font que **seul le cabinet** détient les données persistées : Postgres et fichiers sur la VM Castries, SearXNG auto-hébergé, pas de Files API / Conversations Mistral, ZDR / `chat/completions` sans rétention côté modèle, clé API unique derrière la VM, LAN uniquement, etc. Expliquer **pourquoi** chaque décision rend le cabinet souverain. **Carte globale** « où vit la donnée » et **ce qui quitte le cabinet** (Mistral, Moduléo, SearXNG, rien d’autre) pour les chemins critiques ; liens ADR / specs.
+
+La souveraineté dit aussi que la relecture isolée est un appel Mistral de plus : ce qu’il reçoit (question, réponse, résultats d’outils) et ce qu’il ne reçoit pas (historique).
 
 **Hors périmètre.** Détail par outil de ce qui part / revient (→ **1.7.5**). Doc détaillée du tool calling recherche web (→ **Optimisation de la recherche web**, Plus tard). Implémentation de nouvelles capacités mémoire ou cache.
 
@@ -107,7 +109,7 @@ Ce n’est **pas** une spec (ça vient après « Ouvre la version »).
 
 ## Ensuite : 1.7.8 — Documentation : que faire si…
 
-**Objectif.** Toutes lectures : une entrée par situation que l’on peut rencontrer, retrouvable depuis le message vu à l’écran — bandeaux du poste (Serveur BBASS injoignable, mise à jour, retour arrière), phrases fixes de la VM (Moduléo en panne ou refusé, droit manquant, page trop longue, réponse remplacée par un garde-fou…), statuts de carte Moduléo, erreurs de connexion. Pour chacune : ce que ça veut dire, si c’est grave, quoi faire, qui prévenir. En fin de version, le tableau de couverture de la **1.7.0** est vide.
+**Objectif.** Toutes lectures : une entrée par situation que l’on peut rencontrer, retrouvable depuis le message vu à l’écran — bandeaux du poste (Serveur BBASS injoignable, mise à jour, retour arrière), phrases fixes de la VM (Moduléo en panne ou refusé, droit manquant, page trop longue, réponse remplacée par un garde-fou, « Certaines informations n’ont pas été trouvées dans les sources consultées »…), statuts de carte Moduléo, erreurs de connexion. Pour chacune : ce que ça veut dire, si c’est grave, quoi faire, qui prévenir. En fin de version, le tableau de couverture de la **1.7.0** est vide.
 
 **Hors périmètre.** Corriger ces situations (bugs → Plus tard).
 
