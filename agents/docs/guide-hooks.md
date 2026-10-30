@@ -36,3 +36,15 @@ Nouveau hook : skill **`creer-hook`** (`/ch`). Il ajoute (ou remplace) une secti
 **Fait :** refuse d’écrire un appel HTTP POST/PUT/PATCH/DELETE dans le client ou les outils Moduléo (ADR-0017, GET seul). Docs, JSON et fichiers hors de ces dossiers passent.
 
 **Preuve :** `python3 agents/hooks/bloque-ecriture-moduleo/test_hook.py`
+
+### bloque-up-ecarts-pack
+
+**Source :** `agents/hooks/bloque-up-ecarts-pack/hook.py`
+
+**Claude :** `PreToolUse`, matcher `Skill\|Bash` (`.claude/settings.json` → `.claude/hooks/bloque-up-ecarts-pack.py`)
+
+**Cursor :** `preToolUse` matcher `Skill` ; `beforeShellExecution` (`.cursor/hooks.json`)
+
+**Fait :** refuse `/up` (skill `mettre-a-jour-le-pack`, ou `update-from-pack.sh` / `adopter-le-pack.sh` lancés en commande) tant que `agents/docs/ecarts-avec-le-pack.md` a une ligne au statut « à reporter » : le pack écraserait ces modifications locales. Une simple mention du script (grep, heredoc, guillemets) passe ; fichier absent ou tout « reporté » → passe.
+
+**Preuve :** `python3 agents/hooks/bloque-up-ecarts-pack/test_hook.py`

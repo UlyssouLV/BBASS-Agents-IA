@@ -1,5 +1,6 @@
 import { useProfilTravailQuery } from "@/hooks/useProfilTravail";
 import { ErreurApi } from "@/lib/api";
+import { formaterDateHeure } from "@/lib/dates";
 
 // Réécriture React de la section #onglet-profil-travail d'app.js : lecture
 // seule, contenu vide ("") affiché comme « aucun profil enregistré » (voir
@@ -37,7 +38,7 @@ export function OngletProfilTravail() {
       <p className="text-sm">{profil.contenu}</p>
       {profil.date_derniere_maj && (
         <p className="mt-2 text-xs text-muted-foreground">
-          Dernière mise à jour : {new Date(profil.date_derniere_maj).toLocaleString()}
+          Dernière mise à jour : {formaterDateHeure(profil.date_derniere_maj)}
         </p>
       )}
     </div>

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
+import { formaterDateHeure } from "@/lib/dates";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export function TitreInspecteur() {
@@ -110,8 +111,8 @@ export function TableauConversationsInspecteur({
                 {ligne.titre}
               </button>
             </TableCell>
-            <TableCell>{new Date(ligne.dateCreation).toLocaleString()}</TableCell>
-            <TableCell>{new Date(ligne.dateActivite).toLocaleString()}</TableCell>
+            <TableCell>{formaterDateHeure(ligne.dateCreation)}</TableCell>
+            <TableCell>{formaterDateHeure(ligne.dateActivite)}</TableCell>
           </TableRow>
         ))}
       </TableBody>

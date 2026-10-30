@@ -1,0 +1,52 @@
+# Écrire dans Moduléo
+
+Depuis la 1.5.2, le collaborateur peut demander au chat d’écrire dans Moduléo, par exemple « ajoute le numéro du bureau à l’Étude Dupont », « note sur l’affaire 2024-123 : rappeler le client » ou « saisis 3 h de bornage hier sur l’affaire 2024-123 ».
+
+**Sur le serveur Moduléo de test seulement**, jamais sur le serveur du cabinet ([ADR-0023](../../adr/0023-ecriture-moduleo-confirmee-serveur-de-test.md)). **Le modèle propose, le collaborateur décide** : rien ne part sans un clic sur **Confirmer**.
+
+## Quand les outils sont proposés
+
+Deux outils, proposés seulement si les trois conditions sont réunies :
+
+- le réglage `MODULEO_ECRITURE` est actif sur la VM ;
+- `MODULEO_URL` figure dans la **liste versionnée des serveurs Moduléo de test** ;
+- le compte a au moins une route d’écriture que ses droits Moduléo peuvent ouvrir.
+
+| Outil | Ce qu’il fait |
+| --- | --- |
+| `decrire_ecriture_moduleo` | Donne au modèle les champs d’une route d’écriture : paramètres, exemple de corps JSON et description, tirés du WADL versionné. N’appelle pas Moduléo. Route inconnue ou fermée : une phrase fixe. |
+| `ecrire_moduleo` | **Propose** une écriture : vérifie la route, les paramètres, le corps, la barrière serveur de test et les droits, prépare une Carte de confirmation. **N’envoie rien.** Sa description liste les routes ouvertes au compte, une ligne chacune. |
+
+Créations (POST), modifications (PUT) et suppressions (DELETE) passent toutes par la carte.
+
+## La Carte de confirmation
+
+Quand le modèle appelle `ecrire_moduleo`, une carte apparaît dans le fil, pendant la réponse. Quand la demande est claire, le modèle propose la carte directement, sans poser d’abord la question en texte : la carte est la confirmation.
+
+- un titre en langage métier (« Créer une tâche à faire », « Modifier un numéro de téléphone ») et les dates en lettres, à l’heure de Paris (« 15 novembre 2026 ») ;
+- ce qui sera écrit, **en noms** : l’affaire devient « affaire 2024-123 », le contact « Étude Dupont », l’utilisateur « Jean Martin ». Un id qu’aucun résolveur ne sait nommer s’affiche brut, avec « non résolu » ;
+- un id que Moduléo ne trouve pas (une catégorie qui n’existe pas…) n’ouvre pas de carte : le modèle doit demander au collaborateur l’élément voulu plutôt que d’essayer un autre id ;
+- certaines catégories (de tâche à faire, de note) ne se lisent que par leur id : le chat ne sait pas les retrouver à partir de leur nom (« Terrain » ne suffit pas). Le modèle le dit, et propose l’écriture sans catégorie si elle est facultative ;
+- pour une **modification**, la VM relit d’abord l’élément dans Moduléo ; la carte montre l’élément visé (sa fiche de lecture, sinon ses champs en noms), puis seulement ce qui change, champ par champ, ancien → nouveau (« Libellé : Bornage → Bornage lot B ») ; un champ vidé s’affiche « (vide) ». Un corps qui ne change rien n’ouvre pas de carte ;
+- pour une **suppression**, la carte montre l’élément entier sous **« Sera supprimé »** : sa fiche de lecture (temps passé, tâche du planning), sinon ses champs en noms ;
+- un élément introuvable à la relecture, ou que le compte n’a pas le droit de lire, n’ouvre pas de carte : le modèle reçoit une phrase fixe et rien n’est envoyé ;
+- deux boutons, **Confirmer** et **Annuler**, traités par la VM, **hors du modèle**. Un « oui » tapé dans le chat ne confirme rien.
+
+Après le clic, la carte affiche **« Écrit dans Moduléo. »**, ou une phrase fixe : annulée, refusée (droit retiré entre-temps), données refusées par Moduléo (avec son message), refus d’accès, élément introuvable, panne. Le clic ne relance pas le modèle ; le résultat lui est donné au message suivant, comme le résultat de son outil.
+
+Une carte non confirmée **expire** dès qu’un nouveau message est envoyé dans la Conversation. Un tour peut ouvrir plusieurs cartes : chacune se confirme seule. Les cartes se rechargent avec la Conversation.
+
+## Une seule écriture par clic
+
+La confirmation passe par le verrou du compte : pendant un message en cours, le clic attend la fin de la réponse. La VM vérifie que la carte appartient au compte, qu’elle est encore proposée, relit les droits du compte, puis envoie **une seule** requête à Moduléo, sans nouvelle tentative. Un double clic n’écrit qu’une fois.
+
+## Journal des écritures
+
+Chaque écriture est enregistrée en base (`ecritures_moduleo`) : compte, heure, route, méthode, paramètres et corps, id renvoyé par Moduléo, statut (proposée, confirmée, annulée, expirée, refusée, en échec), message d’erreur. Le journal survit à la suppression de la Conversation. Pas d’écran d’administration en 1.5.2.
+
+## Inspecteur
+
+- `Outil : ecrire_moduleo` : la route, le corps et la carte proposée (ou le refus du garde des droits) ;
+- `confirmation:ecrire_moduleo` : la décision, la requête envoyée et la réponse de Moduléo.
+
+Jamais la clé d’API ni le SecurityCode : ils restent dans les en-têtes du client de la VM.

@@ -5,10 +5,12 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 
 from poste.schemas import (
+    CarteEcritureResponse,
     ConversationCreationRequest,
     ConversationDetailResponse,
     ConversationRenommeeRequest,
     ConversationResponse,
+    DecisionEcritureRequest,
     MessageEnvoyeRequest,
     MessageResponse,
     PieceJointeCreeeResponse,
@@ -17,6 +19,8 @@ from poste.schemas import (
 from poste.session import SessionStore, get_session_store
 from poste.vm_centrale_client import (
     ConversationIntrouvableError,
+    EcritureDejaDecideeError,
+    EcritureIntrouvableError,
     JetonInvalideError,
     PieceJointeCreee,
     PieceJointeIntrouvableError,
@@ -33,6 +37,7 @@ _CONVERSATION_INTROUVABLE = "Conversation introuvable"
 _PIECE_JOINTE_INTROUVABLE = "Pièce jointe introuvable"
 _PIECE_JOINTE_REFUSEE = "Pièce jointe refusée"
 _VM_CENTRALE_INDISPONIBLE = "Le service de conversations de la VM centrale est indisponible"
+_ECRITURE_INTROUVABLE = "Écriture Moduléo introuvable"
 
 
 def _jeton_de_session(session: SessionStore) -> str:
@@ -53,6 +58,11 @@ def _erreur_vm_vers_http(session: SessionStore, erreur: Exception) -> HTTPExcept
         return HTTPException(status_code=404, detail=_CONVERSATION_INTROUVABLE)
     if isinstance(erreur, PieceJointeIntrouvableError):
         return HTTPException(status_code=404, detail=str(erreur) or _PIECE_JOINTE_INTROUVABLE)
+    if isinstance(erreur, EcritureIntrouvableError):
+        return HTTPException(status_code=404, detail=_ECRITURE_INTROUVABLE)
+    if isinstance(erreur, EcritureDejaDecideeError):
+        # La carte à jour (statut, message), pour que le poste l'affiche.
+        return HTTPException(status_code=409, detail=erreur.detail)
     if isinstance(erreur, PieceJointeRefuseeError):
         # Relaie le texte de la VM (type non supporté, fichier trop
         # volumineux, ou déjà liée à un autre message — voir
@@ -191,6 +201,7 @@ def consulter_conversation(
                 date_creation=message.date_creation,
                 tokens_contexte=message.tokens_contexte,
                 fenetre_contexte=message.fenetre_contexte,
+                cartes=[CarteEcritureResponse.model_validate(carte) for carte in message.cartes],
             )
             for message in detail.messages
         ],
@@ -263,6 +274,30 @@ def envoyer_message(
         raise _erreur_vm_vers_http(session, erreur) from erreur
 
     return _relayer_flux(session, flux)
+
+
+@router.post(
+    "/ecritures-moduleo/{ecriture_id}",
+    responses={
+        **_RESPONSES_BASE,
+        404: {"description": _ECRITURE_INTROUVABLE},
+        409: {"description": "Carte déjà décidée ou message en cours (carte à jour en détail)"},
+    },
+)
+def decider_ecriture(
+    ecriture_id: int,
+    requete: DecisionEcritureRequest,
+    client: VmCentraleClient = Depends(get_vm_centrale_client),
+    session: SessionStore = Depends(get_session_store),
+) -> CarteEcritureResponse:
+    # Clic Confirmer / Annuler d'une Carte de confirmation Moduléo (spec
+    # 1.5.2, #204) : la VM seule décide et écrit.
+    jeton = _jeton_de_session(session)
+    try:
+        carte = client.decider_ecriture(jeton, ecriture_id, requete.decision)
+    except Exception as erreur:
+        raise _erreur_vm_vers_http(session, erreur) from erreur
+    return CarteEcritureResponse.model_validate(carte)
 
 
 def _piece_jointe_creee_response(cree: PieceJointeCreee) -> PieceJointeCreeeResponse:

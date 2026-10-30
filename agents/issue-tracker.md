@@ -215,7 +215,7 @@ ADRs de cette version (liens **sur ce tag**, pas `main`) :
 Issues laissées de côté (PR / spec hors périmètre) : #…
 ```
 
-Title: `VX.Y.Z — <purpose>`. Tag on the **feature SHA**, not `main`. Optional leading `> **Modifié en …**` annotation blocks (from a later version) may sit **above** `## Pourquoi`, each separated by blank lines as above.
+Title: `VX.Y.Z — <purpose>`, where `X.Y.Z` is the **product number** (`finaliser-la-version` step 0); when it differs from the development number `D` of the branch, the purpose ends with ` (développement D)`. No Release when nothing reaches the end user (role `livrables`). Tag on the **feature SHA**, not `main`. Optional leading `> **Modifié en …**` annotation blocks (from a later version) may sit **above** `## Pourquoi`, each separated by blank lines as above.
 
 ## Wayfinding operations
 

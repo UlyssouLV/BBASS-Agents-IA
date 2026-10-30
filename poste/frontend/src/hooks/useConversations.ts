@@ -21,11 +21,34 @@ interface JaugeContexte {
   fenetre_contexte: number;
 }
 
+// Carte de confirmation d'une écriture Moduléo (spec 1.5.2, #204) : voir
+// poste.schemas.CarteEcritureResponse. `message` : « Écrit dans Moduléo. »
+// ou la phrase fixe d'un refus / échec / annulation / expiration ; null tant
+// qu'elle est proposée.
+export type StatutEcriture = "proposee" | "confirmee" | "annulee" | "expiree" | "refusee" | "en_echec";
+
+export interface CarteEcriture {
+  id: number;
+  statut: StatutEcriture;
+  methode: string;
+  route: string;
+  titre: string;
+  // PUT (#205) : `avant`, la valeur avant la modification (null hors
+  // différence). DELETE : `rubrique` (« Sera supprimé ») et `fiche`, le
+  // texte de l'élément quand il en a une.
+  lignes: { champ: string; valeur: string; avant?: string | null }[];
+  rubrique?: string | null;
+  fiche?: string | null;
+  message: string | null;
+}
+
 export interface Message extends JaugeContexte {
   id: number;
   role: string;
   contenu: string;
   date_creation: string;
+  // Cartes proposées pendant le tour de ce message `assistant`.
+  cartes?: CarteEcriture[];
 }
 
 // Une page de la pagination par curseur de GET /conversations/{id} (issue
@@ -157,6 +180,8 @@ interface CreerConversationVariables {
   cleIdempotence: string;
   // Statut du tour (spec 1.4.4) : l'étape en cours, publiée par la VM.
   onStatut: (libelle: string) => void;
+  // Carte de confirmation proposée pendant le tour (spec 1.5.2).
+  onCarte: (carte: CarteEcriture) => void;
 }
 
 async function creerConversation({
@@ -164,6 +189,7 @@ async function creerConversation({
   fichier,
   cleIdempotence,
   onStatut,
+  onCarte,
 }: CreerConversationVariables): Promise<ConversationCreee> {
   const piece = fichier ? await _envoyerPieceJointeAvecCache("/pieces-jointes", fichier) : null;
 
@@ -176,7 +202,8 @@ async function creerConversation({
     },
     onStatut,
     _MSG_ERREUR_RESEAU_CONVERSATIONS,
-    "La création de la conversation a échoué. Réessayez plus tard."
+    "La création de la conversation a échoué. Réessayez plus tard.",
+    (carte) => onCarte(carte as CarteEcriture)
   );
 
   return {
@@ -191,8 +218,9 @@ interface EnvoyerMessageVariables {
   message: string;
   fichier: File | null;
   cleIdempotence: string;
-  // Voir CreerConversationVariables.onStatut.
+  // Voir CreerConversationVariables.onStatut / onCarte.
   onStatut: (libelle: string) => void;
+  onCarte: (carte: CarteEcriture) => void;
 }
 
 async function envoyerMessage({
@@ -201,6 +229,7 @@ async function envoyerMessage({
   fichier,
   cleIdempotence,
   onStatut,
+  onCarte,
 }: EnvoyerMessageVariables): Promise<MessageEnvoye> {
   const piece = fichier
     ? await _envoyerPieceJointeAvecCache(`/conversations/${conversationId}/pieces-jointes`, fichier)
@@ -215,7 +244,8 @@ async function envoyerMessage({
     },
     onStatut,
     _MSG_ERREUR_RESEAU_CONVERSATIONS,
-    "L'envoi du message a échoué. Réessayez plus tard."
+    "L'envoi du message a échoué. Réessayez plus tard.",
+    (carte) => onCarte(carte as CarteEcriture)
   );
 
   return {
@@ -335,6 +365,46 @@ export function useEnvoyerMessageMutation() {
     onSuccess: (_donnees, variables) => {
       queryClient.invalidateQueries({ queryKey: cleConversation(variables.conversationId) });
       queryClient.invalidateQueries({ queryKey: CLE_CONVERSATIONS });
+    },
+    onError: (erreur) => surErreurSession(queryClient, erreur),
+  });
+}
+
+// Clic Confirmer / Annuler d'une Carte de confirmation (spec 1.5.2, #204) :
+// la carte à jour. Un 409 (carte déjà décidée, expirée…) porte la carte à
+// jour en détail : rendue comme un résultat, pas comme une erreur.
+async function deciderEcritureRequete(id: number, decision: "confirmer" | "annuler"): Promise<CarteEcriture> {
+  let reponse: Response;
+  try {
+    reponse = await fetch(`/ecritures-moduleo/${id}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ decision }),
+    });
+  } catch {
+    throw new ErreurApi(_MSG_ERREUR_RESEAU_CONVERSATIONS, 0);
+  }
+  const corps = await reponse.json().catch(() => null);
+  if (reponse.ok) {
+    return corps as CarteEcriture;
+  }
+  if (reponse.status === 409 && typeof corps?.detail === "object" && corps.detail !== null) {
+    return corps.detail as CarteEcriture;
+  }
+  const detail =
+    typeof corps?.detail === "string" ? corps.detail : "La décision n'a pas pu être envoyée. Réessayez.";
+  throw new ErreurApi(detail, reponse.status);
+}
+
+export function useDeciderEcritureMutation(conversationId: number | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, decision }: { id: number; decision: "confirmer" | "annuler" }) =>
+      deciderEcritureRequete(id, decision),
+    onSettled: () => {
+      if (conversationId !== null) {
+        queryClient.invalidateQueries({ queryKey: cleConversation(conversationId) });
+      }
     },
     onError: (erreur) => surErreurSession(queryClient, erreur),
   });

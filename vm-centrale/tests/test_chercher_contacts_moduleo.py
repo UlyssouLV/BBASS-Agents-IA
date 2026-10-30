@@ -78,6 +78,9 @@ def test_avec_config_moduleo_le_schema_decrit_les_filtres_en_noms(
     proprietes = schema["function"]["parameters"]["properties"]
     assert set(proprietes) == {"texte", "type_contact", "type_donneur_ordre", "qualifications", "nb_max"}
     assert proprietes["qualifications"]["type"] == "array"
+    # Troisième passage de #206 : « CLIENT EXEMPLE 11 » cherché en
+    # « société » (c'est une personne), donc introuvable.
+    assert "seulement si le collaborateur" in proprietes["type_contact"]["description"]
 
 
 def test_coordonnees_dun_contact_fiche_avec_telephones_emails_adresses_et_affaires(
@@ -89,7 +92,7 @@ def test_coordonnees_dun_contact_fiche_avec_telephones_emails_adresses_et_affair
 
     assert reponse.status_code == 200
     fiche = _contenu_outil(mistral_client_factice)
-    assert fiche.startswith("Contact Étude Dupont")
+    assert fiche.startswith("Contact Étude Dupont [id Moduléo 40]\n")
     assert "Type : Société" in fiche
     assert f"- {_TEL} (Bureau)" in fiche
     assert "- 06 11 22 33 44 (Portable)" in fiche
@@ -97,8 +100,8 @@ def test_coordonnees_dun_contact_fiche_avec_telephones_emails_adresses_et_affair
     assert "- 3 rue de la Mairie, Castries (34160) (Siège)" in fiche
     assert "Client des affaires : 2024-123" in fiche
     assert "Intervenant dans les affaires : 2023-050" in fiche
-    # Jamais un id Moduléo dans la fiche.
-    assert "40" not in fiche and "101" not in fiche
+    # L'id Moduléo sur la ligne de référence seulement (#203).
+    assert fiche.count("[id Moduléo") == 1 and "101" not in fiche
 
 
 def test_chaque_coordonnee_est_lue_ids_puis_fiche_et_les_affaires_en_une_lecture_multi(
@@ -126,7 +129,7 @@ def test_un_contact_sans_coordonnees_na_que_son_type_et_son_nom(
 
     _chercher(client, mistral_client_factice, jeton_valide, {"texte": "Durand"})
 
-    assert _contenu_outil(mistral_client_factice) == "Contact Paul Durand\nType : Personne"
+    assert _contenu_outil(mistral_client_factice) == "Contact Paul Durand [id Moduléo 41]\nType : Personne"
 
 
 def test_filtre_par_qualification_resolu_en_noms(client, faux_moduleo, mistral_client_factice, jeton_valide):
@@ -190,6 +193,40 @@ def test_le_type_de_contact_est_transmis_par_son_nom_moduleo(
 
     (recherche,) = _recherches(faux_moduleo)
     assert recherche["typeContact"] == attendu
+
+
+# Troisième passage de #206 : « CLIENT EXEMPLE 11 », une personne, cherché
+# en « société » par le modèle, était dit introuvable. Avec un nom, le type
+# filtre les contacts trouvés par le nom, sans jamais les perdre.
+
+
+def test_avec_un_nom_le_type_filtre_les_contacts_trouves_par_le_nom(
+    client, faux_moduleo, mistral_client_factice, jeton_valide
+):
+    faux_moduleo.ajouter_contact(40, "Martin", type_contact=1)
+    faux_moduleo.ajouter_contact(41, "Martin SARL", type_contact=3)
+
+    _chercher(client, mistral_client_factice, jeton_valide, {"texte": "Martin", "type_contact": "société"})
+
+    (recherche,) = _recherches(faux_moduleo)
+    assert "typeContact" not in recherche
+    contenu = _contenu_outil(mistral_client_factice)
+    assert "Martin SARL" in contenu
+    assert "Contact Martin [" not in contenu and "Aucun contact de type" not in contenu
+
+
+def test_avec_un_nom_et_un_mauvais_type_les_contacts_trouves_par_le_nom_restent(
+    client, faux_moduleo, mistral_client_factice, jeton_valide
+):
+    faux_moduleo.ajouter_contact(153, "CLIENT EXEMPLE 11", type_contact=1)
+
+    _chercher(
+        client, mistral_client_factice, jeton_valide, {"texte": "CLIENT EXEMPLE 11", "type_contact": "société"}
+    )
+
+    contenu = _contenu_outil(mistral_client_factice)
+    assert contenu.startswith("Aucun contact de type Société ne correspond : contacts trouvés par le nom.\n\n")
+    assert "CLIENT EXEMPLE 11" in contenu
 
 
 def test_un_type_de_contact_inconnu_ne_lance_pas_la_recherche(

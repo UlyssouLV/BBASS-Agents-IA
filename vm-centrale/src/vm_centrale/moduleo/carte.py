@@ -1,0 +1,406 @@
+from collections.abc import Callable, Iterable
+from typing import Any
+
+from vm_centrale.dates import date_heure_en_lettres, instant, jour_en_lettres
+from vm_centrale.moduleo.client import ErreurModuleo, LecteurModuleo, RequeteInterdite
+from vm_centrale.moduleo.droits import DroitManquant, DroitsModuleo
+from vm_centrale.moduleo.fiches import NomsPlanning, NomsTempsPasses, fiche_tache, fiche_temps_passe
+from vm_centrale.moduleo.ids import retirer_ids_moduleo
+from vm_centrale.moduleo.resolution import (
+    activites,
+    resoudre_codes_activite,
+    resoudre_communes,
+    resoudre_contacts,
+    resoudre_equipements,
+    resoudre_libelles,
+    resoudre_participants,
+    resoudre_utilisateurs,
+)
+
+# Lignes de la Carte de confirmation (spec 1.5.2, #204) : chaque champ du
+# corps et chaque paramètre de la route, en noms. Un id est nommé par les
+# résolveurs existants d'après le nom de son champ ; un id qu'aucun ne sait
+# nommer (champ inconnu, élément introuvable, lecture refusée ou en panne)
+# s'affiche brut, avec « non résolu ». Un id qu'un résolveur a cherché
+# sans que Moduléo le trouve empêche la carte (`IdIntrouvable`, #254).
+#
+# PUT (#205) : les seuls champs du corps qui changent l'élément relu,
+# ancien (`avant`) → nouveau, un champ vide valant « (vide) », sous la
+# fiche de l'élément visé (#253). DELETE : la fiche de lecture de l'élément
+# quand elle existe (temps passé, tâche du planning), sinon ses champs en
+# noms. `identites` : les champs qui portent l'id de l'élément lui-même,
+# jamais montrés.
+#
+# Fiche visée en noms (#261) : créateur et dernier modificateur nommés,
+# libellés métier (« Créée par »), ni date vide de Moduléo (`0001-01-01`)
+# ni énumération `Type…` à 0. Un champ « date seule » (`_DATES_SEULES`) se
+# lit en jour, sans fuseau.
+
+NON_RESOLU = "non résolu"
+VIDE = "(vide)"
+
+# Champs que la carte ne montre pas : Moduléo les remplit lui-même.
+_IGNORES = {"ProprietesModifiees"}
+# Libellés métier, par nom de champ (casse indifférente) : seules la note
+# et la tâche du planning, toutes deux au féminin, portent ces champs.
+_LIBELLES = {
+    "idcreator": "Créée par",
+    "idlastmodificator": "Modifiée par",
+    "datecreation": "Créée le",
+    "datedernieremodification": "Modifiée le",
+}
+# Champs des routes ouvertes qui ne portent qu'un jour (README du module).
+_DATES_SEULES = {
+    "date",
+    "datecloture",
+    "datecreation",
+    "datedebutregime",
+    "datefin",
+    "datelimite",
+    "datelivraison",
+    "datenaissance",
+    "dateouverture",
+    "freedate",
+}
+# Date d'un champ vide dans Moduléo.
+_DATE_VIDE = "0001-01-01"
+# Erreurs d'un résolveur : l'id reste non résolu.
+_ILLISIBLE = (DroitManquant, ErreurModuleo, RequeteInterdite, KeyError, TypeError, ValueError)
+
+
+class IdIntrouvable(Exception):
+    # Un id proposé que Moduléo ne trouve pas (#254) : « Catégorie 3 ».
+    def __init__(self, champ: str, id_element: int) -> None:
+        super().__init__(f"{champ} {id_element}")
+
+
+def _multi(lecteur: LecteurModuleo, route: str, ids: Iterable[int]) -> list[dict]:
+    uniques = sorted(set(ids))
+    return lecteur.lire(route, {"ids": ",".join(map(str, uniques))}) if uniques else []
+
+
+def _affaires(lecteur: LecteurModuleo, ids: Iterable[int]) -> dict[int, str]:
+    lues = _multi(lecteur, "cogeo/affaire/multi?ids={ids}", ids)
+    return {a["IdAffaire"]: f"affaire {a.get('Numero') or a['IdAffaire']}" for a in lues}
+
+
+def _devis(lecteur: LecteurModuleo, ids: Iterable[int]) -> dict[int, str]:
+    lus = _multi(lecteur, "cogeo/devis/multi?ids={ids}", ids)
+    return {d["IdDevis"]: f"devis {d.get('Numero') or d['IdDevis']}" for d in lus}
+
+
+def _utilisateurs(lecteur: LecteurModuleo, ids: Iterable[int]) -> dict[int, str]:
+    return {i: u.nom for i, u in resoudre_utilisateurs(lecteur, ids).items()}
+
+
+def _activites(lecteur: LecteurModuleo, ids: Iterable[int]) -> dict[int, str]:
+    return activites(lecteur) if any(True for _ in ids) else {}
+
+
+Resolveur = Callable[[LecteurModuleo, Iterable[int]], dict[int, str]]
+
+
+def _par_id(route: str, parametre: str) -> Resolveur:
+    # Élément sans route `multi` : son libellé, lu id par id (#254).
+    return lambda lecteur, ids: resoudre_libelles(lecteur, route, parametre, ids)
+
+
+# Nom du champ (casse indifférente) → résolveur de son id ou de ses ids.
+_RESOLVEURS: dict[str, Resolveur] = {
+    **dict.fromkeys(("idaffaire", "idsaffaires"), _affaires),
+    **dict.fromkeys(
+        (
+            "idcontact",
+            "idclient",
+            "idrepresentant",
+            "idscontacts",
+            "idcontactlie",
+            "iddestinataire",
+            "idcontactparent",
+        ),
+        resoudre_contacts,
+    ),
+    **dict.fromkeys(
+        (
+            "idutilisateur",
+            "idresponsable",
+            "idcollaborateur",
+            "idredacteur",
+            "idgeometreexpert",
+            "idchefequipe",
+            "idacteurencharge",
+            "idsdestinataires",
+            "idsutilisateurs",
+            "idutilisateursaffectes",
+            "ideffectueepar",
+            "iduser",
+            "idcreator",
+            "idlastmodificator",
+        ),
+        _utilisateurs,
+    ),
+    **dict.fromkeys(("idcommune", "idcommunenaissance", "idcommuneenregistrementrcs"), resoudre_communes),
+    "idcodeactivite": resoudre_codes_activite,
+    "idactivite": _activites,
+    "iddevis": _devis,
+    "participants": resoudre_participants,
+    "equipements": resoudre_equipements,
+    "idcategorietacheafaire": _par_id(
+        "moduleo/categorietacheafaire/{idCategorieTacheAFaire}", "idCategorieTacheAFaire"
+    ),
+    "idcategorienote": _par_id("cogeo/categorienote/{idCategorieNote}", "idCategorieNote"),
+    "idsite": _par_id("moduleo/site/{idSite}", "idSite"),
+    "idservice": _par_id("moduleo/service/{idService}", "idService"),
+    "idlieu": _par_id("cogeo/lieu/{idLieu}", "idLieu"),
+    "idtypefrais": _par_id("cogeo/typefrais/{idTypeFrais}", "idTypeFrais"),
+}
+
+
+def _est_un_id(champ: str) -> bool:
+    cle = champ.casefold()
+    return cle.startswith("id") or cle in _RESOLVEURS
+
+
+def _libelle(champ: str) -> str:
+    # « IdAffaire » → « Affaire », « IdsContacts » → « Contacts »,
+    # « idAffaire » (paramètre) → « Affaire ».
+    if champ.casefold() in _LIBELLES:
+        return _LIBELLES[champ.casefold()]
+    for prefixe in ("Ids", "Id", "ids", "id"):
+        reste = champ.removeprefix(prefixe)
+        if reste != champ and reste[:1].isupper():
+            return reste
+    return champ[:1].upper() + champ[1:]
+
+
+def _ids(valeur: Any) -> list[int]:
+    valeurs = valeur if isinstance(valeur, list) else str(valeur).split(",") if isinstance(valeur, str) else [valeur]
+    ids = []
+    for element in valeurs:
+        try:
+            ids.append(int(str(element).strip()))
+        except ValueError:
+            continue
+    return ids
+
+
+def _vide(champ: str, valeur: Any) -> bool:
+    # Un id à 0 est un id non renseigné, comme une énumération `Type…` à 0
+    # et la date `0001-01-01`.
+    return (
+        valeur is None
+        or valeur == ""
+        or valeur == []
+        or (_est_un_id(champ) and _ids(valeur) == [0])
+        or (champ.casefold().startswith("type") and valeur == 0 and not isinstance(valeur, bool))
+        or (isinstance(valeur, str) and valeur.strip().startswith(_DATE_VIDE))
+    )
+
+
+def _texte(valeur: Any) -> str:
+    if isinstance(valeur, bool):
+        return "oui" if valeur else "non"
+    if isinstance(valeur, list):
+        return ", ".join(_texte(element) for element in valeur)
+    # Une date en lettres, à l'heure de Paris (#256).
+    return (isinstance(valeur, str) and date_heure_en_lettres(valeur)) or str(valeur)
+
+
+def _aplatir(valeurs: dict[str, Any], prefixe: str = "", vides: bool = False) -> list[tuple[str, Any]]:
+    # Un objet imbriqué : « Adresse › Rue ». Un champ vide n'a pas de ligne,
+    # sauf pour comparer (`vides`).
+    champs = []
+    for champ, valeur in valeurs.items():
+        if isinstance(valeur, dict):
+            champs += _aplatir(valeur, f"{prefixe}{_libelle(champ)} › ", vides)
+        elif champ not in _IGNORES and (vides or not _vide(champ, valeur)):
+            champs.append((f"{prefixe}{champ}", valeur))
+    return champs
+
+
+def _feuille(champ: str) -> str:
+    # « Adresse › IdCommune » → « IdCommune ».
+    return champ.rsplit(" › ", 1)[-1]
+
+
+def _resoudre(lecteur: LecteurModuleo, champs: list[tuple[str, Any]]) -> dict[str, dict[int, str]]:
+    # Par résolveur, tous les ids de la carte en une fois : id → nom, vide
+    # pour un élément trouvé sans nom. Une lecture refusée ou en panne
+    # laisse ses ids non résolus : son résolveur n'a pas de clé.
+    a_resoudre: dict[str, list[int]] = {}
+    for champ, valeur in champs:
+        cle = _feuille(champ).casefold()
+        if cle in _RESOLVEURS:
+            a_resoudre.setdefault(cle, []).extend(_ids(valeur))
+    noms: dict[str, dict[int, str]] = {}
+    for cle, ids in a_resoudre.items():
+        try:
+            noms[cle] = _RESOLVEURS[cle](lecteur, ids)
+        except _ILLISIBLE:
+            continue
+    return noms
+
+
+def _verifier_trouves(champs: list[tuple[str, Any]], noms: dict[str, dict[int, str]]) -> None:
+    # Les ids proposés qu'un résolveur a cherchés doivent exister (#254).
+    for champ, valeur in champs:
+        cle = _feuille(champ).casefold()
+        if cle in noms and not _vide(_feuille(champ), valeur):
+            for id_element in _ids(valeur):
+                if id_element and id_element not in noms[cle]:
+                    raise IdIntrouvable(_libelle_complet(champ), id_element)
+
+
+def _libelle_complet(champ: str) -> str:
+    dernier = champ.rsplit(" › ", 1)
+    return " › ".join([*dernier[:-1], _libelle(dernier[-1])])
+
+
+def _en_noms(champ: str, valeur: Any, noms: dict[str, dict[int, str]]) -> str:
+    feuille = _feuille(champ)
+    if _vide(feuille, valeur):
+        return VIDE
+    if _est_un_id(feuille):
+        connus = noms.get(feuille.casefold(), {})
+        # Sans id lisible : la valeur en texte, une liste n'étant pas une clé.
+        ids = _ids(valeur) or [_texte(valeur)]
+        return ", ".join(connus.get(i) or f"{i} ({NON_RESOLU})" for i in ids)
+    if feuille.casefold() in _DATES_SEULES and isinstance(valeur, str):
+        return jour_en_lettres(valeur) or valeur
+    return _texte(valeur)
+
+
+def _lignes(
+    lecteur: LecteurModuleo, champs: list[tuple[str, Any]], proposes: bool = True
+) -> list[dict[str, str]]:
+    # `proposes` : les valeurs viennent du modèle, pas de l'élément relu.
+    noms = _resoudre(lecteur, champs)
+    if proposes:
+        _verifier_trouves(champs, noms)
+    return [{"champ": _libelle_complet(champ), "valeur": _en_noms(champ, valeur, noms)} for champ, valeur in champs]
+
+
+def lignes_en_noms(lecteur: LecteurModuleo, parametres: dict[str, Any], corps: Any) -> list[dict[str, str]]:
+    # Paramètres de la route d'abord, puis le corps, dans l'ordre reçu.
+    champs = _aplatir(parametres)
+    if isinstance(corps, dict):
+        champs += _aplatir(corps)
+    elif isinstance(corps, list):
+        champs += [(f"Élément {n}", element) for n, element in enumerate(corps, start=1)]
+    return _lignes(lecteur, champs)
+
+
+def _normal(champ: str, valeur: Any) -> Any:
+    # Ce que compare la différence : vide, nombre, texte sans espaces autour.
+    # Une date compare son jour (`_DATES_SEULES`) ou son instant : le même,
+    # écrit avec ou sans fuseau, ne change rien.
+    if _vide(champ, valeur):
+        return None
+    if isinstance(valeur, bool):
+        return valeur
+    if isinstance(valeur, (int, float)):
+        return float(valeur)
+    if isinstance(valeur, list):
+        return [_normal("", element) for element in valeur]
+    if isinstance(valeur, str):
+        date = (champ.casefold() in _DATES_SEULES and jour_en_lettres(valeur)) or instant(valeur)
+        if date:
+            return date
+    return str(valeur).strip()
+
+
+def _changements(
+    existant: dict[str, Any], corps: dict[str, Any], identites: set[str]
+) -> list[tuple[str, str, Any, Any]]:
+    # (clé du corps, champ aplati, avant, valeur) de chaque champ du corps,
+    # dans son ordre, dont la valeur change l'élément relu.
+    avant = dict(_aplatir(existant, vides=True))
+    return [
+        (cle, champ, avant.get(champ), valeur)
+        for cle in corps
+        for champ, valeur in _aplatir({cle: corps[cle]}, vides=True)
+        if _feuille(champ).casefold() not in identites
+        and _normal(_feuille(champ), avant.get(champ)) != _normal(_feuille(champ), valeur)
+    ]
+
+
+def champs_modifies(existant: dict[str, Any], corps: dict[str, Any], identites: set[str]) -> list[str]:
+    # Clés du corps que la carte annonce : `ProprietesModifiees` d'un PUT
+    # (#251).
+    return list(dict.fromkeys(cle for cle, *_ in _changements(existant, corps, identites)))
+
+
+def differences_en_noms(
+    lecteur: LecteurModuleo, existant: dict[str, Any], corps: dict[str, Any], identites: set[str]
+) -> list[dict[str, str]]:
+    # Champs du corps, dans son ordre, dont la valeur change l'élément relu.
+    changes = [(champ, ancien, nouveau) for _, champ, ancien, nouveau in _changements(existant, corps, identites)]
+    noms = _resoudre(lecteur, [(champ, v) for champ, ancien, nouveau in changes for v in (ancien, nouveau)])
+    _verifier_trouves([(champ, nouveau) for champ, _, nouveau in changes], noms)
+    return [
+        {
+            "champ": _libelle_complet(champ),
+            "avant": _en_noms(champ, ancien, noms),
+            "valeur": _en_noms(champ, nouveau, noms),
+        }
+        for champ, ancien, nouveau in changes
+    ]
+
+
+def _lisible(resoudre: Callable[[], dict]) -> dict:
+    # Un nom illisible (droit, panne) laisse sa ligne de la fiche vide.
+    try:
+        return resoudre()
+    except _ILLISIBLE:
+        return {}
+
+
+def _numeros_affaires(lecteur: LecteurModuleo, id_affaire: Any) -> dict[int, str]:
+    lues = _multi(lecteur, "cogeo/affaire/multi?ids={ids}", [id_affaire] if id_affaire else [])
+    return {a["IdAffaire"]: str(a.get("Numero") or "") for a in lues}
+
+
+def _fiche_temps_passe(lecteur: LecteurModuleo, temps: dict, droits: DroitsModuleo) -> str:
+    noms = NomsTempsPasses(
+        utilisateurs=_lisible(lambda: resoudre_utilisateurs(lecteur, [temps.get("IdUtilisateur")])),
+        affaires=_lisible(lambda: _numeros_affaires(lecteur, temps.get("IdAffaire"))),
+        codes_activite=_lisible(lambda: resoudre_codes_activite(lecteur, [temps.get("IdCodeActivite")])),
+    )
+    return fiche_temps_passe(temps, noms, droits).texte
+
+
+def _fiche_tache(lecteur: LecteurModuleo, tache: dict, droits: DroitsModuleo) -> str:
+    noms = NomsPlanning(
+        participants=_lisible(lambda: resoudre_participants(lecteur, tache.get("Participants") or [])),
+        activites=_lisible(lambda: activites(lecteur)) if tache.get("IdActivite") else {},
+        equipements=_lisible(lambda: resoudre_equipements(lecteur, tache.get("Equipements") or [])),
+        affaires=_lisible(lambda: _numeros_affaires(lecteur, tache.get("IdAffaire"))),
+    )
+    return fiche_tache(tache, noms).texte
+
+
+# Route de relecture → fiche de lecture de l'élément (moduleo/fiches.py).
+_FICHES: dict[str, Callable[[LecteurModuleo, dict, DroitsModuleo], str]] = {
+    "cogeo/tempspasse/multi?ids={ids}": _fiche_temps_passe,
+    "planning/tacheplanning/multi?ids={ids}": _fiche_tache,
+}
+
+
+def element_en_noms(
+    lecteur: LecteurModuleo, route_lue: str, element: dict[str, Any], droits: DroitsModuleo, identites: set[str]
+) -> tuple[str | None, list[dict[str, str]]]:
+    # (fiche, lignes) de l'élément entier : sa fiche de lecture sans l'id
+    # Moduléo, sinon ses champs en noms.
+    if route_lue in _FICHES:
+        return retirer_ids_moduleo(_FICHES[route_lue](lecteur, element, droits)), []
+    champs = [(champ, valeur) for champ, valeur in _aplatir(element) if _feuille(champ).casefold() not in identites]
+    return None, _lignes(lecteur, champs, proposes=False)
+
+
+def fiche_en_noms(
+    lecteur: LecteurModuleo, route_lue: str, element: dict[str, Any], droits: DroitsModuleo, identites: set[str]
+) -> str:
+    # L'élément visé par un PUT (#253), en texte : sa fiche de lecture, sinon
+    # une ligne « Champ : valeur » par champ en noms.
+    fiche, lignes = element_en_noms(lecteur, route_lue, element, droits, identites)
+    return fiche if fiche is not None else "\n".join(f"{ligne['champ']} : {ligne['valeur']}" for ligne in lignes)

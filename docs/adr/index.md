@@ -30,3 +30,4 @@ Ce n’est ni une spec produit, ni un tutoriel. C’est le journal des choix str
 | [0020](./0020-ci-argos-compartimentee.md) | CI ArgOS compartimentée |
 | [0021](./0021-cd-vm-centrale-staging-prod.md) | CD de la VM centrale (staging, prod) |
 | [0022](./0022-poste-application-windows-version-dictee-par-la-vm.md) | Poste en application Windows, version dictée par la VM |
+| [0023](./0023-ecriture-moduleo-confirmee-serveur-de-test.md) | Écriture Moduléo confirmée, serveur de test |

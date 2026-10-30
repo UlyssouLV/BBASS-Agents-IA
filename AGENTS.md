@@ -4,6 +4,8 @@
 
 **« Ouvre la version »** → implement each `ready-for-agent` child (close when tests are green) → human tests (`/th` on the `ready-for-human` child) → **`/code-review`** → **« Finalise la version »** (quality gate, then **`/cqg`** if it is not `OK`). The **parent** spec closes via `Fixes` on the squash. Do **not** leave implemented children Open. Do **not** close the parent from `encadrer-implement`. New repo: **`/init`** / **« Initialise le repo »**.
 
+Version numbers: the roadmap, specs, branches and issues use the **development** number (one series per minor; two series may land on `main` alternately). The Release, `/sante` and the Poste use the **product** number, always increasing, computed at Finalise; no Release when nothing under role **`livrables`** changed. Rule: `docs/dev/feuille-de-route/README.md` (*Numéro de développement et numéro produit*).
+
 - **« Initialise le repo »** (`/init`): skill `initialise-le-repo`
 - **« Ouvre la version »** (must include **`X.Y.Z`**): skill `ouvrir-la-version`
 - Child-ticket TDD: `/implement`, then skill `encadrer-implement`

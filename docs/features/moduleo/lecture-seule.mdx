@@ -1,6 +1,6 @@
-# Lecture seule
+# Lecture seule en production
 
-Moduléo n’a pas de serveur de test : BBASS est branché sur le serveur réel du cabinet. Deux barrières garantissent qu’il n’y modifie rien.
+BBASS est branché sur le serveur réel du cabinet. Deux barrières garantissent qu’il **ne modifie jamais le Moduléo de production**. Depuis la 1.5.2, l’écriture, confirmée par le collaborateur, n’est possible que sur un **serveur Moduléo de test** dédié par Kipaware ([Écrire dans Moduléo](./ecriture.mdx)).
 
 ## 1. La clé d’API, réglée en lecture
 
@@ -8,15 +8,17 @@ Dans Moduléo, chaque clé d’API se règle **par catégorie** (Affaire, Contac
 
 C’est Moduléo qui refuse alors une écriture, quel que soit le logiciel qui utilise la clé.
 
-## 2. Le client de la VM, GET seul
+## 2. Le client de la VM, GET seul en lecture
 
-La VM centrale ne compte pas seulement sur le réglage de la clé : une clé mal cochée, ou réutilisée pour un autre usage, ne doit pas suffire à écrire. Avant tout envoi, son client refuse :
+La VM centrale ne compte pas seulement sur le réglage de la clé : une clé mal cochée, ou réutilisée pour un autre usage, ne doit pas suffire à écrire. Avant tout envoi, la lecture de son client (`lire()`) refuse :
 
 - toute méthode autre que GET (POST, PUT, DELETE…) ;
 - toute route absente de la table des routes GET connues ;
 - un paramètre que la route ne prévoit pas, ou un paramètre de chemin manquant.
 
 Une requête refusée ne part pas : Moduléo ne la voit jamais.
+
+L’écriture (`ecrire()`, 1.5.2) est un chemin à part : elle ne part qu’avec `MODULEO_ECRITURE` actif **et** une `MODULEO_URL` de la liste versionnée des serveurs de test, où le serveur du cabinet ne figure jamais. Sur la production, l’écriture est impossible même avec un réglage erroné.
 
 ## Les routes connues
 
@@ -40,4 +42,4 @@ Le script retélécharge le WADL et la page (publics, sans clé), régénère la
 
 ## Plus tard
 
-Toute écriture dans Moduléo passera par une nouvelle décision, une clé d’API qui coche l’écriture sur les seules catégories utiles, et un serveur Moduléo de test.
+Toute écriture dans le Moduléo de production passera par une nouvelle décision et une clé d’API qui coche l’écriture sur les seules catégories utiles.

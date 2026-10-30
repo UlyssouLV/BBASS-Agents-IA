@@ -11,12 +11,23 @@
         "command": "sh .cursor/hooks/bloque-ecriture-moduleo.sh",
         "matcher": "Write|StrReplace",
         "failClosed": false
+      },
+      {
+        "command": "sh .cursor/hooks/bloque-up-ecarts-pack.sh",
+        "matcher": "Skill",
+        "failClosed": false
       }
     ],
     "subagentStart": [
       {
         "command": "sh .cursor/hooks/gate-code-review.sh",
         "failClosed": true
+      }
+    ],
+    "beforeShellExecution": [
+      {
+        "command": "sh .cursor/hooks/bloque-up-ecarts-pack.sh",
+        "failClosed": false
       }
     ]
   }

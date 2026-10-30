@@ -5,6 +5,10 @@ __pycache__/
 *.egg-info/
 *.db
 .env
+# Cibles de dev (vm-centrale/src/vm_centrale/cibles_dev.py) : clés chiffrées.
+.env.test
+.env.cabinet
+.env.avant-cibles
 .coverage
 .coverage.*
 coverage-*.xml

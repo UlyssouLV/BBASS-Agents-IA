@@ -2,7 +2,12 @@ from datetime import datetime
 from typing import Any
 
 from vm_centrale.moduleo.client import ModuleoIntrouvable
-from vm_centrale.moduleo.routes import ROUTES_GET
+from vm_centrale.moduleo.routes import ROUTES_ECRITURE, ROUTES_GET
+
+# Le faux se présente comme le serveur Moduléo de test de Kipaware (liste
+# versionnée, moduleo/serveurs_test.json) : une écriture n'y part qu'avec
+# MODULEO_ECRITURE actif (spec 1.5.2, #202).
+URL_SERVEUR_DE_TEST = "https://mwa-kpw-api.kipaware.fr/api"
 
 # Faux Moduléo (spec 1.5.0) : injecté à la place de ClientModuleo
 # (dependency get_client_moduleo), aucun test ne sort sur le réseau. Mêmes
@@ -29,9 +34,14 @@ _FICHES_COORDONNEES = {fiche: (parametre, cle) for fiche, parametre, cle in _COO
 
 
 class FauxModuleo:
-    def __init__(self) -> None:
+    def __init__(self, url: str = URL_SERVEUR_DE_TEST) -> None:
+        self.url = url
         # (route, paramètres) de chaque lecture, dans l'ordre.
         self.appels: list[tuple[str, dict[str, Any]]] = []
+        # (méthode, route, paramètres, corps) de chaque écriture reçue (#202),
+        # et ce que le faux renvoie à chacune.
+        self.ecritures: list[tuple[str, str, dict[str, Any], Any]] = []
+        self.reponse_ecriture: Any = None
         self._affaires: dict[int, dict] = {}
         self._intervenants: dict[int, dict] = {}
         self._utilisateurs: dict[int, dict] = {}
@@ -64,12 +74,44 @@ class FauxModuleo:
         # Parcelles d'affaire et leurs propriétaires (#193).
         self._parcelles: dict[int, dict] = {}
         self._proprietaires: dict[int, dict] = {}
+        # Notes, relues avant leur modification ou suppression (#208).
+        self._notes: dict[int, dict] = {}
+        self._enveloppes: dict[int, dict] = {}
+        # Personnes, relues avant leur modification (#260).
+        self._personnes: dict[int, dict] = {}
+        # Catégories lues seulement par id (#254) : `null`, et non 404,
+        # pour un id inconnu, comme Moduléo.
+        self._categories_tache: dict[int, dict] = {}
+        self._categories_note: dict[int, dict] = {}
         self._filtre_utilisateurs = True
         self._exception: Exception | None = None
 
     def echouer(self, exception: Exception) -> None:
-        # Toute lecture suivante lève `exception` (panne, refus).
+        # Toute lecture ou écriture suivante lève `exception` (panne, refus).
         self._exception = exception
+
+    def ecrire(self, methode: str, route: str, parametres: dict[str, Any], corps: Any) -> Any:
+        # Accepte toute écriture d'une route du WADL, sans rien changer aux
+        # données lues, sauf le PUT d'une note (#251).
+        assert (methode, route) in ROUTES_ECRITURE, (methode, route)
+        self.ecritures.append((methode, route, parametres, corps))
+        if self._exception is not None:
+            raise self._exception
+        if (methode, route) == ("PUT", "cogeo/note/{idNote}") and parametres["idNote"] in self._notes:
+            self._modifier(self._notes[parametres["idNote"]], corps)
+        return self.reponse_ecriture
+
+    @staticmethod
+    def _modifier(element: dict, corps: dict) -> None:
+        # PUT de Moduléo, relevé sur le serveur de test (#251) : avec
+        # `ProprietesModifiees`, seuls les champs listés changent ; sans, un
+        # champ absent du corps est remis à vide.
+        listes = corps.get("ProprietesModifiees")
+        for champ in listes if listes is not None else [c for c in element if c != "IdNote"]:
+            element[champ] = corps.get(champ)
+
+    def note(self, id_note: int) -> dict:
+        return dict(self._notes[id_note])
 
     def ajouter_affaire(self, id_affaire: int, numero: str, objet: str = "", **champs: Any) -> None:
         # `champs` : les autres clés de l'affaire, au nom du JSON Moduléo
@@ -367,6 +409,29 @@ class FauxModuleo:
             "CodeComptabilite": code_comptabilite,
         }
 
+    def ajouter_note(self, id_note: int, message: str, **champs: Any) -> None:
+        # Champs de la réponse de GET cogeo/note/{idNote} (WADL) : IdContact,
+        # IdAffaire, TypeNote, IdCategorieNote…
+        self._notes[id_note] = {"IdNote": id_note, "Message": message, **champs}
+
+    def ajouter_enveloppe(self, id_enveloppe: int, id_affaire: int, montant: float) -> None:
+        self._enveloppes[id_enveloppe] = {
+            "IdEnveloppePrevisionnelle": id_enveloppe,
+            "IdAffaire": id_affaire,
+            "Montant": montant,
+        }
+
+    def ajouter_personne(self, id_personne: int, nom: str, **champs: Any) -> None:
+        # Réponse de GET cogeo/contact/personne/{idContact} : Nom, Prenom,
+        # Commentaire…
+        self._personnes[id_personne] = {"IdContact": id_personne, "Nom": nom, **champs}
+
+    def ajouter_categorie_tache_a_faire(self, id_categorie: int, libelle: str) -> None:
+        self._categories_tache[id_categorie] = {"IdCategorieTacheAFaire": id_categorie, "Libelle": libelle}
+
+    def ajouter_categorie_note(self, id_categorie: int, libelle: str) -> None:
+        self._categories_note[id_categorie] = {"IdCategorieNote": id_categorie, "Libelle": libelle}
+
     def ajouter_qualification(self, id_qualification: int, libelle: str) -> None:
         self._qualifications[id_qualification] = libelle
 
@@ -390,7 +455,7 @@ class FauxModuleo:
         self._affaires_contact.setdefault(id_contact, {}).setdefault(role, []).append(id_affaire)
 
     def _ajouter_coordonnee(self, cle: str, id_coordonnee: int, id_contact: int, fiche: dict) -> None:
-        self._coordonnees[cle][id_coordonnee] = fiche
+        self._coordonnees[cle][id_coordonnee] = {**fiche, "IdContact": id_contact}
         self._coordonnees_contact.setdefault(id_contact, {}).setdefault(cle, []).append(id_coordonnee)
 
     def ajouter_commune(self, id_commune: int, nom: str, code_postal: str) -> None:
@@ -469,6 +534,22 @@ class FauxModuleo:
             if parametres["idProprietaire"] not in self._proprietaires:
                 raise ModuleoIntrouvable(f"404 sur {route}")
             return self._proprietaires[parametres["idProprietaire"]]
+        if route == "cogeo/note/{idNote}":
+            if parametres["idNote"] not in self._notes:
+                raise ModuleoIntrouvable(f"404 sur {route}")
+            return self._notes[parametres["idNote"]]
+        if route == "cogeo/enveloppe/{idEnveloppePrevisionnelle}":
+            if parametres["idEnveloppePrevisionnelle"] not in self._enveloppes:
+                raise ModuleoIntrouvable(f"404 sur {route}")
+            return self._enveloppes[parametres["idEnveloppePrevisionnelle"]]
+        if route == "cogeo/contact/personne/{idContact}":
+            if parametres["idContact"] not in self._personnes:
+                raise ModuleoIntrouvable(f"404 sur {route}")
+            return self._personnes[parametres["idContact"]]
+        if route == "moduleo/categorietacheafaire/{idCategorieTacheAFaire}":
+            return self._categories_tache.get(parametres["idCategorieTacheAFaire"])
+        if route == "cogeo/categorienote/{idCategorieNote}":
+            return self._categories_note.get(parametres["idCategorieNote"])
         if route == "cogeo/intervenant/multi?ids={ids}":
             return [self._intervenants[i] for i in _ids(parametres) if i in self._intervenants]
         if route == "moduleo/utilisateur/{idUtilisateur}":

@@ -303,3 +303,19 @@ def resoudre_equipements(lecteur: LecteurModuleo, ids: Iterable[int | None]) -> 
         id_equipement: _texte(fiche.get("Libelle"))
         for id_equipement, fiche in _lire_chacun(lecteur, "moduleo/equipement/{idEquipement}", "idEquipement", ids).items()
     }
+
+
+# Champs dont l'élément ne se lit que par son id (#254) : pas de route de
+# liste ni de recherche par nom chez Kipaware. Le modèle ne peut pas
+# retrouver leur id à partir d'un nom (→ serveur MCP Moduléo, Plus tard).
+IDS_SANS_RECHERCHE_PAR_NOM = frozenset({"idcategorietacheafaire", "idcategorienote"})
+
+
+def resoudre_libelles(lecteur: LecteurModuleo, route: str, parametre: str, ids: Iterable[int | None]) -> dict[int, str]:
+    # Élément lu par son id (catégorie, site, service… #254) : son libellé,
+    # ou son nom ; vide si la fiche n'a ni l'un ni l'autre. Un id que
+    # Moduléo ne trouve pas (404 ou `null`) est absent.
+    return {
+        id_element: _texte(fiche.get("Libelle")) or _texte(fiche.get("Nom"))
+        for id_element, fiche in _lire_chacun(lecteur, route, parametre, ids).items()
+    }

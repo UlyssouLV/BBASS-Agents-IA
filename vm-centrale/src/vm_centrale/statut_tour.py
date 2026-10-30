@@ -22,12 +22,19 @@ TITRAGE = "Titre de la conversation…"
 ATTENTE = "En attente de la réponse en cours dans une autre conversation…"
 
 Publier = Callable[[str], None]
+# Carte de confirmation d'une écriture Moduléo proposée pendant le tour
+# (spec 1.5.2, #204) : événement `carte`, sans attendre la fin du tour.
+PublierCarte = Callable[[dict], None]
 
 logger = logging.getLogger(__name__)
 
 
 def ne_rien_publier(libelle: str) -> None:
     # Émetteur d'un outil appelé hors d'un tour en flux (tests, scripts).
+    pass
+
+
+def ne_rien_publier_carte(carte: dict) -> None:
     pass
 
 
@@ -77,7 +84,7 @@ def flux_de_la_fin(resultat: BaseModel) -> StreamingResponse:
     return _reponse_en_flux(iter([_fin(resultat)]))
 
 
-def lancer_tour(executer: Callable[[Publier], BaseModel]) -> StreamingResponse:
+def lancer_tour(executer: Callable[[Publier, PublierCarte], BaseModel]) -> StreamingResponse:
     # Une HTTPException levée pendant le tour devient un événement `erreur`
     # avec le même code et le même détail qu'avant le flux.
     file: queue.SimpleQueue[str | None] = queue.SimpleQueue()
@@ -85,9 +92,12 @@ def lancer_tour(executer: Callable[[Publier], BaseModel]) -> StreamingResponse:
     def publier(libelle: str) -> None:
         file.put(_evenement("statut", {"libelle": libelle}))
 
+    def publier_carte(carte: dict) -> None:
+        file.put(_evenement("carte", carte))
+
     def tour() -> None:
         try:
-            file.put(_fin(executer(publier)))
+            file.put(_fin(executer(publier, publier_carte)))
         except HTTPException as erreur:
             file.put(_evenement("erreur", {"status": erreur.status_code, "detail": erreur.detail}))
         except Exception:

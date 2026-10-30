@@ -23,6 +23,16 @@
             "statusMessage": "Refuse une écriture HTTP vers Moduléo"
           }
         ]
+      },
+      {
+        "matcher": "Skill|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && { python3 -c \"\" </dev/null >/dev/null 2>&1 && exec python3 .claude/hooks/bloque-up-ecarts-pack.py; exec py -3 .claude/hooks/bloque-up-ecarts-pack.py; }",
+            "statusMessage": "Refuse /up tant qu'un écart avec le pack est à reporter"
+          }
+        ]
       }
     ]
   }

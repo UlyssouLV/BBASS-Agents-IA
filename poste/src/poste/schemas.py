@@ -1,5 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -50,6 +51,30 @@ class ConversationResponse(BaseModel):
     date_derniere_activite: datetime
 
 
+class LigneCarteEcritureResponse(BaseModel):
+    champ: str
+    valeur: str
+    avant: str | None = None
+
+
+class CarteEcritureResponse(BaseModel):
+    # Carte de confirmation Moduléo (spec 1.5.2, #204), relayée de la VM
+    # centrale : voir vm_centrale.schemas.CarteEcriture.
+    id: int
+    statut: str
+    methode: str
+    route: str
+    titre: str
+    lignes: list[LigneCarteEcritureResponse]
+    rubrique: str | None = None
+    fiche: str | None = None
+    message: str | None
+
+
+class DecisionEcritureRequest(BaseModel):
+    decision: Literal["confirmer", "annuler"]
+
+
 class MessageResponse(BaseModel):
     id: int
     role: str
@@ -59,6 +84,7 @@ class MessageResponse(BaseModel):
     # n'est jamais codée en dur dans le poste.
     tokens_contexte: int | None
     fenetre_contexte: int
+    cartes: list[CarteEcritureResponse] = []
 
 
 class ConversationDetailResponse(BaseModel):

@@ -230,7 +230,7 @@ def test_akerys_trouve_comme_societe_est_affiche_societe(
     )
 
     fiche = _contenu_outil(mistral_client_factice)
-    assert fiche.startswith("Contact AKERYS PROMOTION\nType : Société")
+    assert fiche.startswith("Contact AKERYS PROMOTION [id Moduléo 50]\nType : Société")
     assert "AKERYS Mairie" not in fiche
 
 

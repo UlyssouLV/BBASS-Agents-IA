@@ -96,3 +96,28 @@ def test_echec_ocr_leve_erreur_appel_mistral_avec_le_payload_mais_sans_la_cle(mo
 
     assert "Authorization" not in exc_info.value.payload_envoye
     assert _CLE_API not in str(exc_info.value.payload_envoye)
+
+
+def test_chat_borne_envoie_max_tokens_et_le_delai_de_l_appel(monkeypatch):
+    # Relance imposée bornée (#258).
+    appels_post = []
+
+    def _post_factice(url, headers, json, **options):
+        appels_post.append((json, options))
+        return _ReponseHttpFactice(
+            {
+                "choices": [{"message": {"content": "Réponse"}}],
+                "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+            }
+        )
+
+    monkeypatch.setattr(mistral_client_module._http_client, "post", _post_factice)
+
+    MistralClient().chat("Bonjour", max_tokens=1024, timeout=20.0)
+    MistralClient().chat("Bonjour")
+
+    (borne, options_borne), (libre, options_libre) = appels_post
+    assert borne["max_tokens"] == 1024
+    assert options_borne == {"timeout": 20.0}
+    assert "max_tokens" not in libre
+    assert options_libre == {}
